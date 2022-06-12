@@ -13,8 +13,8 @@ import { restClient, gtxClient, util } from "postchain-client"
 import { hexZeroPad, keccak256 } from "ethers/lib/utils";
 import { intToHex } from "ethjs-util";
 
-const postchainURL = process.env.REACT_APP_POSTCHAIN_URL
-const blockchainRID = process.env.REACT_APP_POSTCHAIN_BRID
+const postchainURL = process.env.REACT_APP_POSTCHAIN_URL || ""
+const blockchainRID = process.env.REACT_APP_POSTCHAIN_BRID || ""
 const rest = restClient.createRestClient(postchainURL, blockchainRID, 5);
 const client = gtxClient.createClient(
     rest,
