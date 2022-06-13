@@ -57,9 +57,6 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
     // Each postchain event will be used to claim only one time.
     mapping (bytes32 => bool) private _events;
 
-    // Each account state snapshot will be used to claim only one time.
-    mapping (bytes32 => bool) private _snapshots;
-
     enum Status {
         Pending,
         Withdrawable,
