@@ -1,6 +1,5 @@
 package net.postchain.eif
 
-import net.postchain.base.BlockchainRidFactory
 import net.postchain.base.gtv.BlockHeaderData
 import net.postchain.base.gtv.BlockHeaderDataFactory
 import net.postchain.base.snapshot.SimpleDigestSystem
@@ -13,14 +12,14 @@ import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
 import net.postchain.core.Transaction
 import net.postchain.crypto.Secp256K1CryptoSystem
+import net.postchain.crypto.devtools.KeyPairHelper
 import net.postchain.devtools.IntegrationTestSetup
-import net.postchain.devtools.KeyPairHelper
 import net.postchain.devtools.PostchainTestNode
 import net.postchain.eif.merkle.MerkleTestUtil.getMerkleProof
 import net.postchain.gtv.*
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.merkle.GtvMerkleHashCalculator
-import net.postchain.gtx.GTXDataBuilder
+import net.postchain.gtx.data.GTXDataBuilder
 import java.math.BigInteger
 import java.security.MessageDigest
 import kotlin.test.Test
@@ -265,7 +264,7 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
         assertEquals(root.toHex(), eifStateRoot!!.toHex())
 
         val eventAndStateData = GtvDictionary.build(mapOf(EIF to GtvByteArray(EMPTY_HASH + eifStateRoot)))
-        val eventAndStateDataHash = eventAndStateData.merkleHash(GtvMerkleHashCalculator(BlockchainRidFactory.cryptoSystem))
+        val eventAndStateDataHash = eventAndStateData.merkleHash(GtvMerkleHashCalculator(Secp256K1CryptoSystem()))
         // Verify account state merkle proof
         for (pos in 0..15) {
             val args = gtv(
@@ -319,7 +318,7 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
         assertEquals(root2.toHex(), eifStateRoot2!!.toHex())
 
         val eventAndStateData2 = GtvDictionary.build(mapOf(EIF to GtvByteArray(EMPTY_HASH + eifStateRoot2)))
-        val eventAndStateDataHash2 = eventAndStateData2.merkleHash(GtvMerkleHashCalculator(BlockchainRidFactory.cryptoSystem))
+        val eventAndStateDataHash2 = eventAndStateData2.merkleHash(GtvMerkleHashCalculator(Secp256K1CryptoSystem()))
         // Verify account state merkle proof
         for (pos in 0..16) {
             val args = gtv(
@@ -439,7 +438,7 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
         assertEquals(eventRootHash.toHex(), eifRootEvent!!.toHex())
 
         val eventAndStateData = GtvDictionary.build(mapOf(EIF to GtvByteArray(eifRootEvent + eifRootState)))
-        val eventAndStateDataHash = eventAndStateData.merkleHash(GtvMerkleHashCalculator(BlockchainRidFactory.cryptoSystem))
+        val eventAndStateDataHash = eventAndStateData.merkleHash(GtvMerkleHashCalculator(Secp256K1CryptoSystem()))
         // Verify event merkle proof
         for (pos in 0..3) {
             val args = gtv(

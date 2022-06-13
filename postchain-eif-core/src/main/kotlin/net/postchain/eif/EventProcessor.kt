@@ -7,7 +7,7 @@ import net.postchain.common.hexStringToByteArray
 import net.postchain.core.framework.AbstractBlockchainProcess
 import net.postchain.gtv.*
 import net.postchain.gtv.GtvFactory.gtv
-import net.postchain.gtx.OpData
+import net.postchain.gtx.data.OpData
 import org.web3j.abi.EventEncoder
 import org.web3j.abi.datatypes.Event
 import org.web3j.protocol.Web3j

@@ -21,8 +21,8 @@ import net.postchain.gtv.merkle.MerkleBasics
 import net.postchain.gtv.merkle.path.GtvPath
 import net.postchain.gtv.merkle.path.GtvPathFactory
 import net.postchain.gtv.merkle.path.GtvPathSet
-import net.postchain.gtx.GTXSpecialTxExtension
 import net.postchain.gtx.SimpleGTXModule
+import net.postchain.gtx.special.GTXSpecialTxExtension
 import org.spongycastle.jce.provider.BouncyCastleProvider
 import java.security.MessageDigest
 import java.security.Security
@@ -126,7 +126,7 @@ private fun blockHeaderData(
     ctx: EContext,
     blockHeight: Long
 ): Gtv {
-    val merkleHashCalculator = GtvMerkleHashCalculator(BlockchainRidFactory.cryptoSystem)
+    val merkleHashCalculator = GtvMerkleHashCalculator(Secp256K1CryptoSystem())
     val blockRid = db.getBlockRID(ctx, blockHeight) ?: return GtvNull
     val bh = BaseBlockHeader(db.getBlockHeader(ctx, blockRid), Secp256K1CryptoSystem()).blockHeaderRec
     return gtv(

@@ -5,13 +5,13 @@ import assertk.assertions.*
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import net.postchain.common.toHex
-import net.postchain.core.BlockQueries
 import net.postchain.core.BlockchainEngine
+import net.postchain.core.block.BlockQueries
 import net.postchain.eif.contracts.TestToken
 import net.postchain.eif.contracts.TokenBridge
 import net.postchain.gtv.*
 import net.postchain.gtv.GtvFactory.gtv
-import net.postchain.gtx.OpData
+import net.postchain.gtx.data.OpData
 import nl.komponents.kovenant.Promise
 import org.awaitility.Awaitility
 import org.awaitility.Duration
