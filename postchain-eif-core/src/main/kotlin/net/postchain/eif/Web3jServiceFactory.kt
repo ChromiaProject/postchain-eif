@@ -14,7 +14,7 @@ object Web3jServiceFactory {
             HttpService(createOkHttpClient(eifConfig))
         } else if (eifConfig.url.startsWith("http")) {
             HttpService(eifConfig.url, createOkHttpClient(eifConfig), false)
-        } else if (System.getProperty("os.name").toLowerCase().startsWith("win")) {
+        } else if (System.getProperty("os.name").lowercase().startsWith("win")) {
             WindowsIpcService(eifConfig.url)
         } else {
             UnixIpcService(eifConfig.url)
