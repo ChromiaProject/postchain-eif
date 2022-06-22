@@ -75,17 +75,17 @@ class NoOpEventProcessor : EventProcessor {
     }
 
     private fun isValidEthereumEventFormat(opArgs: Array<out Gtv>) = opArgs.size == 7 &&
-            opArgs[EncodedEvent.TX_HASH.index].asPrimitive() is ByteArray &&
-            opArgs[EncodedEvent.LOG_INDEX.index].asPrimitive() is BigInteger &&
-            opArgs[EncodedEvent.SIGNATURE.index].asPrimitive() is ByteArray &&
-            opArgs[EncodedEvent.CONTRACT.index].asPrimitive() is ByteArray &&
-            opArgs[EncodedEvent.NAME.index].asPrimitive() is String &&
-            opArgs[EncodedEvent.INDEXED_VALUES.index].asPrimitive() is Array<*> &&
-            opArgs[EncodedEvent.NON_INDEXED_VALUES.index].asPrimitive() is Array<*>
+            opArgs[EncodedEvent.TX_HASH.index] is GtvByteArray &&
+            opArgs[EncodedEvent.LOG_INDEX.index] is GtvBigInteger &&
+            opArgs[EncodedEvent.SIGNATURE.index] is GtvByteArray &&
+            opArgs[EncodedEvent.CONTRACT.index] is GtvByteArray &&
+            opArgs[EncodedEvent.NAME.index] is GtvString &&
+            opArgs[EncodedEvent.INDEXED_VALUES.index] is GtvArray &&
+            opArgs[EncodedEvent.NON_INDEXED_VALUES.index] is GtvArray
 
     private fun isValidEthereumBlockFormat(opArgs: Array<Gtv>) = opArgs.size == 3 &&
-            opArgs[EncodedBlock.NUMBER.index].asPrimitive() is BigInteger &&
-            opArgs[EncodedBlock.HASH.index].asPrimitive() is ByteArray &&
+            opArgs[EncodedBlock.NUMBER.index] is GtvBigInteger &&
+            opArgs[EncodedBlock.HASH.index] is GtvByteArray &&
             opArgs[EncodedBlock.EVENTS.index].asArray().all { isValidEthereumEventFormat(it.asArray()) }
 }
 
