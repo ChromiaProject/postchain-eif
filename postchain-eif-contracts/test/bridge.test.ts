@@ -18,10 +18,11 @@ describe("Token Bridge Test", () => {
     let admin: SignerWithAddress;
     let validator1: SignerWithAddress;
     let validator2: SignerWithAddress;
+    let validator3: SignerWithAddress;
 
     beforeEach(async () => {
         const [deployer] = await ethers.getSigners()
-        ;[admin, validator1, validator2] = await ethers.getSigners()
+        ;[admin, validator1, validator2, validator3] = await ethers.getSigners()
         const tokenFactory = new TestToken__factory(deployer)
         const tokenContract = await tokenFactory.deploy()
         tokenAddress = tokenContract.address
@@ -240,6 +241,7 @@ describe("Token Bridge Test", () => {
             expect(await tokenInstance.totalSupply()).to.eq(toMint)
 
             const bridge = new TokenBridge__factory(user).attach(bridgeAddress)
+            const bridgeAdmin = new TokenBridge__factory(admin).attach(bridgeAddress)
             const toDeposit = ethers.utils.parseEther("100")
             const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
@@ -320,8 +322,15 @@ describe("Token Bridge Test", () => {
                                     extraDataMerkleRoot
                 )
 
+                // update to add new validator at height of 30
+                await bridgeAdmin.addValidator(30, validator1.address)
+                await bridgeAdmin.addValidator(30, validator2.address)
+                await bridgeAdmin.addValidator(30, validator3.address)
+
                 let sig1 = await validator1.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
                 let sig2 = await validator2.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
+                let sig3 = await validator3.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
+
                 let merkleProof = [
                                     DecodeHexStringToByteArray("0000000000000000000000000000000000000000000000000000000000000000"), 
                                     DecodeHexStringToByteArray("0000000000000000000000000000000000000000000000000000000000000000")
@@ -368,59 +377,35 @@ describe("Token Bridge Test", () => {
                         DecodeHexStringToByteArray("0000000000000000000000000000000000000000000000000000000000000000"), 
                         DecodeHexStringToByteArray("0000000000000000000000000000000000000000000000000000000000000000")                        
                     ],
-                }
+                };
+                let sigs = [
+                    DecodeHexStringToByteArray(sig1.substring(2, sig1.length)),
+                    DecodeHexStringToByteArray(sig3.substring(2, sig2.length)),
+                    DecodeHexStringToByteArray(sig2.substring(2, sig2.length))
+                ];
+                let validators = [validator1.address, validator3.address, validator2.address];
                 await expect(bridge.withdrawRequest(maliciousData, eventProof,
-                    DecodeHexStringToByteArray(blockHeader),
-                    [
-                        DecodeHexStringToByteArray(sig1.substring(2, sig1.length)), 
-                        DecodeHexStringToByteArray(sig2.substring(2, sig2.length))
-                    ], 
-                    [validator1.address, validator2.address],
+                    DecodeHexStringToByteArray(blockHeader), sigs, validators, 
                     extraProof)
                 ).to.be.revertedWith('Postchain: invalid event')
-                await expect(bridge.withdrawRequest(data, eventProof,
-                    DecodeHexStringToByteArray(blockHeader),
-                    [
-                        DecodeHexStringToByteArray(sig1.substring(2, sig1.length)), 
-                        DecodeHexStringToByteArray(sig2.substring(2, sig2.length))
-                    ], 
-                    [validator1.address, validator2.address],
+                await expect(bridge.withdrawRequest(data, eventProof, 
+                    DecodeHexStringToByteArray(blockHeader), sigs, validators, 
                     invalidExtraLeaf)
                 ).to.be.revertedWith('Postchain: invalid EIF extra data')
                 await expect(bridge.withdrawRequest(data, eventProof,
-                    DecodeHexStringToByteArray(blockHeader),
-                    [
-                        DecodeHexStringToByteArray(sig1.substring(2, sig1.length)), 
-                        DecodeHexStringToByteArray(sig2.substring(2, sig2.length))
-                    ], 
-                    [validator1.address, validator2.address],
+                    DecodeHexStringToByteArray(blockHeader), sigs, validators, 
                     invalidExtraDataRoot)
                 ).to.be.revertedWith('Postchain: invalid extra data root')
                 await expect(bridge.withdrawRequest(data, eventProof,
-                    DecodeHexStringToByteArray(maliciousBlockHeader),
-                    [
-                        DecodeHexStringToByteArray(sig1.substring(2, sig1.length)), 
-                        DecodeHexStringToByteArray(sig2.substring(2, sig2.length))
-                    ], 
-                    [validator1.address, validator2.address],
+                    DecodeHexStringToByteArray(maliciousBlockHeader), sigs, validators,
                     extraProof)
                 ).to.be.revertedWith('Postchain: invalid block header')
                 await expect(bridge.withdrawRequest(data, eventProof,
-                    DecodeHexStringToByteArray(blockHeader),
-                    [
-                        DecodeHexStringToByteArray(sig1.substring(2, sig1.length)), 
-                        DecodeHexStringToByteArray(sig2.substring(2, sig2.length))
-                    ], 
-                    [validator1.address, validator2.address],
+                    DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     maliciousEl2Proof)
                 ).to.be.revertedWith('Postchain: invalid EIF extra merkle proof')
                 await expect(bridge.withdrawRequest(data, maliciousEventProof,
-                    DecodeHexStringToByteArray(blockHeader),
-                    [
-                        DecodeHexStringToByteArray(sig1.substring(2, sig1.length)), 
-                        DecodeHexStringToByteArray(sig2.substring(2, sig2.length))
-                    ], 
-                    [validator1.address, validator2.address],
+                    DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     extraProof)
                 ).to.be.revertedWith('TokenBridge: invalid merkle proof')
                 await expect(bridge.withdrawRequest(data, eventProof,
@@ -456,23 +441,13 @@ describe("Token Bridge Test", () => {
                     extraProof)
                 ).to.be.revertedWith('TokenBridge: signer is not validator')
                 await expect(bridge.withdrawRequest(data, eventProof,
-                    DecodeHexStringToByteArray(blockHeader),
-                    [
-                        DecodeHexStringToByteArray(sig1.substring(2, sig1.length)), 
-                        DecodeHexStringToByteArray(sig2.substring(2, sig2.length))
-                    ], 
-                    [validator1.address, validator2.address],
+                    DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     extraProof)
                 ).to.emit(bridge, "WithdrawRequest")
                 .withArgs(user.address, tokenAddress, toDeposit)
 
                 await expect(bridge.withdrawRequest(data, eventProof,
-                    DecodeHexStringToByteArray(blockHeader),
-                    [
-                        DecodeHexStringToByteArray(sig1.substring(2, sig1.length)), 
-                        DecodeHexStringToByteArray(sig2.substring(2, sig2.length))
-                    ], 
-                    [validator1.address, validator2.address],
+                    DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     extraProof)
                 ).to.be.revertedWith('TokenBridge: event hash was already used')
 
