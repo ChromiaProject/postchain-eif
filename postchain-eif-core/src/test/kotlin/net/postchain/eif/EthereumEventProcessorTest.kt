@@ -5,13 +5,13 @@ import assertk.assertions.*
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import net.postchain.common.toHex
-import net.postchain.core.BlockQueries
 import net.postchain.core.BlockchainEngine
+import net.postchain.core.block.BlockQueries
 import net.postchain.eif.contracts.TestToken
 import net.postchain.eif.contracts.TokenBridge
 import net.postchain.gtv.*
 import net.postchain.gtv.GtvFactory.gtv
-import net.postchain.gtx.OpData
+import net.postchain.gtx.data.OpData
 import nl.komponents.kovenant.Promise
 import org.awaitility.Awaitility
 import org.awaitility.Duration
@@ -232,8 +232,8 @@ class EthereumEventProcessorTest {
                     val eventBlocks = ethereumEventProcessor.getEventData()
                     val events = eventBlocks.flatMap { it[EncodedBlock.EVENTS.index].asArray().asList() }
                     assert(events.size == 2).isTrue()
-                    val eventContractAddresses = events.map { "0x${it[EncodedEvent.CONTRACT.index].asByteArray().toHex()}".toLowerCase() }
-                    assert(eventContractAddresses).containsExactly(*contractAddresses.map(String::toLowerCase).toTypedArray())
+                    val eventContractAddresses = events.map { "0x${it[EncodedEvent.CONTRACT.index].asByteArray().toHex()}".lowercase() }
+                    assert(eventContractAddresses).containsExactly(*contractAddresses.map(String::lowercase).toTypedArray())
                 }
 
         ethereumEventProcessor.shutdown()

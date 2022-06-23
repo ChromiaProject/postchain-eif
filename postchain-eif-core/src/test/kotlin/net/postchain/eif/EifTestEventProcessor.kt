@@ -6,7 +6,7 @@ import net.postchain.common.toHex
 import net.postchain.eif.contracts.TokenBridge
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvFactory.gtv
-import net.postchain.gtx.OpData
+import net.postchain.gtx.data.OpData
 import org.web3j.abi.EventEncoder
 import java.math.BigInteger
 import java.security.MessageDigest

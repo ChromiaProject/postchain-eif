@@ -5,7 +5,7 @@
 
     <groupId>net.postchain</groupId>
     <artifactId>postchain-eif</artifactId>
-    <version>3.4.2-SNAPSHOT</version>
+    <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <modules>
         <module>postchain-eif-contracts</module>
@@ -17,8 +17,7 @@
     <description>Postchain EIF. Ethereum Integration Framework</description>
 
     <properties>
-        <postchain.version>${project.version}</postchain.version>
-        <rell.version>0.10.8-SNAPSHOT</rell.version>
+        <postchain.version>3.6.0-SNAPSHOT</postchain.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>

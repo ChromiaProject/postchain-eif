@@ -7,7 +7,7 @@ import net.postchain.common.hexStringToByteArray
 import net.postchain.core.framework.AbstractBlockchainProcess
 import net.postchain.gtv.*
 import net.postchain.gtv.GtvFactory.gtv
-import net.postchain.gtx.OpData
+import net.postchain.gtx.data.OpData
 import org.web3j.abi.EventEncoder
 import org.web3j.abi.datatypes.Event
 import org.web3j.protocol.Web3j
@@ -75,17 +75,17 @@ class NoOpEventProcessor : EventProcessor {
     }
 
     private fun isValidEthereumEventFormat(opArgs: Array<out Gtv>) = opArgs.size == 7 &&
-            opArgs[EncodedEvent.TX_HASH.index].asPrimitive() is ByteArray &&
-            opArgs[EncodedEvent.LOG_INDEX.index].asPrimitive() is BigInteger &&
-            opArgs[EncodedEvent.SIGNATURE.index].asPrimitive() is ByteArray &&
-            opArgs[EncodedEvent.CONTRACT.index].asPrimitive() is ByteArray &&
-            opArgs[EncodedEvent.NAME.index].asPrimitive() is String &&
-            opArgs[EncodedEvent.INDEXED_VALUES.index].asPrimitive() is Array<*> &&
-            opArgs[EncodedEvent.NON_INDEXED_VALUES.index].asPrimitive() is Array<*>
+            opArgs[EncodedEvent.TX_HASH.index] is GtvByteArray &&
+            opArgs[EncodedEvent.LOG_INDEX.index] is GtvBigInteger &&
+            opArgs[EncodedEvent.SIGNATURE.index] is GtvByteArray &&
+            opArgs[EncodedEvent.CONTRACT.index] is GtvByteArray &&
+            opArgs[EncodedEvent.NAME.index] is GtvString &&
+            opArgs[EncodedEvent.INDEXED_VALUES.index] is GtvArray &&
+            opArgs[EncodedEvent.NON_INDEXED_VALUES.index] is GtvArray
 
     private fun isValidEthereumBlockFormat(opArgs: Array<Gtv>) = opArgs.size == 3 &&
-            opArgs[EncodedBlock.NUMBER.index].asPrimitive() is BigInteger &&
-            opArgs[EncodedBlock.HASH.index].asPrimitive() is ByteArray &&
+            opArgs[EncodedBlock.NUMBER.index] is GtvBigInteger &&
+            opArgs[EncodedBlock.HASH.index] is GtvByteArray &&
             opArgs[EncodedBlock.EVENTS.index].asArray().all { isValidEthereumEventFormat(it.asArray()) }
 }
 
@@ -192,12 +192,12 @@ class EthereumEventProcessor(
 
             val op = ops[index]
             if (op.opName == OP_ETH_BLOCK) {
-                val opBlockNumber = op.args[EncodedBlock.NUMBER.index].asBigInteger()
-                val eventBlockNumber = eventBlock[EncodedBlock.NUMBER.index].asBigInteger()
-                val opBlockHash = op.args[EncodedBlock.HASH.index].asByteArray()
-                val eventBlockHash = eventBlock[EncodedBlock.HASH.index].asByteArray()
+                val opBlockNumber = op.args[EncodedBlock.NUMBER.index]
+                val eventBlockNumber = eventBlock[EncodedBlock.NUMBER.index]
+                val opBlockHash = op.args[EncodedBlock.HASH.index]
+                val eventBlockHash = eventBlock[EncodedBlock.HASH.index]
 
-                if (opBlockNumber != eventBlockNumber || !opBlockHash.contentEquals(eventBlockHash)) {
+                if (opBlockNumber != eventBlockNumber || opBlockHash != eventBlockHash) {
                     logger.error(
                         "Received unexpected block $opBlockNumber with hash $opBlockHash." +
                                 " Expected block $eventBlockNumber with hash $eventBlockHash"
@@ -205,60 +205,13 @@ class EthereumEventProcessor(
                     return false
                 }
 
-                val opEvents = op.args[EncodedBlock.EVENTS.index].asArray()
-                if (!hasMatchingEvents(opEvents, eventBlock[EncodedBlock.EVENTS.index].asArray())) {
+                if (op.args[EncodedBlock.EVENTS.index] != eventBlock[EncodedBlock.EVENTS.index]) {
                     logger.error("Events in received block $opBlockNumber do not match expected events")
                     return false
                 }
             } else {
                 logger.error("Unknown operation: ${op.opName}")
                 return false
-            }
-        }
-        return true
-    }
-
-    private fun hasMatchingEvents(opEvents: Array<out Gtv>, eventLogs: Array<out Gtv>): Boolean {
-        if (opEvents.size != eventLogs.size) return false
-
-        for ((index, opEvent) in opEvents.withIndex()) {
-            val eventLog = eventLogs[index]
-            if (!opEvent[EncodedEvent.TX_HASH.index].asByteArray().contentEquals(eventLog[EncodedEvent.TX_HASH.index].asByteArray()) ||
-                opEvent[EncodedEvent.LOG_INDEX.index].asBigInteger() != eventLog[EncodedEvent.LOG_INDEX.index].asBigInteger() ||
-                !opEvent[EncodedEvent.SIGNATURE.index].asByteArray().contentEquals(eventLog[EncodedEvent.SIGNATURE.index].asByteArray()) ||
-                !opEvent[EncodedEvent.CONTRACT.index].asByteArray().contentEquals(eventLog[EncodedEvent.CONTRACT.index].asByteArray()) ||
-                opEvent[EncodedEvent.NAME.index].asString() != eventLog[EncodedEvent.NAME.index].asString() ||
-                !hasMatchingValues(opEvent[EncodedEvent.INDEXED_VALUES.index].asArray(), eventLog[EncodedEvent.INDEXED_VALUES.index].asArray()) ||
-                !hasMatchingValues(opEvent[EncodedEvent.NON_INDEXED_VALUES.index].asArray(), eventLog[EncodedEvent.NON_INDEXED_VALUES.index].asArray())
-            ) {
-                return false
-            }
-        }
-        return true
-    }
-
-    private fun hasMatchingValues(opValues: Array<out Gtv>, eventLogValues: Array<out Gtv>): Boolean {
-        if (opValues.size != eventLogValues.size) return false
-
-        for ((index, opValue) in opValues.withIndex()) {
-            val eventLogValue = eventLogValues[index]
-            when (opValue) {
-                is GtvByteArray -> {
-                    if (eventLogValue !is GtvByteArray || !opValue.asByteArray().contentEquals(eventLogValue.asByteArray())) {
-                        return false
-                    }
-                }
-                is GtvBigInteger, is GtvInteger, is GtvString -> {
-                    if (opValue.asPrimitive() != eventLogValue.asPrimitive()) {
-                        return false
-                    }
-                }
-                is GtvArray -> {
-                    if (eventLogValue !is GtvArray || !hasMatchingValues(opValue.asArray(), eventLogValue.asArray())) {
-                        return false
-                    }
-                }
-                else -> throw ProgrammerMistake("Unexpected value gtv type: ${opValue::class}")
             }
         }
         return true

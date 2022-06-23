@@ -7,10 +7,10 @@ import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvInteger
 import net.postchain.gtv.GtvNull
-import net.postchain.gtx.ExtOpData
 import net.postchain.gtx.GTXOperation
 import net.postchain.gtx.GTXSchemaManager
 import net.postchain.gtx.SimpleGTXModule
+import net.postchain.gtx.data.ExtOpData
 import org.apache.commons.dbutils.QueryRunner
 import org.apache.commons.dbutils.handlers.MapListHandler
 import java.math.BigInteger

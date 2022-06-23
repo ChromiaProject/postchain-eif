@@ -57,7 +57,7 @@ $ yarn coverage
 ### Deploy token bridge contract to a network (requires Mnemonic, infura API and Etherscan API key)
 
 ```sh
-$ yarn deploy --network rinkeby --verify --app 0x659E4A3726275EDFD125F52338ECE0D54D15BD99,0x1A642F0E3C3AF545E7ACBD38B07251B3990914F1,0x75E20828B343D1FE37FAE469AB698E19C17F20B5
+$ yarn deploy --network goerli --verify --app 0x659E4A3726275EDFD125F52338ECE0D54D15BD99,0x1A642F0E3C3AF545E7ACBD38B07251B3990914F1,0x75E20828B343D1FE37FAE469AB698E19C17F20B5
 ```
 
 ### Added plugins
@@ -72,11 +72,11 @@ $ yarn deploy --network rinkeby --verify --app 0x659E4A3726275EDFD125F52338ECE0D
 Run below task to prepare upgrade token bridge smart contract
 
 ```sh
-yarn prepare-upgrade --network rinkeby --verify --address PROXY_ADDRESS
+yarn prepare-upgrade --network goerli --verify --address PROXY_ADDRESS
 ```
 
 ### Upgrade
 
 ```sh
-$ yarn upgrade-contract --network rinkeby --address PROXY_ADDRESS
+$ yarn upgrade-contract --network goerli --address PROXY_ADDRESS
 ```

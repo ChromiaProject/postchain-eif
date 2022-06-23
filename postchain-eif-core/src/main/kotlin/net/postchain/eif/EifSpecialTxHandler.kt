@@ -5,6 +5,8 @@ import net.postchain.common.BlockchainRid
 import net.postchain.core.BlockEContext
 import net.postchain.crypto.CryptoSystem
 import net.postchain.gtx.*
+import net.postchain.gtx.data.OpData
+import net.postchain.gtx.special.GTXSpecialTxExtension
 
 const val OP_ETH_BLOCK = "__eth_block"
 
