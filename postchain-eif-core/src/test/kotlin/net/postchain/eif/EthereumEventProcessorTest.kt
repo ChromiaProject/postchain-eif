@@ -232,8 +232,8 @@ class EthereumEventProcessorTest {
                     val eventBlocks = ethereumEventProcessor.getEventData()
                     val events = eventBlocks.flatMap { it[EncodedBlock.EVENTS.index].asArray().asList() }
                     assert(events.size == 2).isTrue()
-                    val eventContractAddresses = events.map { "0x${it[EncodedEvent.CONTRACT.index].asByteArray().toHex()}".toLowerCase() }
-                    assert(eventContractAddresses).containsExactly(*contractAddresses.map(String::toLowerCase).toTypedArray())
+                    val eventContractAddresses = events.map { "0x${it[EncodedEvent.CONTRACT.index].asByteArray().toHex()}".lowercase() }
+                    assert(eventContractAddresses).containsExactly(*contractAddresses.map(String::lowercase).toTypedArray())
                 }
 
         ethereumEventProcessor.shutdown()
