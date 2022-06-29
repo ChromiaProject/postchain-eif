@@ -434,7 +434,7 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
 
   return (
     <div className="relative py-3 sm:max-w-5xl sm:mx-auto">
-      {chainId !== 4 && (
+      {chainId !== 4 && chainId !== 5 && (
         <>
           <div className="alert">
             <div className="flex-1">
