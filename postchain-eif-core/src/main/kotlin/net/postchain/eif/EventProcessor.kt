@@ -92,13 +92,15 @@ class NoOpEventProcessor : EventProcessor {
 /**
  * Reads events from ethereum.
  *
- * @param readOffset Will return events with this specified offset from the last event we have seen from ethereum
+ * @param ethereumReadOffset We will read this amount of blocks from the block head on ethereum, to avoid issues with chain reorg
+ * @param readOffset Will return events from blocks with this specified offset from the last block we have seen from ethereum
  * (so that slower nodes may have a chance to validate the events)
  */
 class EthereumEventProcessor(
         private val web3j: Web3j,
         private val contractAddresses: List<String>,
         events: List<Event>,
+        private val ethereumReadOffset: BigInteger,
         private val readOffset: BigInteger,
         skipToHeight: BigInteger,
         blockchainEngine: BlockchainEngine
@@ -131,7 +133,7 @@ class EthereumEventProcessor(
             lastReadLogBlockHeight + BigInteger.ONE
         }
 
-        val currentBlockHeight = sendWeb3jRequestWithRetry(web3j.ethBlockNumber()).blockNumber
+        val currentBlockHeight = sendWeb3jRequestWithRetry(web3j.ethBlockNumber()).blockNumber - ethereumReadOffset
         // Pacing the reading of logs
         val to = minOf(currentBlockHeight, from + BigInteger.valueOf(MAX_READ_AHEAD))
 
@@ -290,21 +292,25 @@ class EthereumEventProcessor(
 
     private fun <T : Response<*>> sendWeb3jRequestWithRetry(
         request: Request<*, T>,
-        maxRetries: Int? = null,
         retryTimeout: Long = 500
     ): T {
-        val response = request.send()
-        if (response.hasError()) {
-            logger.error("Web3j request failed with error code: ${response.error.code} and message: ${response.error.message}")
-
-            if ((maxRetries == null) || (maxRetries > 0)) {
-                if (retryTimeout > 0) {
-                    sleep(retryTimeout)
-                }
-                return sendWeb3jRequestWithRetry(request, maxRetries?.minus(1), retryTimeout)
+        val response = try {
+            val response = request.send()
+            if (response.hasError()) {
+                logger.error("Web3j request failed with error code: ${response.error.code} and message: ${response.error.message}")
             }
+            response
+        } catch (e: Exception) {
+            logger.error("Web3j request failed", e)
+            null
         }
 
+        if (response == null || response.hasError()) {
+            if (retryTimeout > 0) {
+                sleep(retryTimeout)
+            }
+            return sendWeb3jRequestWithRetry(request, retryTimeout)
+        }
         return response
     }
 }

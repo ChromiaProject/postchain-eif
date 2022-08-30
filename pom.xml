@@ -17,7 +17,7 @@
     <description>Postchain EIF. Ethereum Integration Framework</description>
 
     <properties>
-        <postchain.version>3.6.0-SNAPSHOT</postchain.version>
+        <postchain.version>3.7.0-SNAPSHOT</postchain.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
