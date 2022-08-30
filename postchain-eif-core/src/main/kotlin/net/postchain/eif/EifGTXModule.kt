@@ -29,6 +29,7 @@ import java.security.Security
 
 const val PREFIX: String = "sys.x.eif"
 const val EIF: String = "eif"
+const val LEVELS_PER_PAGE = 2
 
 class EifGTXModule : SimpleGTXModule<Unit>(
     Unit, mapOf(), mapOf(
@@ -54,7 +55,9 @@ class EifGTXModule : SimpleGTXModule<Unit>(
     }
 
     override fun makeBlockBuilderExtensions(): List<BaseBlockBuilderExtension> {
-        return listOf(EthereumEifImplementation(SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)), 2))
+        return listOf(EthereumEifImplementation(SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)),
+            LEVELS_PER_PAGE
+        ))
     }
 
     override fun getSpecialTxExtensions(): List<GTXSpecialTxExtension> {
@@ -91,7 +94,8 @@ fun accountStateMerkleProofQuery(config: Unit, ctx: EContext, args: Gtv): Gtv {
     val blockHeader = SimpleGtvEncoder.encodeGtv(blockHeaderData(db, ctx, blockHeight))
     val blockWitness = blockWitnessData(db, ctx, blockHeight)
     val accountState = accountState(db.getAccountState(ctx, PREFIX, blockHeight, accountNumber))
-    val snapshot = SnapshotPageStore(ctx, 2, SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)), PREFIX)
+    val snapshot = SnapshotPageStore(ctx,
+        LEVELS_PER_PAGE, SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)), PREFIX)
     val proofs = snapshot.getMerkleProof(blockHeight, accountNumber)
     val gtvProofs = proofs.map(::gtv)
     val extraMerkleProof = extraMerkleProof(db, ctx, blockHeight)
@@ -106,7 +110,7 @@ fun accountStateMerkleProofQuery(config: Unit, ctx: EContext, args: Gtv): Gtv {
 
 private fun eventProof(ctx: EContext, blockHeight: Long, event: DatabaseAccess.EventInfo?): Gtv {
     if (event == null) return GtvNull
-    val es = EventPageStore(ctx, 2, SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)), PREFIX)
+    val es = EventPageStore(ctx, LEVELS_PER_PAGE, SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)), PREFIX)
     val proofs = es.getMerkleProof(blockHeight, event.pos)
     val gtvProofs = proofs.map(::gtv)
     return gtv(

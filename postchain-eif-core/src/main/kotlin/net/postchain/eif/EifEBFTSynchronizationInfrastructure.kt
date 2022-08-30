@@ -12,6 +12,7 @@ import net.postchain.gtx.GTXBlockchainConfiguration
 import org.web3j.protocol.Web3j
 import java.math.BigInteger
 
+@Suppress("unused")
 class EifSynchronizationInfrastructureExtension(
     private val postchainContext: PostchainContext
 ) : SynchronizationInfrastructureExtension {
@@ -61,6 +62,7 @@ class EifSynchronizationInfrastructureExtension(
                 web3j,
                 eifBlockchainConfig.contracts,
                 events,
+                BigInteger.valueOf(eifBlockchainConfig.ethereumReadOffset),
                 BigInteger.valueOf(eifBlockchainConfig.readOffset),
                 eifBlockchainConfig.skipToHeight,
                 engine
