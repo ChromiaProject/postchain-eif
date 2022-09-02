@@ -108,8 +108,10 @@ class EthereumEventProcessor(
 
     data class EthereumBlock(val number: BigInteger, val hash: String)
 
+    var lastReadLogBlockHeight = skipToHeight
+        private set
+
     private val eventBlocks: Queue<Array<Gtv>> = LinkedList()
-    private var lastReadLogBlockHeight = skipToHeight
 
     private val eventMap = events.associateBy(EventEncoder::encode)
     private val eventSignatures = eventMap.keys.toTypedArray()
