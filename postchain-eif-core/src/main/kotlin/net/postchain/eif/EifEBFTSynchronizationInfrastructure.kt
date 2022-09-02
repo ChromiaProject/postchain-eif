@@ -7,6 +7,7 @@ import net.postchain.common.exception.UserMistake
 import net.postchain.core.*
 import net.postchain.eif.config.EifBlockchainConfig
 import net.postchain.eif.config.EifConfig
+import net.postchain.eif.metrics.EifMetricsRegistry
 import net.postchain.gtv.mapper.toObject
 import net.postchain.gtx.GTXBlockchainConfiguration
 import org.web3j.protocol.Web3j
@@ -17,6 +18,7 @@ class EifSynchronizationInfrastructureExtension(
     private val postchainContext: PostchainContext
 ) : SynchronizationInfrastructureExtension {
     private val eventProcessors = mutableMapOf<String, EventProcessor>()
+    private val eifMetricsRegistry = EifMetricsRegistry()
 
     companion object : KLogging()
 
@@ -37,18 +39,24 @@ class EifSynchronizationInfrastructureExtension(
                 val eventProcessor = initializeEventProcessor(eifBlockchainConfig, engine, eifConfig)
                 ext.useEventProcessor(eventProcessor)
                 eventProcessors[cfg.blockchainRid.toHex()] = eventProcessor
+                eifMetricsRegistry.registerMetrics(cfg.chainID, cfg.blockchainRid, eventProcessor)
             }
         }
     }
 
     override fun disconnectProcess(process: BlockchainProcess) {
-        val blockchainRid = process.blockchainEngine.getConfiguration().blockchainRid.toHex()
-        val eventProcessor = eventProcessors.remove(blockchainRid)
+        val blockchainRid = process.blockchainEngine.getConfiguration().blockchainRid
+        val eventProcessor = eventProcessors.remove(blockchainRid.toHex())
             ?: throw ProgrammerMistake("Blockchain $blockchainRid not attached")
+        eifMetricsRegistry.unregisterMetrics(blockchainRid)
         eventProcessor.shutdown()
     }
 
-    override fun shutdown() {}
+    override fun shutdown() {
+        eifMetricsRegistry.unregisterAllMetrics()
+        eventProcessors.values.forEach { it.shutdown() }
+        eventProcessors.clear()
+    }
 
     private fun initializeEventProcessor(eifBlockchainConfig: EifBlockchainConfig, engine: BlockchainEngine, eifConfig: EifConfig): EventProcessor {
         return if ("ignore".equals(eifConfig.url, ignoreCase = true)) {
