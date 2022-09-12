@@ -253,7 +253,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
         bytes[] memory sigs,
         address[] memory signers,
         Data.ExtraProofData memory extraProof
-    ) external nonReentrant {
+    ) public nonReentrant {
         _withdrawRequest(eventProof, blockHeader, sigs, signers, extraProof);
         _events[eventProof.leaf] = _updateWithdraw(eventProof.leaf, _event); // mark the event hash was already used.
     }
@@ -268,7 +268,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
         bytes[] memory sigs,
         address[] memory signers,
         Data.ExtraProofData memory extraProof
-    ) external nonReentrant {
+    ) public nonReentrant {
 
         _withdrawRequest(eventProof, blockHeader, sigs, signers, extraProof);
         _events[eventProof.leaf] = _updateWithdrawNFT(eventProof.leaf, _event); // mark the event hash was already used.
