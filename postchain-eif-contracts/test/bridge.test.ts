@@ -256,7 +256,7 @@ describe("Token Bridge Test", () => {
             let logs = receipt.events?.filter((x) =>  {return x.event == 'DepositedERC20'})
             if (logs !== undefined) {
                 let log = logs[0]
-                const blockNumber = hexZeroPad(intToHex(log.blockNumber), 32)
+                const blockNumber = hexZeroPad(intToHex(123), 32)
                 const serialNumber = hexZeroPad(intToHex(log.blockNumber + log.logIndex), 32)
                 const contractAddress = hexZeroPad(tokenAddress, 32)
                 const toAddress = hexZeroPad(user.address, 32)
@@ -291,7 +291,7 @@ describe("Token Bridge Test", () => {
                 let dependenciesHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(dependencies))
 
                 // This merkle root is calculated in the postchain code
-                let extraDataMerkleRoot = "B9F3483C436112C5E7509C33B2889C05378532192066A3130731FAD58F5C6C32"
+                let extraDataMerkleRoot = "C1619D9649328D8735652493BAB15FE454091386C88CF830ADB48A6F2757B128"
 
                 let node1 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(blockchainRid))
                 let node2 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(previousBlockRid))
@@ -522,7 +522,7 @@ describe("Token Bridge Test", () => {
             let logs = receipt.logs
             if (logs !== undefined) {
                 let log = logs[2]
-                const blockNumber = hexZeroPad(intToHex(log.blockNumber), 32)
+                const blockNumber = hexZeroPad(intToHex(123), 32)
                 const serialNumber = hexZeroPad(intToHex(log.blockNumber + log.logIndex), 32)
                 const contractAddress = hexZeroPad(tokenAddress, 32)
                 const toAddress = hexZeroPad(bridgeDelegatorAddress, 32)
@@ -557,7 +557,7 @@ describe("Token Bridge Test", () => {
                 let dependenciesHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(dependencies))
 
                 // This merkle root is calculated in the postchain code
-                let extraDataMerkleRoot = "6DEC83DBC589367A4401260BF8208D3DAAB86CAFDFF40B4C19FB6A4DB0589C18"
+                let extraDataMerkleRoot = "F6FB8226B0BC8A71814A73A73995FCD13EEBF56D1B6F7F153F6BCEE2A53C3D90"
 
                 let node1 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(blockchainRid))
                 let node2 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(previousBlockRid))

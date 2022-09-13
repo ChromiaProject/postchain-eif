@@ -86,7 +86,7 @@ describe("Non Fungible Token", () => {
                 // Note: test data might change depends on the actual log data
                 // and might make the test failed due to it will make difference `extraDataMerkleRoot`
                 // It'd better to find a way to make deterministic test data
-                const blockNumber = hexZeroPad(intToHex(log.blockNumber), 32)
+                const blockNumber = hexZeroPad(intToHex(123), 32)
                 const serialNumber = hexZeroPad(intToHex(log.blockNumber + log.logIndex), 32)
                 const contractAddress = hexZeroPad(nftAddress, 32)
                 const toAddress = hexZeroPad(user.address, 32)
@@ -112,7 +112,7 @@ describe("Non Fungible Token", () => {
                 let dependenciesHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(dependencies))
 
                 // This merkle root is calculated in the postchain code
-                let extraDataMerkleRoot = "E5A2F6772EE9E1F02A9940643527FD2FA2FCD866A4561D66305CFFF239D7B999"
+                let extraDataMerkleRoot = "BA4634529310434DB7697CB5864358828E09A5F099545BE18F47673ECC0405CA"
 
                 let timestamp = 1629878444220
                 let height = 46
