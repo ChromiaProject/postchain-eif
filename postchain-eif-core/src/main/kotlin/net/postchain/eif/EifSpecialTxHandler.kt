@@ -21,7 +21,7 @@ class EifSpecialTxExtension : GTXSpecialTxExtension {
         proc = processor
     }
 
-    override fun init(module: GTXModule, blockchainRID: BlockchainRid, cs: CryptoSystem) {
+    override fun init(module: GTXModule, chainID: Long, blockchainRID: BlockchainRid, cs: CryptoSystem) {
         needEifTnx = module.getOperations().contains(OP_ETH_BLOCK)
     }
 

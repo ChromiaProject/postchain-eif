@@ -11,7 +11,6 @@ import net.postchain.common.data.KECCAK256
 import net.postchain.common.hexStringToByteArray
 import net.postchain.core.EContext
 import net.postchain.crypto.Secp256K1CryptoSystem
-import net.postchain.crypto.encodeSignatureWithV
 import net.postchain.eif.merkle.ProofTreeParser.getProofListAndPosition
 import net.postchain.gtv.*
 import net.postchain.gtv.GtvEncoder.encodeGtv
