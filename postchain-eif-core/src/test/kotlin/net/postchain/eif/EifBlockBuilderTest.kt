@@ -1,5 +1,5 @@
 package net.postchain.eif
-    
+
 import net.postchain.base.gtv.BlockHeaderData
 import net.postchain.base.gtv.BlockHeaderDataFactory
 import net.postchain.base.snapshot.SimpleDigestSystem
