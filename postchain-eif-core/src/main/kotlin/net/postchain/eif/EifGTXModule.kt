@@ -50,6 +50,7 @@ class EifGTXModule : SimpleGTXModule<Unit>(
             createPageTable(ctx, "${PREFIX}_snapshot")
             createEventLeafTable(ctx, PREFIX)
             createStateLeafTable(ctx, PREFIX)
+            createStateLeafTableIndex(ctx, PREFIX, 0)
         }
     }
 
