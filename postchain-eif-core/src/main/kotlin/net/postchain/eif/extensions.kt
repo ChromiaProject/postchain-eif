@@ -32,7 +32,7 @@ class EthereumEifImplementation(
 
     override fun processEmittedEvent(ctxt: TxEContext, type: String, data: Gtv) {
         when (type) {
-            EIF_EVENT -> emitEifEvent(data)
+            EIF_EVENT -> emitEifEvent(ctxt, data)
             EIF_STATE -> emitEifState(data[0].asInteger(), data[1])
             else -> throw ProgrammerMistake("Unrecognized event")
         }
@@ -62,10 +62,10 @@ class EthereumEifImplementation(
      * Serialize, write to leaf store, hash using keccak256.
      * Hashes are remembered and later combined into a Merkle tree
      */
-    private fun emitEifEvent(evt: Gtv) {
+    private fun emitEifEvent(ctxt: TxEContext, evt: Gtv) {
         val data = SimpleGtvEncoder.encodeGtv(evt)
         val hash = ds.digest(data)
-        store.writeEvent(bctx, PREFIX, events.size.toLong(), hash, data)
+        store.writeEvent(ctxt, PREFIX, events.size.toLong(), hash, data)
         events.add(hash)
     }
 

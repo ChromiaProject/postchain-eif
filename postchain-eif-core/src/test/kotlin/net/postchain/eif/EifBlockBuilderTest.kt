@@ -19,7 +19,7 @@ import net.postchain.eif.merkle.MerkleTestUtil.getMerkleProof
 import net.postchain.gtv.*
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.merkle.GtvMerkleHashCalculator
-import net.postchain.gtx.data.GTXDataBuilder
+import net.postchain.gtx.GtxBuilder
 import java.math.BigInteger
 import java.security.MessageDigest
 import kotlin.test.Test
@@ -33,63 +33,63 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
     private lateinit var ds: SimpleDigestSystem
 
     fun makeEifEventOp(bcRid: BlockchainRid, num: Long): ByteArray {
-        val b = GTXDataBuilder(bcRid, arrayOf(KeyPairHelper.pubKey(0)), myCS)
+        val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
         b.addOperation(
             "eif_event",
-            arrayOf(
-                gtv(num),
-                gtv(ds.digest(BigInteger.valueOf(num).toByteArray()))
-            )
+            gtv(num),
+            gtv(ds.digest(BigInteger.valueOf(num).toByteArray()))
         )
-        b.finish()
-        b.sign(myCS.buildSigMaker(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
-        return b.serialize()
+        return b.finish()
+            .sign(myCS.buildSigMaker(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
+            .buildGtx()
+            .encode()
     }
 
     fun makeEifStateOp(bcRid: BlockchainRid, num: Long): ByteArray {
-        val b = GTXDataBuilder(bcRid, arrayOf(KeyPairHelper.pubKey(0)), myCS)
+        val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
         b.addOperation(
             "eif_state",
-            arrayOf(
-                gtv(num),
-                gtv(num),
-                gtv(ds.digest(BigInteger.valueOf(num).toByteArray()))
-            )
+            gtv(num),
+            gtv(num),
+            gtv(ds.digest(BigInteger.valueOf(num).toByteArray()))
         )
-        b.finish()
-        b.sign(myCS.buildSigMaker(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
-        return b.serialize()
+        return b.finish()
+            .sign(myCS.buildSigMaker(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
+            .buildGtx()
+            .encode()
     }
 
     fun makeNOPGTX(bcRid: BlockchainRid): ByteArray {
-        val b = GTXDataBuilder(bcRid, arrayOf(KeyPairHelper.pubKey(0)), myCS)
-        b.addOperation("nop", arrayOf(gtv(42)))
-        b.finish()
-        b.sign(myCS.buildSigMaker(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
-        return b.serialize()
+        val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
+        b.addOperation("nop", gtv(42))
+        return b.finish()
+            .sign(myCS.buildSigMaker(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
+            .buildGtx()
+            .encode()
     }
 
     fun makeTestTx(id: Long, value: String, bcRid: BlockchainRid): ByteArray {
-        val b = GTXDataBuilder(bcRid, arrayOf(KeyPairHelper.pubKey(0)), myCS)
-        b.addOperation("gtx_test", arrayOf(gtv(id), gtv(value)))
-        b.finish()
-        b.sign(myCS.buildSigMaker(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
-        return b.serialize()
+        val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
+        b.addOperation("gtx_test", gtv(id), gtv(value))
+        return b.finish()
+            .sign(myCS.buildSigMaker(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
+            .buildGtx()
+            .encode()
     }
 
     fun makeTimeBTx(from: Long, to: Long?, bcRid: BlockchainRid): ByteArray {
-        val b = GTXDataBuilder(bcRid, arrayOf(KeyPairHelper.pubKey(0)), myCS)
+        val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
         b.addOperation(
-            "timeb", arrayOf(
-                gtv(from),
-                if (to != null) gtv(to) else GtvNull
-            )
+            "timeb",
+            gtv(from),
+            if (to != null) gtv(to) else GtvNull
         )
         // Need to add a valid dummy operation to make the entire TX valid
-        b.addOperation("gtx_test", arrayOf(gtv(1), gtv("true")))
-        b.finish()
-        b.sign(myCS.buildSigMaker(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
-        return b.serialize()
+        b.addOperation("gtx_test", gtv(1), gtv("true"))
+        return b.finish()
+            .sign(myCS.buildSigMaker(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
+            .buildGtx()
+            .encode()
     }
 
     @Test

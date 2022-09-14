@@ -1,10 +1,9 @@
 version: '3'
 services:
   geth:
-    image: ethereum/client-go
+    image: ethereum/client-go:v1.10.16
     ports:
       - 8545:8545
-      - 30303:30303
     volumes:
       - ./geth:/geth
     entrypoint:
