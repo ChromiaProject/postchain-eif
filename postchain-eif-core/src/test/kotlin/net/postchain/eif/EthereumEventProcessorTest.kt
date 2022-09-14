@@ -39,7 +39,7 @@ class EthereumEventProcessorTest {
     private val gethContainer = GethContainer()
         .withExposedService(
             "geth", 8545,
-            Wait.forListeningPort()
+            Wait.forLogMessage(".*HTTP server started.*\\s", 1)
         )
 
     private val gasProvider = DefaultGasProvider()
