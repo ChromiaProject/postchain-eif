@@ -1,7 +1,6 @@
 package net.postchain.eif
 
 import net.postchain.base.gtv.BlockHeaderData
-import net.postchain.base.gtv.BlockHeaderDataFactory
 import net.postchain.base.snapshot.SimpleDigestSystem
 import net.postchain.common.BlockchainRid
 import net.postchain.common.data.EMPTY_HASH
@@ -497,6 +496,6 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
         val blockQueries = node.getBlockchainInstance().blockchainEngine.getBlockQueries()
         val blockRid = blockQueries.getBlockRid(height).get()
         val blockHeader = blockQueries.getBlockHeader(blockRid!!).get()
-        return BlockHeaderDataFactory.buildFromBinary(blockHeader.rawData)
+        return BlockHeaderData.fromBinary(blockHeader.rawData)
     }
 }

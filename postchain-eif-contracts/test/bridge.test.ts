@@ -1,7 +1,7 @@
-import { ethers, upgrades } from "hardhat";
+import { ethers, upgrades, network} from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
-import { TestToken__factory, TokenBridge__factory, TestDelegator__factory, TestDelegator, TokenBridgeDelegator__factory } from "../src/types";
+import { TestToken__factory, TokenBridge__factory, TokenBridgeDelegator__factory } from "../src/types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BytesLike, hexZeroPad, keccak256 } from "ethers/lib/utils";
 import { ContractReceipt, ContractTransaction } from "ethers";
@@ -14,7 +14,6 @@ const { expect } = chai;
 describe("Token Bridge Test", () => {
     let tokenAddress: string;
     let bridgeAddress: string;
-    let testDelegatorAddress: string;
     let bridgeDelegatorAddress: string;
     let admin: SignerWithAddress;
     let validator1: SignerWithAddress;
@@ -22,16 +21,16 @@ describe("Token Bridge Test", () => {
     let validator3: SignerWithAddress;
 
     beforeEach(async () => {
+        await network.provider.request({
+            method: "hardhat_reset",
+            params: [],
+        });
         const [deployer] = await ethers.getSigners()
         ;[admin, validator1, validator2, validator3] = await ethers.getSigners()
         const tokenFactory = new TestToken__factory(deployer)
         const tokenContract = await tokenFactory.deploy()
         tokenAddress = tokenContract.address
         expect(await tokenContract.totalSupply()).to.eq(0)
-
-        const testDelegatorFactory = new TestDelegator__factory(deployer)
-        const testDelegator = await testDelegatorFactory.deploy()
-        testDelegatorAddress = testDelegator.address
 
         const bridgeFactory = new TokenBridge__factory(admin)
         const bridge = await upgrades.deployProxy(bridgeFactory, [[validator1.address, validator2.address]])
@@ -42,152 +41,8 @@ describe("Token Bridge Test", () => {
         bridgeDelegatorAddress = bridgeDelegator.address
     });
 
-    describe("Utility", async () => {
-        describe("hash", async () => {
-            var testDelegatorInstance: TestDelegator
-            beforeEach(async () => {            
-                const [everyone] = await ethers.getSigners()
-                testDelegatorInstance = new TestDelegator__factory(everyone).attach(testDelegatorAddress)
-            })
-
-            it("Non-empty node sha3 hash function", async () => {
-                expect(await testDelegatorInstance.hash("0x24860e5aba544f2344ca0f3b285c33e7b442e2f2c6d47d4b70dddce79df17f20",
-                                                "0x6d8f6f192029b21aedeaa1107974ea6f21c17e071e0ad1268cef4bf16e72772d"))
-                                                    .to.eq("0x0cf42c3b43ad0c84c02c3e553520261b5650ece5ed65bb79a07592f586637f6a");
-            })
-    
-            it("Right empty node sha3 hash function", async () => {
-                expect(await testDelegatorInstance.hash("0x6c5efa1707c93140989e0f95b9a0b8616e0c8ef51392617bf9c917aff96ef769",
-                                                    "0x0000000000000000000000000000000000000000000000000000000000000000"))
-                                                    .to.eq("0x48febd01a647789e62260070b31361f1b12a0fe90bc7ebb700b511b12b9ca410");
-            })
-    
-            it("Left empty node sha3 hash function", async () => {
-                expect(await testDelegatorInstance.hash("0x0000000000000000000000000000000000000000000000000000000000000000",
-                                                    "0x6c5efa1707c93140989e0f95b9a0b8616e0c8ef51392617bf9c917aff96ef769"))
-                                                    .to.eq("0x48febd01a647789e62260070b31361f1b12a0fe90bc7ebb700b511b12b9ca410");
-            })
-
-            it("All empty node", async () => {
-                expect(await testDelegatorInstance.hash("0x0000000000000000000000000000000000000000000000000000000000000000",
-                                                    "0x0000000000000000000000000000000000000000000000000000000000000000"))
-                                                    .to.eq("0x0000000000000000000000000000000000000000000000000000000000000000");                
-            })
-
-            it("hash gtv integer leaf 0", async () => {
-                expect(await testDelegatorInstance.hashGtvIntegerLeaf(0)).to.eq("0x90B136DFC51E08EE70ED929C620C0808D4230EC1015D46C92CCAA30772651DC0".toLowerCase());
-            })
-
-            it("hash gtv integer leaf 1", async () => {
-                expect(await testDelegatorInstance.hashGtvIntegerLeaf(1)).to.eq("0x6CCD14B5A877874DDC7CA52BD3AEDED5543B73A354779224BBB86B0FD315B418".toLowerCase());
-            })
-
-            it("hash gtv integer leaf 127", async () => {
-                expect(await testDelegatorInstance.hashGtvIntegerLeaf(127)).to.eq("0xEBA1A4FE3CDC6C5089D6222F00980599D5E943A933AD11BDEC942B08D1C8D419".toLowerCase());
-            })
-
-            it("hash gtv integer leaf 128", async () => {
-                expect(await testDelegatorInstance.hashGtvIntegerLeaf(128)).to.eq("0xCCC9C7E4A8FC166199E7708146EC6D043DCAD0A20266E064E802E5DD724A66DA".toLowerCase());
-            })
-
-            it("hash gtv integer leaf 168", async () => {
-                expect(await testDelegatorInstance.hashGtvIntegerLeaf(168)).to.eq("0x1DD1D428D59F66807F753FB3E307A65B1B57EACE358A4A94745AA049593A5AEE".toLowerCase());
-            })
-
-            it("hash gtv integer leaf 255", async () => {
-                expect(await testDelegatorInstance.hashGtvIntegerLeaf(255)).to.eq("0x7698DE397F332E1BCC03967CCC1196B0DACB86DC3700FC19566C4F3C322D599E".toLowerCase());
-            })
-
-            it("hash gtv integer leaf 256", async () => {
-                expect(await testDelegatorInstance.hashGtvIntegerLeaf(256)).to.eq("0xCA5F98D59E2E5FE04936A6CCF67F6BF8B5ABDF925BD0FE647A8718CBCE94BD9A".toLowerCase());
-            })
-
-            it("hash gtv integer leaf 1023", async () => {
-                expect(await testDelegatorInstance.hashGtvIntegerLeaf(1023)).to.eq("0x57854DF20A828791922960583A1CE0328FE502DD7D9256852D864D492B3900A5".toLowerCase());
-            })
-
-            it("hash gtv integer leaf 1024", async () => {
-                expect(await testDelegatorInstance.hashGtvIntegerLeaf(1024)).to.eq("0x4765E67F40EFD44127131C1347F389DFB3993D6AC211DDB04E2074E8C1639BD3".toLowerCase());
-            })
-
-            it("hash gtv integer leaf 32769", async () => {
-                expect(await testDelegatorInstance.hashGtvIntegerLeaf(32769)).to.eq("0x66892F0A7CF93E2FF0E8FE5BD475D933CE3B3E46195A36C959888F2F59AEB389".toLowerCase());
-            })
-
-            it("hash gtv integer leaf 1234567890", async () => {
-                expect(await testDelegatorInstance.hashGtvIntegerLeaf(1234567890)).to.eq("0x91F23A381089997DF175AF0AE0DD3E44B651C255ABECA1683F15D831B59C236E".toLowerCase());
-            })            
-        })
-
-        describe("Merkle Proof", async () => {
-            it("Verify valid merkle proof properly", async () => {
-                const [everyone] = await ethers.getSigners()
-                const testDelegatorInstance = new TestDelegator__factory(everyone).attach(testDelegatorAddress)
-
-                expect(await testDelegatorInstance.verify(["0x57abe736cc8dcd7497b22ba39c7c2009088136d479e23cb7d1526751995832d6",
-                                                            "0xd103842c6a7267b533021131520f29734b4cd2256ea3851aa963339c9d763904"], 
-                                                            "0xcb91922c1d21bea083e4c8689dcd0e8af187e672e8aa63a7af4032971318f7f3", 
-                                                            0, 
-                                                            "0x534a672f017938f18e96f552b0086f7e40ed416ab033ff439c89b75c85d9c638")).to.be.true;
-            })
-
-            it("Invalid merkle proof", async () => {
-                const [everyone] = await ethers.getSigners()
-                const testDelegatorInstance = new TestDelegator__factory(everyone).attach(testDelegatorAddress)
-
-                expect(await testDelegatorInstance.verify(["0x57abe736cc8dcd7497b22ba39c7c2009088136d479e23cb7d1526751995832d6",
-                                                            "0xd103842c6a7267b533021131520f29734b4cd2256ea3851aa963339c9d763904"], 
-                                                            "0xcb91922c1d21bea083e4c8689dcd0e8af187e672e8aa63a7af4032971318f7f3", 
-                                                            1, 
-                                                            "0x534a672f017938f18e96f552b0086f7e40ed416ab033ff439c89b75c85d9c638")).to.be.false;
-            })
-        })
-
-        describe("SHA256 Merkle Proof", async () => {
-            it("Verify valid SHA256 merkle proof properly", async () => {
-                const [everyone] = await ethers.getSigners()
-                const testDelegatorInstance = new TestDelegator__factory(everyone).attach(testDelegatorAddress)
-
-                expect(await testDelegatorInstance.verifySHA256(["0xC7CBFEFDF46A4F2F925389E660604B7E68246802F25581C1493F2673EA2F71F1"],
-                                                        "0x480DE19560D2D0DE62AD9306F1156B08CD543626AC1F28134E32C6A2FECB357A",
-                                                        1,
-                                                        "0x120FF48AA20416DF00C6EBC29260BD1B07588536E7BB1D835BDFECD4D7E51F78")).to.be.true;
-
-                expect(await testDelegatorInstance.verifySHA256([
-                                                            "0xC7CBFEFDF46A4F2F925389E660604B7E68246802F25581C1493F2673EA2F71F1",
-                                                            "0x501D248FE65EBBF15B771F8C8CDC574942F9A07EE0C1A43D4459BB70E3088A10",
-                                                            "0x1F2E3EC0A1D920108BF193452F9176BAF9F018B1FB3CFD308DC45DA12D323A07",
-                                                            "0x204D463AADD2DB5530FA5F673B863FBB2D4A84B70A32EC7069A4C0114ABD7A3A"
-                                                        ], 
-                                                        "0x480DE19560D2D0DE62AD9306F1156B08CD543626AC1F28134E32C6A2FECB357A",
-                                                        5,
-                                                        "0xA89A933C4C741C222DA106103E59ADA7F45281592708F31207821A89C5E7CE40")).to.be.true;
-            })
-
-            it("Invalid SHA256 merkle proof due to incorrect merkle root", async () => {
-                const [everyone] = await ethers.getSigners()
-                const testDelegatorInstance = new TestDelegator__factory(everyone).attach(testDelegatorAddress)
-
-                expect(await testDelegatorInstance.verifySHA256(["0xC7CBFEFDF46A4F2F925389E660604B7E68246802F25581C1493F2673EA2F71F1"],
-                                                        "0x480DE19560D2D0DE62AD9306F1156B08CD543626AC1F28134E32C6A2FECB357A",
-                                                        1,
-                                                        "0x120FF48AA20416DF00C6EBC29260BD1B07588536E7BB1D835BDFECD4D7E51F79")).to.be.false;
-
-                expect(await testDelegatorInstance.verifySHA256([
-                                                            "0xC7CBFEFDF46A4F2F925389E660604B7E68246802F25581C1493F2673EA2F71F1",
-                                                            "0x501D248FE65EBBF15B771F8C8CDC574942F9A07EE0C1A43D4459BB70E3088A10",
-                                                            "0x1F2E3EC0A1D920108BF193452F9176BAF9F018B1FB3CFD308DC45DA12D323A07",
-                                                            "0x204D463AADD2DB5530FA5F673B863FBB2D4A84B70A32EC7069A4C0114ABD7A3A"
-                                                        ],
-                                                        "0x480DE19560D2D0DE62AD9306F1156B08CD543626AC1F28134E32C6A2FECB357A",
-                                                        5,
-                                                        "0xA89A933C4C741C222DA106103E59ADA7F45281592708F31207821A89C5E7CE41")).to.be.false;
-            })
-        })        
-    })
-
-    describe("Nodes", async () => {
-        it("Update app node(s) successfully", async () => {
+    describe("Validators", async () => {
+        it("Admin can update validator(s) successfully", async () => {
             const [node1, node2, node3, other] = await ethers.getSigners()
             const bridge = new TokenBridge__factory(admin).attach(bridgeAddress)
             const otherbridge = new TokenBridge__factory(other).attach(bridgeAddress)
@@ -236,7 +91,7 @@ describe("Token Bridge Test", () => {
         })
     })
 
-    describe("Withdraw", async () => {
+    describe("Withdraw by normal user", async () => {
         it("User can request withdraw by providing properly proof data", async () => {
             const [deployer, user] = await ethers.getSigners()
             const tokenInstance = new TestToken__factory(deployer).attach(tokenAddress)
@@ -255,9 +110,8 @@ describe("Token Bridge Test", () => {
             let receipt: ContractReceipt = await tx.wait()
             let logs = receipt.events?.filter((x) =>  {return x.event == 'DepositedERC20'})
             if (logs !== undefined) {
-                let log = logs[0]
-                const blockNumber = hexZeroPad(intToHex(123), 32)
-                const serialNumber = hexZeroPad(intToHex(log.blockNumber + log.logIndex), 32)
+                const blockNumber = hexZeroPad(intToHex(1), 32)
+                const serialNumber = hexZeroPad(intToHex(1), 32)
                 const contractAddress = hexZeroPad(tokenAddress, 32)
                 const toAddress = hexZeroPad(user.address, 32)
                 const amountHex = hexZeroPad(toDeposit.toHexString(), 32)
@@ -291,7 +145,7 @@ describe("Token Bridge Test", () => {
                 let dependenciesHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(dependencies))
 
                 // This merkle root is calculated in the postchain code
-                let extraDataMerkleRoot = "C1619D9649328D8735652493BAB15FE454091386C88CF830ADB48A6F2757B128"
+                let extraDataMerkleRoot = "65F421744240981926404029DED54BCB7EEBA7AD271A06D49733DA00444D537C"
 
                 let node1 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(blockchainRid))
                 let node2 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(previousBlockRid))
@@ -502,7 +356,9 @@ describe("Token Bridge Test", () => {
                     user.address)).to.be.revertedWith('TokenBridge: fund is pending or was already claimed')
             }
         })
+    })
 
+    describe("Withdraw via smart contract", async () => {    
         it("Integrate with smart contract", async () => {
             const [deployer, user] = await ethers.getSigners()
             const tokenInstance = new TestToken__factory(deployer).attach(tokenAddress)
@@ -521,9 +377,8 @@ describe("Token Bridge Test", () => {
             let receipt: ContractReceipt = await tx.wait()
             let logs = receipt.logs
             if (logs !== undefined) {
-                let log = logs[2]
-                const blockNumber = hexZeroPad(intToHex(123), 32)
-                const serialNumber = hexZeroPad(intToHex(log.blockNumber + log.logIndex), 32)
+                const blockNumber = hexZeroPad(intToHex(2), 32)
+                const serialNumber = hexZeroPad(intToHex(2), 32)
                 const contractAddress = hexZeroPad(tokenAddress, 32)
                 const toAddress = hexZeroPad(bridgeDelegatorAddress, 32)
                 const amountHex = hexZeroPad(toDeposit.toHexString(), 32)
@@ -548,7 +403,7 @@ describe("Token Bridge Test", () => {
                 let state = blockNumber.substring(2, blockNumber.length).concat(event)
                 let hashRootState = keccak256(DecodeHexStringToByteArray(state))
                 let eifLeaf = hashRootEvent.substring(2, hashRootEvent.length).concat(hashRootState.substring(2, hashRootState.length))
-                
+
                 let blockchainRid = "977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795"
                 let previousBlockRid = "49e46bf022de1515cbb2bf0f69c62c071825a9b940e8f3892acb5d2021832ba0"
                 let merkleRootHash = "96defe74f43fcf2d12a1844bcd7a3a7bcb0d4fa191776953dae3f1efb508d866"
@@ -557,7 +412,7 @@ describe("Token Bridge Test", () => {
                 let dependenciesHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(dependencies))
 
                 // This merkle root is calculated in the postchain code
-                let extraDataMerkleRoot = "F6FB8226B0BC8A71814A73A73995FCD13EEBF56D1B6F7F153F6BCEE2A53C3D90"
+                let extraDataMerkleRoot = "0925B66651245953D3CA797B6DA6CFC2EDD87C126E74B40F76A6F71D19936153"
 
                 let node1 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(blockchainRid))
                 let node2 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(previousBlockRid))

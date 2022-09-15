@@ -1,4 +1,4 @@
-import {ethers, upgrades} from "hardhat";
+import {ethers, upgrades, network} from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
 import { TokenBridge__factory, ERC721Mock__factory } from "../src/types";
@@ -22,6 +22,10 @@ describe("Non Fungible Token", () => {
     const baseURI = "https://gateway.pinata.cloud/ipfs/QmR5NAV7vCi5oobK2wKNKcM5QAyCCzCg2wysZXwhCYbBLs/";
 
     beforeEach(async () => {
+        await network.provider.request({
+            method: "hardhat_reset",
+            params: [],
+        });
         const [deployer] = await ethers.getSigners()
         ;[directoryNodes, appNodes] = await ethers.getSigners()
         const tokenFactory = new ERC721Mock__factory(deployer)
@@ -81,13 +85,11 @@ describe("Non Fungible Token", () => {
             let receipt: ContractReceipt = await tx.wait()
             let logs = receipt.events?.filter((x) =>  {return x.event == 'DepositedERC721'})
             if (logs !== undefined) {
-                let log = logs[0]
-
-                // Note: test data might change depends on the actual log data
+                // Note: test data (user.address, nftAddress) might change depends on chain setup
                 // and might make the test failed due to it will make difference `extraDataMerkleRoot`
-                // It'd better to find a way to make deterministic test data
-                const blockNumber = hexZeroPad(intToHex(123), 32)
-                const serialNumber = hexZeroPad(intToHex(log.blockNumber + log.logIndex), 32)
+                // though it rarely happen due to we already reset the chain for each test scenario
+                const blockNumber = hexZeroPad(intToHex(101), 32)
+                const serialNumber = hexZeroPad(intToHex(101), 32)
                 const contractAddress = hexZeroPad(nftAddress, 32)
                 const toAddress = hexZeroPad(user.address, 32)
                 const tokenIdHex = hexZeroPad(tokenId.toHexString(), 32)
@@ -103,7 +105,7 @@ describe("Non Fungible Token", () => {
                 let state = blockNumber.substring(2, blockNumber.length).concat(event)
                 let hashRootState = keccak256(DecodeHexStringToByteArray(state))
                 let eifLeaf = hashRootEvent.substring(2, hashRootEvent.length).concat(hashRootState.substring(2, hashRootState.length))
-                
+                console.log(eifLeaf)
                 let blockchainRid = "977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795"
                 let previousBlockRid = "49e46bf022de1515cbb2bf0f69c62c071825a9b940e8f3892acb5d2021832ba0"
                 let merkleRootHash = "96defe74f43fcf2d12a1844bcd7a3a7bcb0d4fa191776953dae3f1efb508d866"
@@ -112,7 +114,7 @@ describe("Non Fungible Token", () => {
                 let dependenciesHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(dependencies))
 
                 // This merkle root is calculated in the postchain code
-                let extraDataMerkleRoot = "BA4634529310434DB7697CB5864358828E09A5F099545BE18F47673ECC0405CA"
+                let extraDataMerkleRoot = "FD46CBE97B08DC9C8E8BB6231EC482AAE07CE31201C7D40C6E0B69748C7F49C1"
 
                 let timestamp = 1629878444220
                 let height = 46
