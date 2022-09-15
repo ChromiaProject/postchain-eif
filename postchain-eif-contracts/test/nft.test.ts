@@ -105,7 +105,7 @@ describe("Non Fungible Token", () => {
                 let state = blockNumber.substring(2, blockNumber.length).concat(event)
                 let hashRootState = keccak256(DecodeHexStringToByteArray(state))
                 let eifLeaf = hashRootEvent.substring(2, hashRootEvent.length).concat(hashRootState.substring(2, hashRootState.length))
-                console.log(eifLeaf)
+ 
                 let blockchainRid = "977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795"
                 let previousBlockRid = "49e46bf022de1515cbb2bf0f69c62c071825a9b940e8f3892acb5d2021832ba0"
                 let merkleRootHash = "96defe74f43fcf2d12a1844bcd7a3a7bcb0d4fa191776953dae3f1efb508d866"
