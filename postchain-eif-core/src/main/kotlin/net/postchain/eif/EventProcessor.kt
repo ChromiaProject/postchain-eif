@@ -92,7 +92,6 @@ class NoOpEventProcessor : EventProcessor {
 /**
  * Reads events from ethereum.
  *
- * @param ethereumReadOffset We will read this amount of blocks from the block head on ethereum, to avoid issues with chain reorg
  * @param readOffset Will return events from blocks with this specified offset from the last block we have seen from ethereum
  * (so that slower nodes may have a chance to validate the events)
  */
@@ -100,7 +99,6 @@ class EthereumEventProcessor(
         private val web3j: Web3j,
         private val contractAddresses: List<String>,
         events: List<Event>,
-        private val ethereumReadOffset: BigInteger,
         private val readOffset: BigInteger,
         skipToHeight: BigInteger,
         blockchainEngine: BlockchainEngine
@@ -135,9 +133,11 @@ class EthereumEventProcessor(
             lastReadLogBlockHeight + BigInteger.ONE
         }
 
-        val currentBlockHeight = sendWeb3jRequestWithRetry(web3j.ethBlockNumber()).blockNumber - ethereumReadOffset
+        // it's safe to query the event from the finalized block on Ethereum PoS
+        val finalizedBlock = DefaultBlockParameter.valueOf("finalized")
+        val finalizedBlockHeight = sendWeb3jRequestWithRetry(web3j.ethGetBlockByNumber(finalizedBlock, false)).block.number
         // Pacing the reading of logs
-        val to = minOf(currentBlockHeight, from + BigInteger.valueOf(MAX_READ_AHEAD))
+        val to = minOf(finalizedBlockHeight, from + BigInteger.valueOf(MAX_READ_AHEAD))
 
         if (to < from) {
             logger.debug { "No new blocks to read. We are at height: $to" }

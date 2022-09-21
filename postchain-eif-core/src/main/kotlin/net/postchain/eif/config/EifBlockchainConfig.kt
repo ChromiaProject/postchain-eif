@@ -16,9 +16,6 @@ data class EifBlockchainConfig(
     @Name("skip_to_height")
     @DefaultValue(defaultBigInteger = "0")
     val skipToHeight: BigInteger,
-    @Name("ethereum_read_offset")
-    @DefaultValue(defaultLong = 12)
-    val ethereumReadOffset: Long,
     @Name("read_offset")
     @DefaultValue(defaultLong = 100)
     val readOffset: Long

@@ -70,7 +70,6 @@ class EifSynchronizationInfrastructureExtension(
                 web3j,
                 eifBlockchainConfig.contracts,
                 events,
-                BigInteger.valueOf(eifBlockchainConfig.ethereumReadOffset),
                 BigInteger.valueOf(eifBlockchainConfig.readOffset),
                 eifBlockchainConfig.skipToHeight,
                 engine
