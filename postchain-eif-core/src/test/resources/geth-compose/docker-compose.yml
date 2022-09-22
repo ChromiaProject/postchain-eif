@@ -1,7 +1,7 @@
 version: '3'
 services:
   geth:
-    image: ethereum/client-go:v1.10.16
+    image: ethereum/client-go:v1.10.18
     ports:
       - 8545:8545
     volumes:
