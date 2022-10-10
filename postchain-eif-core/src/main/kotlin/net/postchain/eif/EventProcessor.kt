@@ -115,7 +115,7 @@ class EVMEventProcessor(
     var lastReadLogBlockHeight = skipToHeight
         private set
 
-    private val eventBlocks = LinkedList<Array<Gtv>>()
+    private val eventBlocks: Queue<Array<Gtv>> = LinkedList()
 
     private val eventMap = events.associateBy(EventEncoder::encode)
     private val eventSignatures = eventMap.keys.toTypedArray()
