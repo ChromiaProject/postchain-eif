@@ -93,28 +93,29 @@ class NoOpEventProcessor : EventProcessor {
 }
 
 /**
- * Reads events from ethereum.
+ * Reads events from evm chain
  *
- * @param ethereumReadOffset We will read this amount of blocks from the block head on ethereum, to avoid issues with chain reorg
- * @param readOffset Will return events from blocks with this specified offset from the last block we have seen from ethereum
+ * @param evmReadOffset We will read this amount of blocks from the block head on the evm chain, to avoid issues with chain reorg
+ * @param readOffset Will return events from blocks with this specified offset from the last block we have seen from evm chain
  * (so that slower nodes may have a chance to validate the events)
  */
-class EthereumEventProcessor(
+class EVMEventProcessor(
+        chain: String,
         private val web3j: Web3j,
         private val contractAddresses: List<String>,
         events: List<Event>,
-        private val ethereumReadOffset: BigInteger,
+        private val evmReadOffset: BigInteger,
         private val readOffset: BigInteger,
         skipToHeight: BigInteger,
         blockchainEngine: BlockchainEngine
-) : EventProcessor, AbstractBlockchainProcess("ethereum-event-processor", blockchainEngine) {
+) : EventProcessor, AbstractBlockchainProcess("$chain-event-processor", blockchainEngine) {
 
     data class EthereumBlock(val number: BigInteger, val hash: String)
 
     var lastReadLogBlockHeight = skipToHeight
         private set
 
-    private val eventBlocks: Queue<Array<Gtv>> = LinkedList()
+    private val eventBlocks = LinkedList<Array<Gtv>>()
 
     private val eventMap = events.associateBy(EventEncoder::encode)
     private val eventSignatures = eventMap.keys.toTypedArray()
@@ -138,7 +139,7 @@ class EthereumEventProcessor(
             lastReadLogBlockHeight + BigInteger.ONE
         }
 
-        val currentBlockHeight = sendWeb3jRequestWithRetry(web3j.ethBlockNumber()).blockNumber - ethereumReadOffset
+        val currentBlockHeight = sendWeb3jRequestWithRetry(web3j.ethBlockNumber()).blockNumber - evmReadOffset
         // Pacing the reading of logs
         val to = minOf(currentBlockHeight, from + BigInteger.valueOf(MAX_READ_AHEAD))
 

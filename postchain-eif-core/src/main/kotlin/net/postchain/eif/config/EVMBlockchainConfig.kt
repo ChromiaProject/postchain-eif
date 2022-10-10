@@ -6,9 +6,11 @@ import net.postchain.gtv.mapper.Name
 import net.postchain.gtv.mapper.RawGtv
 import java.math.BigInteger
 
-data class EifBlockchainConfig(
+data class EVMBlockchainConfig(
     @RawGtv
     val rawGtv: Gtv,
+    @Name("chain_id")
+    val chainId: Long,
     @Name("contracts")
     val contracts: List<String>,
     @Name("events")
@@ -16,9 +18,9 @@ data class EifBlockchainConfig(
     @Name("skip_to_height")
     @DefaultValue(defaultBigInteger = "0")
     val skipToHeight: BigInteger,
-    @Name("ethereum_read_offset")
+    @Name("evm_read_offset")
     @DefaultValue(defaultLong = 12)
-    val ethereumReadOffset: Long,
+    val evmReadOffset: Long,
     @Name("read_offset")
     @DefaultValue(defaultLong = 100)
     val readOffset: Long
