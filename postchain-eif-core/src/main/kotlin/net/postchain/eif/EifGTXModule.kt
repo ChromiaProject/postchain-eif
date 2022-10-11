@@ -55,7 +55,7 @@ class EifGTXModule : SimpleGTXModule<Unit>(
     }
 
     override fun makeBlockBuilderExtensions(): List<BaseBlockBuilderExtension> {
-        return listOf(EthereumEifImplementation(SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)),
+        return listOf(EifImplementation(SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)),
             LEVELS_PER_PAGE
         ))
     }

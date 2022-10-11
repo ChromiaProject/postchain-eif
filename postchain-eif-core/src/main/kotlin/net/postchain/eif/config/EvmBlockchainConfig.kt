@@ -6,7 +6,7 @@ import net.postchain.gtv.mapper.Name
 import net.postchain.gtv.mapper.RawGtv
 import java.math.BigInteger
 
-data class EVMBlockchainConfig(
+data class EvmBlockchainConfig(
     @RawGtv
     val rawGtv: Gtv,
     @Name("chain_id")

@@ -4,7 +4,7 @@ import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.Meter
 import io.micrometer.core.instrument.Metrics
 import net.postchain.common.BlockchainRid
-import net.postchain.eif.EVMEventProcessor
+import net.postchain.eif.EvmEventProcessor
 import net.postchain.eif.EventProcessor
 import net.postchain.metrics.BLOCKCHAIN_RID_TAG
 import net.postchain.metrics.CHAIN_IID_TAG
@@ -16,7 +16,7 @@ class EifMetricsRegistry {
     private val meters = mutableMapOf<BlockchainRid, Meter>()
 
     fun registerMetrics(chainIID: Long, blockchainRid: BlockchainRid, chainId: Long, eventProcessor: EventProcessor) {
-        if (eventProcessor is EVMEventProcessor) {
+        if (eventProcessor is EvmEventProcessor) {
             meters[blockchainRid] = Gauge.builder("eif.last_read_evm_block_height") { eventProcessor.lastReadLogBlockHeight }
                 .description(
                     "Last read evm block height. " +

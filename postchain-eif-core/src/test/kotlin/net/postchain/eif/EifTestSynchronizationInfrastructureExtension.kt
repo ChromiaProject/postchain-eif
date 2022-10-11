@@ -15,7 +15,7 @@ class EifTestSynchronizationInfrastructureExtension(
         val gtxModule = (engine.getConfiguration() as GTXBlockchainConfiguration).module
         val txExtensions = gtxModule.getSpecialTxExtensions()
         for (te in txExtensions) {
-            if (te is EifSpecialTxExtension) te.useEventProcessor(proc)
+            if (te is EifSpecialTxExtension) te.addEventProcessor(1L, proc)
         }
     }
 

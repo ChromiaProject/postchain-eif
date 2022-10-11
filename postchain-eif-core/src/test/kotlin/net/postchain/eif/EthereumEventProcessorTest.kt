@@ -102,7 +102,7 @@ class EthereumEventProcessorTest {
             .send().result.blockNumber
         val eventsToRead = listOf(TokenBridge.DEPOSITEDERC20_EVENT)
         val evmEventProcessor =
-            EVMEventProcessor("ethereum", web3j, listOf(bridge.contractAddress), eventsToRead, BigInteger.ZERO, BigInteger.ONE, contractDeployBlockNumber, engineMock).apply {
+            EvmEventProcessor(1L, web3j, listOf(bridge.contractAddress), eventsToRead, BigInteger.ZERO, BigInteger.ONE, contractDeployBlockNumber, engineMock).apply {
                 start()
             }
 
@@ -128,7 +128,7 @@ class EthereumEventProcessorTest {
         // validate events
         val eventData = evmEventProcessor.getEventData()
         val eventBlocksToValidate = eventData
-            .map { OpData(OP_ETH_BLOCK, it) }
+            .map { OpData(OP_EVM_BLOCK, it) }
         assert(evmEventProcessor.isValidEventData(eventBlocksToValidate)).isTrue()
         // Test if NoOp version can also validate
         assert(NoOpEventProcessor().isValidEventData(eventBlocksToValidate)).isTrue()
@@ -139,7 +139,7 @@ class EthereumEventProcessorTest {
         // Verify that we can't skip any events by removing them from the first block in the list
         val eventBlocksWithoutEvents = eventBlocksToValidate.mapIndexed { i, eventBlock ->
             if (i == 0) {
-                OpData(OP_ETH_BLOCK, arrayOf(
+                OpData(OP_EVM_BLOCK, arrayOf(
                     eventBlock.args[EncodedBlock.NUMBER.index],
                     eventBlock.args[EncodedBlock.HASH.index],
                     gtv(emptyList())
@@ -207,7 +207,7 @@ class EthereumEventProcessorTest {
         val contractAddresses = listOf(bridgeFirst.contractAddress, bridgeSecond.contractAddress)
         val eventsToRead = listOf(TokenBridge.DEPOSITEDERC20_EVENT)
         val evmEventProcessor =
-                EVMEventProcessor("ethereum", web3j, contractAddresses, eventsToRead, BigInteger.ZERO, BigInteger.ONE, contractDeployBlockNumber, engineMock).apply {
+                EvmEventProcessor(1L, web3j, contractAddresses, eventsToRead, BigInteger.ZERO, BigInteger.ONE, contractDeployBlockNumber, engineMock).apply {
                     start()
                 }
 
