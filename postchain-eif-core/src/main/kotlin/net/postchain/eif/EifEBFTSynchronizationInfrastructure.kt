@@ -9,7 +9,7 @@ import net.postchain.eif.config.EifBlockchainConfig
 import net.postchain.eif.config.EifConfig
 import net.postchain.eif.metrics.EifMetricsRegistry
 import net.postchain.gtv.mapper.toObject
-import net.postchain.gtx.GTXBlockchainConfiguration
+import net.postchain.gtx.GTXModuleAwareness
 import org.web3j.protocol.Web3j
 import java.math.BigInteger
 
@@ -25,11 +25,11 @@ class EifSynchronizationInfrastructureExtension(
     override fun connectProcess(process: BlockchainProcess) {
         val engine = process.blockchainEngine
         val cfg = engine.getConfiguration()
-        if (cfg is GTXBlockchainConfiguration) {
+        if (cfg is GTXModuleAwareness) {
             val exs = cfg.module.getSpecialTxExtensions()
             val ext = exs.find { it is EifSpecialTxExtension }
             if (ext is EifSpecialTxExtension) {
-                val eifBlockchainConfig = cfg.configData.rawConfig["eif"]?.toObject<EifBlockchainConfig>()
+                val eifBlockchainConfig = cfg.rawConfig["eif"]?.toObject<EifBlockchainConfig>()
                         ?: throw UserMistake("No EIF config present")
                 if (eifBlockchainConfig.skipToHeight == BigInteger.ZERO) {
                     logger.warn("Skip to height config is set to 0. Consider changing it to avoid redundant queries.")
