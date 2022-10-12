@@ -9,23 +9,23 @@ import org.web3j.protocol.ipc.WindowsIpcService
 import java.util.concurrent.TimeUnit
 
 object Web3jServiceFactory {
-    fun buildService(EVMConfig: EvmConfig): Web3jService {
-        return if (EVMConfig.url == "") {
-            HttpService(createOkHttpClient(EVMConfig))
-        } else if (EVMConfig.url.startsWith("http")) {
-            HttpService(EVMConfig.url, createOkHttpClient(EVMConfig), false)
+    fun buildService(evmConfig: EvmConfig): Web3jService {
+        return if (evmConfig.url == "") {
+            HttpService(createOkHttpClient(evmConfig))
+        } else if (evmConfig.url.startsWith("http")) {
+            HttpService(evmConfig.url, createOkHttpClient(evmConfig), false)
         } else if (System.getProperty("os.name").lowercase().startsWith("win")) {
-            WindowsIpcService(EVMConfig.url)
+            WindowsIpcService(evmConfig.url)
         } else {
-            UnixIpcService(EVMConfig.url)
+            UnixIpcService(evmConfig.url)
         }
     }
 
-    private fun createOkHttpClient(EVMConfig: EvmConfig): OkHttpClient {
+    private fun createOkHttpClient(evmConfig: EvmConfig): OkHttpClient {
         val builder: OkHttpClient.Builder = OkHttpClient.Builder()
-        builder.connectTimeout(EVMConfig.connectTimeout, TimeUnit.SECONDS)
-        builder.readTimeout(EVMConfig.readTimeout, TimeUnit.SECONDS) // Sets the socket timeout too
-        builder.writeTimeout(EVMConfig.writeTimeout, TimeUnit.SECONDS)
+        builder.connectTimeout(evmConfig.connectTimeout, TimeUnit.SECONDS)
+        builder.readTimeout(evmConfig.readTimeout, TimeUnit.SECONDS) // Sets the socket timeout too
+        builder.writeTimeout(evmConfig.writeTimeout, TimeUnit.SECONDS)
         return builder.build()
     }
 }
