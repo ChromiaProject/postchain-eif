@@ -219,7 +219,9 @@ class EthereumEventProcessor(
     }
 
     override fun markAsProcessed(ops: List<OpData>) {
-        pruneEvents(ops.maxOf { it.args[EncodedBlock.NUMBER.index].asBigInteger() })
+        if (ops.isNotEmpty()) {
+            pruneEvents(ops.maxOf { it.args[EncodedBlock.NUMBER.index].asBigInteger() })
+        }
     }
 
     @Synchronized
