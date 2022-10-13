@@ -281,6 +281,7 @@ class EthereumEventProcessor(
         }.size > MAX_QUEUE_SIZE
     }
 
+    @Synchronized
     private fun pruneEvents(pruneHeight: BigInteger) {
         var nextLogEvent = eventBlocks.peek()
         while (nextLogEvent != null && nextLogEvent[EncodedBlock.NUMBER.index].asBigInteger() <= pruneHeight) {
