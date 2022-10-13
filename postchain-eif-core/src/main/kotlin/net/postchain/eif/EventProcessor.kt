@@ -42,7 +42,8 @@ enum class EncodedEvent(val index: Int) {
 interface EventProcessor {
     fun shutdown()
     fun getEventData(): List<Array<Gtv>>
-    fun isValidEventData(ops: Array<OpData>): Boolean
+    fun isValidEventData(ops: List<OpData>): Boolean
+    fun markAsProcessed(ops: List<OpData>)
 }
 
 /**
@@ -59,7 +60,7 @@ class NoOpEventProcessor : EventProcessor {
     /**
      * We can at least validate structure
      */
-    override fun isValidEventData(ops: Array<OpData>): Boolean {
+    override fun isValidEventData(ops: List<OpData>): Boolean {
         for (op in ops) {
             if (op.opName == OP_ETH_BLOCK) {
                 if (!isValidEthereumBlockFormat(op.args)) {
@@ -73,6 +74,8 @@ class NoOpEventProcessor : EventProcessor {
         }
         return true
     }
+
+    override fun markAsProcessed(ops: List<OpData>) {}
 
     private fun isValidEthereumEventFormat(opArgs: Array<out Gtv>) = opArgs.size == 7 &&
             opArgs[EncodedEvent.TX_HASH.index] is GtvByteArray &&
@@ -176,13 +179,7 @@ class EthereumEventProcessor(
     }
 
     @Synchronized
-    override fun isValidEventData(ops: Array<OpData>): Boolean {
-        val lastCommittedBlock = getLastCommittedEthereumBlockHeight()
-        // If we have any old events in the queue we may prune them
-        if (lastCommittedBlock != null) {
-            pruneEvents(lastCommittedBlock)
-        }
-
+    override fun isValidEventData(ops: List<OpData>): Boolean {
         // We are strict here, if we have not seen something we will not try to go and fetch it.
         // We simply verify that the same blocks and events are coming in the same order that we have seen them
         // If there are too many rejections, readOffset should be increased
@@ -221,14 +218,12 @@ class EthereumEventProcessor(
         return true
     }
 
+    override fun markAsProcessed(ops: List<OpData>) {
+        pruneEvents(ops.maxOf { it.args[EncodedBlock.NUMBER.index].asBigInteger() })
+    }
+
     @Synchronized
     override fun getEventData(): List<Array<Gtv>> {
-        val lastCommittedBlock = getLastCommittedEthereumBlockHeight()
-        // If we have any old events in the queue we may prune them
-        if (lastCommittedBlock != null) {
-            pruneEvents(lastCommittedBlock)
-        }
-
         return eventBlocks.stream()
             .takeWhile { it[EncodedBlock.NUMBER.index].asBigInteger() <= lastReadLogBlockHeight - readOffset }
             .toList()
@@ -284,9 +279,9 @@ class EthereumEventProcessor(
         }.size > MAX_QUEUE_SIZE
     }
 
-    private fun pruneEvents(lastCommittedBlock: BigInteger) {
+    private fun pruneEvents(pruneHeight: BigInteger) {
         var nextLogEvent = eventBlocks.peek()
-        while (nextLogEvent != null && nextLogEvent[EncodedBlock.NUMBER.index].asBigInteger() <= lastCommittedBlock) {
+        while (nextLogEvent != null && nextLogEvent[EncodedBlock.NUMBER.index].asBigInteger() <= pruneHeight) {
             eventBlocks.poll()
             nextLogEvent = eventBlocks.peek()
         }

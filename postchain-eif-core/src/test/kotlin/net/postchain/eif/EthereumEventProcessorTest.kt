@@ -91,7 +91,7 @@ class EthereumEventProcessorTest {
 
         // Mock query for last eth block in this test
         val blockQueriesMock: BlockQueries = mock {
-            on { query(eq("get_last_eth_block"), any()) } doReturn getMockedBlockHeightResponse(null)
+            on { query(eq("get_last_eth_block"), any()) } doReturn Promise.ofSuccess<Gtv, Exception>(GtvNull)
         }
         val engineMock: BlockchainEngine = mock {
             on { getBlockQueries() } doReturn blockQueriesMock
@@ -129,13 +129,12 @@ class EthereumEventProcessorTest {
         val eventData = ethereumEventProcessor.getEventData()
         val eventBlocksToValidate = eventData
             .map { OpData(OP_ETH_BLOCK, it) }
-            .toTypedArray()
         assert(ethereumEventProcessor.isValidEventData(eventBlocksToValidate)).isTrue()
         // Test if NoOp version can also validate
         assert(NoOpEventProcessor().isValidEventData(eventBlocksToValidate)).isTrue()
 
         // Verify that we can't skip any events by removing a block
-        assert(ethereumEventProcessor.isValidEventData(eventBlocksToValidate.sliceArray(1 until eventBlocksToValidate.size))).isFalse()
+        assert(ethereumEventProcessor.isValidEventData(eventBlocksToValidate.subList(1, eventBlocksToValidate.size))).isFalse()
 
         // Verify that we can't skip any events by removing them from the first block in the list
         val eventBlocksWithoutEvents = eventBlocksToValidate.mapIndexed { i, eventBlock ->
@@ -148,13 +147,11 @@ class EthereumEventProcessorTest {
             } else {
                 eventBlock
             }
-        }.toTypedArray()
+        }
         assert(ethereumEventProcessor.isValidEventData(eventBlocksWithoutEvents)).isFalse()
 
         // Mock that the block was validated and committed to DB
-        val eventDataBlockNumber = eventData.last()[EncodedBlock.NUMBER.index].asBigInteger()
-        whenever(blockQueriesMock.query(eq("get_last_eth_block"), any()))
-            .doReturn(getMockedBlockHeightResponse(eventDataBlockNumber))
+        ethereumEventProcessor.markAsProcessed(eventBlocksToValidate)
 
         // Assert events before last committed block are not included now
         assert(ethereumEventProcessor.getEventData().isEmpty()).isTrue()
@@ -198,7 +195,7 @@ class EthereumEventProcessorTest {
 
         // Mock query for last eth block in this test
         val blockQueriesMock: BlockQueries = mock {
-            on { query(eq("get_last_eth_block"), any()) } doReturn getMockedBlockHeightResponse(null)
+            on { query(eq("get_last_eth_block"), any()) } doReturn Promise.ofSuccess<Gtv, Exception>(GtvNull)
         }
         val engineMock: BlockchainEngine = mock {
             on { getBlockQueries() } doReturn blockQueriesMock
@@ -237,14 +234,6 @@ class EthereumEventProcessorTest {
                 }
 
         ethereumEventProcessor.shutdown()
-    }
-
-    private fun getMockedBlockHeightResponse(height: BigInteger?): Promise<Gtv, Exception> {
-        return if (height == null) {
-            Promise.ofSuccess<Gtv, Exception>(GtvNull)
-        } else {
-            Promise.ofSuccess<Gtv, Exception>(GtvDictionary.build(mapOf("eth_block_height" to GtvBigInteger(height))))
-        }
     }
 
     private fun getBinaryFromArtifactResource(resourcePath: String): String {

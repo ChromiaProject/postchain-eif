@@ -31,9 +31,11 @@ class EifTestEventProcessor : EventProcessor {
         return out
     }
 
-    override fun isValidEventData(ops: Array<OpData>): Boolean {
+    override fun isValidEventData(ops: List<OpData>): Boolean {
         return true
     }
+
+    override fun markAsProcessed(ops: List<OpData>) {}
 
     private fun generateData(height: Long, i: Int): Array<Gtv> {
         val blockHash = ds.digest(BigInteger.valueOf(i.toLong()).toByteArray()).toHex()
