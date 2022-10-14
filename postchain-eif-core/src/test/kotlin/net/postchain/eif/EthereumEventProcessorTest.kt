@@ -181,7 +181,7 @@ class EthereumEventProcessorTest {
         // Check that data in the event matches what we sent
         assert("0x${indexedValues[0].asByteArray().toHex()}").isEqualTo(transactionManager.fromAddress, true) // owner
         assert("0x${indexedValues[1].asByteArray().toHex()}").isEqualTo(testToken.contractAddress, true) // token
-        assert(nonIndexedValues[0].asBigInteger()).isEqualTo(max) // value
+        assert(nonIndexedValues[1].asBigInteger()).isEqualTo(max) // value
 
         evmEventProcessor.shutdown()
     }
