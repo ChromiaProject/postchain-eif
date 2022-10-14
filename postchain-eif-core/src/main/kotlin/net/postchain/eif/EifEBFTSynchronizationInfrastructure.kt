@@ -6,7 +6,6 @@ import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.exception.UserMistake
 import net.postchain.core.*
 import net.postchain.eif.config.EvmBlockchainConfig
-import net.postchain.eif.config.EvmChainConfig
 import net.postchain.eif.config.EvmConfig
 import net.postchain.eif.metrics.EifMetricsRegistry
 import net.postchain.gtv.mapper.toObject
@@ -30,18 +29,17 @@ class EifSynchronizationInfrastructureExtension(
             val exs = cfg.module.getSpecialTxExtensions()
             val ext = exs.find { it is EifSpecialTxExtension }
             if (ext is EifSpecialTxExtension) {
-                val evmChainConfig = cfg.rawConfig["eif"]?.toObject<EvmChainConfig>()
-                        ?: throw UserMistake("No EIF config present")
-                val chains = evmChainConfig.chains
+                val eifBlockchainConfig = cfg.rawConfig["eif"] ?: throw UserMistake("No EIF config present")
+                val chains = eifBlockchainConfig["chains"]?.asDict()?.mapValues { it.value.toObject<EvmBlockchainConfig>() }
+                        ?: throw UserMistake("No chains are configured under key eif/chains")
+
                 eventProcessors[cfg.blockchainRid.toHex()] = mutableMapOf()
-                for (chain in chains) {
-                    val evmBlockchainConfig = cfg.rawConfig[chain]?.toObject<EvmBlockchainConfig>()
-                            ?: throw UserMistake("No $chain config present")
+                for ((evmBlockchainName, evmBlockchainConfig) in chains) {
                     if (evmBlockchainConfig.skipToHeight == BigInteger.ZERO) {
                         logger.warn("Skip to height config is set to 0. Consider changing it to avoid redundant queries.")
                     }
 
-                    val evmConfig = EvmConfig.fromAppConfig(chain, postchainContext.appConfig)
+                    val evmConfig = EvmConfig.fromAppConfig(evmBlockchainName, postchainContext.appConfig)
                     val eventProcessor = initializeEventProcessor(evmBlockchainConfig, engine, evmConfig)
                     ext.addEventProcessor(evmBlockchainConfig.networkId, eventProcessor)
                     eventProcessors[cfg.blockchainRid.toHex()]?.set(evmBlockchainConfig.networkId, eventProcessor)
