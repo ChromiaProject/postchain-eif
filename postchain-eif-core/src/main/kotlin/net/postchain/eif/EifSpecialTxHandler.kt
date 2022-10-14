@@ -35,7 +35,9 @@ class EifSpecialTxExtension : GTXSpecialTxExtension {
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
         if (position == SpecialTransactionPosition.Begin) {
             val data = proc.getEventData()
-            return data.map { OpData(OP_ETH_BLOCK, it) }
+            return data.map { OpData(OP_ETH_BLOCK, it) }.also {
+                bctx.addAfterCommitHook { proc.markAsProcessed(it) }
+            }
         }
         return listOf()
     }
@@ -43,7 +45,8 @@ class EifSpecialTxExtension : GTXSpecialTxExtension {
 
     override fun validateSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext, ops: List<OpData>): Boolean {
         if (position == SpecialTransactionPosition.Begin) {
-            return proc.isValidEventData(ops.toTypedArray())
+            bctx.addAfterCommitHook { proc.markAsProcessed(ops) }
+            return proc.isValidEventData(ops)
         }
         return ops.isEmpty()
     }
