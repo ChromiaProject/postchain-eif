@@ -9,13 +9,13 @@ import net.postchain.eif.EventProcessor
 import net.postchain.metrics.BLOCKCHAIN_RID_TAG
 import net.postchain.metrics.CHAIN_IID_TAG
 
-private const val CHAIN_ID_TAG = "chain_id"
+private const val NETWORK_ID_TAG = "network_id"
 
 class EifMetricsRegistry {
 
     private val meters = mutableMapOf<BlockchainRid, Meter>()
 
-    fun registerMetrics(chainIID: Long, blockchainRid: BlockchainRid, chainId: Long, eventProcessor: EventProcessor) {
+    fun registerMetrics(chainIID: Long, blockchainRid: BlockchainRid, networkId: Long, eventProcessor: EventProcessor) {
         if (eventProcessor is EvmEventProcessor) {
             meters[blockchainRid] = Gauge.builder("eif.last_read_evm_block_height") { eventProcessor.lastReadLogBlockHeight }
                 .description(
@@ -24,7 +24,7 @@ class EifMetricsRegistry {
                 )
                 .tag(CHAIN_IID_TAG, chainIID.toString())
                 .tag(BLOCKCHAIN_RID_TAG, blockchainRid.toHex())
-                .tag(CHAIN_ID_TAG, chainId.toString())
+                .tag(NETWORK_ID_TAG, networkId.toString())
                 .register(Metrics.globalRegistry)
         }
     }

@@ -43,9 +43,9 @@ class EifSynchronizationInfrastructureExtension(
 
                     val evmConfig = EvmConfig.fromAppConfig(chain, postchainContext.appConfig)
                     val eventProcessor = initializeEventProcessor(evmBlockchainConfig, engine, evmConfig)
-                    ext.addEventProcessor(evmBlockchainConfig.chainId, eventProcessor)
-                    eventProcessors[cfg.blockchainRid.toHex()]?.set(evmBlockchainConfig.chainId, eventProcessor)
-                    eifMetricsRegistry.registerMetrics(cfg.chainID, cfg.blockchainRid, evmBlockchainConfig.chainId, eventProcessor)
+                    ext.addEventProcessor(evmBlockchainConfig.networkId, eventProcessor)
+                    eventProcessors[cfg.blockchainRid.toHex()]?.set(evmBlockchainConfig.networkId, eventProcessor)
+                    eifMetricsRegistry.registerMetrics(cfg.chainID, cfg.blockchainRid, evmBlockchainConfig.networkId, eventProcessor)
                 }
             }
         }
@@ -56,12 +56,12 @@ class EifSynchronizationInfrastructureExtension(
         val eventProcessors = eventProcessors.remove(blockchainRid.toHex())
             ?: throw ProgrammerMistake("Blockchain $blockchainRid not attached")
         eifMetricsRegistry.unregisterMetrics(blockchainRid)
-        eventProcessors.forEach { (_, eventProcessor) -> eventProcessor.shutdown()}
+        eventProcessors.values.forEach { it.shutdown() }
     }
 
     override fun shutdown() {
         eifMetricsRegistry.unregisterAllMetrics()
-        eventProcessors.values.forEach { it.forEach { (_, eventProcessor) -> eventProcessor.shutdown() } }
+        eventProcessors.values.forEach { it.values.forEach { eventProcessor -> eventProcessor.shutdown() } }
         eventProcessors.clear()
     }
 
@@ -73,7 +73,7 @@ class EifSynchronizationInfrastructureExtension(
             val web3j = Web3j.build(Web3jServiceFactory.buildService(evmConfig))
 
             val events = evmBlockchainConfig.events.asArray().map(GtvToEventMapper::map)
-            EvmEventProcessor(evmBlockchainConfig.chainId,
+            EvmEventProcessor(evmBlockchainConfig.networkId,
                 web3j,
                 evmBlockchainConfig.contracts,
                 events,

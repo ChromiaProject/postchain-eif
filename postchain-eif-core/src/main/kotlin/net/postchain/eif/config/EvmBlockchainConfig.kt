@@ -7,21 +7,21 @@ import net.postchain.gtv.mapper.RawGtv
 import java.math.BigInteger
 
 data class EvmBlockchainConfig(
-    @RawGtv
+        @RawGtv
     val rawGtv: Gtv,
-    @Name("chain_id")
-    val chainId: Long,
-    @Name("contracts")
+        @Name("network_id")
+    val networkId: Long,
+        @Name("contracts")
     val contracts: List<String>,
-    @Name("events")
+        @Name("events")
     val events: Gtv,
-    @Name("skip_to_height")
+        @Name("skip_to_height")
     @DefaultValue(defaultBigInteger = "0")
     val skipToHeight: BigInteger,
-    @Name("evm_read_offset")
+        @Name("evm_read_offset")
     @DefaultValue(defaultLong = 12)
     val evmReadOffset: Long,
-    @Name("read_offset")
+        @Name("read_offset")
     @DefaultValue(defaultLong = 100)
     val readOffset: Long
 )

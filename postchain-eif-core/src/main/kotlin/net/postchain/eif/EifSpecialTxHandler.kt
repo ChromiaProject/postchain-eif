@@ -17,8 +17,8 @@ class EifSpecialTxExtension : GTXSpecialTxExtension {
 
     private val processors = mutableMapOf<Long, EventProcessor>()
 
-    fun addEventProcessor(chainID: Long, processor: EventProcessor) {
-        processors[chainID] = processor
+    fun addEventProcessor(networkID: Long, processor: EventProcessor) {
+        processors[networkID] = processor
     }
 
     override fun init(module: GTXModule, chainID: Long, blockchainRID: BlockchainRid, cs: CryptoSystem) {

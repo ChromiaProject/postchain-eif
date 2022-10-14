@@ -100,7 +100,7 @@ class NoOpEventProcessor : EventProcessor {
  * (so that slower nodes may have a chance to validate the events)
  */
 class EvmEventProcessor(
-        private val chainId: Long,
+        private val networkId: Long,
         private val web3j: Web3j,
         private val contractAddresses: List<String>,
         events: List<Event>,
@@ -108,7 +108,7 @@ class EvmEventProcessor(
         private val readOffset: BigInteger,
         skipToHeight: BigInteger,
         blockchainEngine: BlockchainEngine
-) : EventProcessor, AbstractBlockchainProcess("$chainId-event-processor", blockchainEngine) {
+) : EventProcessor, AbstractBlockchainProcess("$networkId-event-processor", blockchainEngine) {
 
     data class EvmBlock(val number: BigInteger, val hash: String)
 
@@ -131,7 +131,7 @@ class EvmEventProcessor(
      * Producer thread will read events from ethereum ond add to queue in this action. Main thread will consume them.
      */
     override fun action() {
-        val lastCommittedBlock = getLastCommittedEvmBlockHeight(chainId)
+        val lastCommittedBlock = getLastCommittedEvmBlockHeight(networkId)
         val from = if (lastCommittedBlock != null) {
             // Skip ahead if we are behind last committed block
             maxOf(lastReadLogBlockHeight, lastCommittedBlock) + BigInteger.ONE
@@ -253,8 +253,8 @@ class EvmEventProcessor(
         )
     }
 
-    private fun getLastCommittedEvmBlockHeight(chainId: Long): BigInteger? {
-        val block = blockchainEngine.getBlockQueries().query("get_last_evm_block", gtv("chainId" to gtv(chainId))).get()
+    private fun getLastCommittedEvmBlockHeight(networkId: Long): BigInteger? {
+        val block = blockchainEngine.getBlockQueries().query("get_last_evm_block", gtv("networkId" to gtv(networkId))).get()
         if (block == GtvNull) {
             return null
         }
