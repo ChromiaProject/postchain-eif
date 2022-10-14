@@ -113,11 +113,13 @@ describe("Token Bridge Test", () => {
             if (logs !== undefined) {
                 const blockNumber = hexZeroPad(intToHex(1), 32)
                 const serialNumber = hexZeroPad(intToHex(1), 32)
+                const networkId = hexZeroPad(intToHex(network.config.chainId == undefined ? 1 : network.config.chainId), 32)
                 const contractAddress = hexZeroPad(tokenAddress, 32)
                 const toAddress = hexZeroPad(user.address, 32)
                 const amountHex = hexZeroPad(toDeposit.toHexString(), 32)
                 let event: string = ''
                 event = event.concat(serialNumber.substring(2, serialNumber.length))
+                event = event.concat(networkId.substring(2, networkId.length))
                 event = event.concat(contractAddress.substring(2, contractAddress.length))
                 event = event.concat(toAddress.substring(2, toAddress.length))
                 event = event.concat(amountHex.substring(2, amountHex.length))
@@ -125,6 +127,7 @@ describe("Token Bridge Test", () => {
                 // swap toAddress and contractAddress position to make maliciousEvent
                 let maliciousEvent: string = ''
                 maliciousEvent = maliciousEvent.concat(serialNumber.substring(2, serialNumber.length))
+                maliciousEvent = maliciousEvent.concat(networkId.substring(2, networkId.length))
                 maliciousEvent = maliciousEvent.concat(toAddress.substring(2, toAddress.length))
                 maliciousEvent = maliciousEvent.concat(contractAddress.substring(2, contractAddress.length))
                 maliciousEvent = maliciousEvent.concat(amountHex.substring(2, amountHex.length))
@@ -146,7 +149,7 @@ describe("Token Bridge Test", () => {
                 let dependenciesHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(dependencies))
 
                 // This merkle root is calculated in the postchain code
-                let extraDataMerkleRoot = "65F421744240981926404029DED54BCB7EEBA7AD271A06D49733DA00444D537C"
+                let extraDataMerkleRoot = "084FE92782C73BE4AD04B6CA167F8513EE9FB4693DD58C3CD96AC266209B0F23"
 
                 let node1 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(blockchainRid))
                 let node2 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(previousBlockRid))
@@ -380,11 +383,13 @@ describe("Token Bridge Test", () => {
             if (logs !== undefined) {
                 const blockNumber = hexZeroPad(intToHex(2), 32)
                 const serialNumber = hexZeroPad(intToHex(2), 32)
+                const networkId = hexZeroPad(intToHex(network.config.chainId == undefined ? 1 : network.config.chainId), 32)
                 const contractAddress = hexZeroPad(tokenAddress, 32)
                 const toAddress = hexZeroPad(bridgeDelegatorAddress, 32)
                 const amountHex = hexZeroPad(toDeposit.toHexString(), 32)
                 let event: string = ''
                 event = event.concat(serialNumber.substring(2, serialNumber.length))
+                event = event.concat(networkId.substring(2, networkId.length))
                 event = event.concat(contractAddress.substring(2, contractAddress.length))
                 event = event.concat(toAddress.substring(2, toAddress.length))
                 event = event.concat(amountHex.substring(2, amountHex.length))
@@ -392,6 +397,7 @@ describe("Token Bridge Test", () => {
                 // swap toAddress and contractAddress position to make maliciousEvent
                 let maliciousEvent: string = ''
                 maliciousEvent = maliciousEvent.concat(serialNumber.substring(2, serialNumber.length))
+                maliciousEvent = maliciousEvent.concat(networkId.substring(2, networkId.length))
                 maliciousEvent = maliciousEvent.concat(toAddress.substring(2, toAddress.length))
                 maliciousEvent = maliciousEvent.concat(contractAddress.substring(2, contractAddress.length))
                 maliciousEvent = maliciousEvent.concat(amountHex.substring(2, amountHex.length))
@@ -413,7 +419,7 @@ describe("Token Bridge Test", () => {
                 let dependenciesHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(dependencies))
 
                 // This merkle root is calculated in the postchain code
-                let extraDataMerkleRoot = "0925B66651245953D3CA797B6DA6CFC2EDD87C126E74B40F76A6F71D19936153"
+                let extraDataMerkleRoot = "DBDE34E2EC321CDC0DB70D32842364BF3F97C649D648660FAB25F553A989AE2E"
 
                 let node1 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(blockchainRid))
                 let node2 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(previousBlockRid))

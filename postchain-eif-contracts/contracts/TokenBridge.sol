@@ -300,7 +300,8 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
     function _updateWithdraw(bytes32 hash, bytes memory _event) internal returns (bool) {
         Withdraw storage wd = _withdraw[hash];
         {
-            (IERC20 token, address beneficiary, uint256 amount) = hash.verifyEvent(_event);
+            (IERC20 token, address beneficiary, uint256 amount, uint256 netId) = hash.verifyEvent(_event);
+            require(networkId == netId, "TokenBridge: incorrect network id");
             require(amount > 0 && amount <= _balances[token], "TokenBridge: invalid amount to make request withdraw");
             wd.token = token;
             wd.beneficiary = beneficiary;
@@ -316,7 +317,8 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
     function _updateWithdrawNFT(bytes32 hash, bytes memory _event) internal returns (bool) {
         WithdrawNFT storage wd = _withdrawNFT[hash];
         {
-            (IERC721 nft, address beneficiary, uint256 tokenId) = hash.verifyEventNFT(_event);
+            (IERC721 nft, address beneficiary, uint256 tokenId, uint256 netId) = hash.verifyEventNFT(_event);
+            require(networkId == netId, "TokenBridge: incorrect network id");
             require(_owners[nft][tokenId] != address(0), "TokenBridge: invalid token id to make request withdraw");
             wd.nft = nft;
             wd.beneficiary = beneficiary;
