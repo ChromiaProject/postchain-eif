@@ -89,9 +89,9 @@ class EthereumEventProcessorTest {
         // Deploy token bridge contract
         val bridge = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send()
 
-        // Mock query for last eth block in this test
+        // Mock query for last evm block in this test
         val blockQueriesMock: BlockQueries = mock {
-            on { query(eq("get_last_eth_block"), any()) } doReturn Promise.ofSuccess<Gtv, Exception>(GtvNull)
+            on { query(eq("get_last_evm_block"), any()) } doReturn Promise.ofSuccess<Gtv, Exception>(GtvNull)
         }
         val engineMock: BlockchainEngine = mock {
             on { getBlockQueries() } doReturn blockQueriesMock
@@ -193,9 +193,9 @@ class EthereumEventProcessorTest {
         val bridgeFirst = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send()
         val bridgeSecond = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send()
 
-        // Mock query for last eth block in this test
+        // Mock query for last evm block in this test
         val blockQueriesMock: BlockQueries = mock {
-            on { query(eq("get_last_eth_block"), any()) } doReturn Promise.ofSuccess<Gtv, Exception>(GtvNull)
+            on { query(eq("get_last_evm_block"), any()) } doReturn Promise.ofSuccess<Gtv, Exception>(GtvNull)
         }
         val engineMock: BlockchainEngine = mock {
             on { getBlockQueries() } doReturn blockQueriesMock

@@ -254,7 +254,7 @@ class EvmEventProcessor(
     }
 
     private fun getLastCommittedEvmBlockHeight(networkId: Long): BigInteger? {
-        val block = blockchainEngine.getBlockQueries().query("get_last_evm_block", gtv("networkId" to gtv(networkId))).get()
+        val block = blockchainEngine.getBlockQueries().query("get_last_evm_block", gtv("network_id" to gtv(networkId))).get()
         if (block == GtvNull) {
             return null
         }
