@@ -8,20 +8,20 @@ import java.math.BigInteger
 
 data class EvmBlockchainConfig(
         @RawGtv
-    val rawGtv: Gtv,
+        val rawGtv: Gtv,
         @Name("network_id")
-    val networkId: Long,
+        val networkId: Long,
         @Name("contracts")
-    val contracts: List<String>,
+        val contracts: List<String>,
         @Name("events")
-    val events: Gtv,
+        val events: Gtv,
         @Name("skip_to_height")
-    @DefaultValue(defaultBigInteger = "0")
-    val skipToHeight: BigInteger,
+        @DefaultValue(defaultBigInteger = "0")
+        val skipToHeight: BigInteger,
         @Name("evm_read_offset")
-    @DefaultValue(defaultLong = 12)
-    val evmReadOffset: Long,
+        @DefaultValue(defaultLong = 12)
+        val evmReadOffset: Long,
         @Name("read_offset")
-    @DefaultValue(defaultLong = 100)
-    val readOffset: Long
+        @DefaultValue(defaultLong = 100)
+        val readOffset: Long
 )
