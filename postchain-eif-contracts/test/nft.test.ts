@@ -57,6 +57,7 @@ describe("Non Fungible Token", () => {
                     .withArgs(
                         user.address,
                         nftAddress,
+                        network.config.chainId,
                         tokenId,
                         name,
                         symbol,

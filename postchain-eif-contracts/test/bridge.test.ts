@@ -80,6 +80,7 @@ describe("Token Bridge Test", () => {
                     .withArgs(
                         user.address,
                         tokenAddress,
+                        network.config.chainId,
                         toDeposit,
                         name,
                         symbol,

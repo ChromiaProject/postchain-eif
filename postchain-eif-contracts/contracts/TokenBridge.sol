@@ -53,6 +53,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
     mapping (uint => mapping(address => bool)) validatorMap;
     mapping (uint => address[]) public validators; // postchain block height => validators
     uint[] public validatorHeights;
+    uint256 public networkId;
 
     // Each postchain event will be used to claim only one time.
     mapping (bytes32 => bool) private _events;
@@ -88,8 +89,8 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
 
     event ValidatorAdded(uint height, address indexed _validator);
     event ValidatorRemoved(uint height, address indexed _validator);
-    event DepositedERC20(address indexed sender, IERC20 indexed token, uint amount, string name, string symbol, uint8 decimals);
-    event DepositedERC721(address indexed sender, IERC721 indexed nft, uint tokenId, string name, string symbol, string tokenURI);
+    event DepositedERC20(address indexed sender, IERC20 indexed token, uint networkId, uint amount, string name, string symbol, uint8 decimals);
+    event DepositedERC721(address indexed sender, IERC721 indexed nft, uint networkId, uint tokenId, string name, string symbol, string tokenURI);
     event WithdrawRequest(address indexed beneficiary, IERC20 indexed token, uint256 value);
     event WithdrawRequestNFT(address indexed beneficiary, IERC721 indexed token, uint256 tokenId);
     event Withdrawal(address indexed beneficiary, IERC20 indexed token, uint256 value);
@@ -97,8 +98,14 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
 
     function initialize(address[] memory _validators) public initializer {
         __Ownable_init();
-        validators[0] = _validators;
 
+        uint256 id;
+        assembly {
+            id := chainid()
+        }
+        networkId = id;
+
+        validators[0] = _validators;
         for (uint i = 0; i < validators[0].length; i++) {
             validatorMap[0][validators[0][i]] = true;
         }
@@ -213,7 +220,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
         // Do transfer
         token.transferFrom(msg.sender, address(this), amount);
         _balances[token] += amount;
-        emit DepositedERC20(msg.sender, token, amount, name, symbol, decimals);
+        emit DepositedERC20(msg.sender, token, networkId, amount, name, symbol, decimals);
         return true;
     }
 
@@ -239,7 +246,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
             tokenURI = abi.decode(_tokenURI, (string));
         }
 
-        emit DepositedERC721(msg.sender, nft, tokenId, name, symbol, tokenURI);
+        emit DepositedERC721(msg.sender, nft, networkId, tokenId, name, symbol, tokenURI);
         return true;
     }
 

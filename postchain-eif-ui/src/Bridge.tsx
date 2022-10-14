@@ -42,24 +42,26 @@ const sendTnx = async (signer, to, calldata) => {
 }
 
 const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenAddress: string, bridgeAddress: string, tokenType: string, tokenId: number}) => {
-  const { library, account } = useWeb3React();
+  const { library, chainId, account } = useWeb3React();
   const fetchTokenInfo = async () => {
     var tokenContract;
     let balance;
     let withdraws;
     if (tokenType === "ERC721") {
       tokenContract = new ethers.Contract(tokenAddress, ERC721TokenArtifacts.abi, library);
-      const hasToken = await client.query('eth_has_erc721', { "token_address": tokenAddress.toLowerCase(), "beneficiary": account.toLowerCase(), "token_id": tokenId })
+      const hasToken = await client.query('evm_has_erc721', { "network_id": chainId, "token_address": tokenAddress.toLowerCase(), "beneficiary": account.toLowerCase(), "token_id": tokenId })
       balance = hasToken ? 1 : 0;
       withdraws = await client.query('get_erc721_withdrawal', {
+        'network_id': chainId,
         'token_address': tokenAddress.toLowerCase(),
         'token_id': tokenId,
         'beneficiary': account.toLowerCase()
       });
     } else {
       tokenContract = new ethers.Contract(tokenAddress, ERC20TokenArtifacts.abi, library);
-      balance = await client.query('eth_balance_of_erc20', { "token_address": tokenAddress.toLowerCase(), "beneficiary": account.toLowerCase() })
+      balance = await client.query('evm_balance_of_erc20', { "network_id": chainId, "token_address": tokenAddress.toLowerCase(), "beneficiary": account.toLowerCase() })
       withdraws = await client.query('get_erc20_withdrawal', {
+        'network_id': chainId,
         'token_address': tokenAddress.toLowerCase(),
         'beneficiary': account.toLowerCase()
       });
@@ -273,7 +275,7 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
 const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
   const { library, chainId, account } = useWeb3React()
   const [balance, setBalance] = useState(BigNumber.from(0))
-  const [deposite, setDeposit] = useState(BigNumber.from(0))
+  const [deposit, setDeposit] = useState(BigNumber.from(0))
   const [amount, setAmount] = useState(0)
   const [withdrawAmount, setWithdrawAmount] = useState(0)
   const [unit, setUnit] = useState(18)
@@ -472,10 +474,10 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
               </div>
               <div className="stat">
                 <div className="stat-title">Deposited Ammount</div>
-                <div className="stat-value">{Number(formatUnits(deposite, unit)).toFixed(6)}</div>
+                <div className="stat-value">{Number(formatUnits(deposit, unit)).toFixed(6)}</div>
               </div>
               <div className="stat">
-                <div className="stat-title">New Deposite</div>
+                <div className="stat-title">New Deposit</div>
                 <div className="stat-value">{amount}</div>
               </div>
             </div>

@@ -44,6 +44,7 @@ class EifTestEventProcessor : EventProcessor {
         val from = ds.digest(BigInteger.valueOf(1L).toByteArray()).toHex()
         val to = ds.digest(BigInteger.valueOf(2L).toByteArray()).toHex()
         return arrayOf(
+            gtv(1L),
             gtv(height), gtv(blockHash), gtv(transactionHash),
             gtv(i.toLong()), gtv(EventEncoder.encode(TokenBridge.DEPOSITEDERC20_EVENT)),
             gtv(contractAddress), gtv(from), gtv(to), gtv(BigInteger.valueOf(i.toLong()))

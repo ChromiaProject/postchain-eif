@@ -24,9 +24,10 @@ import java.util.*
 import kotlin.streams.toList
 
 enum class EncodedBlock(val index: Int) {
-    NUMBER(0),
-    HASH(1),
-    EVENTS(2)
+    NETWORK_ID(0),
+    NUMBER(1),
+    HASH(2),
+    EVENTS(3)
 }
 
 enum class EncodedEvent(val index: Int) {
@@ -86,7 +87,8 @@ class NoOpEventProcessor : EventProcessor {
             opArgs[EncodedEvent.INDEXED_VALUES.index] is GtvArray &&
             opArgs[EncodedEvent.NON_INDEXED_VALUES.index] is GtvArray
 
-    private fun isValidEvmBlockFormat(opArgs: Array<Gtv>) = opArgs.size == 3 &&
+    private fun isValidEvmBlockFormat(opArgs: Array<Gtv>) = opArgs.size == 4 &&
+            opArgs[EncodedBlock.NETWORK_ID.index] is GtvInteger &&
             opArgs[EncodedBlock.NUMBER.index] is GtvBigInteger &&
             opArgs[EncodedBlock.HASH.index] is GtvByteArray &&
             opArgs[EncodedBlock.EVENTS.index].asArray().all { isValidEvmEventFormat(it.asArray()) }
@@ -247,9 +249,10 @@ class EvmEventProcessor(
             ))
         }
         return arrayOf(
-            gtv(eventBlock.first.number),
-            gtv(eventBlock.first.hash.substring(2).hexStringToByteArray()),
-            gtv(events)
+                gtv(networkId),
+                gtv(eventBlock.first.number),
+                gtv(eventBlock.first.hash.substring(2).hexStringToByteArray()),
+                gtv(events)
         )
     }
 
