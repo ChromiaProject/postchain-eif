@@ -114,6 +114,7 @@ describe("Token Bridge Test", () => {
                 const blockNumber = hexZeroPad(intToHex(1), 32)
                 const serialNumber = hexZeroPad(intToHex(1), 32)
                 const networkId = hexZeroPad(intToHex(network.config.chainId == undefined ? 1 : network.config.chainId), 32)
+                const zeroNetworkId = hexZeroPad(intToHex(0), 32)
                 const contractAddress = hexZeroPad(tokenAddress, 32)
                 const toAddress = hexZeroPad(user.address, 32)
                 const amountHex = hexZeroPad(toDeposit.toHexString(), 32)
@@ -132,14 +133,25 @@ describe("Token Bridge Test", () => {
                 maliciousEvent = maliciousEvent.concat(contractAddress.substring(2, contractAddress.length))
                 maliciousEvent = maliciousEvent.concat(amountHex.substring(2, amountHex.length))
 
+                let wrongNetworkIdEvent: string = ''
+                wrongNetworkIdEvent = wrongNetworkIdEvent.concat(serialNumber.substring(2, serialNumber.length))
+                wrongNetworkIdEvent = wrongNetworkIdEvent.concat(zeroNetworkId.substring(2, networkId.length))
+                wrongNetworkIdEvent = wrongNetworkIdEvent.concat(contractAddress.substring(2, contractAddress.length))
+                wrongNetworkIdEvent = wrongNetworkIdEvent.concat(toAddress.substring(2, toAddress.length))
+                wrongNetworkIdEvent = wrongNetworkIdEvent.concat(amountHex.substring(2, amountHex.length))
+
                 let data = DecodeHexStringToByteArray(event)
                 let maliciousData = DecodeHexStringToByteArray(maliciousEvent)
+                let wrongNetworkIdData = DecodeHexStringToByteArray(wrongNetworkIdEvent)
                 let hashEventLeaf = keccak256(data)
                 let maliciousHashEventLeaf = keccak256(keccak256(data))
+                let wrongNetworkIdHashEventLeaf = keccak256(wrongNetworkIdData)
                 let hashRootEvent = keccak256(keccak256(hashEventLeaf))
+                let wrongNetworkIdHashRoot = keccak256(keccak256(wrongNetworkIdHashEventLeaf))
                 let state = blockNumber.substring(2, blockNumber.length).concat(event)
                 let hashRootState = keccak256(DecodeHexStringToByteArray(state))
                 let eifLeaf = hashRootEvent.substring(2, hashRootEvent.length).concat(hashRootState.substring(2, hashRootState.length))
+                let eifWrongNetworkIdLeaf = wrongNetworkIdHashRoot.substring(2, wrongNetworkIdHashRoot.length).concat(hashRootState.substring(2, hashRootState.length))
 
                 let blockchainRid = "977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795"
                 let previousBlockRid = "49e46bf022de1515cbb2bf0f69c62c071825a9b940e8f3892acb5d2021832ba0"
@@ -150,6 +162,7 @@ describe("Token Bridge Test", () => {
 
                 // This merkle root is calculated in the postchain code
                 let extraDataMerkleRoot = "084FE92782C73BE4AD04B6CA167F8513EE9FB4693DD58C3CD96AC266209B0F23"
+                let wrongNetworkIdExtraDataMerkleRoot = "3FA75D6A93D7F8F5BB4B17F0C8F27B1ABB6B08CF907A203F957FBB101D8EC8F2"
 
                 let node1 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(blockchainRid))
                 let node2 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(previousBlockRid))
@@ -164,11 +177,14 @@ describe("Token Bridge Test", () => {
                 let node56 = postchainMerkleNodeHash([0x00, node5, node6])
                 let node1234 = postchainMerkleNodeHash([0x00, node12, node34])
                 let node5678 = postchainMerkleNodeHash([0x00, node56, DecodeHexStringToByteArray(extraDataMerkleRoot)])
+                let wrongNetworkIdNode5678 = postchainMerkleNodeHash([0x00, node56, DecodeHexStringToByteArray(wrongNetworkIdExtraDataMerkleRoot)])
 
                 let blockRid = postchainMerkleNodeHash([0x7, node1234, node5678])
                 let maliciousBlockRid = postchainMerkleNodeHash([0x7, node1234, node1234])
+                let wrongNetworkIdBlockRid = postchainMerkleNodeHash([0x7, node1234, wrongNetworkIdNode5678])
                 let blockHeader: BytesLike = ''
                 let maliciousBlockHeader: BytesLike = ''
+                let wrongNetworkIdBlockHeader: BytesLike = ''
                 let ts = hexZeroPad(intToHex(timestamp), 32)
                 let h = hexZeroPad(intToHex(height), 32)
                 blockHeader = blockHeader.concat(blockchainRid, blockRid.substring(2, blockRid.length), previousBlockRid,
@@ -185,6 +201,13 @@ describe("Token Bridge Test", () => {
                                     extraDataMerkleRoot
                 )
 
+                wrongNetworkIdBlockHeader = wrongNetworkIdBlockHeader.concat(blockchainRid, wrongNetworkIdBlockRid.substring(2, wrongNetworkIdBlockRid.length), previousBlockRid, 
+                                    merkleRootHashHashedLeaf.substring(2, merkleRootHashHashedLeaf.length),
+                                    ts.substring(2, ts.length), h.substring(2, h.length),
+                                    dependenciesHashedLeaf.substring(2, dependenciesHashedLeaf.length),
+                                    wrongNetworkIdExtraDataMerkleRoot
+                )
+
                 // update to add new validator at height of 30
                 await bridgeAdmin.addValidator(30, validator1.address)
                 await bridgeAdmin.addValidator(30, validator2.address)
@@ -193,6 +216,10 @@ describe("Token Bridge Test", () => {
                 let sig1 = await validator1.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
                 let sig2 = await validator2.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
                 let sig3 = await validator3.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
+
+                let wrongNetworkIdSig1 = await validator1.signMessage(DecodeHexStringToByteArray(wrongNetworkIdBlockRid.substring(2, wrongNetworkIdBlockRid.length)))
+                let wrongNetworkIdSig2 = await validator2.signMessage(DecodeHexStringToByteArray(wrongNetworkIdBlockRid.substring(2, wrongNetworkIdBlockRid.length)))
+                let wrongNetworkIdSig3 = await validator3.signMessage(DecodeHexStringToByteArray(wrongNetworkIdBlockRid.substring(2, wrongNetworkIdBlockRid.length)))
 
                 let merkleProof = [
                                     DecodeHexStringToByteArray("0000000000000000000000000000000000000000000000000000000000000000"), 
@@ -209,12 +236,25 @@ describe("Token Bridge Test", () => {
                     position: 0,
                     merkleProofs: merkleProof,
                 }
+                let wrongNetworkIdEventProof = {
+                    leaf: DecodeHexStringToByteArray(wrongNetworkIdHashEventLeaf.substring(2, wrongNetworkIdHashEventLeaf.length)),
+                    position: 0,
+                    merkleProofs: merkleProof,
+                }
                 let hashedLeaf = hashGtvBytes64Leaf(DecodeHexStringToByteArray(eifLeaf))
+                let wrongNetworkIdHashedLeaf = hashGtvBytes64Leaf(DecodeHexStringToByteArray(eifWrongNetworkIdLeaf))
                 let extraProof = {
                     leaf: DecodeHexStringToByteArray(eifLeaf),
                     hashedLeaf: DecodeHexStringToByteArray(hashedLeaf.substring(2, hashedLeaf.length)),
                     position: 1,
                     extraRoot: DecodeHexStringToByteArray(extraDataMerkleRoot),
+                    extraMerkleProofs: [DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797")],
+                }
+                let wrongNetworkIdExtraProof = {
+                    leaf: DecodeHexStringToByteArray(eifWrongNetworkIdLeaf),
+                    hashedLeaf: DecodeHexStringToByteArray(wrongNetworkIdHashedLeaf.substring(2, wrongNetworkIdHashedLeaf.length)),
+                    position: 1,
+                    extraRoot: DecodeHexStringToByteArray(wrongNetworkIdExtraDataMerkleRoot),
                     extraMerkleProofs: [DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797")],
                 }
                 let invalidExtraLeaf = {
@@ -243,10 +283,19 @@ describe("Token Bridge Test", () => {
                 };
                 let sigs = [
                     DecodeHexStringToByteArray(sig1.substring(2, sig1.length)),
-                    DecodeHexStringToByteArray(sig3.substring(2, sig2.length)),
+                    DecodeHexStringToByteArray(sig3.substring(2, sig3.length)),
                     DecodeHexStringToByteArray(sig2.substring(2, sig2.length))
                 ];
+                let wrongNetworkIdSigs = [
+                    DecodeHexStringToByteArray(wrongNetworkIdSig1.substring(2, wrongNetworkIdSig1.length)),
+                    DecodeHexStringToByteArray(wrongNetworkIdSig3.substring(2, wrongNetworkIdSig3.length)),
+                    DecodeHexStringToByteArray(wrongNetworkIdSig2.substring(2, wrongNetworkIdSig2.length))
+                ]
                 let validators = [validator1.address, validator3.address, validator2.address];
+                await expect(bridge.withdrawRequest(wrongNetworkIdData, wrongNetworkIdEventProof,
+                    DecodeHexStringToByteArray(wrongNetworkIdBlockHeader), wrongNetworkIdSigs, validators, 
+                    wrongNetworkIdExtraProof)
+                ).to.be.revertedWith('TokenBridge: incorrect network id')
                 await expect(bridge.withdrawRequest(maliciousData, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators, 
                     extraProof)
