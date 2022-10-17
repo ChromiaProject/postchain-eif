@@ -5,6 +5,7 @@ import net.postchain.PostchainContext
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.exception.UserMistake
 import net.postchain.core.*
+import net.postchain.eif.config.EifBlockchainConfig
 import net.postchain.eif.config.EvmBlockchainConfig
 import net.postchain.eif.config.EvmConfig
 import net.postchain.eif.metrics.EifMetricsRegistry
@@ -29,12 +30,11 @@ class EifSynchronizationInfrastructureExtension(
             val exs = cfg.module.getSpecialTxExtensions()
             val ext = exs.find { it is EifSpecialTxExtension }
             if (ext is EifSpecialTxExtension) {
-                val eifBlockchainConfig = cfg.rawConfig["eif"] ?: throw UserMistake("No EIF config present")
-                val chains = eifBlockchainConfig["chains"]?.asDict()?.mapValues { it.value.toObject<EvmBlockchainConfig>() }
-                        ?: throw UserMistake("No chains are configured under key eif/chains")
+                val eifBlockchainConfig = cfg.rawConfig["eif"]?.toObject<EifBlockchainConfig>()
+                        ?: throw UserMistake("No EIF config present")
 
                 eventProcessors[cfg.blockchainRid.toHex()] = mutableMapOf()
-                for ((evmBlockchainName, evmBlockchainConfig) in chains) {
+                for ((evmBlockchainName, evmBlockchainConfig) in eifBlockchainConfig.chains) {
                     if (evmBlockchainConfig.skipToHeight == BigInteger.ZERO) {
                         logger.warn("Skip to height config is set to 0. Consider changing it to avoid redundant queries.")
                     }
