@@ -196,15 +196,17 @@ class EvmEventProcessor(
 
             val op = ops[index]
             if (op.opName == OP_EVM_BLOCK) {
+                val opNetworkId = op.args[EncodedBlock.NETWORK_ID.index]
+                val eventNetworkId = eventBlock[EncodedBlock.NETWORK_ID.index]
                 val opBlockNumber = op.args[EncodedBlock.NUMBER.index]
                 val eventBlockNumber = eventBlock[EncodedBlock.NUMBER.index]
                 val opBlockHash = op.args[EncodedBlock.HASH.index]
                 val eventBlockHash = eventBlock[EncodedBlock.HASH.index]
 
-                if (opBlockNumber != eventBlockNumber || opBlockHash != eventBlockHash) {
+                if (opNetworkId != eventNetworkId || opBlockNumber != eventBlockNumber || opBlockHash != eventBlockHash) {
                     logger.error(
-                        "Received unexpected block $opBlockNumber with hash $opBlockHash." +
-                                " Expected block $eventBlockNumber with hash $eventBlockHash"
+                        "Received unexpected block $opBlockNumber with hash $opBlockHash in network $opNetworkId." +
+                                " Expected block $eventBlockNumber with hash $eventBlockHash in network $eventNetworkId"
                     )
                     return false
                 }
