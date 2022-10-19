@@ -87,7 +87,7 @@ class NoOpEventProcessor : EventProcessor {
             opArgs[EncodedEvent.INDEXED_VALUES.index] is GtvArray &&
             opArgs[EncodedEvent.NON_INDEXED_VALUES.index] is GtvArray
 
-    private fun isValidEvmBlockFormat(opArgs: Array<Gtv>) = opArgs.size == 4 &&
+    private fun isValidEvmBlockFormat(opArgs: Array<out Gtv>) = opArgs.size == 4 &&
             opArgs[EncodedBlock.NETWORK_ID.index] is GtvInteger &&
             opArgs[EncodedBlock.NUMBER.index] is GtvBigInteger &&
             opArgs[EncodedBlock.HASH.index] is GtvByteArray &&
