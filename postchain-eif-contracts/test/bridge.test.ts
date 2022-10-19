@@ -1,7 +1,7 @@
 import { ethers, upgrades, network} from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
-import { TestToken__factory, TokenBridge__factory, TokenBridgeDelegator__factory } from "../src/types";
+import { TestToken__factory, TokenBridge__factory, TokenBridgeDelegator__factory, Validator__factory } from "../src/types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BytesLike, hexZeroPad, keccak256 } from "ethers/lib/utils";
 import { ContractReceipt, ContractTransaction } from "ethers";
@@ -14,6 +14,7 @@ const { expect } = chai;
 describe("Token Bridge Test", () => {
     let tokenAddress: string;
     let bridgeAddress: string;
+    let validatorAddress: string;
     let bridgeDelegatorAddress: string;
     let admin: SignerWithAddress;
     let validator1: SignerWithAddress;
@@ -32,8 +33,12 @@ describe("Token Bridge Test", () => {
         tokenAddress = tokenContract.address
         expect(await tokenContract.totalSupply()).to.eq(0)
 
+        const validatorFactory = new Validator__factory(admin)
+        const validatorContract = await validatorFactory.deploy([validator1.address, validator2.address])
+        validatorAddress = validatorContract.address
+
         const bridgeFactory = new TokenBridge__factory(admin)
-        const bridge = await upgrades.deployProxy(bridgeFactory, [[validator1.address, validator2.address]])
+        const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress])
         bridgeAddress = bridge.address
 
         const bridgeDelegatorFactory = new TokenBridgeDelegator__factory(deployer)
@@ -44,18 +49,18 @@ describe("Token Bridge Test", () => {
     describe("Validators", async () => {
         it("Admin can update validator(s) successfully", async () => {
             const [node1, node2, node3, other] = await ethers.getSigners()
-            const bridge = new TokenBridge__factory(admin).attach(bridgeAddress)
-            const otherbridge = new TokenBridge__factory(other).attach(bridgeAddress)
-            await expect(otherbridge.addValidator(0, node1.address)).to.be.revertedWith("Ownable: caller is not the owner")
+            const validator = new Validator__factory(admin).attach(validatorAddress)
+            const otherValidator = new Validator__factory(other).attach(validatorAddress)
+            await expect(otherValidator.addValidator(0, node1.address)).to.be.revertedWith("Ownable: caller is not the owner")
             // Update App Nodes
-            await bridge.removeValidator(0, validator1.address)
-            await bridge.removeValidator(0, validator2.address)
-            await bridge.addValidator(0, node1.address)
-            await bridge.addValidator(0, node2.address)
-            await bridge.addValidator(0, node3.address)
-            expect(await bridge.validators(0, 0)).to.eq(node1.address)
-            expect(await bridge.validators(0, 1)).to.eq(node2.address)
-            expect(await bridge.validators(0, 2)).to.eq(node3.address)
+            await validator.removeValidator(0, validator1.address)
+            await validator.removeValidator(0, validator2.address)
+            await validator.addValidator(0, node1.address)
+            await validator.addValidator(0, node2.address)
+            await validator.addValidator(0, node3.address)
+            expect(await validator.validators(0, 0)).to.eq(node1.address)
+            expect(await validator.validators(0, 1)).to.eq(node2.address)
+            expect(await validator.validators(0, 2)).to.eq(node3.address)
         })
     })
 
@@ -102,7 +107,7 @@ describe("Token Bridge Test", () => {
             expect(await tokenInstance.totalSupply()).to.eq(toMint)
 
             const bridge = new TokenBridge__factory(user).attach(bridgeAddress)
-            const bridgeAdmin = new TokenBridge__factory(admin).attach(bridgeAddress)
+            const validatorAdmin = new Validator__factory(admin).attach(validatorAddress)
             const toDeposit = ethers.utils.parseEther("100")
             const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
@@ -209,9 +214,9 @@ describe("Token Bridge Test", () => {
                 )
 
                 // update to add new validator at height of 30
-                await bridgeAdmin.addValidator(30, validator1.address)
-                await bridgeAdmin.addValidator(30, validator2.address)
-                await bridgeAdmin.addValidator(30, validator3.address)
+                await validatorAdmin.addValidator(30, validator1.address)
+                await validatorAdmin.addValidator(30, validator2.address)
+                await validatorAdmin.addValidator(30, validator3.address)
 
                 let sig1 = await validator1.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
                 let sig2 = await validator2.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
@@ -332,7 +337,7 @@ describe("Token Bridge Test", () => {
                     ], 
                     [validator1.address, validator2.address],
                     extraProof)
-                ).to.be.revertedWith('TokenBridge: duplicate signature or signers is out of order')
+                ).to.be.revertedWith('Validator: duplicate signature or signers is out of order')
                 await expect(bridge.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader),
                     [
@@ -341,7 +346,7 @@ describe("Token Bridge Test", () => {
                     ], 
                     [validator2.address, validator1.address],
                     extraProof)
-                ).to.be.revertedWith('TokenBridge: duplicate signature or signers is out of order')
+                ).to.be.revertedWith('Validator: duplicate signature or signers is out of order')
                 let sig = await admin.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
                 await expect(bridge.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader),
@@ -351,7 +356,7 @@ describe("Token Bridge Test", () => {
                     ], 
                     [admin.address, validator1.address],
                     extraProof)
-                ).to.be.revertedWith('TokenBridge: signer is not validator')
+                ).to.be.revertedWith('Validator: signer is not validator')
                 await expect(bridge.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     extraProof)
@@ -421,7 +426,7 @@ describe("Token Bridge Test", () => {
             expect(await tokenInstance.totalSupply()).to.eq(toMint)
 
             const bridge = new TokenBridge__factory(user).attach(bridgeAddress)
-            const bridgeAdmin = new TokenBridge__factory(admin).attach(bridgeAddress)
+            const validatorAdmin = new Validator__factory(admin).attach(validatorAddress)
             const bridgeDelegator = new TokenBridgeDelegator__factory(user).attach(bridgeDelegatorAddress)            
             const toDeposit = ethers.utils.parseEther("100")
             await bridgeDelegator.approve(tokenAddress, bridgeAddress, toDeposit)
@@ -468,7 +473,7 @@ describe("Token Bridge Test", () => {
                 let dependenciesHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(dependencies))
 
                 // This merkle root is calculated in the postchain code
-                let extraDataMerkleRoot = "DBDE34E2EC321CDC0DB70D32842364BF3F97C649D648660FAB25F553A989AE2E"
+                let extraDataMerkleRoot = "8E052CEB23DB2111FBB13A1C2F6B3639C4EA8F447022A1B9BFF42442EF939F17"
 
                 let node1 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(blockchainRid))
                 let node2 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(previousBlockRid))
@@ -505,9 +510,9 @@ describe("Token Bridge Test", () => {
                 )
 
                 // update to add new validator at height of 30
-                await bridgeAdmin.addValidator(30, validator1.address)
-                await bridgeAdmin.addValidator(30, validator2.address)
-                await bridgeAdmin.addValidator(30, validator3.address)
+                await validatorAdmin.addValidator(30, validator1.address)
+                await validatorAdmin.addValidator(30, validator2.address)
+                await validatorAdmin.addValidator(30, validator3.address)
 
                 let sig1 = await validator1.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
                 let sig2 = await validator2.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
@@ -602,7 +607,7 @@ describe("Token Bridge Test", () => {
                     ], 
                     [validator1.address, validator2.address],
                     extraProof)
-                ).to.be.revertedWith('TokenBridge: duplicate signature or signers is out of order')
+                ).to.be.revertedWith('Validator: duplicate signature or signers is out of order')
                 await expect(bridgeDelegator.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader),
                     [
@@ -611,7 +616,7 @@ describe("Token Bridge Test", () => {
                     ], 
                     [validator2.address, validator1.address],
                     extraProof)
-                ).to.be.revertedWith('TokenBridge: duplicate signature or signers is out of order')
+                ).to.be.revertedWith('Validator: duplicate signature or signers is out of order')
                 let sig = await admin.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
                 await expect(bridgeDelegator.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader),
@@ -621,7 +626,7 @@ describe("Token Bridge Test", () => {
                     ], 
                     [admin.address, validator1.address],
                     extraProof)
-                ).to.be.revertedWith('TokenBridge: signer is not validator')
+                ).to.be.revertedWith('Validator: signer is not validator')
                 await expect(bridgeDelegator.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     extraProof)

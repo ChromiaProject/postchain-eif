@@ -1,23 +1,30 @@
 import { task } from "hardhat/config";
-import { TokenBridge, TokenBridge__factory } from "../../src/types";
+import { TokenBridge, TokenBridge__factory, Validator, Validator__factory } from "../../src/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 task("deploy:bridge")
   .addOptionalParam('app', 'app node')
   .addFlag('verify', 'Verify contracts at Etherscan')
   .setAction(async ({ verify, app}, hre) => {
+    // deploy validator smart contract
+    const validatorFactory: Validator__factory = await hre.ethers.getContractFactory("Validator")
+    const validators = app === undefined ? [] : getNodes(app)
+    const validator: Validator = <Validator>await validatorFactory.deploy(validators)
+
     // deploy token bridge smart contract
     const factory: TokenBridge__factory = await hre.ethers.getContractFactory("TokenBridge")
-    const appNode = app === undefined ? [] : getNodes(app);
-
-    const bridge: TokenBridge = <TokenBridge>await hre.upgrades.deployProxy(factory, [appNode]);
-    await bridge.deployed();
-    console.log("Token bridge deployed to: ", bridge.address);
-    const proxyAdmin = await hre.upgrades.erc1967.getAdminAddress(bridge.address);
-    console.log("Proxy admin address is: ", proxyAdmin);
+    const bridge: TokenBridge = <TokenBridge>await hre.upgrades.deployProxy(factory, [validator.address])
+    await bridge.deployed()
+    console.log("Token bridge deployed to: ", bridge.address)
+    const proxyAdmin = await hre.upgrades.erc1967.getAdminAddress(bridge.address)
+    console.log("Proxy admin address is: ", proxyAdmin)
 
     if (verify) {
-        await verifyContract(hre, bridge.address);
+        await hre.run("verify:verify", {
+            address: validator.address,
+            constructorArguments: [validators],
+        });
+        await verifyProxyContract(hre, bridge.address);
     }
   });
 
@@ -29,7 +36,7 @@ task("prepare:bridge")
         console.log("New logic contract of token bridge has been prepared for upgrade at: ", upgrade);
 
         if (verify) {
-            await verifyContract(hre, upgrade);
+            await verifyProxyContract(hre, upgrade);
         }
     });
 
@@ -42,7 +49,8 @@ task("upgrade:bridge")
         console.log("Token bridge has been upgraded");
     });
 
-async function verifyContract(hre: HardhatRuntimeEnvironment, proxyAddress: string) {
+    
+async function verifyProxyContract(hre: HardhatRuntimeEnvironment, proxyAddress: string) {
     // We need to wait a little bit to verify the contract after deployment
     const implementationAddress = await hre.upgrades.erc1967.getImplementationAddress(proxyAddress);
     console.log("Verifying logic contract deployed at: " + implementationAddress + ". This may take some time.");

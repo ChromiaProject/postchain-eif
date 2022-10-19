@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 // Internal libraries
 import "./utils/cryptography/Hash.sol";
-import "./utils/cryptography/ECDSA.sol";
 import "./utils/cryptography/MerkleProof.sol";
 import "./Data.sol";
 

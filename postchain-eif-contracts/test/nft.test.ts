@@ -1,7 +1,7 @@
 import {ethers, upgrades, network} from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
-import { TokenBridge__factory, ERC721Mock__factory } from "../src/types";
+import { TokenBridge__factory, ERC721Mock__factory, Validator__factory } from "../src/types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumber, ContractReceipt, ContractTransaction } from "ethers";
 import { BytesLike, hexZeroPad, keccak256 } from "ethers/lib/utils";
@@ -15,6 +15,7 @@ const { expect } = chai;
 describe("Non Fungible Token", () => {
     let nftAddress: string;
     let bridgeAddress: string;
+    let validatorAddress: string;
     let directoryNodes: SignerWithAddress;
     let appNodes: SignerWithAddress;
     const name = "CRYPTOPUNKS";
@@ -32,8 +33,12 @@ describe("Non Fungible Token", () => {
         const tokenContract = await tokenFactory.deploy(name, symbol)
         nftAddress = tokenContract.address
 
+        const validatorFactory = new Validator__factory(directoryNodes)
+        const validatorContract = await validatorFactory.deploy([appNodes.address])
+        validatorAddress = validatorContract.address
+
         const factory = new TokenBridge__factory(directoryNodes)
-        const bridge = await upgrades.deployProxy(factory, [[appNodes.address]])
+        const bridge = await upgrades.deployProxy(factory, [validatorAddress])
         bridgeAddress = bridge.address
     });
 

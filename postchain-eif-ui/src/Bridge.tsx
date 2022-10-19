@@ -244,8 +244,8 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
           </thead>
           <tbody>
             {data?.withdraws?.map((w) => {
-              const eventHash = tokenType === 'ERC20' ? calculateEventLeafHash(w.serial, w.token, w.beneficiary, w.amount)
-                  : calculateEventLeafHash(w.serial, w.token, w.beneficiary, tokenId)
+              const eventHash = tokenType === 'ERC20' ? calculateEventLeafHash(w.serial, chainId, w.token, w.beneficiary, w.amount)
+                  : calculateEventLeafHash(w.serial, chainId, w.token, w.beneficiary, tokenId)
               return (<tr key={w?.serial}>
                 <th>{w?.serial}</th>
                 <td>{tokenType === "ERC20" ? Number(formatUnits(w?.amount.toString() ?? 0, data?.decimals)).toFixed(6) : tokenId}</td>
@@ -321,10 +321,10 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
       let sender = util.makeKeyPair()
       var tx = client.newTransaction([sender.pubKey])
       if (tokenType === "ERC721") {
-        tx.addOperation("withdraw_ERC721", tokenAddress.toLowerCase(), account.toLowerCase(), tokenId)
+        tx.addOperation("withdraw_ERC721", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), tokenId)
       } else {
         const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
-        tx.addOperation("withdraw_ERC20", tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount))
+        tx.addOperation("withdraw_ERC20", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount))
       }
       tx.sign(sender.privKey, sender.pubKey)
       let txRID = tx.getTxRID()
@@ -436,7 +436,7 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
 
   return (
     <div className="relative py-3 sm:max-w-5xl sm:mx-auto">
-      {chainId !== 4 && chainId !== 5 && (
+      {chainId !== 5 && chainId !== 97 && chainId !== 80001 && (
         <>
           <div className="alert">
             <div className="flex-1">
@@ -454,7 +454,7 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
                   d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
                 />
               </svg>
-              <label>Please connect to the Rinkeby testnet for testing.</label>
+              <label>Please connect to the Polygon Mumbai/Görli/BSC testnet for testing.</label>
             </div>
           </div>
           <div className="divider"></div>
