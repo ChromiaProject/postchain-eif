@@ -7,7 +7,9 @@ data class EvmConfig(
         val url: String,
         val connectTimeout: Long,
         val readTimeout: Long,
-        val writeTimeout: Long
+        val writeTimeout: Long,
+        val maxReadAhead: Long,
+        val maxQueueSize: Long
 ) {
     companion object {
         @JvmStatic
@@ -16,7 +18,9 @@ data class EvmConfig(
                     config.getString("$chain.url", ""),
                     config.getLong("evm.connectTimeout", 300),
                     config.getLong("evm.readTimeout", 300),
-                    config.getLong("evm.writeTimeout", 300)
+                    config.getLong("evm.writeTimeout", 300),
+                    config.getLong("$chain.maxReadAhead", 2_000L),
+                    config.getLong("$chain.maxQueueSize", 1_000L),
             )
         }
     }

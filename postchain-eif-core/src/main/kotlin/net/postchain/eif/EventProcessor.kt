@@ -108,6 +108,8 @@ class EvmEventProcessor(
         events: List<Event>,
         private val evmReadOffset: BigInteger,
         private val readOffset: BigInteger,
+        private val maxReadAhead: Long,
+        private val maxQueueSize: Long,
         skipToHeight: BigInteger,
         blockchainEngine: BlockchainEngine
 ) : EventProcessor, AbstractBlockchainProcess("$networkId-event-processor", blockchainEngine) {
@@ -122,13 +124,6 @@ class EvmEventProcessor(
     private val eventMap = events.associateBy(EventEncoder::encode)
     private val eventSignatures = eventMap.keys.toTypedArray()
 
-    companion object {
-        // The idea here is to avoid too big log queries and
-        // also potentially filling up our event queue too much
-        private const val MAX_READ_AHEAD = 10_000L
-        private const val MAX_QUEUE_SIZE = 1_000L
-    }
-
     /**
      * Producer thread will read events from ethereum ond add to queue in this action. Main thread will consume them.
      */
@@ -137,7 +132,7 @@ class EvmEventProcessor(
 
         val currentBlockHeight = sendWeb3jRequestWithRetry(web3j.ethBlockNumber()).blockNumber - evmReadOffset
         // Pacing the reading of logs
-        val to = minOf(currentBlockHeight, from + BigInteger.valueOf(MAX_READ_AHEAD))
+        val to = minOf(currentBlockHeight, from + BigInteger.valueOf(maxReadAhead))
 
         if (to < from) {
             logger.debug { "No new blocks to read. We are at height: $to" }
@@ -278,7 +273,7 @@ class EvmEventProcessor(
         // Just check against the events that we can actually consume
         return eventBlocks.filter {
             it[EncodedBlock.NUMBER.index].asBigInteger() <= lastReadLogBlockHeight - readOffset
-        }.size > MAX_QUEUE_SIZE
+        }.size > maxQueueSize
     }
 
     @Synchronized
