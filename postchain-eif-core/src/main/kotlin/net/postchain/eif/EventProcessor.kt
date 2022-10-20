@@ -114,7 +114,7 @@ class EvmEventProcessor(
 
     data class EvmBlock(val number: BigInteger, val hash: String)
 
-    var lastReadLogBlockHeight = skipToHeight
+    var lastReadLogBlockHeight = getLastCommittedEvmBlockHeight(networkId) ?: skipToHeight
         private set
 
     private val eventBlocks: Queue<Array<Gtv>> = LinkedList()
@@ -133,13 +133,7 @@ class EvmEventProcessor(
      * Producer thread will read events from ethereum ond add to queue in this action. Main thread will consume them.
      */
     override fun action() {
-        val lastCommittedBlock = getLastCommittedEvmBlockHeight(networkId)
-        val from = if (lastCommittedBlock != null) {
-            // Skip ahead if we are behind last committed block
-            maxOf(lastReadLogBlockHeight, lastCommittedBlock) + BigInteger.ONE
-        } else {
-            lastReadLogBlockHeight + BigInteger.ONE
-        }
+        val from = lastReadLogBlockHeight + BigInteger.ONE
 
         val currentBlockHeight = sendWeb3jRequestWithRetry(web3j.ethBlockNumber()).blockNumber - evmReadOffset
         // Pacing the reading of logs
