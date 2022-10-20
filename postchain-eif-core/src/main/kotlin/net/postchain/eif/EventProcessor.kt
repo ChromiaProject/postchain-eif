@@ -111,7 +111,7 @@ class EthereumEventProcessor(
 
     data class EthereumBlock(val number: BigInteger, val hash: String)
 
-    var lastReadLogBlockHeight = skipToHeight
+    var lastReadLogBlockHeight = getLastCommittedEthereumBlockHeight() ?: skipToHeight
         private set
 
     private val eventBlocks: Queue<Array<Gtv>> = LinkedList()
@@ -130,13 +130,7 @@ class EthereumEventProcessor(
      * Producer thread will read events from ethereum ond add to queue in this action. Main thread will consume them.
      */
     override fun action() {
-        val lastCommittedBlock = getLastCommittedEthereumBlockHeight()
-        val from = if (lastCommittedBlock != null) {
-            // Skip ahead if we are behind last committed block
-            maxOf(lastReadLogBlockHeight, lastCommittedBlock) + BigInteger.ONE
-        } else {
-            lastReadLogBlockHeight + BigInteger.ONE
-        }
+        val from = lastReadLogBlockHeight + BigInteger.ONE
 
         val currentBlockHeight = sendWeb3jRequestWithRetry(web3j.ethBlockNumber()).blockNumber - ethereumReadOffset
         // Pacing the reading of logs
