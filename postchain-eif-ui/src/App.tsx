@@ -7,14 +7,22 @@ import { ReactQueryDevtools } from "react-query/devtools";
 import Bridge from "./Bridge";
 import "./App.css";
 
-const bridgeAddress = process.env.REACT_APP_TOKEN_BRIDGE_ADDRESS
+const goerliBridgeAddress = process.env.REACT_APP_GOERLI_TOKEN_BRIDGE_ADDRESS
+const bscBridgeAddress = process.env.REACT_APP_BSC_TOKEN_BRIDGE_ADDRESS
+const mumbaiBridgeAddress = process.env.REACT_APP_MUMBAI_TOKEN_BRIDGE_ADDRESS
 
 const queryClient = new QueryClient();
+
 function App() {
-    const [tokenAddress, setTokenAddress] = useState("");
+    const [chainId, setChainId] = useState(5)
+    const [tokenAddress, setTokenAddress] = useState("")
 
     function handleChange(event) {
-        setTokenAddress(event.target.value);
+        setTokenAddress(event.target.value)
+    }
+
+    function handleChangeNetwork(event) {
+        setChainId(event.target.value)
     }
 
     return (
@@ -22,16 +30,33 @@ function App() {
             <QueryClientProvider client={queryClient}>
             <div className="App">
                 <Connector />
-
-                <select className="select select-bordered w-full max-w-xs" onChange={handleChange} defaultValue="">
-                    <option value="">Please choose your token to deposit</option>
-                    <option value="0x39615b16b74589919c9ce1ea73F1FC5D53141a78">CHR</option>
-                    <option value="0x2b203de02ad6109521e09985b3af9b8c62541cd6">OMG</option> 
-                    <option value="0xeb8f08a975ab53e34d8a0330e0d34de942c95926">USDC</option>
-                    <option value="0x4da8d0795830f75be471f072a034d42c369b5d0a">LINK</option>
-                    <option value="0x064e16771A4864561f767e4Ef4a6989fc4045aE7">ZKNFT</option>
-                </select>
-                {!!tokenAddress && !!bridgeAddress && (<Bridge bridgeAddress={bridgeAddress} tokenAddress={tokenAddress} />)}
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Pick the network</span>
+                    </label>
+                    <select id="network" className="select select-bordered w-full max-w-xs" onChange={handleChangeNetwork} defaultValue="5">
+                        <option value="5">5 - Goerli test network</option>
+                        <option value="97">97 - BNB Smart Chain Testnet</option>
+                        <option value="80001">80001 - Polygon Mumbai</option>
+                    </select>
+                    <label class="label">
+                        <span class="label-text">Pick the token</span>
+                    </label>
+                    <select id="token" className="select select-bordered w-full max-w-xs" onChange={handleChange} defaultValue="">
+                        <option value="">Please choose your token to deposit</option>
+                        <option value="0x39615b16b74589919c9ce1ea73F1FC5D53141a78">CHR (Goerli)</option>
+                        <option value="0x5C221E77624690fff6dd741493D735a17716c26B">DAI (Goerli)</option>
+                        <option value="0xd35CCeEAD182dcee0F148EbaC9447DA2c4D449c4">USDC (Goerli)</option>
+                        <option value="0x63bfb2118771bd0da7A6936667A7BB705A06c1bA">LINK (Goerli)</option>
+                        <option value="0xeD24FC36d5Ee211Ea25A80239Fb8C4Cfd80f12Ee">BUSD (BSC Testnet)</option>
+                        <option value="0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06">LINK (BSC Testnet)</option>
+                        <option value="0x326C977E6efc84E512bB9C30f76E30c160eD06FB">LINK (Mumbai)</option>
+                        <option value="0xfe4F5145f6e09952a5ba9e956ED0C25e3Fa4c7F1">DERC20 (Mumbai)</option>
+                    </select>
+                </div>
+                {chainId == 5 && !!tokenAddress && !!goerliBridgeAddress && (<Bridge bridgeAddress={goerliBridgeAddress} tokenAddress={tokenAddress} />)}
+                {chainId == 97 && !!tokenAddress && !!bscBridgeAddress && (<Bridge bridgeAddress={bscBridgeAddress} tokenAddress={tokenAddress} />)}
+                {chainId == 80001 && !!tokenAddress && !!mumbaiBridgeAddress && (<Bridge bridgeAddress={mumbaiBridgeAddress} tokenAddress={tokenAddress} />)}
             </div>
             <ReactQueryDevtools initialIsOpen={false} />
             <Toaster position="top-right" />            

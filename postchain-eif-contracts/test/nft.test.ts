@@ -1,7 +1,7 @@
 import {ethers, upgrades, network} from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
-import { TokenBridge__factory, ERC721Mock__factory } from "../src/types";
+import { TokenBridge__factory, ERC721Mock__factory, Validator__factory } from "../src/types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumber, ContractReceipt, ContractTransaction } from "ethers";
 import { BytesLike, hexZeroPad, keccak256 } from "ethers/lib/utils";
@@ -15,6 +15,7 @@ const { expect } = chai;
 describe("Non Fungible Token", () => {
     let nftAddress: string;
     let bridgeAddress: string;
+    let validatorAddress: string;
     let directoryNodes: SignerWithAddress;
     let appNodes: SignerWithAddress;
     const name = "CRYPTOPUNKS";
@@ -32,8 +33,12 @@ describe("Non Fungible Token", () => {
         const tokenContract = await tokenFactory.deploy(name, symbol)
         nftAddress = tokenContract.address
 
+        const validatorFactory = new Validator__factory(directoryNodes)
+        const validatorContract = await validatorFactory.deploy([appNodes.address])
+        validatorAddress = validatorContract.address
+
         const factory = new TokenBridge__factory(directoryNodes)
-        const bridge = await upgrades.deployProxy(factory, [[appNodes.address]])
+        const bridge = await upgrades.deployProxy(factory, [validatorAddress])
         bridgeAddress = bridge.address
     });
 
@@ -57,6 +62,7 @@ describe("Non Fungible Token", () => {
                     .withArgs(
                         user.address,
                         nftAddress,
+                        network.config.chainId,
                         tokenId,
                         name,
                         symbol,
@@ -90,11 +96,13 @@ describe("Non Fungible Token", () => {
                 // though it rarely happen due to we already reset the chain for each test scenario
                 const blockNumber = hexZeroPad(intToHex(101), 32)
                 const serialNumber = hexZeroPad(intToHex(101), 32)
+                const networkId = hexZeroPad(intToHex(network.config.chainId == undefined ? 1 : network.config.chainId), 32)                
                 const contractAddress = hexZeroPad(nftAddress, 32)
                 const toAddress = hexZeroPad(user.address, 32)
                 const tokenIdHex = hexZeroPad(tokenId.toHexString(), 32)
                 let event: string = ''
                 event = event.concat(serialNumber.substring(2, serialNumber.length))
+                event = event.concat(networkId.substring(2, networkId.length))
                 event = event.concat(contractAddress.substring(2, contractAddress.length))
                 event = event.concat(toAddress.substring(2, toAddress.length))
                 event = event.concat(tokenIdHex.substring(2, tokenIdHex.length))
@@ -114,7 +122,7 @@ describe("Non Fungible Token", () => {
                 let dependenciesHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(dependencies))
 
                 // This merkle root is calculated in the postchain code
-                let extraDataMerkleRoot = "FD46CBE97B08DC9C8E8BB6231EC482AAE07CE31201C7D40C6E0B69748C7F49C1"
+                let extraDataMerkleRoot = "258E024FB2F9EEC50F5338292159E98DB661DD8F69895104F7548882B9E1E5EB"
 
                 let timestamp = 1629878444220
                 let height = 46
@@ -167,6 +175,7 @@ describe("Non Fungible Token", () => {
                 // swap toAddress and contractAddress position to make maliciousEvent
                 let maliciousEvent: string = ''
                 maliciousEvent = maliciousEvent.concat(serialNumber.substring(2, serialNumber.length))
+                maliciousEvent = maliciousEvent.concat(networkId.substring(2, networkId.length))
                 maliciousEvent = maliciousEvent.concat(toAddress.substring(2, toAddress.length))
                 maliciousEvent = maliciousEvent.concat(contractAddress.substring(2, contractAddress.length))
                 maliciousEvent = maliciousEvent.concat(tokenIdHex.substring(2, tokenIdHex.length))                
