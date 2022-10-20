@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 // Internal libraries
 import "./utils/cryptography/Hash.sol";
-import "./utils/cryptography/ECDSA.sol";
 import "./utils/cryptography/MerkleProof.sol";
 import "./Data.sol";
 
@@ -16,6 +15,7 @@ library Postchain {
 
     struct Event {
         uint256 serialNumber;
+        uint256 networkId;
         IERC20 token;
         address beneficiary;
         uint256 amount;
@@ -23,6 +23,7 @@ library Postchain {
 
     struct EventNFT {
         uint256 serialNumber;
+        uint256 networkId;
         IERC721 nft;
         address beneficiary;
         uint256 tokenId;
@@ -41,22 +42,22 @@ library Postchain {
 
 
 
-    function verifyEvent(bytes32 _hash, bytes memory _event) internal pure returns (IERC20, address, uint256) {
+    function verifyEvent(bytes32 _hash, bytes memory _event) internal pure returns (IERC20, address, uint256, uint256) {
         Event memory evt = abi.decode(_event, (Event));
         bytes32 hash = keccak256(_event);
         if (hash != _hash) {
             revert('Postchain: invalid event');
         }
-        return (evt.token, evt.beneficiary, evt.amount);
+        return (evt.token, evt.beneficiary, evt.amount, evt.networkId);
     }
 
-    function verifyEventNFT(bytes32 _hash, bytes memory _event) internal pure returns (IERC721, address, uint256) {
+    function verifyEventNFT(bytes32 _hash, bytes memory _event) internal pure returns (IERC721, address, uint256, uint256) {
         EventNFT memory evt = abi.decode(_event, (EventNFT));
         bytes32 hash = keccak256(_event);
         if (hash != _hash) {
             revert('Postchain: invalid event');
         }
-        return (evt.nft, evt.beneficiary, evt.tokenId);
+        return (evt.nft, evt.beneficiary, evt.tokenId, evt.networkId);
     }    
 
     function verifyBlockHeader(

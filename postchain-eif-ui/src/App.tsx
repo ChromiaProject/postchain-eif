@@ -26,9 +26,9 @@ function App() {
                 <select className="select select-bordered w-full max-w-xs" onChange={handleChange} defaultValue="">
                     <option value="">Please choose your token to deposit</option>
                     <option value="0x39615b16b74589919c9ce1ea73F1FC5D53141a78">CHR</option>
-                    <option value="0x2b203de02ad6109521e09985b3af9b8c62541cd6">OMG</option> 
-                    <option value="0xeb8f08a975ab53e34d8a0330e0d34de942c95926">USDC</option>
-                    <option value="0x4da8d0795830f75be471f072a034d42c369b5d0a">LINK</option>
+                    <option value="0x5C221E77624690fff6dd741493D735a17716c26B">DAI</option> 
+                    <option value="0xd35CCeEAD182dcee0F148EbaC9447DA2c4D449c4">USDC</option>
+                    <option value="0x63bfb2118771bd0da7A6936667A7BB705A06c1bA">LINK</option>
                     <option value="0x064e16771A4864561f767e4Ef4a6989fc4045aE7">ZKNFT</option>
                 </select>
                 {!!tokenAddress && !!bridgeAddress && (<Bridge bridgeAddress={bridgeAddress} tokenAddress={tokenAddress} />)}

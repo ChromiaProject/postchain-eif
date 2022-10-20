@@ -24,9 +24,10 @@ import java.util.*
 import kotlin.streams.toList
 
 enum class EncodedBlock(val index: Int) {
-    NUMBER(0),
-    HASH(1),
-    EVENTS(2)
+    NETWORK_ID(0),
+    NUMBER(1),
+    HASH(2),
+    EVENTS(3)
 }
 
 enum class EncodedEvent(val index: Int) {
@@ -86,7 +87,8 @@ class NoOpEventProcessor : EventProcessor {
             opArgs[EncodedEvent.INDEXED_VALUES.index] is GtvArray &&
             opArgs[EncodedEvent.NON_INDEXED_VALUES.index] is GtvArray
 
-    private fun isValidEvmBlockFormat(opArgs: Array<Gtv>) = opArgs.size == 3 &&
+    private fun isValidEvmBlockFormat(opArgs: Array<out Gtv>) = opArgs.size == 4 &&
+            opArgs[EncodedBlock.NETWORK_ID.index] is GtvInteger &&
             opArgs[EncodedBlock.NUMBER.index] is GtvBigInteger &&
             opArgs[EncodedBlock.HASH.index] is GtvByteArray &&
             opArgs[EncodedBlock.EVENTS.index].asArray().all { isValidEvmEventFormat(it.asArray()) }
@@ -194,15 +196,17 @@ class EvmEventProcessor(
 
             val op = ops[index]
             if (op.opName == OP_EVM_BLOCK) {
+                val opNetworkId = op.args[EncodedBlock.NETWORK_ID.index]
+                val eventNetworkId = eventBlock[EncodedBlock.NETWORK_ID.index]
                 val opBlockNumber = op.args[EncodedBlock.NUMBER.index]
                 val eventBlockNumber = eventBlock[EncodedBlock.NUMBER.index]
                 val opBlockHash = op.args[EncodedBlock.HASH.index]
                 val eventBlockHash = eventBlock[EncodedBlock.HASH.index]
 
-                if (opBlockNumber != eventBlockNumber || opBlockHash != eventBlockHash) {
+                if (opNetworkId != eventNetworkId || opBlockNumber != eventBlockNumber || opBlockHash != eventBlockHash) {
                     logger.error(
-                        "Received unexpected block $opBlockNumber with hash $opBlockHash." +
-                                " Expected block $eventBlockNumber with hash $eventBlockHash"
+                        "Received unexpected block $opBlockNumber with hash $opBlockHash in network $opNetworkId." +
+                                " Expected block $eventBlockNumber with hash $eventBlockHash in network $eventNetworkId"
                     )
                     return false
                 }
@@ -247,9 +251,10 @@ class EvmEventProcessor(
             ))
         }
         return arrayOf(
-            gtv(eventBlock.first.number),
-            gtv(eventBlock.first.hash.substring(2).hexStringToByteArray()),
-            gtv(events)
+                gtv(networkId),
+                gtv(eventBlock.first.number),
+                gtv(eventBlock.first.hash.substring(2).hexStringToByteArray()),
+                gtv(events)
         )
     }
 
