@@ -105,7 +105,7 @@ class EvmEventProcessor(
         private val web3j: Web3j,
         private val contractAddresses: List<String>,
         events: List<Event>,
-        private val evmReadOffset: BigInteger,
+        private val readOffset: BigInteger,
         skipToHeight: BigInteger,
         blockchainEngine: BlockchainEngine
 ) : EventProcessor, AbstractBlockchainProcess("$networkId-event-processor", blockchainEngine) {
@@ -225,7 +225,7 @@ class EvmEventProcessor(
     @Synchronized
     override fun getEventData(): List<Array<Gtv>> {
         return eventBlocks.stream()
-            .takeWhile { it[EncodedBlock.NUMBER.index].asBigInteger() <= lastReadLogBlockHeight - evmReadOffset }
+            .takeWhile { it[EncodedBlock.NUMBER.index].asBigInteger() <= lastReadLogBlockHeight - readOffset }
             .toList()
     }
 
@@ -276,7 +276,7 @@ class EvmEventProcessor(
     private fun isQueueFull(): Boolean {
         // Just check against the events that we can actually consume
         return eventBlocks.filter {
-            it[EncodedBlock.NUMBER.index].asBigInteger() <= lastReadLogBlockHeight - evmReadOffset
+            it[EncodedBlock.NUMBER.index].asBigInteger() <= lastReadLogBlockHeight - readOffset
         }.size > MAX_QUEUE_SIZE
     }
 

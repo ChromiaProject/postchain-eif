@@ -71,13 +71,14 @@ class EifSynchronizationInfrastructureExtension(
             val web3j = Web3j.build(Web3jServiceFactory.buildService(evmConfig))
 
             val events = evmBlockchainConfig.events.asArray().map(GtvToEventMapper::map)
-            EvmEventProcessor(evmBlockchainConfig.networkId,
-                web3j,
-                evmBlockchainConfig.contracts,
-                events,
-                BigInteger.valueOf(evmBlockchainConfig.evmReadOffset),
-                BigInteger.valueOf(evmBlockchainConfig.readOffset),
-                engine
+            EvmEventProcessor(
+                    evmBlockchainConfig.networkId,
+                    web3j,
+                    evmBlockchainConfig.contracts,
+                    events,
+                    BigInteger.valueOf(evmBlockchainConfig.readOffset),
+                    evmBlockchainConfig.skipToHeight,
+                    engine
             ).apply { start() }
         }
     }

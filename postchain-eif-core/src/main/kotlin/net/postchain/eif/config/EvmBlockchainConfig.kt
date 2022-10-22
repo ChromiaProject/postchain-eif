@@ -18,9 +18,6 @@ data class EvmBlockchainConfig(
         @Name("skip_to_height")
         @DefaultValue(defaultBigInteger = "0")
         val skipToHeight: BigInteger,
-        @Name("evm_read_offset")
-        @DefaultValue(defaultLong = 12)
-        val evmReadOffset: Long,
         @Name("read_offset")
         @DefaultValue(defaultLong = 100)
         val readOffset: Long
