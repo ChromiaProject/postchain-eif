@@ -29,6 +29,8 @@ const chainIds = {
   mainnet: 1,
   rinkeby: 4,
   ropsten: 3,
+  bsc: 97,
+  mumbai: 80001,
 };
 
 const MNEMONIC = process.env.MNEMONIC || "";
@@ -70,6 +72,26 @@ const config: HardhatUserConfig = {
     kovan: createTestnetConfig("kovan"),
     rinkeby: createTestnetConfig("rinkeby"),
     ropsten: createTestnetConfig("ropsten"),
+    bsc: {
+      accounts: {
+        count: 10,
+        initialIndex: 0,
+        mnemonic: MNEMONIC,
+        path: "m/44'/60'/0'/0",
+      },
+      chainId: chainIds.bsc,
+      url: "https://data-seed-prebsc-1-s1.binance.org:8545/",
+    },
+    mumbai: {
+      accounts: {
+        count: 10,
+        initialIndex: 0,
+        mnemonic: MNEMONIC,
+        path: "m/44'/60'/0'/0",
+      },
+      chainId: chainIds.mumbai,
+      url: "https://polygon-mumbai.g.alchemy.com/v2/HY9dxoQq2MBbyMd-LSmnHujDe231wKgz",
+    }
   },
   paths: {
     artifacts: "./src/artifacts",

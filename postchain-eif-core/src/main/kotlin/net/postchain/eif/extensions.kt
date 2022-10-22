@@ -18,7 +18,7 @@ import java.util.*
 const val EIF_EVENT = "eif_event"
 const val EIF_STATE = "eif_state"
 
-class EthereumEifImplementation(
+class EifImplementation(
         private val ds: DigestSystem,
         private val levelsPerPage: Int): BaseBlockBuilderExtension, TxEventSink {
 

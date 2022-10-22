@@ -8,21 +8,21 @@ import net.postchain.gtx.*
 import net.postchain.gtx.data.OpData
 import net.postchain.gtx.special.GTXSpecialTxExtension
 
-const val OP_ETH_BLOCK = "__eth_block"
+const val OP_EVM_BLOCK = "__evm_block"
 
 class EifSpecialTxExtension : GTXSpecialTxExtension {
     private var needEifTnx: Boolean = false
-    private val rops = setOf(OP_ETH_BLOCK)
+    private val rops = setOf(OP_EVM_BLOCK)
     override fun getRelevantOps() = rops
 
-    private lateinit var proc: EventProcessor
+    private val processors = mutableMapOf<Long, EventProcessor>()
 
-    fun useEventProcessor(processor: EventProcessor) {
-        proc = processor
+    fun addEventProcessor(networkID: Long, processor: EventProcessor) {
+        processors[networkID] = processor
     }
 
     override fun init(module: GTXModule, chainID: Long, blockchainRID: BlockchainRid, cs: CryptoSystem) {
-        needEifTnx = module.getOperations().contains(OP_ETH_BLOCK)
+        needEifTnx = module.getOperations().contains(OP_EVM_BLOCK)
     }
 
     override fun needsSpecialTransaction(position: SpecialTransactionPosition): Boolean {
@@ -33,17 +33,24 @@ class EifSpecialTxExtension : GTXSpecialTxExtension {
     }
 
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
-        if (position == SpecialTransactionPosition.Begin) {
+        if (position == SpecialTransactionPosition.Begin && processors.isNotEmpty()) {
+            val index = bctx.height.mod(processors.size)
+            val proc = processors.values.toList()[index]
             val data = proc.getEventData()
-            return data.map { OpData(OP_ETH_BLOCK, it) }
+            return data.map { OpData(OP_EVM_BLOCK, it) }.also {
+                bctx.addAfterCommitHook { proc.markAsProcessed(it) }
+            }
         }
         return listOf()
     }
 
 
     override fun validateSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext, ops: List<OpData>): Boolean {
-        if (position == SpecialTransactionPosition.Begin) {
-            return proc.isValidEventData(ops.toTypedArray())
+        if (position == SpecialTransactionPosition.Begin && processors.isNotEmpty()) {
+            val index = bctx.height.mod(processors.size)
+            val proc = processors.values.toList()[index]
+            bctx.addAfterCommitHook { proc.markAsProcessed(ops) }
+            return proc.isValidEventData(ops)
         }
         return ops.isEmpty()
     }

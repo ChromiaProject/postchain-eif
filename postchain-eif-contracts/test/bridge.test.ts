@@ -1,7 +1,7 @@
 import { ethers, upgrades, network} from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
-import { TestToken__factory, TokenBridge__factory, TokenBridgeDelegator__factory } from "../src/types";
+import { TestToken__factory, TokenBridge__factory, TokenBridgeDelegator__factory, Validator__factory } from "../src/types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BytesLike, hexZeroPad, keccak256 } from "ethers/lib/utils";
 import { ContractReceipt, ContractTransaction } from "ethers";
@@ -14,6 +14,7 @@ const { expect } = chai;
 describe("Token Bridge Test", () => {
     let tokenAddress: string;
     let bridgeAddress: string;
+    let validatorAddress: string;
     let bridgeDelegatorAddress: string;
     let admin: SignerWithAddress;
     let validator1: SignerWithAddress;
@@ -32,8 +33,12 @@ describe("Token Bridge Test", () => {
         tokenAddress = tokenContract.address
         expect(await tokenContract.totalSupply()).to.eq(0)
 
+        const validatorFactory = new Validator__factory(admin)
+        const validatorContract = await validatorFactory.deploy([validator1.address, validator2.address])
+        validatorAddress = validatorContract.address
+
         const bridgeFactory = new TokenBridge__factory(admin)
-        const bridge = await upgrades.deployProxy(bridgeFactory, [[validator1.address, validator2.address]])
+        const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress])
         bridgeAddress = bridge.address
 
         const bridgeDelegatorFactory = new TokenBridgeDelegator__factory(deployer)
@@ -44,18 +49,18 @@ describe("Token Bridge Test", () => {
     describe("Validators", async () => {
         it("Admin can update validator(s) successfully", async () => {
             const [node1, node2, node3, other] = await ethers.getSigners()
-            const bridge = new TokenBridge__factory(admin).attach(bridgeAddress)
-            const otherbridge = new TokenBridge__factory(other).attach(bridgeAddress)
-            await expect(otherbridge.addValidator(0, node1.address)).to.be.revertedWith("Ownable: caller is not the owner")
+            const validator = new Validator__factory(admin).attach(validatorAddress)
+            const otherValidator = new Validator__factory(other).attach(validatorAddress)
+            await expect(otherValidator.addValidator(0, node1.address)).to.be.revertedWith("Ownable: caller is not the owner")
             // Update App Nodes
-            await bridge.removeValidator(0, validator1.address)
-            await bridge.removeValidator(0, validator2.address)
-            await bridge.addValidator(0, node1.address)
-            await bridge.addValidator(0, node2.address)
-            await bridge.addValidator(0, node3.address)
-            expect(await bridge.validators(0, 0)).to.eq(node1.address)
-            expect(await bridge.validators(0, 1)).to.eq(node2.address)
-            expect(await bridge.validators(0, 2)).to.eq(node3.address)
+            await validator.removeValidator(0, validator1.address)
+            await validator.removeValidator(0, validator2.address)
+            await validator.addValidator(0, node1.address)
+            await validator.addValidator(0, node2.address)
+            await validator.addValidator(0, node3.address)
+            expect(await validator.validators(0, 0)).to.eq(node1.address)
+            expect(await validator.validators(0, 1)).to.eq(node2.address)
+            expect(await validator.validators(0, 2)).to.eq(node3.address)
         })
     })
 
@@ -80,6 +85,7 @@ describe("Token Bridge Test", () => {
                     .withArgs(
                         user.address,
                         tokenAddress,
+                        network.config.chainId,
                         toDeposit,
                         name,
                         symbol,
@@ -101,7 +107,7 @@ describe("Token Bridge Test", () => {
             expect(await tokenInstance.totalSupply()).to.eq(toMint)
 
             const bridge = new TokenBridge__factory(user).attach(bridgeAddress)
-            const bridgeAdmin = new TokenBridge__factory(admin).attach(bridgeAddress)
+            const validatorAdmin = new Validator__factory(admin).attach(validatorAddress)
             const toDeposit = ethers.utils.parseEther("100")
             const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
@@ -112,11 +118,14 @@ describe("Token Bridge Test", () => {
             if (logs !== undefined) {
                 const blockNumber = hexZeroPad(intToHex(1), 32)
                 const serialNumber = hexZeroPad(intToHex(1), 32)
+                const networkId = hexZeroPad(intToHex(network.config.chainId == undefined ? 1 : network.config.chainId), 32)
+                const zeroNetworkId = hexZeroPad(intToHex(0), 32)
                 const contractAddress = hexZeroPad(tokenAddress, 32)
                 const toAddress = hexZeroPad(user.address, 32)
                 const amountHex = hexZeroPad(toDeposit.toHexString(), 32)
                 let event: string = ''
                 event = event.concat(serialNumber.substring(2, serialNumber.length))
+                event = event.concat(networkId.substring(2, networkId.length))
                 event = event.concat(contractAddress.substring(2, contractAddress.length))
                 event = event.concat(toAddress.substring(2, toAddress.length))
                 event = event.concat(amountHex.substring(2, amountHex.length))
@@ -124,18 +133,30 @@ describe("Token Bridge Test", () => {
                 // swap toAddress and contractAddress position to make maliciousEvent
                 let maliciousEvent: string = ''
                 maliciousEvent = maliciousEvent.concat(serialNumber.substring(2, serialNumber.length))
+                maliciousEvent = maliciousEvent.concat(networkId.substring(2, networkId.length))
                 maliciousEvent = maliciousEvent.concat(toAddress.substring(2, toAddress.length))
                 maliciousEvent = maliciousEvent.concat(contractAddress.substring(2, contractAddress.length))
                 maliciousEvent = maliciousEvent.concat(amountHex.substring(2, amountHex.length))
 
+                let wrongNetworkIdEvent: string = ''
+                wrongNetworkIdEvent = wrongNetworkIdEvent.concat(serialNumber.substring(2, serialNumber.length))
+                wrongNetworkIdEvent = wrongNetworkIdEvent.concat(zeroNetworkId.substring(2, networkId.length))
+                wrongNetworkIdEvent = wrongNetworkIdEvent.concat(contractAddress.substring(2, contractAddress.length))
+                wrongNetworkIdEvent = wrongNetworkIdEvent.concat(toAddress.substring(2, toAddress.length))
+                wrongNetworkIdEvent = wrongNetworkIdEvent.concat(amountHex.substring(2, amountHex.length))
+
                 let data = DecodeHexStringToByteArray(event)
                 let maliciousData = DecodeHexStringToByteArray(maliciousEvent)
+                let wrongNetworkIdData = DecodeHexStringToByteArray(wrongNetworkIdEvent)
                 let hashEventLeaf = keccak256(data)
                 let maliciousHashEventLeaf = keccak256(keccak256(data))
+                let wrongNetworkIdHashEventLeaf = keccak256(wrongNetworkIdData)
                 let hashRootEvent = keccak256(keccak256(hashEventLeaf))
+                let wrongNetworkIdHashRoot = keccak256(keccak256(wrongNetworkIdHashEventLeaf))
                 let state = blockNumber.substring(2, blockNumber.length).concat(event)
                 let hashRootState = keccak256(DecodeHexStringToByteArray(state))
                 let eifLeaf = hashRootEvent.substring(2, hashRootEvent.length).concat(hashRootState.substring(2, hashRootState.length))
+                let eifWrongNetworkIdLeaf = wrongNetworkIdHashRoot.substring(2, wrongNetworkIdHashRoot.length).concat(hashRootState.substring(2, hashRootState.length))
 
                 let blockchainRid = "977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795"
                 let previousBlockRid = "49e46bf022de1515cbb2bf0f69c62c071825a9b940e8f3892acb5d2021832ba0"
@@ -145,7 +166,8 @@ describe("Token Bridge Test", () => {
                 let dependenciesHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(dependencies))
 
                 // This merkle root is calculated in the postchain code
-                let extraDataMerkleRoot = "65F421744240981926404029DED54BCB7EEBA7AD271A06D49733DA00444D537C"
+                let extraDataMerkleRoot = "084FE92782C73BE4AD04B6CA167F8513EE9FB4693DD58C3CD96AC266209B0F23"
+                let wrongNetworkIdExtraDataMerkleRoot = "3FA75D6A93D7F8F5BB4B17F0C8F27B1ABB6B08CF907A203F957FBB101D8EC8F2"
 
                 let node1 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(blockchainRid))
                 let node2 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(previousBlockRid))
@@ -160,11 +182,14 @@ describe("Token Bridge Test", () => {
                 let node56 = postchainMerkleNodeHash([0x00, node5, node6])
                 let node1234 = postchainMerkleNodeHash([0x00, node12, node34])
                 let node5678 = postchainMerkleNodeHash([0x00, node56, DecodeHexStringToByteArray(extraDataMerkleRoot)])
+                let wrongNetworkIdNode5678 = postchainMerkleNodeHash([0x00, node56, DecodeHexStringToByteArray(wrongNetworkIdExtraDataMerkleRoot)])
 
                 let blockRid = postchainMerkleNodeHash([0x7, node1234, node5678])
                 let maliciousBlockRid = postchainMerkleNodeHash([0x7, node1234, node1234])
+                let wrongNetworkIdBlockRid = postchainMerkleNodeHash([0x7, node1234, wrongNetworkIdNode5678])
                 let blockHeader: BytesLike = ''
                 let maliciousBlockHeader: BytesLike = ''
+                let wrongNetworkIdBlockHeader: BytesLike = ''
                 let ts = hexZeroPad(intToHex(timestamp), 32)
                 let h = hexZeroPad(intToHex(height), 32)
                 blockHeader = blockHeader.concat(blockchainRid, blockRid.substring(2, blockRid.length), previousBlockRid,
@@ -181,14 +206,25 @@ describe("Token Bridge Test", () => {
                                     extraDataMerkleRoot
                 )
 
+                wrongNetworkIdBlockHeader = wrongNetworkIdBlockHeader.concat(blockchainRid, wrongNetworkIdBlockRid.substring(2, wrongNetworkIdBlockRid.length), previousBlockRid, 
+                                    merkleRootHashHashedLeaf.substring(2, merkleRootHashHashedLeaf.length),
+                                    ts.substring(2, ts.length), h.substring(2, h.length),
+                                    dependenciesHashedLeaf.substring(2, dependenciesHashedLeaf.length),
+                                    wrongNetworkIdExtraDataMerkleRoot
+                )
+
                 // update to add new validator at height of 30
-                await bridgeAdmin.addValidator(30, validator1.address)
-                await bridgeAdmin.addValidator(30, validator2.address)
-                await bridgeAdmin.addValidator(30, validator3.address)
+                await validatorAdmin.addValidator(30, validator1.address)
+                await validatorAdmin.addValidator(30, validator2.address)
+                await validatorAdmin.addValidator(30, validator3.address)
 
                 let sig1 = await validator1.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
                 let sig2 = await validator2.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
                 let sig3 = await validator3.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
+
+                let wrongNetworkIdSig1 = await validator1.signMessage(DecodeHexStringToByteArray(wrongNetworkIdBlockRid.substring(2, wrongNetworkIdBlockRid.length)))
+                let wrongNetworkIdSig2 = await validator2.signMessage(DecodeHexStringToByteArray(wrongNetworkIdBlockRid.substring(2, wrongNetworkIdBlockRid.length)))
+                let wrongNetworkIdSig3 = await validator3.signMessage(DecodeHexStringToByteArray(wrongNetworkIdBlockRid.substring(2, wrongNetworkIdBlockRid.length)))
 
                 let merkleProof = [
                                     DecodeHexStringToByteArray("0000000000000000000000000000000000000000000000000000000000000000"), 
@@ -205,12 +241,25 @@ describe("Token Bridge Test", () => {
                     position: 0,
                     merkleProofs: merkleProof,
                 }
+                let wrongNetworkIdEventProof = {
+                    leaf: DecodeHexStringToByteArray(wrongNetworkIdHashEventLeaf.substring(2, wrongNetworkIdHashEventLeaf.length)),
+                    position: 0,
+                    merkleProofs: merkleProof,
+                }
                 let hashedLeaf = hashGtvBytes64Leaf(DecodeHexStringToByteArray(eifLeaf))
+                let wrongNetworkIdHashedLeaf = hashGtvBytes64Leaf(DecodeHexStringToByteArray(eifWrongNetworkIdLeaf))
                 let extraProof = {
                     leaf: DecodeHexStringToByteArray(eifLeaf),
                     hashedLeaf: DecodeHexStringToByteArray(hashedLeaf.substring(2, hashedLeaf.length)),
                     position: 1,
                     extraRoot: DecodeHexStringToByteArray(extraDataMerkleRoot),
+                    extraMerkleProofs: [DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797")],
+                }
+                let wrongNetworkIdExtraProof = {
+                    leaf: DecodeHexStringToByteArray(eifWrongNetworkIdLeaf),
+                    hashedLeaf: DecodeHexStringToByteArray(wrongNetworkIdHashedLeaf.substring(2, wrongNetworkIdHashedLeaf.length)),
+                    position: 1,
+                    extraRoot: DecodeHexStringToByteArray(wrongNetworkIdExtraDataMerkleRoot),
                     extraMerkleProofs: [DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797")],
                 }
                 let invalidExtraLeaf = {
@@ -239,10 +288,19 @@ describe("Token Bridge Test", () => {
                 };
                 let sigs = [
                     DecodeHexStringToByteArray(sig1.substring(2, sig1.length)),
-                    DecodeHexStringToByteArray(sig3.substring(2, sig2.length)),
+                    DecodeHexStringToByteArray(sig3.substring(2, sig3.length)),
                     DecodeHexStringToByteArray(sig2.substring(2, sig2.length))
                 ];
+                let wrongNetworkIdSigs = [
+                    DecodeHexStringToByteArray(wrongNetworkIdSig1.substring(2, wrongNetworkIdSig1.length)),
+                    DecodeHexStringToByteArray(wrongNetworkIdSig3.substring(2, wrongNetworkIdSig3.length)),
+                    DecodeHexStringToByteArray(wrongNetworkIdSig2.substring(2, wrongNetworkIdSig2.length))
+                ]
                 let validators = [validator1.address, validator3.address, validator2.address];
+                await expect(bridge.withdrawRequest(wrongNetworkIdData, wrongNetworkIdEventProof,
+                    DecodeHexStringToByteArray(wrongNetworkIdBlockHeader), wrongNetworkIdSigs, validators, 
+                    wrongNetworkIdExtraProof)
+                ).to.be.revertedWith('TokenBridge: incorrect network id')
                 await expect(bridge.withdrawRequest(maliciousData, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators, 
                     extraProof)
@@ -279,7 +337,7 @@ describe("Token Bridge Test", () => {
                     ], 
                     [validator1.address, validator2.address],
                     extraProof)
-                ).to.be.revertedWith('TokenBridge: duplicate signature or signers is out of order')
+                ).to.be.revertedWith('Validator: duplicate signature or signers is out of order')
                 await expect(bridge.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader),
                     [
@@ -288,7 +346,7 @@ describe("Token Bridge Test", () => {
                     ], 
                     [validator2.address, validator1.address],
                     extraProof)
-                ).to.be.revertedWith('TokenBridge: duplicate signature or signers is out of order')
+                ).to.be.revertedWith('Validator: duplicate signature or signers is out of order')
                 let sig = await admin.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
                 await expect(bridge.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader),
@@ -298,7 +356,7 @@ describe("Token Bridge Test", () => {
                     ], 
                     [admin.address, validator1.address],
                     extraProof)
-                ).to.be.revertedWith('TokenBridge: signer is not validator')
+                ).to.be.revertedWith('Validator: signer is not validator')
                 await expect(bridge.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     extraProof)
@@ -368,7 +426,7 @@ describe("Token Bridge Test", () => {
             expect(await tokenInstance.totalSupply()).to.eq(toMint)
 
             const bridge = new TokenBridge__factory(user).attach(bridgeAddress)
-            const bridgeAdmin = new TokenBridge__factory(admin).attach(bridgeAddress)
+            const validatorAdmin = new Validator__factory(admin).attach(validatorAddress)
             const bridgeDelegator = new TokenBridgeDelegator__factory(user).attach(bridgeDelegatorAddress)            
             const toDeposit = ethers.utils.parseEther("100")
             await bridgeDelegator.approve(tokenAddress, bridgeAddress, toDeposit)
@@ -379,11 +437,13 @@ describe("Token Bridge Test", () => {
             if (logs !== undefined) {
                 const blockNumber = hexZeroPad(intToHex(2), 32)
                 const serialNumber = hexZeroPad(intToHex(2), 32)
+                const networkId = hexZeroPad(intToHex(network.config.chainId == undefined ? 1 : network.config.chainId), 32)
                 const contractAddress = hexZeroPad(tokenAddress, 32)
                 const toAddress = hexZeroPad(bridgeDelegatorAddress, 32)
                 const amountHex = hexZeroPad(toDeposit.toHexString(), 32)
                 let event: string = ''
                 event = event.concat(serialNumber.substring(2, serialNumber.length))
+                event = event.concat(networkId.substring(2, networkId.length))
                 event = event.concat(contractAddress.substring(2, contractAddress.length))
                 event = event.concat(toAddress.substring(2, toAddress.length))
                 event = event.concat(amountHex.substring(2, amountHex.length))
@@ -391,6 +451,7 @@ describe("Token Bridge Test", () => {
                 // swap toAddress and contractAddress position to make maliciousEvent
                 let maliciousEvent: string = ''
                 maliciousEvent = maliciousEvent.concat(serialNumber.substring(2, serialNumber.length))
+                maliciousEvent = maliciousEvent.concat(networkId.substring(2, networkId.length))
                 maliciousEvent = maliciousEvent.concat(toAddress.substring(2, toAddress.length))
                 maliciousEvent = maliciousEvent.concat(contractAddress.substring(2, contractAddress.length))
                 maliciousEvent = maliciousEvent.concat(amountHex.substring(2, amountHex.length))
@@ -412,7 +473,7 @@ describe("Token Bridge Test", () => {
                 let dependenciesHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(dependencies))
 
                 // This merkle root is calculated in the postchain code
-                let extraDataMerkleRoot = "0925B66651245953D3CA797B6DA6CFC2EDD87C126E74B40F76A6F71D19936153"
+                let extraDataMerkleRoot = "8E052CEB23DB2111FBB13A1C2F6B3639C4EA8F447022A1B9BFF42442EF939F17"
 
                 let node1 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(blockchainRid))
                 let node2 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(previousBlockRid))
@@ -449,9 +510,9 @@ describe("Token Bridge Test", () => {
                 )
 
                 // update to add new validator at height of 30
-                await bridgeAdmin.addValidator(30, validator1.address)
-                await bridgeAdmin.addValidator(30, validator2.address)
-                await bridgeAdmin.addValidator(30, validator3.address)
+                await validatorAdmin.addValidator(30, validator1.address)
+                await validatorAdmin.addValidator(30, validator2.address)
+                await validatorAdmin.addValidator(30, validator3.address)
 
                 let sig1 = await validator1.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
                 let sig2 = await validator2.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
@@ -546,7 +607,7 @@ describe("Token Bridge Test", () => {
                     ], 
                     [validator1.address, validator2.address],
                     extraProof)
-                ).to.be.revertedWith('TokenBridge: duplicate signature or signers is out of order')
+                ).to.be.revertedWith('Validator: duplicate signature or signers is out of order')
                 await expect(bridgeDelegator.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader),
                     [
@@ -555,7 +616,7 @@ describe("Token Bridge Test", () => {
                     ], 
                     [validator2.address, validator1.address],
                     extraProof)
-                ).to.be.revertedWith('TokenBridge: duplicate signature or signers is out of order')
+                ).to.be.revertedWith('Validator: duplicate signature or signers is out of order')
                 let sig = await admin.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
                 await expect(bridgeDelegator.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader),
@@ -565,7 +626,7 @@ describe("Token Bridge Test", () => {
                     ], 
                     [admin.address, validator1.address],
                     extraProof)
-                ).to.be.revertedWith('TokenBridge: signer is not validator')
+                ).to.be.revertedWith('Validator: signer is not validator')
                 await expect(bridgeDelegator.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     extraProof)

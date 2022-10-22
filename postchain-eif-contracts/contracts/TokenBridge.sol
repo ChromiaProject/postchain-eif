@@ -15,6 +15,11 @@ import "@openzeppelin/contracts/interfaces/IERC20.sol";
 // Internal libraries
 import "./Postchain.sol";
 
+interface IValidator {
+    function getValidatorHeight(uint _height) external view returns (uint);
+    function isValidSignatures(uint height, bytes32 hash, bytes[] memory signatures, address[] memory signers) external view returns (bool);
+}
+
 // This contract is upgradeable. This imposes restrictions on how storage layout can be modified once it is deployed
 // Some instructions are also not allowed. Read more at: https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable
 // Note: To enhance the security & decentralization, we should call transferOwnership() to external multi-sig owner after deploy the smart contract
@@ -22,7 +27,6 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
 
     uint8 constant ERC20_ACCOUNT_STATE_BYTE_SIZE = 64;
     uint8 constant ERC721_ACCOUNT_STATE_BYTE_SIZE = 64;
-    using EC for bytes32;
     using Postchain for bytes32;
     using MerkleProof for bytes32[];
 
@@ -50,9 +54,8 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
     mapping (IERC721 => mapping(uint256 => address)) public _owners;
     mapping (bytes32 => Withdraw) public _withdraw;
     mapping (bytes32 => WithdrawNFT) public _withdrawNFT;
-    mapping (uint => mapping(address => bool)) validatorMap;
-    mapping (uint => address[]) public validators; // postchain block height => validators
-    uint[] public validatorHeights;
+    IValidator public validator;
+    uint256 public networkId;
 
     // Each postchain event will be used to claim only one time.
     mapping (bytes32 => bool) private _events;
@@ -86,79 +89,22 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
         Status status;
     }
 
-    event ValidatorAdded(uint height, address indexed _validator);
-    event ValidatorRemoved(uint height, address indexed _validator);
-    event DepositedERC20(address indexed sender, IERC20 indexed token, uint amount, string name, string symbol, uint8 decimals);
-    event DepositedERC721(address indexed sender, IERC721 indexed nft, uint tokenId, string name, string symbol, string tokenURI);
+    event DepositedERC20(address indexed sender, IERC20 indexed token, uint networkId, uint amount, string name, string symbol, uint8 decimals);
+    event DepositedERC721(address indexed sender, IERC721 indexed nft, uint networkId, uint tokenId, string name, string symbol, string tokenURI);
     event WithdrawRequest(address indexed beneficiary, IERC20 indexed token, uint256 value);
     event WithdrawRequestNFT(address indexed beneficiary, IERC721 indexed token, uint256 tokenId);
     event Withdrawal(address indexed beneficiary, IERC20 indexed token, uint256 value);
     event WithdrawalNFT(address indexed beneficiary, IERC721 indexed nft, uint256 tokenId);
 
-    function initialize(address[] memory _validators) public initializer {
+    function initialize(IValidator _validator) public initializer {
         __Ownable_init();
-        validators[0] = _validators;
 
-        for (uint i = 0; i < validators[0].length; i++) {
-            validatorMap[0][validators[0][i]] = true;
+        uint256 id;
+        assembly {
+            id := chainid()
         }
-        validatorHeights.push(0);
-    }
-    
-    function isValidator(uint _height, address _addr) public view returns (bool) {
-        return validatorMap[_height][_addr];
-    }
-    
-    function addValidator(uint _height, address _validator) external onlyOwner {
-        if (_height < validatorHeights[validatorHeights.length-1]) {
-            revert("TokenBridge: cannot update previous heights' validator");
-        } else if (_height > validatorHeights[validatorHeights.length-1]) {
-            validatorHeights.push(_height);
-        }
-        require(!validatorMap[_height][_validator]);
-        validators[_height].push(_validator);
-        validatorMap[_height][_validator] = true;
-        emit ValidatorAdded(_height, _validator);
-    }
-
-    function removeValidator(uint _height, address _validator) external onlyOwner {
-        if (_height < validatorHeights[validatorHeights.length-1]) {
-            revert("TokenBridge: cannot update previous heights' validator");
-        }
-        require(isValidator(_height, _validator));
-        uint index;
-        uint validatorCount = validators[_height].length;
-        for (uint i = 0; i < validatorCount; i++) {
-            if (validators[_height][i] == _validator) {
-                index = i;
-                break;
-            }
-        }
-
-        validatorMap[_height][_validator] = false;
-        validators[_height][index] = validators[_height][validatorCount - 1];
-        validators[_height].pop();
-
-        emit ValidatorRemoved(_height, _validator);
-    }
-
-    function getValidatorHeight(uint _height) external view returns (uint) {
-        return _getValidatorHeight(_height);
-    }
-
-    function _getValidatorHeight(uint _height) internal view returns (uint) {
-        uint lastIndex = validatorHeights.length-1;
-        uint lastHeight = validatorHeights[lastIndex];
-        if (_height >= lastHeight) {
-            return lastHeight;
-        } else {
-            for (uint i = lastIndex; i > 0; i--) {
-                if (_height < validatorHeights[i] && _height >= validatorHeights[i-1]) {
-                    return validatorHeights[i-1];
-                }
-            }
-            return 0;
-        }
+        networkId = id;
+        validator = _validator;
     }
 
     /**
@@ -213,7 +159,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
         // Do transfer
         token.transferFrom(msg.sender, address(this), amount);
         _balances[token] += amount;
-        emit DepositedERC20(msg.sender, token, amount, name, symbol, decimals);
+        emit DepositedERC20(msg.sender, token, networkId, amount, name, symbol, decimals);
         return true;
     }
 
@@ -239,7 +185,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
             tokenURI = abi.decode(_tokenURI, (string));
         }
 
-        emit DepositedERC721(msg.sender, nft, tokenId, name, symbol, tokenURI);
+        emit DepositedERC721(msg.sender, nft, networkId, tokenId, name, symbol, tokenURI);
         return true;
     }
 
@@ -284,7 +230,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
         require(_events[eventProof.leaf] == false, "TokenBridge: event hash was already used");
         {
             (uint height, bytes32 blockRid, bytes32 eventRoot, ) = Postchain.verifyBlockHeader(blockHeader, extraProof);
-            if (!isValidSignatures(_getValidatorHeight(height), blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
+            if (!validator.isValidSignatures(validator.getValidatorHeight(height), blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
             if (!MerkleProof.verify(eventProof.merkleProofs, eventProof.leaf, eventProof.position, eventRoot)) revert("TokenBridge: invalid merkle proof");
         }
         return;
@@ -293,7 +239,8 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
     function _updateWithdraw(bytes32 hash, bytes memory _event) internal returns (bool) {
         Withdraw storage wd = _withdraw[hash];
         {
-            (IERC20 token, address beneficiary, uint256 amount) = hash.verifyEvent(_event);
+            (IERC20 token, address beneficiary, uint256 amount, uint256 netId) = hash.verifyEvent(_event);
+            require(networkId == netId, "TokenBridge: incorrect network id");
             require(amount > 0 && amount <= _balances[token], "TokenBridge: invalid amount to make request withdraw");
             wd.token = token;
             wd.beneficiary = beneficiary;
@@ -309,7 +256,8 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
     function _updateWithdrawNFT(bytes32 hash, bytes memory _event) internal returns (bool) {
         WithdrawNFT storage wd = _withdrawNFT[hash];
         {
-            (IERC721 nft, address beneficiary, uint256 tokenId) = hash.verifyEventNFT(_event);
+            (IERC721 nft, address beneficiary, uint256 tokenId, uint256 netId) = hash.verifyEventNFT(_event);
+            require(networkId == netId, "TokenBridge: incorrect network id");
             require(_owners[nft][tokenId] != address(0), "TokenBridge: invalid token id to make request withdraw");
             wd.nft = nft;
             wd.beneficiary = beneficiary;
@@ -347,34 +295,5 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
         _owners[wd.nft][tokenId] = address(0);
         wd.nft.safeTransferFrom(address(this), beneficiary, tokenId);
         emit WithdrawalNFT(beneficiary, wd.nft, tokenId);
-    }
-
-    function isValidSignatures(uint height, bytes32 hash, bytes[] memory signatures, address[] memory signers) internal view returns (bool) {
-        uint _actualSignature = 0;
-        uint _requiredSignature = _calculateBFTRequiredNum(validators[height].length);
-        address _lastSigner = address(0);
-        for (uint i = 0; i < signatures.length; i++) {
-            for (uint k = 0; k < signers.length; k++) {
-                require(isValidator(height, signers[k]), "TokenBridge: signer is not validator");
-                if (_isValidSignature(hash, signatures[i], signers[k])) {
-                    _actualSignature++;
-                    require(signers[k] > _lastSigner, "TokenBridge: duplicate signature or signers is out of order");
-                    _lastSigner = signers[k];
-                    break;
-                }
-            }
-        }
-        return (_actualSignature >= _requiredSignature);
-    }
-
-    function _calculateBFTRequiredNum(uint total) internal pure returns (uint) {
-        if (total == 0) return 0;
-        return (total - (total - 1) / 3);
-    }
-
-    function _isValidSignature(bytes32 hash, bytes memory signature, address signer) internal pure returns (bool) {
-        bytes memory prefix = "\x19Ethereum Signed Message:\n32";
-        bytes32 prefixedProof = keccak256(abi.encodePacked(prefix, hash));
-        return (prefixedProof.recover(signature) == signer || hash.recover(signature) == signer);
-    }    
+    }  
 }

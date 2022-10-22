@@ -1,6 +1,6 @@
 package net.postchain.eif
 
-import net.postchain.eif.config.EifConfig
+import net.postchain.eif.config.EvmConfig
 import okhttp3.OkHttpClient
 import org.web3j.protocol.Web3jService
 import org.web3j.protocol.http.HttpService
@@ -9,23 +9,23 @@ import org.web3j.protocol.ipc.WindowsIpcService
 import java.util.concurrent.TimeUnit
 
 object Web3jServiceFactory {
-    fun buildService(eifConfig: EifConfig): Web3jService {
-        return if (eifConfig.url == "") {
-            HttpService(createOkHttpClient(eifConfig))
-        } else if (eifConfig.url.startsWith("http")) {
-            HttpService(eifConfig.url, createOkHttpClient(eifConfig), false)
+    fun buildService(evmConfig: EvmConfig): Web3jService {
+        return if (evmConfig.url == "") {
+            HttpService(createOkHttpClient(evmConfig))
+        } else if (evmConfig.url.startsWith("http")) {
+            HttpService(evmConfig.url, createOkHttpClient(evmConfig), false)
         } else if (System.getProperty("os.name").lowercase().startsWith("win")) {
-            WindowsIpcService(eifConfig.url)
+            WindowsIpcService(evmConfig.url)
         } else {
-            UnixIpcService(eifConfig.url)
+            UnixIpcService(evmConfig.url)
         }
     }
 
-    private fun createOkHttpClient(eifConfig: EifConfig): OkHttpClient {
+    private fun createOkHttpClient(evmConfig: EvmConfig): OkHttpClient {
         val builder: OkHttpClient.Builder = OkHttpClient.Builder()
-        builder.connectTimeout(eifConfig.connectTimeout, TimeUnit.SECONDS)
-        builder.readTimeout(eifConfig.readTimeout, TimeUnit.SECONDS) // Sets the socket timeout too
-        builder.writeTimeout(eifConfig.writeTimeout, TimeUnit.SECONDS)
+        builder.connectTimeout(evmConfig.connectTimeout, TimeUnit.SECONDS)
+        builder.readTimeout(evmConfig.readTimeout, TimeUnit.SECONDS) // Sets the socket timeout too
+        builder.writeTimeout(evmConfig.writeTimeout, TimeUnit.SECONDS)
         return builder.build()
     }
 }

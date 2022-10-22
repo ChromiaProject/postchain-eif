@@ -24,9 +24,10 @@ import java.util.*
 import kotlin.streams.toList
 
 enum class EncodedBlock(val index: Int) {
-    NUMBER(0),
-    HASH(1),
-    EVENTS(2)
+    NETWORK_ID(0),
+    NUMBER(1),
+    HASH(2),
+    EVENTS(3)
 }
 
 enum class EncodedEvent(val index: Int) {
@@ -42,12 +43,13 @@ enum class EncodedEvent(val index: Int) {
 interface EventProcessor {
     fun shutdown()
     fun getEventData(): List<Array<Gtv>>
-    fun isValidEventData(ops: Array<OpData>): Boolean
+    fun isValidEventData(ops: List<OpData>): Boolean
+    fun markAsProcessed(ops: List<OpData>)
 }
 
 /**
- * This event processor is used for nodes that are not connected to ethereum.
- * No EIF special operations will be produced and no operations will be validated against ethereum.
+ * This event processor is used for nodes that are not connected to a network.
+ * No EIF special operations will be produced and no operations will be validated.
  */
 class NoOpEventProcessor : EventProcessor {
     companion object : KLogging()
@@ -59,11 +61,11 @@ class NoOpEventProcessor : EventProcessor {
     /**
      * We can at least validate structure
      */
-    override fun isValidEventData(ops: Array<OpData>): Boolean {
+    override fun isValidEventData(ops: List<OpData>): Boolean {
         for (op in ops) {
-            if (op.opName == OP_ETH_BLOCK) {
-                if (!isValidEthereumBlockFormat(op.args)) {
-                    logger.error("Received malformed operation of type $OP_ETH_BLOCK")
+            if (op.opName == OP_EVM_BLOCK) {
+                if (!isValidEvmBlockFormat(op.args)) {
+                    logger.error("Received malformed operation of type $OP_EVM_BLOCK")
                     return false
                 }
             } else {
@@ -74,7 +76,9 @@ class NoOpEventProcessor : EventProcessor {
         return true
     }
 
-    private fun isValidEthereumEventFormat(opArgs: Array<out Gtv>) = opArgs.size == 7 &&
+    override fun markAsProcessed(ops: List<OpData>) {}
+
+    private fun isValidEvmEventFormat(opArgs: Array<out Gtv>) = opArgs.size == 7 &&
             opArgs[EncodedEvent.TX_HASH.index] is GtvByteArray &&
             opArgs[EncodedEvent.LOG_INDEX.index] is GtvBigInteger &&
             opArgs[EncodedEvent.SIGNATURE.index] is GtvByteArray &&
@@ -83,30 +87,32 @@ class NoOpEventProcessor : EventProcessor {
             opArgs[EncodedEvent.INDEXED_VALUES.index] is GtvArray &&
             opArgs[EncodedEvent.NON_INDEXED_VALUES.index] is GtvArray
 
-    private fun isValidEthereumBlockFormat(opArgs: Array<Gtv>) = opArgs.size == 3 &&
+    private fun isValidEvmBlockFormat(opArgs: Array<out Gtv>) = opArgs.size == 4 &&
+            opArgs[EncodedBlock.NETWORK_ID.index] is GtvInteger &&
             opArgs[EncodedBlock.NUMBER.index] is GtvBigInteger &&
             opArgs[EncodedBlock.HASH.index] is GtvByteArray &&
-            opArgs[EncodedBlock.EVENTS.index].asArray().all { isValidEthereumEventFormat(it.asArray()) }
+            opArgs[EncodedBlock.EVENTS.index].asArray().all { isValidEvmEventFormat(it.asArray()) }
 }
 
 /**
- * Reads events from ethereum.
+ * Reads events from evm chain
  *
  * @param readOffset Will return events from blocks with this specified offset from the last block we have seen from ethereum
  * (so that slower nodes may have a chance to validate the events)
  */
-class EthereumEventProcessor(
+class EvmEventProcessor(
+        private val networkId: Long,
         private val web3j: Web3j,
         private val contractAddresses: List<String>,
         events: List<Event>,
-        private val readOffset: BigInteger,
+        private val evmReadOffset: BigInteger,
         skipToHeight: BigInteger,
         blockchainEngine: BlockchainEngine
-) : EventProcessor, AbstractBlockchainProcess("ethereum-event-processor", blockchainEngine) {
+) : EventProcessor, AbstractBlockchainProcess("$networkId-event-processor", blockchainEngine) {
 
-    data class EthereumBlock(val number: BigInteger, val hash: String)
+    data class EvmBlock(val number: BigInteger, val hash: String)
 
-    var lastReadLogBlockHeight = skipToHeight
+    var lastReadLogBlockHeight = getLastCommittedEvmBlockHeight(networkId) ?: skipToHeight
         private set
 
     private val eventBlocks: Queue<Array<Gtv>> = LinkedList()
@@ -125,14 +131,7 @@ class EthereumEventProcessor(
      * Producer thread will read events from ethereum ond add to queue in this action. Main thread will consume them.
      */
     override fun action() {
-        val lastCommittedBlock = getLastCommittedEthereumBlockHeight()
-        val from = if (lastCommittedBlock != null) {
-            // Skip ahead if we are behind last committed block
-            maxOf(lastReadLogBlockHeight, lastCommittedBlock) + BigInteger.ONE
-        } else {
-            lastReadLogBlockHeight + BigInteger.ONE
-        }
-
+        val from = lastReadLogBlockHeight + BigInteger.ONE
         // it's safe to query the event from the finalized block on Ethereum PoS
         val finalizedBlock = DefaultBlockParameter.valueOf("finalized")
         val finalizedBlockHeight = sendWeb3jRequestWithRetry(web3j.ethGetBlockByNumber(finalizedBlock, false)).block.number
@@ -158,7 +157,7 @@ class EthereumEventProcessor(
         // Ensure events are sorted on txIndex + logIndex, blocks sorted on block number
         val sortedEncodedLogs = logResponse.logs
                 .map { (it as EthLog.LogObject).get() }
-                .groupBy { EthereumBlock(it.blockNumber, it.blockHash) }
+                .groupBy { EvmBlock(it.blockNumber, it.blockHash) }
                 .mapValues { it.value.sortedWith(compareBy({ event -> event.transactionIndex }, { event -> event.logIndex })) }
                 .toList()
                 .sortedBy { it.first.number }
@@ -176,13 +175,7 @@ class EthereumEventProcessor(
     }
 
     @Synchronized
-    override fun isValidEventData(ops: Array<OpData>): Boolean {
-        val lastCommittedBlock = getLastCommittedEthereumBlockHeight()
-        // If we have any old events in the queue we may prune them
-        if (lastCommittedBlock != null) {
-            pruneEvents(lastCommittedBlock)
-        }
-
+    override fun isValidEventData(ops: List<OpData>): Boolean {
         // We are strict here, if we have not seen something we will not try to go and fetch it.
         // We simply verify that the same blocks and events are coming in the same order that we have seen them
         // If there are too many rejections, readOffset should be increased
@@ -195,16 +188,18 @@ class EthereumEventProcessor(
             if (index >= ops.size) break
 
             val op = ops[index]
-            if (op.opName == OP_ETH_BLOCK) {
+            if (op.opName == OP_EVM_BLOCK) {
+                val opNetworkId = op.args[EncodedBlock.NETWORK_ID.index]
+                val eventNetworkId = eventBlock[EncodedBlock.NETWORK_ID.index]
                 val opBlockNumber = op.args[EncodedBlock.NUMBER.index]
                 val eventBlockNumber = eventBlock[EncodedBlock.NUMBER.index]
                 val opBlockHash = op.args[EncodedBlock.HASH.index]
                 val eventBlockHash = eventBlock[EncodedBlock.HASH.index]
 
-                if (opBlockNumber != eventBlockNumber || opBlockHash != eventBlockHash) {
+                if (opNetworkId != eventNetworkId || opBlockNumber != eventBlockNumber || opBlockHash != eventBlockHash) {
                     logger.error(
-                        "Received unexpected block $opBlockNumber with hash $opBlockHash." +
-                                " Expected block $eventBlockNumber with hash $eventBlockHash"
+                        "Received unexpected block $opBlockNumber with hash $opBlockHash in network $opNetworkId." +
+                                " Expected block $eventBlockNumber with hash $eventBlockHash in network $eventNetworkId"
                     )
                     return false
                 }
@@ -221,20 +216,20 @@ class EthereumEventProcessor(
         return true
     }
 
+    override fun markAsProcessed(ops: List<OpData>) {
+        if (ops.isNotEmpty()) {
+            pruneEvents(ops.maxOf { it.args[EncodedBlock.NUMBER.index].asBigInteger() })
+        }
+    }
+
     @Synchronized
     override fun getEventData(): List<Array<Gtv>> {
-        val lastCommittedBlock = getLastCommittedEthereumBlockHeight()
-        // If we have any old events in the queue we may prune them
-        if (lastCommittedBlock != null) {
-            pruneEvents(lastCommittedBlock)
-        }
-
         return eventBlocks.stream()
-            .takeWhile { it[EncodedBlock.NUMBER.index].asBigInteger() <= lastReadLogBlockHeight - readOffset }
+            .takeWhile { it[EncodedBlock.NUMBER.index].asBigInteger() <= lastReadLogBlockHeight - evmReadOffset }
             .toList()
     }
 
-    private fun eventBlockToGtv(eventBlock: Pair<EthereumBlock, List<Log>>): Array<Gtv> {
+    private fun eventBlockToGtv(eventBlock: Pair<EvmBlock, List<Log>>): Array<Gtv> {
         val events = eventBlock.second.map { event ->
             val matchingEvent = eventMap[event.topics[0]] ?: throw ProgrammerMistake("No matching event")
             val parameters = Contract.staticExtractEventParameters(matchingEvent, event)
@@ -249,20 +244,21 @@ class EthereumEventProcessor(
             ))
         }
         return arrayOf(
-            gtv(eventBlock.first.number),
-            gtv(eventBlock.first.hash.substring(2).hexStringToByteArray()),
-            gtv(events)
+                gtv(networkId),
+                gtv(eventBlock.first.number),
+                gtv(eventBlock.first.hash.substring(2).hexStringToByteArray()),
+                gtv(events)
         )
     }
 
-    private fun getLastCommittedEthereumBlockHeight(): BigInteger? {
-        val block = blockchainEngine.getBlockQueries().query("get_last_eth_block", gtv(mutableMapOf())).get()
+    private fun getLastCommittedEvmBlockHeight(networkId: Long): BigInteger? {
+        val block = blockchainEngine.getBlockQueries().query("get_last_evm_block", gtv("network_id" to gtv(networkId))).get()
         if (block == GtvNull) {
             return null
         }
 
-        val blockHeight = block.asDict()["eth_block_height"]
-            ?: throw ProgrammerMistake("Last eth block has no height stored")
+        val blockHeight = block.asDict()["evm_block_height"]
+            ?: throw ProgrammerMistake("Last evm block has no height stored")
 
         return blockHeight.asBigInteger()
     }
@@ -280,13 +276,14 @@ class EthereumEventProcessor(
     private fun isQueueFull(): Boolean {
         // Just check against the events that we can actually consume
         return eventBlocks.filter {
-            it[EncodedBlock.NUMBER.index].asBigInteger() <= lastReadLogBlockHeight - readOffset
+            it[EncodedBlock.NUMBER.index].asBigInteger() <= lastReadLogBlockHeight - evmReadOffset
         }.size > MAX_QUEUE_SIZE
     }
 
-    private fun pruneEvents(lastCommittedBlock: BigInteger) {
+    @Synchronized
+    private fun pruneEvents(pruneHeight: BigInteger) {
         var nextLogEvent = eventBlocks.peek()
-        while (nextLogEvent != null && nextLogEvent[EncodedBlock.NUMBER.index].asBigInteger() <= lastCommittedBlock) {
+        while (nextLogEvent != null && nextLogEvent[EncodedBlock.NUMBER.index].asBigInteger() <= pruneHeight) {
             eventBlocks.poll()
             nextLogEvent = eventBlocks.peek()
         }

@@ -31,9 +31,11 @@ class EifTestEventProcessor : EventProcessor {
         return out
     }
 
-    override fun isValidEventData(ops: Array<OpData>): Boolean {
+    override fun isValidEventData(ops: List<OpData>): Boolean {
         return true
     }
+
+    override fun markAsProcessed(ops: List<OpData>) {}
 
     private fun generateData(height: Long, i: Int): Array<Gtv> {
         val blockHash = ds.digest(BigInteger.valueOf(i.toLong()).toByteArray()).toHex()
@@ -42,6 +44,7 @@ class EifTestEventProcessor : EventProcessor {
         val from = ds.digest(BigInteger.valueOf(1L).toByteArray()).toHex()
         val to = ds.digest(BigInteger.valueOf(2L).toByteArray()).toHex()
         return arrayOf(
+            gtv(1L),
             gtv(height), gtv(blockHash), gtv(transactionHash),
             gtv(i.toLong()), gtv(EventEncoder.encode(TokenBridge.DEPOSITEDERC20_EVENT)),
             gtv(contractAddress), gtv(from), gtv(to), gtv(BigInteger.valueOf(i.toLong()))

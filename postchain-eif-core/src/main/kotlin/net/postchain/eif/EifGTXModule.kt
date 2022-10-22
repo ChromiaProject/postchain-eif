@@ -55,7 +55,7 @@ class EifGTXModule : SimpleGTXModule<Unit>(
     }
 
     override fun makeBlockBuilderExtensions(): List<BaseBlockBuilderExtension> {
-        return listOf(EthereumEifImplementation(SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)),
+        return listOf(EifImplementation(SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)),
             LEVELS_PER_PAGE
         ))
     }
@@ -132,7 +132,7 @@ private fun blockHeaderData(
 ): Gtv {
     val merkleHashCalculator = GtvMerkleHashCalculator(Secp256K1CryptoSystem())
     val blockRid = db.getBlockRID(ctx, blockHeight) ?: return GtvNull
-    val bh = BaseBlockHeader(db.getBlockHeader(ctx, blockRid), Secp256K1CryptoSystem()).blockHeaderRec
+    val bh = BaseBlockHeader(db.getBlockHeader(ctx, blockRid), merkleHashCalculator).blockHeaderRec
     return gtv(
         bh.gtvBlockchainRid,
         gtv(blockRid),
@@ -147,13 +147,13 @@ private fun blockHeaderData(
 
 private fun extraMerkleProof(db: DatabaseAccess, ctx: EContext, blockHeight: Long): Gtv {
     val cryptoSystem = Secp256K1CryptoSystem()
+    val calculator = GtvMerkleHashCalculator(cryptoSystem)
     val blockRid = db.getBlockRID(ctx, blockHeight) ?: return GtvNull
-    val bh = BaseBlockHeader(db.getBlockHeader(ctx, blockRid), cryptoSystem).blockHeaderRec
+    val bh = BaseBlockHeader(db.getBlockHeader(ctx, blockRid), calculator).blockHeaderRec
     val gtvExtra = bh.gtvExtra
     val path: Array<Any> = arrayOf(EIF)
     val gtvPath: GtvPath = GtvPathFactory.buildFromArrayOfPointers(path)
     val gtvPaths = GtvPathSet(setOf(gtvPath))
-    val calculator = GtvMerkleHashCalculator(cryptoSystem)
     val extraProofTree = gtvExtra.generateProof(gtvPaths, calculator)
     val merkleProofs = getProofListAndPosition(extraProofTree.root)
     val proofs = merkleProofs.first
