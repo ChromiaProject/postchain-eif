@@ -279,9 +279,9 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
   const [amount, setAmount] = useState(0)
   const [withdrawAmount, setWithdrawAmount] = useState(0)
   const [unit, setUnit] = useState(18)
-  const tokenId = 65695
+  const tokenId = 388
   var tokenType: string
-  if (tokenAddress === "0x064e16771A4864561f767e4Ef4a6989fc4045aE7") {
+  if (tokenAddress === "0x932Ca55B9Ef0b3094E8Fa82435b3b4c50d713043") {
     tokenType = "ERC721"
   } else {
     tokenType = "ERC20"
@@ -343,6 +343,34 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
       console.log(error)
     }
   }
+
+  const postchainClaim = async () => {
+    try {
+      let sender = util.makeKeyPair()
+      var tx = client.newTransaction([sender.pubKey])
+      if (tokenType === "ERC721") {
+        tx.addOperation("claim_ERC721", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), tokenId)
+      } else {
+        const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
+        tx.addOperation("claim_ERC20", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount))
+      }
+      tx.sign(sender.privKey, sender.pubKey)
+      let txRID = tx.getTxRID()
+      tx.send((err) => {
+        if (err !== null) {
+          console.log(err)
+          return
+        }
+        toast.promise(waitConfirmation(txRID), {
+          loading: `Transaction submitted. Wait for confirmation...`,
+          success: <b>Transaction confirmed!</b>,
+          error: <b>Transaction failed!.</b>,
+        })
+      })
+    } catch (error) {
+      console.log(error)
+    }
+  }  
 
   useEffect(() => {
     const fetchDepositedTokenInfo = () => {
@@ -536,6 +564,9 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
           <div className="justify-center card-actions">
             <button onClick={postchainWithdraw} type="button" className="btn btn-outline btn-accent">
               Withdraw on Postchain
+            </button>
+            <button onClick={postchainClaim} type="button" className="btn btn-outline btn-accent">
+              Claim on Postchain
             </button>
           </div>
         </div></div>
