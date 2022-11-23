@@ -40,6 +40,12 @@ entity evm_erc721 {
     uri: text;
 }
 
+entity evm_erc721_link {
+    token: evm_erc721;
+    original: og.Dip.instance;
+    key token, original;
+}
+
 entity evm_event {
     index evm_block;
     tnx_hash: byte_array;
@@ -200,6 +206,39 @@ operation __evm_block(network_id: integer, evm_block_height: integer, evm_block_
     }
 }
 
+operation deposit_ft3_token(account: acc.account, asset: ft3.asset, amount: integer) {
+    require(amount > 0, "amount should larger than 0");
+    val token = evm_erc20 @? { asset }; // TODO: ensure that 1:1 relation here
+    require(token, "this asset it not evm bridge token");
+
+    // burn ft3 token of the account
+    destroy_asset(account, asset, amount);
+
+    // update the postchain EIF state for equivalent account
+    val ft3_account_link = ft3_account_link @? { .account_id == account.id };
+    require(ft3_account_link);
+    val evm_account_link = evm_account_link @? { .network_id == token.network_id, .state_n == ft3_account_link.state_n };
+    require(evm_account_link);
+    deposit_ERC20(token.network_id, evm_account_link.evm_beneficiary, token.address, amount, token.name, token.symbol, token.decimals);
+}
+
+operation deposit_non_fungible_original(account: acc.account, original: og.Dip.instance) {
+    val ft3_burn_account = og.ensure_locked_account("BURN", account);
+    og.Ownership.transfer(account, original, ft3_burn_account.id, 1);
+
+    val token_link = evm_erc721_link @? { original }; // TODO: ensure that 1:1 relation here
+    require(token_link, "this asset it not evm bridge token");
+    val token = token_link.token;
+
+    // update the postchain EIF state for equivalent account
+    val ft3_account_link = ft3_account_link @? { .account_id == account.id };
+    require(ft3_account_link);
+    val evm_account_link = evm_account_link @? { .network_id == token.network_id, .state_n == ft3_account_link.state_n };
+    require(evm_account_link);
+
+    deposit_ERC721(token.network_id, evm_account_link.evm_beneficiary, token.address, token.token_id, token.name, token.symbol, token.uri);
+}
+
 operation withdraw_ERC20(network_id: integer, token_address: text, beneficiary: text, amount: integer) {
     require(amount > 0, "Must withdraw an amount larger than 0");
     val token = evm_erc20 @? { network_id, .address == token_address };
@@ -232,7 +271,8 @@ operation withdraw_ERC20(network_id: integer, token_address: text, beneficiary: 
     emit_withdraw(network_id, beneficiary, withdraw_info);
 }
 
-operation claim_ERC20(network_id: integer, token_address: text, beneficiary: text, amount: integer) {
+operation claim_ERC20(network_id: integer, token_address: text, beneficiary: text, amount: integer, 
+                        r: byte_array, s: byte_array, v: integer, pk: pubkey) {
     require(amount > 0, "Must withdraw an amount larger than 0");
     val token = evm_erc20 @? { network_id, .address == token_address };
     if (empty(token)) {
@@ -264,12 +304,13 @@ operation claim_ERC20(network_id: integer, token_address: text, beneficiary: tex
     withdraw_info.add(amount.to_gtv());
     emit_withdraw(network_id, beneficiary, withdraw_info);
 
-    val account_link = get_or_create_ft3_account_link(network_id, beneficiary);
+    val account_link = get_or_create_ft3_account_link(network_id, beneficiary, r, s, v, pk);
     val ft3_balance = ft3.ensure_balance( acc.account @ { account_link.account_id }, token.asset );
     ft3_balance.amount += amount;
 }
 
-operation claim_ERC721(network_id: integer, token_address: text, beneficiary: text, token_id: integer) {
+operation claim_ERC721(network_id: integer, token_address: text, beneficiary: text, token_id: integer,
+                        r: byte_array, s: byte_array, v: integer, pk: pubkey) {
     val token = evm_erc721 @? { network_id, .address == token_address, token_id };
     if (empty(token)) {
         return;
@@ -299,13 +340,13 @@ operation claim_ERC721(network_id: integer, token_address: text, beneficiary: te
     withdraw_info.add(token_id.to_gtv());
     emit_withdraw(network_id, beneficiary, withdraw_info);
 
-    val account_link = get_or_create_ft3_account_link(network_id, beneficiary);
+    val account_link = get_or_create_ft3_account_link(network_id, beneficiary, r, s, v, pk);
     val account = acc.account @ { account_link.account_id };
     val dclass = dip.Interface.dclass @? { og.chromia.INonFungibleOriginal.interface };
     if (empty(dclass)) {
         og.initialize_original_interfaces(account);
     }
-    val original = og.Minter.I(
+    val original_type = og.Minter.I(
         interface_name = og.chromia.INonFungibleOriginal.interface,
         [
             og.chromia.IOriginal.name: dip.Text.T(token.name),
@@ -313,7 +354,11 @@ operation claim_ERC721(network_id: integer, token_address: text, beneficiary: te
             og.chromia.IOriginal.creator_name: dip.Text.T("Owner")
         ]
     );
-    og.Minter.mint_non_fungible_original(account, original, dip.Meta.Engine.access(account));
+    val original = og.Minter.mint_non_fungible_original(account, original_type, dip.Meta.Engine.access(account));
+    create evm_erc721_link(
+        token,
+        original
+    );
 }
 
 operation withdraw_ERC721(network_id: integer, token_address: text, beneficiary: text, token_id: integer) {
@@ -365,17 +410,23 @@ function get_or_create_evm_account_link(network_id: integer, beneficiary: text):
     return account;
 }
 
-function get_or_create_ft3_account_link(network_id: integer, beneficiary: text): ft3_account_link {
+function get_or_create_ft3_account_link(network_id: integer, beneficiary: text, 
+                                        r: byte_array, s: byte_array, v: integer, pk: pubkey): ft3_account_link {
     val account = evm_account_link @? { network_id, beneficiary };
     require(account, "evm account link does not exist");
     val ft3_account = ft3_account_link @? { .state_n == account.state_n };
+    val recovered_pubkey = crypto.eth_ecrecover(r, s, v, pk);
+    val eth_address = get_eth_address(recovered_pubkey);
+    require(eth_address == beneficiary.sub(2), "beneficiary is not correct");
     if (empty(ft3_account)) {
         val args = list<gtv>();
         args.add("A".to_gtv());
         args.add(network_id.to_text().to_gtv());
         args.add(beneficiary.to_gtv());
         val participants = op_context.get_signers();
-        // TODO: should check participants[0] is beneficiary
+        require_not_empty(participants, "participants is empty");
+        require(participants.size() == 1, "only support single auth");
+        require(participants[0] == pk, "ft3 participant is not correct");
         val auth_desc = acc.auth_descriptor(
             auth_type = "S",
             participants,
@@ -476,6 +527,20 @@ function emit_withdraw(network_id: integer, beneficiary: text, eth_event_data: l
     op_context.emit_event("eif_event", eth_event_data.to_gtv());
 }
 
-function to_zero_padded_hex(array: byte_array) {
-    return "0x" + array.to_hex();
+function to_zero_padded_hex(array: byte_array) = "0x" + array.to_hex();
+
+function get_eth_address(pk: byte_array) = crypto.keccak256(pk).sub(13).to_hex();
+
+function destroy_asset(from: acc.account, ft3.asset, amount: integer): ft3.payment_history_entry {
+	val b = ft3.ensure_balance(from, asset); 
+	require(b.amount >= amount);
+	b.amount -= amount;
+	return create ft3.payment_history_entry (
+        from,
+        asset,
+        .delta = amount,
+        .op_index = 0,
+        .is_input = true,
+        .entry_index = 0
+      );
 }
