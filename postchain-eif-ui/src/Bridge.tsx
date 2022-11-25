@@ -280,6 +280,7 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
   const [withdrawAmount, setWithdrawAmount] = useState(0)
   const [unit, setUnit] = useState(18)
   const tokenId = 388
+  const user = util.makeKeyPair();
   var tokenType: string
   if (tokenAddress === "0x932Ca55B9Ef0b3094E8Fa82435b3b4c50d713043") {
     tokenType = "ERC721"
@@ -318,15 +319,14 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
 
   const postchainWithdraw = async () => {
     try {
-      let sender = util.makeKeyPair()
-      var tx = client.newTransaction([sender.pubKey])
+      var tx = client.newTransaction([user.pubKey])
       if (tokenType === "ERC721") {
         tx.addOperation("withdraw_ERC721", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), tokenId)
       } else {
         const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
         tx.addOperation("withdraw_ERC20", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount))
       }
-      tx.sign(sender.privKey, sender.pubKey)
+      tx.sign(user.privKey, user.pubKey)
       let txRID = tx.getTxRID()
       tx.send((err) => {
         if (err !== null) {
@@ -346,15 +346,22 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
 
   const postchainClaim = async () => {
     try {
-      let sender = util.makeKeyPair()
-      var tx = client.newTransaction([sender.pubKey])
+      var tx = client.newTransaction([user.pubKey])
+      const signer = library.getSigner()
+      const pk = util.toBuffer(user.pubKey).toString('hex')
+      var signature = await signer.signMessage(pk);
+      signature = signature.split('x')[1];
+      var r = Buffer.from(signature.substring(0, 64), 'hex')
+      var s = Buffer.from(signature.substring(64, 128), 'hex')
+      var v = parseInt(signature.substring(128, 130), 16) - 27
+
       if (tokenType === "ERC721") {
-        tx.addOperation("claim_ERC721", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), tokenId)
+        tx.addOperation("claim_ERC721", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), tokenId, r, s, v, pk)
       } else {
         const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
-        tx.addOperation("claim_ERC20", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount))
+        tx.addOperation("claim_ERC20", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount), r, s, v, pk)
       }
-      tx.sign(sender.privKey, sender.pubKey)
+      tx.sign(user.privKey, user.pubKey)
       let txRID = tx.getTxRID()
       tx.send((err) => {
         if (err !== null) {
