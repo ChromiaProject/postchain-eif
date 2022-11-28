@@ -377,7 +377,36 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
     } catch (error) {
       console.log(error)
     }
-  }  
+  }
+
+  const postchainDeposit = async () => {
+    try {
+      var tx = client.newTransaction([user.pubKey])
+      const signer = library.getSigner()
+
+      if (tokenType === "ERC721") {
+        tx.addOperation("deposit_non_fungible_original", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), tokenId)
+      } else {
+        const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
+        tx.addOperation("deposit_ft3_token", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount))
+      }
+      tx.sign(user.privKey, user.pubKey)
+      let txRID = tx.getTxRID()
+      tx.send((err) => {
+        if (err !== null) {
+          console.log(err)
+          return
+        }
+        toast.promise(waitConfirmation(txRID), {
+          loading: `Transaction submitted. Wait for confirmation...`,
+          success: <b>Transaction confirmed!</b>,
+          error: <b>Transaction failed!.</b>,
+        })
+      })
+    } catch (error) {
+      console.log(error)
+    }
+  }
 
   useEffect(() => {
     const fetchDepositedTokenInfo = () => {
@@ -574,6 +603,9 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
             </button>
             <button onClick={postchainClaim} type="button" className="btn btn-outline btn-accent">
               Claim on Postchain
+            </button>
+            <button onClick={postchainDeposit} type="button" className="btn btn-outline btn-accent">
+              Deposit on Postchain
             </button>
           </div>
         </div></div>
