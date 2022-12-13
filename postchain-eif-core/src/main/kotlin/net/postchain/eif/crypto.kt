@@ -6,11 +6,11 @@ import net.postchain.crypto.CURVE
 import net.postchain.crypto.CURVE_PARAMS
 import net.postchain.crypto.bigIntegerToBytes
 import net.postchain.crypto.secp256k1_decodeSignature
-import org.spongycastle.asn1.x9.X9IntegerConverter
-import org.spongycastle.math.ec.ECAlgorithms
-import org.spongycastle.math.ec.ECPoint
-import org.spongycastle.math.ec.custom.sec.SecP256K1Curve
-import org.spongycastle.util.Arrays
+import org.bouncycastle.asn1.x9.X9IntegerConverter
+import org.bouncycastle.math.ec.ECAlgorithms
+import org.bouncycastle.math.ec.ECPoint
+import org.bouncycastle.math.ec.custom.sec.SecP256K1Curve
+import org.bouncycastle.util.Arrays
 import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.security.MessageDigest
