@@ -4,7 +4,7 @@ import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
 import net.postchain.gtv.*
 import org.junit.jupiter.api.Test
-import org.spongycastle.jce.provider.BouncyCastleProvider
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.security.Security
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
