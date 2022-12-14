@@ -23,7 +23,7 @@ import org.mockito.kotlin.*
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.datatypes.Address
-import org.web3j.abi.datatypes.DynamicBytes
+import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto.Credentials
 import org.web3j.protocol.Web3j
@@ -114,9 +114,12 @@ class EthereumEventProcessorTest {
             approve(Address(bridge.contractAddress), Uint256(BigInteger.valueOf(initialMint))).send()
         }
 
+        // Allow token
+        bridge.allowToken(Address(testToken.contractAddress))
         // Deposit to postchain
         for (i in 1..5) {
-            bridge.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), DynamicBytes("FF".hexStringToByteArray())).send()
+            bridge.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN),
+                Bytes32("fc91c4abaff09f4c67a0ab84d4e9afd37c929978bea3fa1790403ab6ee85bf33".hexStringToByteArray())).send()
         }
 
         Awaitility.await()
@@ -165,7 +168,8 @@ class EthereumEventProcessorTest {
             mint(Address(transactionManager.fromAddress), Uint256(max)).send()
             approve(Address(bridge.contractAddress), Uint256(max)).send()
         }
-        bridge.deposit(Address(testToken.contractAddress), Uint256(max), DynamicBytes("FF".hexStringToByteArray())).send()
+        bridge.deposit(Address(testToken.contractAddress), Uint256(max),
+            Bytes32("fc91c4abaff09f4c67a0ab84d4e9afd37c929978bea3fa1790403ab6ee85bf33".hexStringToByteArray())).send()
 
         Awaitility.await()
             .atMost(Duration.ONE_MINUTE)
@@ -220,9 +224,15 @@ class EthereumEventProcessorTest {
             approve(Address(bridgeSecond.contractAddress), Uint256(BigInteger.TEN)).send()
         }
 
+        // Allow token
+        bridgeFirst.allowToken(Address(testToken.contractAddress))
+        bridgeSecond.allowToken(Address(testToken.contractAddress))
+
         // Deposit to postchain
-        bridgeFirst.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), DynamicBytes("FF".hexStringToByteArray())).send()
-        bridgeSecond.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), DynamicBytes("FF".hexStringToByteArray())).send()
+        bridgeFirst.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN),
+            Bytes32("fc91c4abaff09f4c67a0ab84d4e9afd37c929978bea3fa1790403ab6ee85bf33".hexStringToByteArray())).send()
+        bridgeSecond.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN),
+            Bytes32("fc91c4abaff09f4c67a0ab84d4e9afd37c929978bea3fa1790403ab6ee85bf33".hexStringToByteArray())).send()
 
         // Verify we got both events from the different contracts
         Awaitility.await()
