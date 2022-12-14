@@ -39,12 +39,9 @@
             <type>tar.gz</type>
         </dependency>
         <dependency>
-            <groupId>com.madgag.spongycastle</groupId>
-            <artifactId>core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.madgag.spongycastle</groupId>
-            <artifactId>prov</artifactId>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>1.72</version>
         </dependency>
 
         <dependency>

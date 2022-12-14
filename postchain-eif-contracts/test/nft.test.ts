@@ -11,6 +11,7 @@ import { intToHex } from "ethjs-util";
 
 chai.use(solidity);
 const { expect } = chai;
+const ft3_account_id = "0x95471c57f0bc16284cb1016eba3b2736fa5fb2a640e2f20984079f4349f867ff"
 
 describe("Non Fungible Token", () => {
     let nftAddress: string;
@@ -39,6 +40,7 @@ describe("Non Fungible Token", () => {
 
         const factory = new TokenBridge__factory(directoryNodes)
         const bridge = await upgrades.deployProxy(factory, [validatorAddress])
+        await bridge.allowNFT(nftAddress)
         bridgeAddress = bridge.address
     });
 
@@ -57,11 +59,12 @@ describe("Non Fungible Token", () => {
             await tokenApproveInstance.setApprovalForAll(bridgeAddress, true)
             let tokenURI = await tokenApproveInstance.tokenURI(tokenId)
             expect(tokenURI).to.eq(baseURI+tokenId.toString())
-            await expect(bridge.depositNFT(nftAddress, tokenId))
+            await expect(bridge.depositNFT(nftAddress, tokenId, ft3_account_id))
                     .to.emit(bridge, "DepositedERC721")
                     .withArgs(
                         user.address,
                         nftAddress,
+                        ft3_account_id,
                         network.config.chainId,
                         tokenId,
                         name,
@@ -87,7 +90,8 @@ describe("Non Fungible Token", () => {
             const bridge = new TokenBridge__factory(user).attach(bridgeAddress)
             const tokenApproveInstance = new ERC721Mock__factory(user).attach(nftAddress)
             await tokenApproveInstance.setApprovalForAll(bridgeAddress, true)
-            let tx: ContractTransaction = await bridge.depositNFT(nftAddress, tokenId)
+            await expect(bridge.depositNFT(bridgeAddress, tokenId, ft3_account_id)).to.be.revertedWith('TokenBridge: not allow nft')
+            let tx: ContractTransaction = await bridge.depositNFT(nftAddress, tokenId, ft3_account_id)
             let receipt: ContractReceipt = await tx.wait()
             let logs = receipt.events?.filter((x) =>  {return x.event == 'DepositedERC721'})
             if (logs !== undefined) {

@@ -10,6 +10,7 @@ import { DecodeHexStringToByteArray, hashGtvBytes32Leaf, hashGtvBytes64Leaf, has
 
 chai.use(solidity);
 const { expect } = chai;
+const ft3_account_id = "0x95471c57f0bc16284cb1016eba3b2736fa5fb2a640e2f20984079f4349f867ff"
 
 describe("Token Bridge Test", () => {
     let tokenAddress: string;
@@ -44,6 +45,8 @@ describe("Token Bridge Test", () => {
         const bridgeDelegatorFactory = new TokenBridgeDelegator__factory(deployer)
         const bridgeDelegator = await bridgeDelegatorFactory.deploy(bridgeAddress)
         bridgeDelegatorAddress = bridgeDelegator.address
+
+        await bridge.allowToken(tokenAddress)
     });
 
     describe("Validators", async () => {
@@ -80,11 +83,12 @@ describe("Token Bridge Test", () => {
             const name = await tokenApproveInstance.name()
             const symbol = await tokenApproveInstance.symbol()
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
-            await expect(bridge.deposit(tokenAddress, toDeposit))
+            await expect(bridge.deposit(tokenAddress, toDeposit, ft3_account_id))
                     .to.emit(bridge, "DepositedERC20")
                     .withArgs(
                         user.address,
                         tokenAddress,
+                        ft3_account_id,
                         network.config.chainId,
                         toDeposit,
                         name,
@@ -112,7 +116,8 @@ describe("Token Bridge Test", () => {
             const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
 
-            let tx: ContractTransaction = await bridge.deposit(tokenAddress, toDeposit)
+            await expect(bridge.deposit(bridgeAddress, toDeposit, ft3_account_id)).to.be.revertedWith('TokenBridge: not allow token')
+            let tx: ContractTransaction = await bridge.deposit(tokenAddress, toDeposit, ft3_account_id)
             let receipt: ContractReceipt = await tx.wait()
             let logs = receipt.events?.filter((x) =>  {return x.event == 'DepositedERC20'})
             if (logs !== undefined) {
@@ -431,7 +436,8 @@ describe("Token Bridge Test", () => {
             const toDeposit = ethers.utils.parseEther("100")
             await bridgeDelegator.approve(tokenAddress, bridgeAddress, toDeposit)
 
-            let tx: ContractTransaction = await bridgeDelegator.deposit(tokenAddress, toDeposit)
+            await expect(bridge.deposit(bridgeAddress, toDeposit, ft3_account_id)).to.be.revertedWith('TokenBridge: not allow token')
+            let tx: ContractTransaction = await bridgeDelegator.deposit(tokenAddress, toDeposit, ft3_account_id)
             let receipt: ContractReceipt = await tx.wait()
             let logs = receipt.logs
             if (logs !== undefined) {

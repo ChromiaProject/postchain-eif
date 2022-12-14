@@ -1,7 +1,13 @@
+import admin: ^.access.admin;
 import acc: ^.ft3.account;
 import ft3: ^.ft3.core;
 import dip: ^.dip.core;
 import og: ^.originals.core;
+
+entity token_mapping {
+    key token: evm_erc20;
+    key asset: ft3.asset;
+}
 
 entity evm_account_link {
     network_id: integer;
@@ -29,7 +35,6 @@ entity evm_erc20 {
     name: text;
     symbol: text;
     decimals: integer;
-    asset: ft3.asset;
     key network_id, address;
 }
 
@@ -163,72 +168,133 @@ operation __evm_block(network_id: integer, evm_block_height: integer, evm_block_
             non_indexed_values_bytes += value.to_bytes();
         }
 
-        val evm_event = create evm_event(
-            evm_block,
-            tnx_hash = event.tnx_hash,
-            log_index = event.log_index,
-            event_signature = event.signature,
-            contract_address = event.contract_address,
-            indexed_values = indexed_values_bytes,
-            non_indexed_values = non_indexed_values_bytes
-        );
-        
+        // ignore invalid events' network id
+        val net_id = integer.from_gtv(event.non_indexed_values[0]);
+        if (net_id != network_id) {
+            print("ignore invalid events' network id: " + net_id + " : " + network_id);
+            continue;
+        }
         val beneficiary = to_zero_padded_hex(byte_array.from_gtv(event.indexed_values[0]));
+        val token_address = to_zero_padded_hex(byte_array.from_gtv(event.indexed_values[1]));
+        val ft3_account_id = byte_array.from_gtv(event.indexed_values[2]).to_hex();
+        print("ft3_account_id: " + ft3_account_id);
+        val ft3_account = acc.account @? { .id == byte_array.from_hex(ft3_account_id) };
+
         when (event.name) {
             "DepositedERC20" -> {
-                val token_address = to_zero_padded_hex(byte_array.from_gtv(event.indexed_values[1]));
-                val net_id = integer.from_gtv(event.non_indexed_values[0]);
-                require(net_id == network_id, "incorrect network id");
+                // ignore the unsupport token, move to process next events if any
+                val token = evm_erc20 @? { network_id, .address == token_address };
+                if (empty(token)) {
+                    print("ignore the unsupport token, move to process next events if any: " + token_address);
+                    continue;
+                }
+                val token_mapping = token_mapping @? { .token == token!! };
+                if (empty(token_mapping)) {
+                    print("no token_mapping");
+                    continue;
+                }
+
+                // ignore event if ft3 asset does not exist
+                val ft3_asset = ft3.asset @? { .id == token_mapping!!.asset.id };
+                if (empty(ft3_asset)) {
+                    print("ignore event if ft3 asset does not exist: " + token_mapping.asset.id);
+                    continue;
+                }
                 val amount = integer.from_gtv(event.non_indexed_values[1]);
-                val name = text.from_gtv(event.non_indexed_values[2]);
-                val symbol = text.from_gtv(event.non_indexed_values[3]);
-                val decimals = integer.from_gtv(event.non_indexed_values[4]);
-                deposit_ERC20(network_id, beneficiary, token_address, amount, name, symbol, decimals);
+                val evm_event = create evm_event(
+                    evm_block,
+                    tnx_hash = event.tnx_hash,
+                    log_index = event.log_index,
+                    event_signature = event.signature,
+                    contract_address = event.contract_address,
+                    indexed_values = indexed_values_bytes,
+                    non_indexed_values = non_indexed_values_bytes
+                );
+
+                // if user account does not exist, record the state into EIF for withdraw back to EVM chains later.
+                // This feature is to avoid losing fund of user  
+                if (empty(ft3_account)) {
+                    val name = text.from_gtv(event.non_indexed_values[2]);
+                    val symbol = text.from_gtv(event.non_indexed_values[3]);
+                    val decimals = integer.from_gtv(event.non_indexed_values[4]);
+                    print("record the state into EIF for withdraw back to EVM chains later: " + ft3_account_id);
+                    deposit_ERC20(network_id, beneficiary, token_address, amount, name, symbol, decimals);
+                
+                    val account_link = get_or_create_evm_account_link(network_id, beneficiary);
+                    val state = build_account_state(network_id, beneficiary);
+                    val state_data = state_data(
+                        account_link.state_n,
+                        account = state
+                    );
+                    op_context.emit_event("eif_state", state_data.to_gtv());
+                } else {
+                    // mint postchain token for ft3 account
+                    print("mint postchain token for ft3 account: " + ft3_account_id);
+                    val ft3_balance = ft3.ensure_balance( ft3_account, ft3_asset!! );
+                    ft3_balance.amount += amount;
+                }
             }
             "DepositedERC721" -> {
-                val token_address = to_zero_padded_hex(byte_array.from_gtv(event.indexed_values[1]));
-                val net_id = integer.from_gtv(event.non_indexed_values[0]);
-                require(net_id == network_id, "incorrect network id");
+                // ignore event if dip instance does not exist
+                // TODO: 
+
                 val token_id = integer.from_gtv(event.non_indexed_values[1]);
                 val name = text.from_gtv(event.non_indexed_values[2]);
                 val symbol = text.from_gtv(event.non_indexed_values[3]);
                 val uri = text.from_gtv(event.non_indexed_values[4]);
-                deposit_ERC721(network_id, beneficiary, token_address, token_id, name, symbol, uri);
+                deposit_ERC721(network_id, beneficiary, token_address, token_id, name, symbol, uri);                
             }
         }
-        val account_link = get_or_create_evm_account_link(network_id, beneficiary);
-        val state = build_account_state(network_id, beneficiary);
-        val state_data = state_data(
-            account_link.state_n,
-            account = state
-        );
-        op_context.emit_event("eif_state", state_data.to_gtv());
     }
 }
 
-// operation deposit_ft3_token(account: acc.account, asset: ft3.asset, amount: integer) {
-operation deposit_ft3_token(network_id: integer, token_address: text, beneficiary: text, amount: integer) {
+operation add_new_evm_erc20(network_id: integer, token_address: text, name: text, symbol: text, decimals: integer) {
+    admin.require_admin("Only admin can add new token mapping");
+    require(empty(evm_erc20 @? { network_id, .address == token_address }), "token already existed");
+    create evm_erc20(
+        network_id,
+        address = token_address,
+        name,
+        symbol,
+        decimals
+    );
+}
+
+operation add_new_token_mapping(network_id: integer, token_address: text, asset_id: byte_array) {
+    admin.require_admin("Only admin can add new token mapping");
+
+    val token = require(
+        evm_erc20 @? { network_id, .address == token_address },
+        "Token does not exist: " + token_address
+    );
+
+    val asset = require(
+        ft3.asset @? { .id == asset_id },
+        "Asset does not exist: " + asset_id
+    );
+
+    require(
+        empty(token_mapping @? { token, asset }),
+        "Token already mapped"
+    );
+
+    create token_mapping(token, asset);
+}
+
+operation deposit_ft3_token(account_id: byte_array, network_id: integer, token_address: text, beneficiary: text, amount: integer) {
     require(amount > 0, "amount should larger than 0");
-    val token = evm_erc20 @? { network_id, .address == token_address };
-    require(token, "token is not evm bridge");
-    val asset_id = (token.name, chain_context.blockchain_rid).hash();
-    val asset = ft3.asset @? { .id == asset_id };
-    require(asset, "ft3 asset does not exist");
+    val token = require(evm_erc20 @? { network_id, .address == token_address }, "token is not support");
+    val token_mapping = require(token_mapping @? { token }, "token is not support");
+    val asset = require(ft3.asset @? { .id == token_mapping.asset.id }, "asset does not exist");
 
-    val evm_account_link = evm_account_link @? { network_id, beneficiary };
-    require(evm_account_link, "evm account link does not exist");
-
-    val ft3_account_link = ft3_account_link @? { .state_n == evm_account_link.state_n };
-    require(ft3_account_link, "ft3 account link does not exist");
-
-    val account = acc.account @? { .id == ft3_account_link.account_id };
+    val account = acc.account @? { .id == account_id };
     require(account, "ft3 account does not exist");
 
     // burn ft3 token of the account
     destroy_asset(account, asset, amount);
 
     // update the postchain EIF state for equivalent account
-    deposit_ERC20(token.network_id, evm_account_link.evm_beneficiary, token.address, amount, token.name, token.symbol, token.decimals);
+    deposit_ERC20(network_id, beneficiary, token_address, amount, token_mapping.token.name, token_mapping.token.symbol, token_mapping.token.decimals);
 }
 
 operation deposit_non_fungible_original(account: acc.account, original: og.Dip.instance) {
@@ -278,44 +344,6 @@ operation withdraw_ERC20(network_id: integer, token_address: text, beneficiary: 
     withdraw_info.add(byte_array.from_hex("000000000000000000000000" + beneficiary.sub(2)).to_gtv());
     withdraw_info.add(amount.to_gtv());
     emit_withdraw(network_id, beneficiary, withdraw_info);
-}
-
-operation claim_ERC20(network_id: integer, token_address: text, beneficiary: text, amount: integer, 
-                        r: byte_array, s: byte_array, v: integer, pk: text) {
-    require(amount > 0, "Must withdraw an amount larger than 0");
-    val token = evm_erc20 @? { network_id, .address == token_address };
-    if (empty(token)) {
-        return;
-    }
-    val balance = evm_erc20_balance @? { network_id, token, beneficiary };
-    require_not_empty(balance, "No balance for this token");
-    require(balance.amount >= amount, "Balance is too low");
-    update balance(.amount -= amount);
-
-    update withdraw_stats(withdraw_count += 1);
-    val next_serial = withdraw_stats.withdraw_count;
-
-    // net_id = 0 means withdraw from postchain snapshot state into FT3
-    val net_id = 0;
-    create evm_erc20_withdraw(
-        serial = next_serial,
-        network_id = net_id,
-        token,
-        beneficiary,
-        amount
-    );
-
-    val withdraw_info = list<gtv>();
-    withdraw_info.add(next_serial.to_gtv());
-    withdraw_info.add(net_id.to_gtv());
-    withdraw_info.add(byte_array.from_hex("000000000000000000000000" + token_address.sub(2)).to_gtv());
-    withdraw_info.add(byte_array.from_hex("000000000000000000000000" + beneficiary.sub(2)).to_gtv());
-    withdraw_info.add(amount.to_gtv());
-    emit_withdraw(network_id, beneficiary, withdraw_info);
-
-    val account_link = get_or_create_ft3_account_link(network_id, beneficiary, r, s, v, pk);
-    val ft3_balance = ft3.ensure_balance( acc.account @ { account_link.account_id }, token.asset );
-    ft3_balance.amount += amount;
 }
 
 operation claim_ERC721(network_id: integer, token_address: text, beneficiary: text, token_id: integer,
@@ -477,17 +505,15 @@ function build_account_state(network_id: integer, beneficiary: text) {
 }
 
 function deposit_ERC20(network_id: integer, beneficiary: text, token_address: text, amount: integer, name: text, symbol: text, decimals: integer) {
+    print("deposit_ERC20: " + token_address + " : " + beneficiary + " : " + name);
     var token = evm_erc20 @? { network_id, .address == token_address };
     if (empty(token)) {
-        val asset = ft3.register_asset(name, chain_context.blockchain_rid);
-
         token = create evm_erc20(
             network_id,
             address = token_address,
             name,
             symbol,
-            decimals,
-            asset
+            decimals
         );
     }
 

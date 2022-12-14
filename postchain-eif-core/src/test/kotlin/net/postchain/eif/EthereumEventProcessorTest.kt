@@ -4,6 +4,7 @@ import assertk.assert
 import assertk.assertions.*
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
+import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
 import net.postchain.core.BlockchainEngine
 import net.postchain.core.block.BlockQueries
@@ -22,6 +23,7 @@ import org.mockito.kotlin.*
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.datatypes.Address
+import org.web3j.abi.datatypes.DynamicBytes
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto.Credentials
 import org.web3j.protocol.Web3j
@@ -114,7 +116,7 @@ class EthereumEventProcessorTest {
 
         // Deposit to postchain
         for (i in 1..5) {
-            bridge.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN)).send()
+            bridge.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), DynamicBytes("FF".hexStringToByteArray())).send()
         }
 
         Awaitility.await()
@@ -163,7 +165,7 @@ class EthereumEventProcessorTest {
             mint(Address(transactionManager.fromAddress), Uint256(max)).send()
             approve(Address(bridge.contractAddress), Uint256(max)).send()
         }
-        bridge.deposit(Address(testToken.contractAddress), Uint256(max)).send()
+        bridge.deposit(Address(testToken.contractAddress), Uint256(max), DynamicBytes("FF".hexStringToByteArray())).send()
 
         Awaitility.await()
             .atMost(Duration.ONE_MINUTE)
@@ -219,8 +221,8 @@ class EthereumEventProcessorTest {
         }
 
         // Deposit to postchain
-        bridgeFirst.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN)).send()
-        bridgeSecond.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN)).send()
+        bridgeFirst.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), DynamicBytes("FF".hexStringToByteArray())).send()
+        bridgeSecond.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), DynamicBytes("FF".hexStringToByteArray())).send()
 
         // Verify we got both events from the different contracts
         Awaitility.await()

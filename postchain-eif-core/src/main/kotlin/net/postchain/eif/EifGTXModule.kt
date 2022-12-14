@@ -22,7 +22,7 @@ import net.postchain.gtv.merkle.path.GtvPathFactory
 import net.postchain.gtv.merkle.path.GtvPathSet
 import net.postchain.gtx.SimpleGTXModule
 import net.postchain.gtx.special.GTXSpecialTxExtension
-import org.spongycastle.jce.provider.BouncyCastleProvider
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.security.MessageDigest
 import java.security.Security
 

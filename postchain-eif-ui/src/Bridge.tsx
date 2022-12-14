@@ -17,9 +17,9 @@ const postchainURL = process.env.REACT_APP_POSTCHAIN_URL || ""
 const blockchainRID = process.env.REACT_APP_POSTCHAIN_BRID || ""
 const rest = restClient.createRestClient(postchainURL, blockchainRID, 5);
 const client = gtxClient.createClient(
-    rest,
-    Buffer.from(blockchainRID, 'hex'),
-    []
+  rest,
+  Buffer.from(blockchainRID, 'hex'),
+  []
 )
 
 interface Props {
@@ -41,7 +41,7 @@ const sendTnx = async (signer, to, calldata) => {
   })
 }
 
-const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenAddress: string, bridgeAddress: string, tokenType: string, tokenId: number}) => {
+const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenAddress: string, bridgeAddress: string, tokenType: string, tokenId: number }) => {
   const { library, chainId, account } = useWeb3React();
   const fetchTokenInfo = async () => {
     var tokenContract;
@@ -92,8 +92,8 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
   var DecodeHexStringToByteArray = function (hexString: string) {
     var result = [];
     while (hexString.length >= 2) {
-        result.push(parseInt(hexString.substring(0, 2), 16))
-        hexString = hexString.substring(2, hexString.length)
+      result.push(parseInt(hexString.substring(0, 2), 16))
+      hexString = hexString.substring(2, hexString.length)
     }
     return result;
   }
@@ -162,7 +162,7 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
         calldata = bridge.interface.encodeFunctionData("withdrawRequestNFT", [eventData, evtProof, blockHeader, sigs, signers, extraProof])
       }
       await sendTnx(signer, bridgeAddress, calldata)
-    } catch (error) { 
+    } catch (error) {
       console.log(error)
     }
   }
@@ -183,7 +183,7 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
         calldata = bridge.interface.encodeFunctionData("withdrawNFT", [zeroPaddedEventHash, account])
       }
       await sendTnx(signer, bridgeAddress, calldata)
-    } catch (error) { 
+    } catch (error) {
       console.log(error)
     }
   }
@@ -199,7 +199,7 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
       )
       let calldata = bridge.interface.encodeFunctionData("pendingWithdraw", [zeroPaddedEventHash])
       await sendTnx(signer, bridgeAddress, calldata)
-    } catch (e) { 
+    } catch (e) {
       console.log(e.Message)
     }
   }
@@ -215,10 +215,10 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
       )
       let calldata = bridge.interface.encodeFunctionData("unpendingWithdraw", [zeroPaddedEventHash])
       await sendTnx(signer, bridgeAddress, calldata)
-    } catch (e) { 
+    } catch (e) {
       console.log(e.Message)
     }
-  }  
+  }
 
   return (
     <div className="flex flex-col">
@@ -245,7 +245,7 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
           <tbody>
             {data?.withdraws?.map((w) => {
               const eventHash = tokenType === 'ERC20' ? calculateEventLeafHash(w.serial, chainId, w.token, w.beneficiary, w.amount)
-                  : calculateEventLeafHash(w.serial, chainId, w.token, w.beneficiary, tokenId)
+                : calculateEventLeafHash(w.serial, chainId, w.token, w.beneficiary, tokenId)
               return (<tr key={w?.serial}>
                 <th>{w?.serial}</th>
                 <td>{tokenType === "ERC20" ? Number(formatUnits(w?.amount.toString() ?? 0, data?.decimals)).toFixed(6) : tokenId}</td>
@@ -272,15 +272,25 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
   )
 }
 
-const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
+const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
   const { library, chainId, account } = useWeb3React()
   const [balance, setBalance] = useState(BigNumber.from(0))
   const [deposit, setDeposit] = useState(BigNumber.from(0))
   const [amount, setAmount] = useState(0)
+  const [assetId, setAssetId] = useState("")
+  const [accountId, setAccountId] = useState("")
   const [withdrawAmount, setWithdrawAmount] = useState(0)
   const [unit, setUnit] = useState(18)
   const tokenId = 388
-  const user = util.makeKeyPair();
+  const user = util.makeKeyPair()
+  const adminPUB = Buffer.from(
+    "02a829e1d7fffbd856a04b53ec7d478d8896803b571c7700ec464d6a9d4f0e3bbd",
+    "hex"
+  );
+  const adminPRIV = Buffer.from(
+    "2e88348d2b7aa474be72eab4ea5613e7a39e9c27078b00a2cdc3ce94d912aeb9",
+    "hex"
+  );
   var tokenType: string
   if (tokenAddress === "0x932Ca55B9Ef0b3094E8Fa82435b3b4c50d713043") {
     tokenType = "ERC721"
@@ -288,7 +298,7 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
     tokenType = "ERC20"
   }
 
-  const waitConfirmation = function(txRID) {
+  const waitConfirmation = function (txRID) {
     return new Promise((resolve, reject) => {
       rest.status(txRID, (err, res) => {
         if (err) {
@@ -315,6 +325,100 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
         }
       })
     })
+  }
+
+  const postchainRegisterAccount = async () => {
+    try {
+      var tx = client.newTransaction([adminPUB])
+      tx.addOperation("register_admin_account")
+      tx.sign(adminPRIV, adminPUB)
+      let txRID = tx.getTxRID()
+      tx.send((err) => {
+        if (err !== null) {
+          console.log(err)
+          return
+        }
+        toast.promise(waitConfirmation(txRID), {
+          loading: `Transaction submitted. Wait for confirmation...`,
+          success: <b>Transaction confirmed!</b>,
+          error: <b>Transaction failed!.</b>,
+        })
+      })
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  const postchainCreateAsset = async () => {
+    try {
+      var tokenContract = new ethers.Contract(tokenAddress, ERC20TokenArtifacts.abi, library)
+      let name = await tokenContract.name()
+      var tx = client.newTransaction([adminPUB])
+      tx.addOperation("ft3.dev_register_asset", name, Buffer.from(blockchainRID, 'hex'))
+      tx.sign(adminPRIV, adminPUB)
+      let txRID = tx.getTxRID()
+      tx.send((err) => {
+        if (err !== null) {
+          console.log(err)
+          return
+        }
+        toast.promise(waitConfirmation(txRID), {
+          loading: `Transaction submitted. Wait for confirmation...`,
+          success: <b>Transaction confirmed!</b>,
+          error: <b>Transaction failed!.</b>,
+        })
+      })
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  const postchainAddTokenMapping = async () => {
+    try {
+      var tx = client.newTransaction([adminPUB])
+      tx.addOperation("add_new_token_mapping", chainId, tokenAddress.toLowerCase(), Buffer.from(assetId, 'hex'))
+      tx.sign(adminPRIV, adminPUB)
+      let txRID = tx.getTxRID()
+      tx.send((err) => {
+        if (err !== null) {
+          console.log(err)
+          return
+        }
+        toast.promise(waitConfirmation(txRID), {
+          loading: `Transaction submitted. Wait for confirmation...`,
+          success: <b>Transaction confirmed!</b>,
+          error: <b>Transaction failed!.</b>,
+        })
+      })
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  const postchainRegisterERC20Token = async () => {
+    try {
+      var tokenContract = new ethers.Contract(tokenAddress, ERC20TokenArtifacts.abi, library)
+      let name: string = await tokenContract.name()
+      let symbol: string = await tokenContract.symbol()
+      let decimals: number = await tokenContract.decimals()
+      var tx = client.newTransaction([adminPUB])
+      tx.addOperation("add_new_evm_erc20", chainId, tokenAddress.toLowerCase(), name, symbol, decimals)
+      tx.sign(adminPRIV, adminPUB)
+      let txRID = tx.getTxRID()
+      tx.send((err) => {
+        if (err !== null) {
+          console.log(err)
+          return
+        }
+        toast.promise(waitConfirmation(txRID), {
+          loading: `Transaction submitted. Wait for confirmation...`,
+          success: <b>Transaction confirmed!</b>,
+          error: <b>Transaction failed!.</b>,
+        })
+      })
+    } catch (error) {
+      console.log(error)
+    }
   }
 
   const postchainWithdraw = async () => {
@@ -344,51 +448,14 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
     }
   }
 
-  const postchainClaim = async () => {
-    try {
-      var tx = client.newTransaction([user.pubKey])
-      const signer = library.getSigner()
-      const pk = util.toBuffer(user.pubKey).toString('hex')
-      var signature = await signer.signMessage(pk);
-      signature = signature.split('x')[1];
-      var r = Buffer.from(signature.substring(0, 64), 'hex')
-      var s = Buffer.from(signature.substring(64, 128), 'hex')
-      var v = parseInt(signature.substring(128, 130), 16) - 27
-
-      if (tokenType === "ERC721") {
-        tx.addOperation("claim_ERC721", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), tokenId, r, s, v, pk)
-      } else {
-        const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
-        tx.addOperation("claim_ERC20", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount), r, s, v, pk)
-      }
-      tx.sign(user.privKey, user.pubKey)
-      let txRID = tx.getTxRID()
-      tx.send((err) => {
-        if (err !== null) {
-          console.log(err)
-          return
-        }
-        toast.promise(waitConfirmation(txRID), {
-          loading: `Transaction submitted. Wait for confirmation...`,
-          success: <b>Transaction confirmed!</b>,
-          error: <b>Transaction failed!.</b>,
-        })
-      })
-    } catch (error) {
-      console.log(error)
-    }
-  }
-
   const postchainDeposit = async () => {
     try {
       var tx = client.newTransaction([user.pubKey])
-      const signer = library.getSigner()
-
       if (tokenType === "ERC721") {
         tx.addOperation("deposit_non_fungible_original", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), tokenId)
       } else {
         const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
-        tx.addOperation("deposit_ft3_token", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount))
+        tx.addOperation("deposit_ft3_token", Buffer.from(accountId, 'hex'), chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount))
       }
       tx.sign(user.privKey, user.pubKey)
       let txRID = tx.getTxRID()
@@ -447,6 +514,20 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
     }
   }, [library, tokenAddress, account]);
 
+  const allowToken = async () => {
+    const signer = library.getSigner()
+    try {
+      const bridge = new ethers.Contract(
+        bridgeAddress,
+        BridgeArtifacts.abi,
+        library
+      )
+      const calldata = bridge.interface.encodeFunctionData("allowToken", [tokenAddress])
+      await sendTnx(signer, bridgeAddress, calldata)
+    } catch (error) {
+    }
+  }
+
   const depositTokens = async () => {
     const signer = library.getSigner()
     try {
@@ -456,7 +537,7 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
         library
       )
       const value = ethers.BigNumber.from(amount).mul(ethers.BigNumber.from(10).pow(unit))
-      const calldata = bridge.interface.encodeFunctionData("deposit", [tokenAddress, value])
+      const calldata = bridge.interface.encodeFunctionData("deposit", [tokenAddress, value, Buffer.from(accountId, 'hex')])
       await sendTnx(signer, bridgeAddress, calldata)
     } catch (error) {
     }
@@ -526,7 +607,7 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
       )}
 
       <div className="flex items-center w-full px-4 py-10 bg-cover card bg-base-200">
-        <TokenInfo tokenAddress={tokenAddress} bridgeAddress={bridgeAddress} tokenType={tokenType} tokenId={tokenId}/>
+        <TokenInfo tokenAddress={tokenAddress} bridgeAddress={bridgeAddress} tokenType={tokenType} tokenId={tokenId} />
 
         <div className="text-center shadow-2xl card">
           <div className="card-body">
@@ -546,6 +627,37 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
               </div>
             </div>
 
+            <input 
+              type="text" 
+              placeholder="Account Id" 
+              value={accountId}
+              onChange={(evt) => setAccountId(evt.target.value)}
+              className="input w-full max-w-xs"
+            />
+            <input 
+              type="text" 
+              placeholder="Asset Id" 
+              value={assetId}
+              onChange={(evt) => setAssetId(evt.target.value)}
+              className="input w-full max-w-xs"
+            />            
+            <div>
+              <div className="justify-center card-actions">
+                <button onClick={postchainRegisterAccount} type="button" className="btn btn-outline btn-accent">
+                  Register Account
+                </button>
+                <button onClick={postchainCreateAsset} type="button" className="btn btn-outline btn-accent">
+                  Create New Asset
+                </button>
+                <button onClick={postchainRegisterERC20Token} type="button" className="btn btn-outline btn-accent">
+                  Register ERC20 Token
+                </button>
+                <button onClick={postchainAddTokenMapping} type="button" className="btn btn-outline btn-accent">
+                  Add Token Mapping
+                </button>                
+              </div>
+            </div>
+
             <input
               type="range"
               max="10"
@@ -560,6 +672,9 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
                     <button onClick={approveTokens} type="button" className="btn btn-outline btn-accent">
                       Approve
                     </button>
+                    <button onClick={allowToken} type="button" className="btn btn-outline btn-accent">
+                      Allow Token
+                    </button>                    
                     <button onClick={depositTokens} type="button" className="btn btn-outline btn-accent">
                       Deposit
                     </button>
@@ -595,14 +710,11 @@ const Bridge = ({ bridgeAddress, tokenAddress}: Props) => {
           </div>
           <div className="form-control">
             <input type="range" max="10" className="range range-accent" value={withdrawAmount}
-              onChange={(evt) => setWithdrawAmount(evt.target.valueAsNumber)}/>
+              onChange={(evt) => setWithdrawAmount(evt.target.valueAsNumber)} />
           </div>
           <div className="justify-center card-actions">
             <button onClick={postchainWithdraw} type="button" className="btn btn-outline btn-accent">
               Withdraw on Postchain
-            </button>
-            <button onClick={postchainClaim} type="button" className="btn btn-outline btn-accent">
-              Claim on Postchain
             </button>
             <button onClick={postchainDeposit} type="button" className="btn btn-outline btn-accent">
               Deposit on Postchain

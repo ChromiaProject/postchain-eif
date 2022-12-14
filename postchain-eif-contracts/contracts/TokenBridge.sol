@@ -50,6 +50,8 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
         uint accountNumber;
     }
 
+    mapping (IERC20 => bool) public _allowedToken;
+    mapping (IERC721 => bool) public _allowedNFT;
     mapping (IERC20 => uint256) public _balances;
     mapping (IERC721 => mapping(uint256 => address)) public _owners;
     mapping (bytes32 => Withdraw) public _withdraw;
@@ -89,12 +91,22 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
         Status status;
     }
 
-    event DepositedERC20(address indexed sender, IERC20 indexed token, uint networkId, uint amount, string name, string symbol, uint8 decimals);
-    event DepositedERC721(address indexed sender, IERC721 indexed nft, uint networkId, uint tokenId, string name, string symbol, string tokenURI);
+    event DepositedERC20(address indexed sender, IERC20 indexed token, bytes32 indexed ft3_account_id, uint networkId, uint amount, string name, string symbol, uint8 decimals);
+    event DepositedERC721(address indexed sender, IERC721 indexed nft, bytes32 indexed ft3_account_id, uint networkId, uint tokenId, string name, string symbol, string tokenURI);
     event WithdrawRequest(address indexed beneficiary, IERC20 indexed token, uint256 value);
     event WithdrawRequestNFT(address indexed beneficiary, IERC721 indexed token, uint256 tokenId);
     event Withdrawal(address indexed beneficiary, IERC20 indexed token, uint256 value);
     event WithdrawalNFT(address indexed beneficiary, IERC721 indexed nft, uint256 tokenId);
+
+    modifier isAllowToken(IERC20 token) {
+        require(_allowedToken[token], "TokenBridge: not allow token");
+        _;
+    }
+
+    modifier isAllowNFT(IERC721 nft) {
+        require(_allowedNFT[nft], "TokenBridge: not allow nft");
+        _;
+    }
 
     function initialize(IValidator _validator) public initializer {
         __Ownable_init();
@@ -121,6 +133,14 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
         return this.onERC721Received.selector;
     }
 
+    function allowToken(IERC20 token) onlyOwner public {
+        _allowedToken[token] = true;
+    }
+
+    function allowNFT(IERC721 nft) onlyOwner public {
+        _allowedNFT[nft] = true;
+    }
+
     function pendingWithdraw(bytes32 _hash) onlyOwner public {
         Withdraw storage wd = _withdraw[_hash];
         require(wd.status == Status.Withdrawable, "TokenBridge: withdraw request status is not withdrawable");
@@ -133,7 +153,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
         wd.status = Status.Withdrawable;
     }
 
-    function deposit(IERC20 token, uint256 amount) public returns (bool) {
+    function deposit(IERC20 token, uint256 amount, bytes32 ft3_account_id) isAllowToken(token) public returns (bool) {
         string memory name = "";
         string memory symbol = "";
         uint8 decimals = 0;
@@ -159,11 +179,11 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
         // Do transfer
         token.transferFrom(msg.sender, address(this), amount);
         _balances[token] += amount;
-        emit DepositedERC20(msg.sender, token, networkId, amount, name, symbol, decimals);
+        emit DepositedERC20(msg.sender, token, ft3_account_id, networkId, amount, name, symbol, decimals);
         return true;
     }
 
-    function depositNFT(IERC721 nft, uint256 tokenId) public returns (bool) {
+    function depositNFT(IERC721 nft, uint256 tokenId, bytes32 ft3_account_id) isAllowNFT(nft) public returns (bool) {
         nft.safeTransferFrom(msg.sender, address(this), tokenId);
         _owners[nft][tokenId] = msg.sender;
         string memory name = "";
@@ -185,7 +205,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
             tokenURI = abi.decode(_tokenURI, (string));
         }
 
-        emit DepositedERC721(msg.sender, nft, networkId, tokenId, name, symbol, tokenURI);
+        emit DepositedERC721(msg.sender, nft, ft3_account_id, networkId, tokenId, name, symbol, tokenURI);
         return true;
     }
 
