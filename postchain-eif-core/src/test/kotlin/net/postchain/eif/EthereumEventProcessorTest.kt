@@ -89,7 +89,9 @@ class EthereumEventProcessorTest {
     fun `Deposit events on ethereum should be parsed and private validated`() {
         val initialMint = 50L
         // Deploy token bridge contract
-        val bridge = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send()
+        val bridge = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
+            initialize(Address("0x0000000000000000000000000000000000000000")).send()
+        }
 
         // Mock query for last evm block in this test
         val blockQueriesMock: BlockQueries = mock {
@@ -115,7 +117,7 @@ class EthereumEventProcessorTest {
         }
 
         // Allow token
-        bridge.allowToken(Address(testToken.contractAddress))
+        bridge.allowToken(Address(testToken.contractAddress)).send()
         // Deposit to postchain
         for (i in 1..5) {
             bridge.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN),
@@ -196,8 +198,12 @@ class EthereumEventProcessorTest {
     fun `Events can be received from multiple contracts`() {
         val initialMint = 20L
         // Deploy two token bridge contracts
-        val bridgeFirst = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send()
-        val bridgeSecond = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send()
+        val bridgeFirst = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
+            initialize(Address("0x0000000000000000000000000000000000000000")).send()
+        }
+        val bridgeSecond = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
+            initialize(Address("0x0000000000000000000000000000000000000000")).send()
+        }
 
         // Mock query for last evm block in this test
         val blockQueriesMock: BlockQueries = mock {
@@ -225,8 +231,8 @@ class EthereumEventProcessorTest {
         }
 
         // Allow token
-        bridgeFirst.allowToken(Address(testToken.contractAddress))
-        bridgeSecond.allowToken(Address(testToken.contractAddress))
+        bridgeFirst.allowToken(Address(testToken.contractAddress)).send()
+        bridgeSecond.allowToken(Address(testToken.contractAddress)).send()
 
         // Deposit to postchain
         bridgeFirst.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN),
