@@ -281,7 +281,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
   const [accountId, setAccountId] = useState("")
   const [withdrawAmount, setWithdrawAmount] = useState(0)
   const [unit, setUnit] = useState(18)
-  const tokenId = 388
+  const tokenId = 383
   const user = util.makeKeyPair()
   const adminPUB = Buffer.from(
     "02a829e1d7fffbd856a04b53ec7d478d8896803b571c7700ec464d6a9d4f0e3bbd",
@@ -331,6 +331,72 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
     try {
       var tx = client.newTransaction([adminPUB])
       tx.addOperation("register_admin_account")
+      tx.sign(adminPRIV, adminPUB)
+      let txRID = tx.getTxRID()
+      tx.send((err) => {
+        if (err !== null) {
+          console.log(err)
+          return
+        }
+        toast.promise(waitConfirmation(txRID), {
+          loading: `Transaction submitted. Wait for confirmation...`,
+          success: <b>Transaction confirmed!</b>,
+          error: <b>Transaction failed!.</b>,
+        })
+      })
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  const postchainRegisterChromiaBaseOriginals =async () => {
+    try {
+      var tx = client.newTransaction([adminPUB])
+      tx.addOperation("register_chromia_base_originals")
+      tx.sign(adminPRIV, adminPUB)
+      let txRID = tx.getTxRID()
+      tx.send((err) => {
+        if (err !== null) {
+          console.log(err)
+          return
+        }
+        toast.promise(waitConfirmation(txRID), {
+          loading: `Transaction submitted. Wait for confirmation...`,
+          success: <b>Transaction confirmed!</b>,
+          error: <b>Transaction failed!.</b>,
+        })
+      })
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  const postchainInitEifOriginalInterface =async () => {
+    try {
+      var tx = client.newTransaction([adminPUB])
+      tx.addOperation("init_eif_original_interface")
+      tx.sign(adminPRIV, adminPUB)
+      let txRID = tx.getTxRID()
+      tx.send((err) => {
+        if (err !== null) {
+          console.log(err)
+          return
+        }
+        toast.promise(waitConfirmation(txRID), {
+          loading: `Transaction submitted. Wait for confirmation...`,
+          success: <b>Transaction confirmed!</b>,
+          error: <b>Transaction failed!.</b>,
+        })
+      })
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  const postchainAddEifNftMapping = async () => {
+    try {
+      var tx = client.newTransaction([adminPUB])
+      tx.addOperation("add_eif_nft_mapping", chainId, tokenAddress.toLowerCase())
       tx.sign(adminPRIV, adminPUB)
       let txRID = tx.getTxRID()
       tx.send((err) => {
@@ -452,7 +518,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
     try {
       var tx = client.newTransaction([user.pubKey])
       if (tokenType === "ERC721") {
-        tx.addOperation("deposit_non_fungible_original", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), tokenId)
+        tx.addOperation("deposit_non_fungible_original", Buffer.from(accountId, 'hex'), Buffer.from(assetId, 'hex'), chainId, tokenAddress.toLowerCase(), account.toLowerCase())
       } else {
         const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
         tx.addOperation("deposit_ft3_token", Buffer.from(accountId, 'hex'), chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount))
@@ -528,6 +594,20 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
     }
   }
 
+  const allowNFT = async () => {
+    const signer = library.getSigner()
+    try {
+      const bridge = new ethers.Contract(
+        bridgeAddress,
+        BridgeArtifacts.abi,
+        library
+      )
+      const calldata = bridge.interface.encodeFunctionData("allowNFT", [tokenAddress])
+      await sendTnx(signer, bridgeAddress, calldata)
+    } catch (error) {
+    }
+  }
+
   const depositTokens = async () => {
     const signer = library.getSigner()
     try {
@@ -552,7 +632,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         library
       )
       const id = ethers.BigNumber.from(tokenId)
-      const calldata = bridge.interface.encodeFunctionData("depositNFT", [tokenAddress, id])
+      const calldata = bridge.interface.encodeFunctionData("depositNFT", [tokenAddress, id, Buffer.from(accountId, 'hex')])
       await sendTnx(signer, bridgeAddress, calldata)
     } catch (error) {
     }
@@ -654,7 +734,21 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
                 </button>
                 <button onClick={postchainAddTokenMapping} type="button" className="btn btn-outline btn-accent">
                   Add Token Mapping
-                </button>                
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div className="justify-center card-actions">
+                <button onClick={postchainRegisterChromiaBaseOriginals} type="button" className="btn btn-outline btn-accent">
+                  Register Chromia Base Originals
+                </button>
+                <button onClick={postchainInitEifOriginalInterface} type="button" className="btn btn-outline btn-accent">
+                  Init Eif Original Interface
+                </button>
+                <button onClick={postchainAddEifNftMapping} type="button" className="btn btn-outline btn-accent">
+                  Add Eif Nft Mapping
+                </button>
               </div>
             </div>
 
@@ -674,7 +768,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
                     </button>
                     <button onClick={allowToken} type="button" className="btn btn-outline btn-accent">
                       Allow Token
-                    </button>                    
+                    </button>
                     <button onClick={depositTokens} type="button" className="btn btn-outline btn-accent">
                       Deposit
                     </button>
@@ -688,6 +782,9 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
                   <div className="justify-center card-actions">
                     <button onClick={setApprovalForAll} type="button" className="btn btn-outline btn-accent">
                       Approve
+                    </button>
+                    <button onClick={allowNFT} type="button" className="btn btn-outline btn-accent">
+                      Allow NFT
                     </button>
                     <button onClick={depositNFTokens} type="button" className="btn btn-outline btn-accent">
                       Deposit
