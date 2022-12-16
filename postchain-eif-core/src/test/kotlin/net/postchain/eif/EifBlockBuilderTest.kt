@@ -10,6 +10,7 @@ import net.postchain.common.data.KECCAK256
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
 import net.postchain.core.Transaction
+import net.postchain.crypto.KeyPair
 import net.postchain.crypto.Secp256K1CryptoSystem
 import net.postchain.crypto.devtools.KeyPairHelper
 import net.postchain.devtools.IntegrationTestSetup
@@ -30,7 +31,7 @@ val myCS = Secp256K1CryptoSystem()
 class EifBlockBuilderTest : IntegrationTestSetup() {
 
     private lateinit var ds: SimpleDigestSystem
-
+    private val sigMaker = myCS.buildSigMaker(KeyPair(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
     fun makeEifEventOp(bcRid: BlockchainRid, num: Long): ByteArray {
         val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
         b.addOperation(
@@ -39,7 +40,7 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
             gtv(ds.digest(BigInteger.valueOf(num).toByteArray()))
         )
         return b.finish()
-            .sign(myCS.buildSigMaker(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
+            .sign(sigMaker)
             .buildGtx()
             .encode()
     }
@@ -53,7 +54,7 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
             gtv(ds.digest(BigInteger.valueOf(num).toByteArray()))
         )
         return b.finish()
-            .sign(myCS.buildSigMaker(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
+            .sign(sigMaker)
             .buildGtx()
             .encode()
     }
@@ -62,7 +63,7 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
         val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
         b.addOperation("nop", gtv(42))
         return b.finish()
-            .sign(myCS.buildSigMaker(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
+            .sign(sigMaker)
             .buildGtx()
             .encode()
     }
@@ -71,7 +72,7 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
         val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
         b.addOperation("gtx_test", gtv(id), gtv(value))
         return b.finish()
-            .sign(myCS.buildSigMaker(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
+            .sign(sigMaker)
             .buildGtx()
             .encode()
     }
@@ -86,7 +87,7 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
         // Need to add a valid dummy operation to make the entire TX valid
         b.addOperation("gtx_test", gtv(1), gtv("true"))
         return b.finish()
-            .sign(myCS.buildSigMaker(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
+            .sign(sigMaker)
             .buildGtx()
             .encode()
     }
