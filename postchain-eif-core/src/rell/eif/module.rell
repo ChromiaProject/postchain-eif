@@ -448,7 +448,7 @@ operation claim_ERC20(network_id: integer, token_address: text, beneficiary: tex
     );
     val token_mapping = require(
         token_mapping @? { .token == token },
-        "no token_mapping"
+        "no token mapping"
     );
     val ft3_asset = require(
         ft3.asset @? { .id == token_mapping.asset.id }, 
@@ -546,19 +546,23 @@ operation claim_ERC721(network_id: integer, token_address: text, beneficiary: te
     og.Minter.mint_non_fungible_original(account, original_type, dip.Meta.Engine.access(account));
 }
 
-// TODO: Need to enhance/harden the security for this withdrawal
-// With the current implementation, anyone can call the withdrawal of the non-zero balance of beneficiaries.
-// they cannot grab the fund but they call the withdraw without intention of the owner/beneficiary.
-// It will be a bit noisy.
-// We might force the postchain signer of operation need to send the signature to ensure that
-// the signer control the private key of the beneficiary by using eth_ecrecover()
-operation withdraw_ERC20(network_id: integer, token_address: text, beneficiary: text, amount: integer) {
+operation withdraw_ERC20(network_id: integer, token_address: text, beneficiary: text, amount: integer, 
+                                                    r: byte_array, s: byte_array, v: integer, pk: text) {
     require(amount > 0, "Must withdraw an amount larger than 0");
+
+    // ensure that the signer also control the beneficiary account
+    val recovered_pubkey = crypto.eth_ecrecover(r, s, v, hash_eth_message(pk));
+    val eth_address = get_eth_address(recovered_pubkey);
+    require(eth_address == beneficiary.sub(2), "beneficiary is not correct, " + "b: " + beneficiary.sub(2) + " e: " + eth_address);
+    val participants = op_context.get_signers();
+    require_not_empty(participants, "participants is empty");
+    require(participants.size() == 1, "only support single auth");
+    require(participants[0].to_hex() == pk, "ft3 participant is not correct, " + participants[0].to_hex() + ", " + pk);
+
     val token = evm_erc20 @? { network_id, .address == token_address };
     if (empty(token)) {
         return;
     }
-
     val balance = evm_erc20_balance @? { network_id, token, beneficiary };
     require_not_empty(balance, "No balance for this token");
     require(balance.amount >= amount, "Balance is too low");
@@ -584,13 +588,17 @@ operation withdraw_ERC20(network_id: integer, token_address: text, beneficiary: 
     emit_withdraw(network_id, beneficiary, withdraw_info);
 }
 
-// TODO: Need to enhance/harden the security for this withdrawal
-// With the current implementation, anyone can call the withdrawal of the non-zero balance of beneficiaries.
-// they cannot grab the fund but they call the withdraw without intention of the owner/beneficiary.
-// It will be a bit noisy.
-// We might force the postchain signer of operation need to send the signature to ensure that
-// the signer control the private key of the beneficiary by using eth_ecrecover()
-operation withdraw_ERC721(network_id: integer, token_address: text, beneficiary: text, token_id: integer) {
+operation withdraw_ERC721(network_id: integer, token_address: text, beneficiary: text, token_id: integer,
+                                                        r: byte_array, s: byte_array, v: integer, pk: text) {
+    // ensure that the signer also control the beneficiary account
+    val recovered_pubkey = crypto.eth_ecrecover(r, s, v, hash_eth_message(pk));
+    val eth_address = get_eth_address(recovered_pubkey);
+    require(eth_address == beneficiary.sub(2), "beneficiary is not correct, " + "b: " + beneficiary.sub(2) + " e: " + eth_address);
+    val participants = op_context.get_signers();
+    require_not_empty(participants, "participants is empty");
+    require(participants.size() == 1, "only support single auth");
+    require(participants[0].to_hex() == pk, "ft3 participant is not correct, " + participants[0].to_hex() + ", " + pk);    
+
     val token = evm_erc721 @? { network_id, .address == token_address, token_id };
     if (empty(token)) {
         return;

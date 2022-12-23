@@ -50,6 +50,9 @@ class EthereumEventProcessorTest {
     // and the address created must be added to /geth-compose/geth/test.json
     private val credentials = Credentials
         .create("0x0000000000000000000000000000000001000000000000000000000000000000")
+    private val accountId = Bytes32("fc91c4abaff09f4c67a0ab84d4e9afd37c929978bea3fa1790403ab6ee85bf33"
+        .hexStringToByteArray())
+    private val validatorContract = Address("0x0000000000000000000000000000000000000000")
     private lateinit var web3j: Web3j
     private lateinit var transactionManager: TransactionManager
 
@@ -90,7 +93,7 @@ class EthereumEventProcessorTest {
         val initialMint = 50L
         // Deploy token bridge contract
         val bridge = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
-            initialize(Address("0x0000000000000000000000000000000000000000")).send()
+            initialize(validatorContract).send()
         }
 
         // Mock query for last evm block in this test
@@ -120,8 +123,7 @@ class EthereumEventProcessorTest {
         bridge.allowToken(Address(testToken.contractAddress)).send()
         // Deposit to postchain
         for (i in 1..5) {
-            bridge.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN),
-                Bytes32("fc91c4abaff09f4c67a0ab84d4e9afd37c929978bea3fa1790403ab6ee85bf33".hexStringToByteArray())).send()
+            bridge.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), accountId).send()
         }
 
         Awaitility.await()
@@ -170,8 +172,7 @@ class EthereumEventProcessorTest {
             mint(Address(transactionManager.fromAddress), Uint256(max)).send()
             approve(Address(bridge.contractAddress), Uint256(max)).send()
         }
-        bridge.deposit(Address(testToken.contractAddress), Uint256(max),
-            Bytes32("fc91c4abaff09f4c67a0ab84d4e9afd37c929978bea3fa1790403ab6ee85bf33".hexStringToByteArray())).send()
+        bridge.deposit(Address(testToken.contractAddress), Uint256(max), accountId).send()
 
         Awaitility.await()
             .atMost(Duration.ONE_MINUTE)
@@ -199,10 +200,10 @@ class EthereumEventProcessorTest {
         val initialMint = 20L
         // Deploy two token bridge contracts
         val bridgeFirst = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
-            initialize(Address("0x0000000000000000000000000000000000000000")).send()
+            initialize(validatorContract).send()
         }
         val bridgeSecond = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
-            initialize(Address("0x0000000000000000000000000000000000000000")).send()
+            initialize(validatorContract).send()
         }
 
         // Mock query for last evm block in this test
@@ -235,10 +236,8 @@ class EthereumEventProcessorTest {
         bridgeSecond.allowToken(Address(testToken.contractAddress)).send()
 
         // Deposit to postchain
-        bridgeFirst.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN),
-            Bytes32("fc91c4abaff09f4c67a0ab84d4e9afd37c929978bea3fa1790403ab6ee85bf33".hexStringToByteArray())).send()
-        bridgeSecond.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN),
-            Bytes32("fc91c4abaff09f4c67a0ab84d4e9afd37c929978bea3fa1790403ab6ee85bf33".hexStringToByteArray())).send()
+        bridgeFirst.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), accountId).send()
+        bridgeSecond.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), accountId).send()
 
         // Verify we got both events from the different contracts
         Awaitility.await()

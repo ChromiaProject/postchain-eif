@@ -281,7 +281,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
   const [accountId, setAccountId] = useState("")
   const [withdrawAmount, setWithdrawAmount] = useState(0)
   const [unit, setUnit] = useState(18)
-  const tokenId = 383
+  const tokenId = 382
   const user = util.makeKeyPair()
   const adminPUB = Buffer.from(
     "02a829e1d7fffbd856a04b53ec7d478d8896803b571c7700ec464d6a9d4f0e3bbd",
@@ -490,11 +490,54 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
   const postchainWithdraw = async () => {
     try {
       var tx = client.newTransaction([user.pubKey])
+      const signer = library.getSigner()
+      const pk = util.toBuffer(user.pubKey).toString('hex')
+      var signature = await signer.signMessage(pk);
+      signature = signature.split('x')[1];
+      var r = Buffer.from(signature.substring(0, 64), 'hex')
+      var s = Buffer.from(signature.substring(64, 128), 'hex')
+      var v = parseInt(signature.substring(128, 130), 16) - 27
+
       if (tokenType === "ERC721") {
-        tx.addOperation("withdraw_ERC721", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), tokenId)
+        tx.addOperation("withdraw_ERC721", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), tokenId, r, s, v, pk)
       } else {
         const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
-        tx.addOperation("withdraw_ERC20", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount))
+        tx.addOperation("withdraw_ERC20", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount), r, s, v, pk)
+      }
+      tx.sign(user.privKey, user.pubKey)
+      let txRID = tx.getTxRID()
+      tx.send((err) => {
+        if (err !== null) {
+          console.log(err)
+          return
+        }
+        toast.promise(waitConfirmation(txRID), {
+          loading: `Transaction submitted. Wait for confirmation...`,
+          success: <b>Transaction confirmed!</b>,
+          error: <b>Transaction failed!.</b>,
+        })
+      })
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  const postchainClaim = async () => {
+    try {
+      var tx = client.newTransaction([user.pubKey])
+      const signer = library.getSigner()
+      const pk = util.toBuffer(user.pubKey).toString('hex')
+      var signature = await signer.signMessage(pk);
+      signature = signature.split('x')[1];
+      var r = Buffer.from(signature.substring(0, 64), 'hex')
+      var s = Buffer.from(signature.substring(64, 128), 'hex')
+      var v = parseInt(signature.substring(128, 130), 16) - 27
+
+      if (tokenType === "ERC721") {
+        tx.addOperation("claim_ERC721", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), tokenId, r, s, v, pk, Buffer.from(accountId, "hex"))
+      } else {
+        const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
+        tx.addOperation("claim_ERC20", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount), r, s, v, pk, Buffer.from(accountId, "hex"))
       }
       tx.sign(user.privKey, user.pubKey)
       let txRID = tx.getTxRID()
@@ -591,6 +634,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       const calldata = bridge.interface.encodeFunctionData("allowToken", [tokenAddress])
       await sendTnx(signer, bridgeAddress, calldata)
     } catch (error) {
+      console.log(error)
     }
   }
 
@@ -605,6 +649,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       const calldata = bridge.interface.encodeFunctionData("allowNFT", [tokenAddress])
       await sendTnx(signer, bridgeAddress, calldata)
     } catch (error) {
+      console.log(error)
     }
   }
 
@@ -620,6 +665,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       const calldata = bridge.interface.encodeFunctionData("deposit", [tokenAddress, value, Buffer.from(accountId, 'hex')])
       await sendTnx(signer, bridgeAddress, calldata)
     } catch (error) {
+      console.log(error)
     }
   };
 
@@ -815,6 +861,9 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
             </button>
             <button onClick={postchainDeposit} type="button" className="btn btn-outline btn-accent">
               Deposit on Postchain
+            </button>
+            <button onClick={postchainClaim} type="button" className="btn btn-outline btn-accent">
+              Claim on Postchain
             </button>
           </div>
         </div></div>
