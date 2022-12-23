@@ -281,7 +281,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
   const [accountId, setAccountId] = useState("")
   const [withdrawAmount, setWithdrawAmount] = useState(0)
   const [unit, setUnit] = useState(18)
-  const tokenId = 382
+  const tokenId = 381
   const user = util.makeKeyPair()
   const adminPUB = Buffer.from(
     "02a829e1d7fffbd856a04b53ec7d478d8896803b571c7700ec464d6a9d4f0e3bbd",
