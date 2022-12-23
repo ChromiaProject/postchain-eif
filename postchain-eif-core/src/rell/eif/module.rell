@@ -196,13 +196,13 @@ operation __evm_block(network_id: integer, evm_block_height: integer, evm_block_
         // ignore invalid events' network id
         val net_id = integer.from_gtv(event.non_indexed_values[0]);
         if (net_id != network_id) {
-            print("ignore invalid events' network id: " + net_id + " : " + network_id);
+            log("ignore invalid events' network id: " + net_id + " : " + network_id);
             continue;
         }
         val beneficiary = to_zero_padded_hex(byte_array.from_gtv(event.indexed_values[0]));
         val token_address = to_zero_padded_hex(byte_array.from_gtv(event.indexed_values[1]));
         val ft3_account_id = byte_array.from_gtv(event.indexed_values[2]);
-        print("ft3_account_id: " + ft3_account_id.to_hex());
+        log("ft3_account_id: " + ft3_account_id.to_hex());
         val ft3_account = acc.account @? { .id == ft3_account_id };
 
         when (event.name) {
@@ -210,19 +210,19 @@ operation __evm_block(network_id: integer, evm_block_height: integer, evm_block_
                 // ignore the unsupport token, move to process next events if any
                 val token = evm_erc20 @? { network_id, .address == token_address };
                 if (empty(token)) {
-                    print("ignore the unsupport token, move to process next events if any: " + token_address);
+                    log("ignore the unsupport token, move to process next events if any: " + token_address);
                     continue;
                 }
                 val token_mapping = token_mapping @? { .token == token!! };
                 if (empty(token_mapping)) {
-                    print("no token_mapping");
+                    log("no token_mapping");
                     continue;
                 }
 
                 // ignore event if ft3 asset does not exist
                 val ft3_asset = ft3.asset @? { .id == token_mapping!!.asset.id };
                 if (empty(ft3_asset)) {
-                    print("ignore event if ft3 asset does not exist: " + token_mapping.asset.id);
+                    log("ignore event if ft3 asset does not exist: " + token_mapping.asset.id);
                     continue;
                 }
                 val amount = integer.from_gtv(event.non_indexed_values[1]);
@@ -242,7 +242,7 @@ operation __evm_block(network_id: integer, evm_block_height: integer, evm_block_
                     val name = text.from_gtv(event.non_indexed_values[2]);
                     val symbol = text.from_gtv(event.non_indexed_values[3]);
                     val decimals = integer.from_gtv(event.non_indexed_values[4]);
-                    print("record the state into EIF for withdraw back to EVM chains later: " + ft3_account_id);
+                    log("record the state into EIF for withdraw back to EVM chains later: " + ft3_account_id);
                     deposit_ERC20(network_id, beneficiary, token_address, amount, name, symbol, decimals);
                 
                     val account_link = get_or_create_evm_account_link(network_id, beneficiary);
@@ -254,7 +254,7 @@ operation __evm_block(network_id: integer, evm_block_height: integer, evm_block_
                     op_context.emit_event("eif_state", state_data.to_gtv());
                 } else {
                     // mint postchain token for ft3 account
-                    print("mint postchain token for ft3 account: " + ft3_account_id);
+                    log("mint postchain token for ft3 account: " + ft3_account_id);
                     val ft3_balance = ft3.ensure_balance( ft3_account, ft3_asset!! );
                     ft3_balance.amount += amount;
                 }
@@ -263,7 +263,7 @@ operation __evm_block(network_id: integer, evm_block_height: integer, evm_block_
                 // ignore event if dip instance does not exist
                 val interface = nft_mapping @? { network_id, .address == token_address }.interface;
                 if (empty(interface)) {
-                    print("nft token was not mapping yet: " + token_address);
+                    log("nft token was not mapping yet: " + token_address);
                     continue;
                 }
                 
@@ -283,7 +283,7 @@ operation __evm_block(network_id: integer, evm_block_height: integer, evm_block_
                 val uri = text.from_gtv(event.non_indexed_values[4]);
 
                 if (empty(ft3_account)) {
-                    print("deposit nft into EIF: " + name);
+                    log("deposit nft into EIF: " + name);
                     deposit_ERC721(network_id, beneficiary, token_address, token_id, name, symbol, uri);
 
                     val account_link = get_or_create_evm_account_link(network_id, beneficiary);
@@ -294,7 +294,7 @@ operation __evm_block(network_id: integer, evm_block_height: integer, evm_block_
                     );
                     op_context.emit_event("eif_state", state_data.to_gtv());
                 } else {
-                    print("mint postchain original for ft3 account: " + ft3_account_id);
+                    log("mint postchain original for ft3 account: " + ft3_account_id);
                     require(interface!!.name == eif.INonFungibleOriginal.interface, "interface is not supported: " + interface!!.name);
                     val original_type = og.Minter.I(
                         interface_name = interface.name,
@@ -673,7 +673,7 @@ function build_account_state(network_id: integer, beneficiary: text) {
 }
 
 function deposit_ERC20(network_id: integer, beneficiary: text, token_address: text, amount: integer, name: text, symbol: text, decimals: integer) {
-    print("deposit_ERC20: " + token_address + " : " + beneficiary + " : " + name);
+    log("deposit_ERC20: " + token_address + " : " + beneficiary + " : " + name);
     var token = evm_erc20 @? { network_id, .address == token_address };
     if (empty(token)) {
         token = create evm_erc20(
