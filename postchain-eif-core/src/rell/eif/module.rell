@@ -24,7 +24,7 @@ namespace eif.INonFungibleOriginal {
                 symbol: dip.Type(dip.Text.T(), [dip.Optional()]),
                 uri: dip.Type(dip.Text.T(), [dip.Optional()])
             ],
-			dependencies() @* {} (dip.Interface.get($)),
+            dependencies() @* {} (dip.Interface.get($)),
             account = account,
             is_open = true
 		);
