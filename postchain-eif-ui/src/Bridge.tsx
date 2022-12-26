@@ -281,7 +281,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
   const [accountId, setAccountId] = useState("")
   const [withdrawAmount, setWithdrawAmount] = useState(0)
   const [unit, setUnit] = useState(18)
-  const tokenId = 381
+  const tokenId = 380
   const user = util.makeKeyPair()
   const adminPUB = Buffer.from(
     "02a829e1d7fffbd856a04b53ec7d478d8896803b571c7700ec464d6a9d4f0e3bbd",
@@ -331,6 +331,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
     try {
       var tx = client.newTransaction([adminPUB])
       tx.addOperation("register_admin_account")
+      tx.addOperation("nop", Date.now())
       tx.sign(adminPRIV, adminPUB)
       let txRID = tx.getTxRID()
       tx.send((err) => {
@@ -353,6 +354,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
     try {
       var tx = client.newTransaction([adminPUB])
       tx.addOperation("register_chromia_base_originals")
+      tx.addOperation("nop", Date.now())
       tx.sign(adminPRIV, adminPUB)
       let txRID = tx.getTxRID()
       tx.send((err) => {
@@ -375,6 +377,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
     try {
       var tx = client.newTransaction([adminPUB])
       tx.addOperation("init_eif_original_interface")
+      tx.addOperation("nop", Date.now())
       tx.sign(adminPRIV, adminPUB)
       let txRID = tx.getTxRID()
       tx.send((err) => {
@@ -397,6 +400,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
     try {
       var tx = client.newTransaction([adminPUB])
       tx.addOperation("add_eif_nft_mapping", chainId, tokenAddress.toLowerCase())
+      tx.addOperation("nop", Date.now())
       tx.sign(adminPRIV, adminPUB)
       let txRID = tx.getTxRID()
       tx.send((err) => {
@@ -421,6 +425,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       let name = await tokenContract.name()
       var tx = client.newTransaction([adminPUB])
       tx.addOperation("ft3.dev_register_asset", name, Buffer.from(blockchainRID, 'hex'))
+      tx.addOperation("nop", Date.now())
       tx.sign(adminPRIV, adminPUB)
       let txRID = tx.getTxRID()
       tx.send((err) => {
@@ -443,6 +448,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
     try {
       var tx = client.newTransaction([adminPUB])
       tx.addOperation("add_new_token_mapping", chainId, tokenAddress.toLowerCase(), Buffer.from(assetId, 'hex'))
+      tx.addOperation("nop", Date.now())
       tx.sign(adminPRIV, adminPUB)
       let txRID = tx.getTxRID()
       tx.send((err) => {
@@ -469,6 +475,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       let decimals: number = await tokenContract.decimals()
       var tx = client.newTransaction([adminPUB])
       tx.addOperation("add_new_evm_erc20", chainId, tokenAddress.toLowerCase(), name, symbol, decimals)
+      tx.addOperation("nop", Date.now())
       tx.sign(adminPRIV, adminPUB)
       let txRID = tx.getTxRID()
       tx.send((err) => {
@@ -504,6 +511,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
         tx.addOperation("withdraw_ERC20", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount), r, s, v, pk)
       }
+      tx.addOperation("nop", Date.now())
       tx.sign(user.privKey, user.pubKey)
       let txRID = tx.getTxRID()
       tx.send((err) => {
@@ -539,6 +547,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
         tx.addOperation("claim_ERC20", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount), r, s, v, pk, Buffer.from(accountId, "hex"))
       }
+      tx.addOperation("nop", Date.now())
       tx.sign(user.privKey, user.pubKey)
       let txRID = tx.getTxRID()
       tx.send((err) => {
@@ -566,6 +575,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
         tx.addOperation("deposit_ft3_token", Buffer.from(accountId, 'hex'), chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount))
       }
+      tx.addOperation("nop", Date.now())
       tx.sign(user.privKey, user.pubKey)
       let txRID = tx.getTxRID()
       tx.send((err) => {
