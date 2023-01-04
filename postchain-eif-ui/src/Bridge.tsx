@@ -7,7 +7,7 @@ import { useQuery } from "react-query";
 
 import ERC20TokenArtifacts from "./postchain-eif-contracts/artifacts/@openzeppelin/contracts/token/ERC20/ERC20.sol/ERC20.json";
 import ERC721TokenArtifacts from "./postchain-eif-contracts/artifacts/@openzeppelin/contracts/token/ERC721/ERC721.sol/ERC721.json";
-import BridgeArtifacts from "./postchain-eif-contracts/artifacts/contracts/TokenBridge.sol/TokenBridge.json";
+import BridgeArtifacts from "./postchain-eif-contracts/artifacts/contracts/NFTBridge.sol/NFTBridge.json";
 
 import { restClient, gtxClient, util } from "postchain-client"
 import { hexZeroPad, keccak256 } from "ethers/lib/utils";
@@ -43,6 +43,7 @@ const sendTnx = async (signer, to, calldata) => {
 
 const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenAddress: string, bridgeAddress: string, tokenType: string, tokenId: number }) => {
   const { library, chainId, account } = useWeb3React();
+  const [accountId, setAccountId] = useState("")
   const fetchTokenInfo = async () => {
     var tokenContract;
     let balance;
@@ -188,6 +189,27 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
     }
   }
 
+  const withdrawToPostchain = async (eventHash: string) => {
+    const signer = library.getSigner();
+    const zeroPaddedEventHash = "0x" + eventHash
+    try {
+      const bridge = new ethers.Contract(
+        bridgeAddress,
+        BridgeArtifacts.abi,
+        library
+      )
+      var calldata
+      if (tokenType === "ERC20") {
+        calldata = bridge.interface.encodeFunctionData("withdrawToPostchain", [zeroPaddedEventHash, Buffer.from(accountId, 'hex')])
+      } else {
+        calldata = bridge.interface.encodeFunctionData("withdrawNFT2Postchain", [zeroPaddedEventHash, Buffer.from(accountId, 'hex')])
+      }
+      await sendTnx(signer, bridgeAddress, calldata)
+    } catch (error) {
+      console.log(error)
+    }
+  }  
+
   const pending = async (eventHash: string) => {
     const signer = library.getSigner();
     const zeroPaddedEventHash = "0x" + eventHash
@@ -221,7 +243,15 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
   }
 
   return (
+    
     <div className="flex flex-col">
+      <input 
+        type="text" 
+        placeholder="Account Id" 
+        value={accountId}
+        onChange={(evt) => setAccountId(evt.target.value)}
+        className="input w-full max-w-xs"
+      />
       <button className="btn">
         {data?.name}
         <div className="ml-2 badge">{data?.symbol}</div>
@@ -256,6 +286,9 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
                   <button type="button" className="btn btn-outline btn-accent" onClick={() => withdraw(eventHash)}>
                     Withdraw
                   </button>
+                  <button type="button" className="btn btn-outline btn-accent" onClick={() => withdrawToPostchain(eventHash)}>
+                    Withdraw To Postchain
+                  </button>                  
                   <button type="button" className="btn btn-outline btn-accent" onClick={() => pending(eventHash)}>
                     Pending
                   </button>
@@ -594,6 +627,34 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
     }
   }
 
+  const postchainBridgeToEVM = async () => {
+    try {
+      var tx = client.newTransaction([user.pubKey])
+      if (tokenType === "ERC721") {
+        tx.addOperation("bridge_non_fungible_original_to_evm", Buffer.from(accountId, 'hex'), Buffer.from(assetId, 'hex'), chainId, tokenAddress.toLowerCase(), account.toLowerCase())
+      } else {
+        const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
+        tx.addOperation("bridge_ft3_token_to_evm", Buffer.from(accountId, 'hex'), chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount))
+      }
+      tx.addOperation("nop", Date.now())
+      tx.sign(user.privKey, user.pubKey)
+      let txRID = tx.getTxRID()
+      tx.send((err) => {
+        if (err !== null) {
+          console.log(err)
+          return
+        }
+        toast.promise(waitConfirmation(txRID), {
+          loading: `Transaction submitted. Wait for confirmation...`,
+          success: <b>Transaction confirmed!</b>,
+          error: <b>Transaction failed!.</b>,
+        })
+      })
+    } catch (error) {
+      console.log(error)
+    }
+  }  
+
   useEffect(() => {
     const fetchDepositedTokenInfo = () => {
       const bridge = new ethers.Contract(
@@ -663,6 +724,22 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
     }
   }
 
+  const fundTokens = async () => {
+    const signer = library.getSigner()
+    try {
+      const bridge = new ethers.Contract(
+        bridgeAddress,
+        BridgeArtifacts.abi,
+        library
+      )
+      const value = ethers.BigNumber.from(amount).mul(ethers.BigNumber.from(10).pow(unit))
+      const calldata = bridge.interface.encodeFunctionData("fund", [tokenAddress, value])
+      await sendTnx(signer, bridgeAddress, calldata)
+    } catch (error) {
+      console.log(error)
+    }
+  };
+
   const depositTokens = async () => {
     const signer = library.getSigner()
     try {
@@ -676,6 +753,21 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       await sendTnx(signer, bridgeAddress, calldata)
     } catch (error) {
       console.log(error)
+    }
+  };
+
+  const fundNFTokens = async () => {
+    const signer = library.getSigner()
+    try {
+      const bridge = new ethers.Contract(
+        bridgeAddress,
+        BridgeArtifacts.abi,
+        library
+      )
+      const id = ethers.BigNumber.from(tokenId)
+      const calldata = bridge.interface.encodeFunctionData("fundNFT", [tokenAddress, id])
+      await sendTnx(signer, bridgeAddress, calldata)
+    } catch (error) {
     }
   };
 
@@ -828,6 +920,9 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
                     <button onClick={depositTokens} type="button" className="btn btn-outline btn-accent">
                       Deposit
                     </button>
+                    <button onClick={fundTokens} type="button" className="btn btn-outline btn-accent">
+                      Fund
+                    </button>
                   </div>
                 </div>
               </>
@@ -845,6 +940,9 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
                     <button onClick={depositNFTokens} type="button" className="btn btn-outline btn-accent">
                       Deposit
                     </button>
+                    <button onClick={fundNFTokens} type="button" className="btn btn-outline btn-accent">
+                      Fund
+                    </button>                    
                   </div>
                 </div>
               </>
@@ -874,6 +972,9 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
             </button>
             <button onClick={postchainClaim} type="button" className="btn btn-outline btn-accent">
               Claim on Postchain
+            </button>
+            <button onClick={postchainBridgeToEVM} type="button" className="btn btn-outline btn-accent">
+              Bridge to EVM
             </button>
           </div>
         </div></div>
