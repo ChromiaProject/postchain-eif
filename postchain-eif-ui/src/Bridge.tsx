@@ -7,7 +7,7 @@ import { useQuery } from "react-query";
 
 import ERC20TokenArtifacts from "./postchain-eif-contracts/artifacts/@openzeppelin/contracts/token/ERC20/ERC20.sol/ERC20.json";
 import ERC721TokenArtifacts from "./postchain-eif-contracts/artifacts/@openzeppelin/contracts/token/ERC721/ERC721.sol/ERC721.json";
-import BridgeArtifacts from "./postchain-eif-contracts/artifacts/contracts/NFTBridge.sol/NFTBridge.json";
+import BridgeArtifacts from "./postchain-eif-contracts/artifacts/contracts/TokenBridge.sol/TokenBridge.json";
 
 import { restClient, gtxClient, util } from "postchain-client"
 import { hexZeroPad, keccak256 } from "ethers/lib/utils";
@@ -312,10 +312,18 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
   const [amount, setAmount] = useState(0)
   const [assetId, setAssetId] = useState("")
   const [accountId, setAccountId] = useState("")
+  const [authDescId, setAuthDescId] = useState("")
   const [withdrawAmount, setWithdrawAmount] = useState(0)
   const [unit, setUnit] = useState(18)
   const tokenId = 380
-  const user = util.makeKeyPair()
+  const userPUB = Buffer.from(
+    "038f888dec563b5bc253e87abc90afd26c3287021d10236ea19d248043dc39e0b8",
+    "hex"
+  );
+  const userPRIV = Buffer.from(
+    "71b5b7f8de0661af934a5e4612f3d0ba183e639bdf4e7452fb6457ed3cfbc825",
+    "hex"
+  );
   const adminPUB = Buffer.from(
     "02a829e1d7fffbd856a04b53ec7d478d8896803b571c7700ec464d6a9d4f0e3bbd",
     "hex"
@@ -361,6 +369,29 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
   }
 
   const postchainRegisterAccount = async () => {
+    try {
+      var tx = client.newTransaction([userPUB])
+      tx.addOperation("register_user_account", userPUB)
+      tx.addOperation("nop", Date.now())
+      tx.sign(userPRIV, userPUB)
+      let txRID = tx.getTxRID()
+      tx.send((err) => {
+        if (err !== null) {
+          console.log(err)
+          return
+        }
+        toast.promise(waitConfirmation(txRID), {
+          loading: `Transaction submitted. Wait for confirmation...`,
+          success: <b>Transaction confirmed!</b>,
+          error: <b>Transaction failed!.</b>,
+        })
+      })
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  const postchainRegisterAdminAccount = async () => {
     try {
       var tx = client.newTransaction([adminPUB])
       tx.addOperation("register_admin_account")
@@ -529,9 +560,9 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
 
   const postchainWithdraw = async () => {
     try {
-      var tx = client.newTransaction([user.pubKey])
+      var tx = client.newTransaction([userPUB])
       const signer = library.getSigner()
-      const pk = util.toBuffer(user.pubKey).toString('hex')
+      const pk = util.toBuffer(userPUB).toString('hex')
       var signature = await signer.signMessage(pk);
       signature = signature.split('x')[1];
       var r = Buffer.from(signature.substring(0, 64), 'hex')
@@ -545,7 +576,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         tx.addOperation("withdraw_ERC20", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount), r, s, v, pk)
       }
       tx.addOperation("nop", Date.now())
-      tx.sign(user.privKey, user.pubKey)
+      tx.sign(userPRIV, userPUB)
       let txRID = tx.getTxRID()
       tx.send((err) => {
         if (err !== null) {
@@ -565,9 +596,9 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
 
   const postchainClaim = async () => {
     try {
-      var tx = client.newTransaction([user.pubKey])
+      var tx = client.newTransaction([userPUB])
       const signer = library.getSigner()
-      const pk = util.toBuffer(user.pubKey).toString('hex')
+      const pk = util.toBuffer(userPUB).toString('hex')
       var signature = await signer.signMessage(pk);
       signature = signature.split('x')[1];
       var r = Buffer.from(signature.substring(0, 64), 'hex')
@@ -581,7 +612,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         tx.addOperation("claim_ERC20", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount), r, s, v, pk, Buffer.from(accountId, "hex"))
       }
       tx.addOperation("nop", Date.now())
-      tx.sign(user.privKey, user.pubKey)
+      tx.sign(userPRIV, userPUB)
       let txRID = tx.getTxRID()
       tx.send((err) => {
         if (err !== null) {
@@ -601,15 +632,16 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
 
   const postchainDeposit = async () => {
     try {
-      var tx = client.newTransaction([user.pubKey])
+      var tx = client.newTransaction([userPUB])
+      const auth = [Buffer.from(accountId, 'hex'), Buffer.from(authDescId, 'hex')]
       if (tokenType === "ERC721") {
-        tx.addOperation("deposit_non_fungible_original", Buffer.from(accountId, 'hex'), Buffer.from(assetId, 'hex'), chainId, tokenAddress.toLowerCase(), account.toLowerCase())
+        tx.addOperation("deposit_non_fungible_original", auth, Buffer.from(assetId, 'hex'), chainId, tokenAddress.toLowerCase(), account.toLowerCase())
       } else {
         const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
-        tx.addOperation("deposit_ft3_token", Buffer.from(accountId, 'hex'), chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount))
+        tx.addOperation("deposit_ft3_token", auth, chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount))
       }
       tx.addOperation("nop", Date.now())
-      tx.sign(user.privKey, user.pubKey)
+      tx.sign(userPRIV, userPUB)
       let txRID = tx.getTxRID()
       tx.send((err) => {
         if (err !== null) {
@@ -629,15 +661,16 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
 
   const postchainBridgeToEVM = async () => {
     try {
-      var tx = client.newTransaction([user.pubKey])
+      var tx = client.newTransaction([userPUB])
+      const auth = [Buffer.from(accountId, 'hex'), Buffer.from(authDescId, 'hex')]
       if (tokenType === "ERC721") {
-        tx.addOperation("bridge_non_fungible_original_to_evm", Buffer.from(accountId, 'hex'), Buffer.from(assetId, 'hex'), chainId, tokenAddress.toLowerCase(), account.toLowerCase())
+        tx.addOperation("bridge_non_fungible_original_to_evm", auth, Buffer.from(assetId, 'hex'), chainId, tokenAddress.toLowerCase(), account.toLowerCase())
       } else {
         const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
-        tx.addOperation("bridge_ft3_token_to_evm", Buffer.from(accountId, 'hex'), chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount))
+        tx.addOperation("bridge_ft3_token_to_evm", auth, chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount))
       }
       tx.addOperation("nop", Date.now())
-      tx.sign(user.privKey, user.pubKey)
+      tx.sign(userPRIV, userPUB)
       let txRID = tx.getTxRID()
       tx.send((err) => {
         if (err !== null) {
@@ -864,6 +897,13 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
             />
             <input 
               type="text" 
+              placeholder="Auth Description Id" 
+              value={authDescId}
+              onChange={(evt) => setAuthDescId(evt.target.value)}
+              className="input w-full max-w-xs"
+            />
+            <input 
+              type="text" 
               placeholder="Asset Id" 
               value={assetId}
               onChange={(evt) => setAssetId(evt.target.value)}
@@ -871,8 +911,11 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
             />            
             <div>
               <div className="justify-center card-actions">
-                <button onClick={postchainRegisterAccount} type="button" className="btn btn-outline btn-accent">
-                  Register Account
+              <button onClick={postchainRegisterAccount} type="button" className="btn btn-outline btn-accent">
+                  Register User Account
+                </button>
+                <button onClick={postchainRegisterAdminAccount} type="button" className="btn btn-outline btn-accent">
+                  Register Admin Account
                 </button>
                 <button onClick={postchainCreateAsset} type="button" className="btn btn-outline btn-accent">
                   Create New Asset

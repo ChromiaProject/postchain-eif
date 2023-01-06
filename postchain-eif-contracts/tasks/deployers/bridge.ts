@@ -1,5 +1,5 @@
 import { task } from "hardhat/config";
-import { NFTBridge, NFTBridge__factory, Validator, Validator__factory } from "../../src/types";
+import { TokenBridge, TokenBridge__factory, Validator, Validator__factory } from "../../src/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 task("deploy:bridge")
@@ -12,8 +12,8 @@ task("deploy:bridge")
     const validator: Validator = <Validator>await validatorFactory.deploy(validators)
 
     // deploy token bridge smart contract
-    const factory: NFTBridge__factory = await hre.ethers.getContractFactory("NFTBridge")
-    const bridge: NFTBridge = <NFTBridge>await hre.upgrades.deployProxy(factory, [validator.address])
+    const factory: TokenBridge__factory = await hre.ethers.getContractFactory("TokenBridge")
+    const bridge: TokenBridge = <TokenBridge>await hre.upgrades.deployProxy(factory, [validator.address])
     await bridge.deployed()
     console.log("Token bridge deployed to: ", bridge.address)
     const proxyAdmin = await hre.upgrades.erc1967.getAdminAddress(bridge.address)
@@ -36,7 +36,7 @@ task("deploy:bridge")
 task("prepare:bridge")
     .addParam('address', '')
     .setAction(async ({ address, verify}, hre ) => {
-        const factory: NFTBridge__factory = await hre.ethers.getContractFactory("NFTBridge");
+        const factory: TokenBridge__factory = await hre.ethers.getContractFactory("TokenBridge");
         const upgrade = await hre.upgrades.prepareUpgrade(address, factory);
         console.log("New logic contract of token bridge has been prepared for upgrade at: ", upgrade);
 
@@ -49,7 +49,7 @@ task("upgrade:bridge")
     .addParam('address', '')
     .addFlag('verify', 'Verify contracts at Etherscan')
     .setAction(async ({ address }, hre) => {
-        const factory: NFTBridge__factory = await hre.ethers.getContractFactory("NFTBridge");
+        const factory: TokenBridge__factory = await hre.ethers.getContractFactory("TokenBridge");
         await hre.upgrades.upgradeProxy(address, factory);
         console.log("Token bridge has been upgraded");
     });
