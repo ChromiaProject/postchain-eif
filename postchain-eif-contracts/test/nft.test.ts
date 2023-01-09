@@ -1,7 +1,7 @@
 import {ethers, upgrades, network} from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
-import { TokenBridge__factory, ERC721Mock__factory, Validator__factory } from "../src/types";
+import { NFTBridge__factory, ERC721Mock__factory, Validator__factory } from "../src/types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumber, ContractReceipt, ContractTransaction } from "ethers";
 import { BytesLike, hexZeroPad, keccak256 } from "ethers/lib/utils";
@@ -38,7 +38,7 @@ describe("Non Fungible Token", () => {
         const validatorContract = await validatorFactory.deploy([appNodes.address])
         validatorAddress = validatorContract.address
 
-        const factory = new TokenBridge__factory(directoryNodes)
+        const factory = new NFTBridge__factory(directoryNodes)
         const bridge = await upgrades.deployProxy(factory, [validatorAddress])
         await bridge.allowNFT(nftAddress)
         bridgeAddress = bridge.address
@@ -54,7 +54,7 @@ describe("Non Fungible Token", () => {
             expect(await tokenInstance.balanceOf(user.address)).to.eq(1)
             expect(await tokenInstance.ownerOf(tokenId)).to.eq(user.address)
 
-            const bridge = new TokenBridge__factory(user).attach(bridgeAddress)
+            const bridge = new NFTBridge__factory(user).attach(bridgeAddress)
             const tokenApproveInstance = new ERC721Mock__factory(user).attach(nftAddress)
             await tokenApproveInstance.setApprovalForAll(bridgeAddress, true)
             let tokenURI = await tokenApproveInstance.tokenURI(tokenId)
@@ -87,10 +87,10 @@ describe("Non Fungible Token", () => {
             expect(await tokenInstance.balanceOf(user.address)).to.eq(1)
             expect(await tokenInstance.ownerOf(tokenId)).to.eq(user.address)
 
-            const bridge = new TokenBridge__factory(user).attach(bridgeAddress)
+            const bridge = new NFTBridge__factory(user).attach(bridgeAddress)
             const tokenApproveInstance = new ERC721Mock__factory(user).attach(nftAddress)
             await tokenApproveInstance.setApprovalForAll(bridgeAddress, true)
-            await expect(bridge.depositNFT(bridgeAddress, tokenId, ft3_account_id)).to.be.revertedWith('TokenBridge: not allow nft')
+            await expect(bridge.depositNFT(bridgeAddress, tokenId, ft3_account_id)).to.be.revertedWith('NFTBridge: not allow nft')
             let tx: ContractTransaction = await bridge.depositNFT(nftAddress, tokenId, ft3_account_id)
             let receipt: ContractReceipt = await tx.wait()
             let logs = receipt.events?.filter((x) =>  {return x.event == 'DepositedERC721'})
@@ -252,12 +252,12 @@ describe("Non Fungible Token", () => {
                 await expect(bridge.withdrawRequestNFT(data, maliciousEventProof,
                     DecodeHexStringToByteArray(blockHeader),
                     [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [appNodes.address], el2Proof)
-                ).to.be.revertedWith('TokenBridge: invalid merkle proof')
+                ).to.be.revertedWith('NFTBridge: invalid merkle proof')
 
                 await expect(bridge.withdrawRequestNFT(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader),
                     [], [], el2Proof)
-                ).to.be.revertedWith('TokenBridge: block signature is invalid')
+                ).to.be.revertedWith('NFTBridge: block signature is invalid')
 
                 await expect(bridge.withdrawRequestNFT(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader),
@@ -268,15 +268,15 @@ describe("Non Fungible Token", () => {
                 await expect(bridge.withdrawRequestNFT(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader),
                     [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [appNodes.address], el2Proof)
-                ).to.be.revertedWith('TokenBridge: event hash was already used')
+                ).to.be.revertedWith('NFTBridge: event hash was already used')
 
                 await expect(bridge.withdrawNFT(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
-                    deployer.address)).to.revertedWith("TokenBridge: no nft for the beneficiary")
+                    deployer.address)).to.revertedWith("NFTBridge: no nft for the beneficiary")
 
                 await expect(bridge.withdrawNFT(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
-                    user.address)).to.revertedWith("TokenBridge: not mature enough to withdraw the nft")
+                    user.address)).to.revertedWith("NFTBridge: not mature enough to withdraw the nft")
 
                 // force mining 100 blocks
                 for (let i = 0; i < 100; i++) {
@@ -297,7 +297,7 @@ describe("Non Fungible Token", () => {
 
                 await expect(bridge.withdrawNFT(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
-                    user.address)).to.revertedWith("TokenBridge: nft is pending or was already claimed")
+                    user.address)).to.revertedWith("NFTBridge: nft is pending or was already claimed")
             }
         })
     })
