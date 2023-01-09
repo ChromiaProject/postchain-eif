@@ -20,10 +20,17 @@ task("deploy:bridge")
     console.log("Proxy admin address is: ", proxyAdmin)
 
     if (verify) {
-        await hre.run("verify:verify", {
-            address: validator.address,
-            constructorArguments: [validators],
-        });
+        // When redeploy new smart contracts, etherscan can automatically verify the smart contract 
+        // with the similar code, then calling verify will return error.
+        // We add try/catch to handle the error and continue to verify the main bridge smart contract.
+        try {
+            await hre.run("verify:verify", {
+                address: validator.address,
+                constructorArguments: [validators],
+            });
+        } catch (e) {
+            console.log(e);
+        }
         await verifyProxyContract(hre, bridge.address);
     }
   });
