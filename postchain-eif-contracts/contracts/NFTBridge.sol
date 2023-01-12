@@ -147,7 +147,6 @@ contract NFTBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reentr
         {
             (IERC721 nft, address beneficiary, uint256 tokenId, uint256 netId) = hash.verifyEventNFT(_event);
             require(networkId == netId, "NFTBridge: incorrect network id");
-            require(_owners[nft][tokenId] != address(0), "NFTBridge: invalid token id to make request withdraw");
             wd.nft = nft;
             wd.beneficiary = beneficiary;
             wd.tokenId = tokenId;
@@ -178,7 +177,6 @@ contract NFTBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reentr
         require(wd.beneficiary == msg.sender, "NFTBridge: no nft for the beneficiary");
         require(wd.block_number <= block.number, "NFTBridge: not mature enough to withdraw the nft");
         require(wd.status == Status.Withdrawable, "NFTBridge: nft is pending or was already claimed");
-        require(_owners[wd.nft][tokenId] != address(0), "NFTBridge: nft token id does not exist or was already claimed");
         wd.status = Status.PostchainWithdrawn;
         (string memory name, string memory symbol, string memory tokenURI) = _getNFTInfo(wd.nft, tokenId);
         emit DepositedERC721(msg.sender, wd.nft, ft3_account_id, networkId, tokenId, name, symbol, tokenURI);
