@@ -9,6 +9,7 @@ import net.postchain.common.data.Hash
 import net.postchain.common.data.KECCAK256
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
+import net.postchain.concurrent.util.get
 import net.postchain.core.Transaction
 import net.postchain.crypto.KeyPair
 import net.postchain.crypto.Secp256K1CryptoSystem
@@ -187,10 +188,10 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
         // -------------------------
         makeSureBlockIsBuiltCorrectly()
 
-        val value = node.getBlockchainInstance().blockchainEngine.getBlockQueries().query(
-            """{"type"="gtx_test_get_value", "txRID"="${validTx1.getRID().toHex()}"}"""
-        )
-        assertEquals("\"true\"", value.get())
+        val value = node.getBlockchainInstance().blockchainEngine.getBlockQueries().query("gtx_test_get_value", gtv(mapOf(
+                "txRID" to gtv(validTx1.getRID().toHex())
+        )))
+        assertEquals(gtv("true"), value.get())
     }
 
     @Test
