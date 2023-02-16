@@ -12,6 +12,7 @@ import net.postchain.eif.contracts.TokenBridge
 import net.postchain.gtv.*
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtx.data.OpData
+import nl.komponents.kovenant.Promise
 import org.awaitility.Awaitility
 import org.awaitility.Duration
 import org.junit.jupiter.api.AfterEach
@@ -91,7 +92,7 @@ class EthereumEventProcessorTest {
 
         // Mock query for last evm block in this test
         val blockQueriesMock: BlockQueries = mock {
-            on { query(eq("get_last_evm_block"), any()) } doReturn CompletableFuture.completedFuture(GtvNull)
+            on { query(eq("get_last_evm_block"), any()) } doReturn Promise.of(GtvNull)
         }
         val engineMock: BlockchainEngine = mock {
             on { getBlockQueries() } doReturn blockQueriesMock
@@ -195,7 +196,7 @@ class EthereumEventProcessorTest {
 
         // Mock query for last evm block in this test
         val blockQueriesMock: BlockQueries = mock {
-            on { query(eq("get_last_evm_block"), any()) } doReturn CompletableFuture.completedFuture(GtvNull)
+            on { query(eq("get_last_evm_block"), any()) } doReturn Promise.of(GtvNull)
         }
         val engineMock: BlockchainEngine = mock {
             on { getBlockQueries() } doReturn blockQueriesMock
