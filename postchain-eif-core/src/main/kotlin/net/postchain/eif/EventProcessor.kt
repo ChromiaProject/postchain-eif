@@ -21,7 +21,7 @@ import org.web3j.tx.Contract
 import java.lang.Thread.sleep
 import java.math.BigInteger
 import java.util.*
-import kotlin.streams.toList
+import java.util.stream.Collectors
 
 enum class EncodedBlock(val index: Int) {
     NETWORK_ID(0),
@@ -222,7 +222,7 @@ class EvmEventProcessor(
     override fun getEventData(): List<Array<Gtv>> {
         return eventBlocks.stream()
             .takeWhile { it[EncodedBlock.NUMBER.index].asBigInteger() <= lastReadLogBlockHeight - readOffset }
-            .toList()
+            .collect(Collectors.toList())
     }
 
     private fun eventBlockToGtv(eventBlock: Pair<EvmBlock, List<Log>>): Array<Gtv> {
