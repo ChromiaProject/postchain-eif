@@ -25,30 +25,8 @@ interface IValidator {
 // Note: To enhance the security & decentralization, we should call transferOwnership() to external multi-sig owner after deploy the smart contract
 contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, ReentrancyGuardUpgradeable {
 
-    uint8 constant ERC20_ACCOUNT_STATE_BYTE_SIZE = 64;
-    uint8 constant ERC721_ACCOUNT_STATE_BYTE_SIZE = 64;
     using Postchain for bytes32;
     using MerkleProof for bytes32[];
-
-    struct PostchainBlock {
-        uint height;
-        bytes32 blockRid;
-    }
-
-    struct ERC20AccountState {
-        IERC20 token;
-        uint amount;
-    }
-
-    struct ERC721AccountState {
-        IERC721 token;
-        uint tokenId;
-    }
-
-    struct AccountStateNumber {
-        uint blockHeight;
-        uint accountNumber;
-    }
 
     mapping (IERC20 => uint256) public _balances;
     mapping (IERC721 => mapping(uint256 => address)) public _owners;
@@ -64,13 +42,6 @@ contract TokenBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reen
         Pending,
         Withdrawable,
         Withdrawn
-    }
-
-    struct Transaction {
-        address destination;
-        uint value;
-        bytes data;
-        bool executed;
     }
 
     struct Withdraw {
