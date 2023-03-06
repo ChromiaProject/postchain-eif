@@ -159,11 +159,11 @@ private fun extraMerkleProof(db: DatabaseAccess, ctx: EContext, blockHeight: Lon
     val proofs = merkleProofs.first
     val position = merkleProofs.second
     val gtvProofs = proofs.map(::gtv)
-    val leaf = gtvExtra[EIF]!!
+    val leaf = gtvExtra[EIF]!! as GtvByteArray
     val hashedLeaf = MerkleBasics.hashingFun(
         byteArrayOf(MerkleBasics.HASH_PREFIX_LEAF) + encodeGtv(leaf), cryptoSystem)
     return gtv(
-        "leaf" to gtv(leaf),
+        "leaf" to leaf,
         "hashedLeaf" to gtv(hashedLeaf),
         "position" to gtv(position.toLong()),
         "extraRoot" to gtv(gtvExtra.merkleHash(calculator)),
