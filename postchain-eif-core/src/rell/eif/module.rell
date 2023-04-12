@@ -416,6 +416,9 @@ operation deposit_ft3_token(auth_id, network_id: integer, token_address: text, b
 
     // update the postchain EIF state for equivalent account
     deposit_ERC20(network_id, beneficiary, token_address, amount, token_mapping.token.name, token_mapping.token.symbol, token_mapping.token.decimals);
+
+    // update relevant account state
+    update_account_state(account.id, asset.id);
 }
 
 operation bridge_ft3_token_to_evm(auth_id, network_id: integer, token_address: text, beneficiary: text, amount: integer) {
@@ -426,8 +429,9 @@ operation bridge_ft3_token_to_evm(auth_id, network_id: integer, token_address: t
 
     val account = do_auth(auth_id, ["T"]);
 
-    // burn ft3 token of the account
+    // burn ft3 token of the account and update relevant account state
     destroy_asset(account, asset, amount);
+    update_account_state(account.id, asset.id);
 
     update withdraw_stats(withdraw_count += 1);
     val next_serial = withdraw_stats.withdraw_count;
