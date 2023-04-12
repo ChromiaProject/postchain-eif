@@ -22,6 +22,8 @@ interface IValidator {
 // Note: To enhance the security & decentralization, we should call transferOwnership() to external multi-sig owner after deploy the smart contract
 contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
+    uint8 constant ERC20_ACCOUNT_STATE_BYTE_SIZE = 64;
+
     using Postchain for bytes32;
     using MerkleProof for bytes32[];
 
@@ -30,9 +32,14 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
     mapping (bytes32 => Withdraw) public _withdraw;
     IValidator public validator;
     uint256 public networkId;
+    bool public isMassExit;
+    PostchainBlock public massExitBlock;
 
     // Each postchain event will be used to claim only one time.
     mapping (bytes32 => bool) private _events;
+
+    // Each account state snapshot will be used to claim only one time.
+    mapping (bytes32 => bool) private _snapshots;
 
     enum Status {
         Pending,
@@ -49,13 +56,35 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         Status status;
     }
 
+    struct PostchainBlock {
+        uint height;
+        bytes32 blockRid;
+    }
+
+    struct ERC20AccountState {
+        IERC20 token;
+        uint amount;
+    }
+
+    struct AccountStateNumber {
+        uint blockHeight;
+        uint accountNumber;
+    }
+
     event FundedERC20(address indexed sender, IERC20 indexed token, uint amount);
     event DepositedERC20(address indexed sender, IERC20 indexed token, bytes32 indexed ft3_account_id, uint networkId, uint amount, string name, string symbol, uint8 decimals);
     event WithdrawRequest(address indexed beneficiary, IERC20 indexed token, uint256 value);
     event Withdrawal(address indexed beneficiary, IERC20 indexed token, uint256 value);
+    event MassExit(uint indexed height, bytes32 indexed blockRid);
+    event WithdrawalBySnapshot(address indexed beneficiary);
 
     modifier isAllowToken(IERC20 token) {
         require(_allowedToken[token], "TokenBridge: not allow token");
+        _;
+    }
+
+    modifier whenMassExit() {
+        require(isMassExit, "TokenBridge: mass exit was not triggered yet");
         _;
     }
 
@@ -72,6 +101,20 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
 
     function allowToken(IERC20 token) onlyOwner public {
         _allowedToken[token] = true;
+    }
+
+    function triggerMassExit(uint height, bytes32 blockRid) onlyOwner public {
+        require(!isMassExit, "TokenBridge: mass exit already set");
+        isMassExit = true;
+        massExitBlock = PostchainBlock(height, blockRid);
+    }
+
+    function postponeMassExit() onlyOwner whenMassExit public {
+        isMassExit = false;
+    }
+
+    function updateMassExitBlock(uint height, bytes32 blockRid) onlyOwner whenMassExit public {
+        massExitBlock = PostchainBlock(height, blockRid);
     }
 
     function pendingWithdraw(bytes32 _hash) onlyOwner public {
@@ -184,6 +227,40 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         wd.amount = 0;
         (string memory name, string memory symbol, uint8 decimals) = _getTokenInfo(wd.token);
         emit DepositedERC20(msg.sender, wd.token, ft3_account_id, networkId, amount, name, symbol, decimals);
+    }
+
+    /// @dev withdraw all account assets in the postchain snapshot when mass exit was triggered
+    function withdrawBySnapshot(
+        AccountStateNumber memory account,
+        bytes calldata snapshot,
+        bytes32[] memory stateProofs,
+        bytes memory blockHeader,
+        bytes[] memory sigs,
+        address[] memory signers,
+        Data.ExtraProofData memory extraProof
+    ) whenMassExit nonReentrant public  {
+        bytes32 stateHash = keccak256(abi.encodePacked(snapshot));
+        require(_snapshots[stateHash] == false, "TokenBridge: snapshot already used");
+        (uint height, bytes32 blockRid, , bytes32 stateRoot) = Postchain.verifyBlockHeader(blockHeader, extraProof);
+        require(blockRid == massExitBlock.blockRid, "TokenBridge: account state block rid should equal to mass exit block rid");
+        require(account.blockHeight <= massExitBlock.height, "TokenBridge: account state number should less than or equal to mass exit block");
+        if (!validator.isValidSignatures(validator.getValidatorHeight(height), blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
+        if (!MerkleProof.verify(stateProofs, stateHash, account.accountNumber, stateRoot)) revert("TokenBridge: invalid merkle proof");
+
+        address beneficiary = abi.decode(snapshot[:32], (address));
+        uint offset = 32;
+        // Get byte size of all ERC20 balances
+        uint byteSize = abi.decode(snapshot[offset:offset + 32], (uint));
+        offset += 32;
+        for (uint i = offset; i < offset + byteSize; i += ERC20_ACCOUNT_STATE_BYTE_SIZE) {
+            ERC20AccountState memory accountState = abi.decode(snapshot[i:i + ERC20_ACCOUNT_STATE_BYTE_SIZE], (ERC20AccountState));
+            if (accountState.amount > 0) {
+                accountState.token.transfer(beneficiary, accountState.amount);
+            }
+        }
+
+        _snapshots[stateHash] = true;
+        emit WithdrawalBySnapshot(beneficiary);
     }
 
     function _getTokenInfo(IERC20 token) internal view returns (string memory name, string memory symbol, uint8 decimals) {

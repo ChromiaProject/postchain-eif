@@ -691,4 +691,35 @@ describe("Token Bridge Test", () => {
             }
         })        
     })
+
+    describe("Mass Exit", async () => {
+        it("only admin can manage mass exit",async () => {
+            const [admin, other] = await ethers.getSigners()
+            let otherTokenBridge = new TokenBridge__factory(other).attach(bridgeAddress)
+            let adminTokenBridge = new TokenBridge__factory(admin).attach(bridgeAddress)
+            expect(await adminTokenBridge.isMassExit()).to.be.false
+            let node1 = hashGtvBytes32Leaf(DecodeHexStringToByteArray("977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795"))
+            let node2 = hashGtvBytes32Leaf(DecodeHexStringToByteArray("49e46bf022de1515cbb2bf0f69c62c071825a9b940e8f3892acb5d2021832ba0"))
+            let blockRid = postchainMerkleNodeHash([0x7, node1, node2])
+
+            // non admin cannot trigger mass exit
+            await expect(otherTokenBridge.triggerMassExit(100, blockRid)).to.be.revertedWith("Ownable: caller is not the owner")
+
+            // admin can trigger mass exit
+            await adminTokenBridge.triggerMassExit(100, blockRid)
+            expect(await adminTokenBridge.isMassExit()).to.be.true
+            expect((await adminTokenBridge.massExitBlock()).blockRid).to.be.equal(blockRid)
+            expect((await adminTokenBridge.massExitBlock()).height).to.be.equal(100)
+
+            // update mass exit block
+            await adminTokenBridge.updateMassExitBlock(200, blockRid)
+            expect((await adminTokenBridge.massExitBlock()).blockRid).to.be.equal(blockRid)
+            expect((await adminTokenBridge.massExitBlock()).height).to.be.equal(200)
+
+            // postpone mass exit
+            await expect(otherTokenBridge.postponeMassExit()).to.be.revertedWith("Ownable: caller is not the owner")
+            await adminTokenBridge.postponeMassExit()
+            expect(await adminTokenBridge.isMassExit()).to.be.false
+        })
+    })
 })
