@@ -17,7 +17,7 @@
     <description>Postchain EIF. Ethereum Integration Framework</description>
 
     <properties>
-        <postchain.version>3.8.0-SNAPSHOT</postchain.version>
+        <postchain.version>3.7.1</postchain.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
@@ -133,18 +133,46 @@
 
         <plugins>
             <plugin>
-                <groupId>com.amashchenko.maven.plugin</groupId>
-                <artifactId>gitflow-maven-plugin</artifactId>
-                <version>${gitflow.maven.plugin.version}</version>
-                <configuration>
-                    <gitFlowConfig>
-                        <developmentBranch>dev</developmentBranch>
-                        <versionTagPrefix>ver-</versionTagPrefix>
-                    </gitFlowConfig>
-                </configuration>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <id>copy-deps</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <includeScope>runtime</includeScope>
+                            <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.amashchenko.maven.plugin</groupId>
+                        <artifactId>gitflow-maven-plugin</artifactId>
+                        <version>${gitflow.maven.plugin.version}</version>
+                        <configuration>
+                            <gitFlowConfig>
+                                <developmentBranch>dev</developmentBranch>
+                                <versionTagPrefix>ver-</versionTagPrefix>
+                            </gitFlowConfig>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
     <repositories>
         <repository>

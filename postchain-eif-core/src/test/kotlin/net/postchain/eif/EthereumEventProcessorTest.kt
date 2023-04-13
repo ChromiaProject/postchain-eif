@@ -98,7 +98,7 @@ class EthereumEventProcessorTest {
 
         // Mock query for last evm block in this test
         val blockQueriesMock: BlockQueries = mock {
-            on { query(eq("get_last_evm_block"), any()) } doReturn Promise.ofSuccess<Gtv, Exception>(GtvNull)
+            on { query(eq("get_last_evm_block"), any()) } doReturn Promise.of(GtvNull)
         }
         val engineMock: BlockchainEngine = mock {
             on { getBlockQueries() } doReturn blockQueriesMock
@@ -208,7 +208,7 @@ class EthereumEventProcessorTest {
 
         // Mock query for last evm block in this test
         val blockQueriesMock: BlockQueries = mock {
-            on { query(eq("get_last_evm_block"), any()) } doReturn Promise.ofSuccess<Gtv, Exception>(GtvNull)
+            on { query(eq("get_last_evm_block"), any()) } doReturn Promise.of(GtvNull)
         }
         val engineMock: BlockchainEngine = mock {
             on { getBlockQueries() } doReturn blockQueriesMock
@@ -254,7 +254,7 @@ class EthereumEventProcessorTest {
     }
 
     private fun getBinaryFromArtifactResource(resourcePath: String): String {
-        val artifactFile = javaClass.getResource(resourcePath).readText()
+        val artifactFile = javaClass.getResource(resourcePath)?.readText()
         val artifactJson = GsonBuilder().create().fromJson(artifactFile, JsonObject::class.java)
         return artifactJson.get("bytecode").asString
     }
