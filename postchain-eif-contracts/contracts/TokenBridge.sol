@@ -153,7 +153,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
      */
     function withdrawRequest(
         bytes memory _event,
-        Data.EventProof memory eventProof,
+        Data.Proof memory eventProof,
         bytes memory blockHeader,
         bytes[] memory sigs,
         address[] memory signers,
@@ -164,7 +164,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
     }
 
     function _withdrawRequest(
-        Data.EventProof memory eventProof,
+        Data.Proof memory eventProof,
         bytes memory blockHeader,
         bytes[] memory sigs,
         address[] memory signers,
@@ -231,21 +231,19 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
 
     /// @dev withdraw all account assets in the postchain snapshot when mass exit was triggered
     function withdrawBySnapshot(
-        AccountStateNumber memory account,
         bytes calldata snapshot,
-        bytes32[] memory stateProofs,
+        Data.Proof memory stateProof,
         bytes memory blockHeader,
         bytes[] memory sigs,
         address[] memory signers,
         Data.ExtraProofData memory extraProof
     ) whenMassExit nonReentrant public  {
-        bytes32 stateHash = keccak256(abi.encodePacked(snapshot));
-        require(_snapshots[stateHash] == false, "TokenBridge: snapshot already used");
+        require(_snapshots[stateProof.leaf] == false, "TokenBridge: snapshot already used");
+        require(stateProof.leaf == keccak256(snapshot), "TokenBridge: snapshot data is not correct");
         (uint height, bytes32 blockRid, , bytes32 stateRoot) = Postchain.verifyBlockHeader(blockHeader, extraProof);
-        require(blockRid == massExitBlock.blockRid, "TokenBridge: account state block rid should equal to mass exit block rid");
-        require(account.blockHeight <= massExitBlock.height, "TokenBridge: account state number should less than or equal to mass exit block");
+        require(height <= massExitBlock.height, "TokenBridge: account state number should less than or equal to mass exit block");
         if (!validator.isValidSignatures(validator.getValidatorHeight(height), blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
-        if (!MerkleProof.verify(stateProofs, stateHash, account.accountNumber, stateRoot)) revert("TokenBridge: invalid merkle proof");
+        if (!MerkleProof.verify(stateProof.merkleProofs, stateProof.leaf, stateProof.position, stateRoot)) revert("TokenBridge: invalid merkle proof");
 
         address beneficiary = abi.decode(snapshot[:32], (address));
         uint offset = 32;
@@ -259,7 +257,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
             }
         }
 
-        _snapshots[stateHash] = true;
+        _snapshots[stateProof.leaf] = true;
         emit WithdrawalBySnapshot(beneficiary);
     }
 

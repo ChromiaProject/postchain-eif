@@ -91,19 +91,18 @@ fun accountStateMerkleProofQuery(config: Unit, ctx: EContext, args: Gtv): Gtv {
     val blockHeight = argsDict["blockHeight"]!!.asInteger()
     val accountNumber = argsDict["accountNumber"]!!.asInteger()
     val db = DatabaseAccess.of(ctx)
-    val blockHeader = SimpleGtvEncoder.encodeGtv(blockHeaderData(db, ctx, blockHeight))
-    val blockWitness = blockWitnessData(db, ctx, blockHeight)
-    val accountState = accountState(db.getAccountState(ctx, PREFIX, blockHeight, accountNumber))
-    val snapshot = SnapshotPageStore(ctx,
-        LEVELS_PER_PAGE, SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)), PREFIX)
-    val proofs = snapshot.getMerkleProof(blockHeight, accountNumber)
-    val gtvProofs = proofs.map(::gtv)
-    val extraMerkleProof = extraMerkleProof(db, ctx, blockHeight)
+    val accountState = db.getAccountState(ctx, PREFIX, blockHeight, accountNumber) ?: return GtvNull
+    // Query the account state at the s block height
+    val accountBlockHeight = accountState.blockHeight
+    val blockHeader = SimpleGtvEncoder.encodeGtv(blockHeaderData(db, ctx, accountBlockHeight))
+    val blockWitness = blockWitnessData(db, ctx, accountBlockHeight)
+    val stateProof = stateProof(ctx, accountState)
+    val extraMerkleProof = extraMerkleProof(db, ctx, accountBlockHeight)
     return gtv(
-        "accountState" to accountState,
+        "stateData" to gtv(accountState.data),
         "blockHeader" to gtv(blockHeader),
         "blockWitness" to blockWitness,
-        "stateProofs" to gtv(gtvProofs),
+        "stateProof" to stateProof,
         "extraMerkleProof" to extraMerkleProof
     )
 }
@@ -114,9 +113,22 @@ private fun eventProof(ctx: EContext, blockHeight: Long, event: DatabaseAccess.E
     val proofs = es.getMerkleProof(blockHeight, event.pos)
     val gtvProofs = proofs.map(::gtv)
     return gtv(
-        "leaf" to gtv(event.hash),
-        "position" to gtv(event.pos),
-        "merkleProofs" to gtv(gtvProofs)
+            "leaf" to gtv(event.hash),
+            "position" to gtv(event.pos),
+            "merkleProofs" to gtv(gtvProofs)
+    )
+}
+
+private fun stateProof(ctx: EContext, state: DatabaseAccess.AccountState?) : Gtv {
+    if (state == null) return GtvNull
+    val ds = SimpleDigestSystem(MessageDigest.getInstance(KECCAK256))
+    val ss = SnapshotPageStore(ctx, LEVELS_PER_PAGE, ds, PREFIX)
+    val proofs = ss.getMerkleProof(state.blockHeight, state.stateN)
+    val gtvProofs = proofs.map(::gtv)
+    return gtv(
+            "leaf" to gtv(ds.digest(state.data)),
+            "position" to gtv(state.stateN),
+            "merkleProofs" to gtv(gtvProofs)
     )
 }
 

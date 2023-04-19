@@ -193,16 +193,16 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
         signers[i] = "0x" + blockWitness[i].pubkey
       }
 
-      const accountState = state.accountState
-      const account = {
-        blockHeight: accountState[0],
-        accountNumber: accountState[1],
+      const stateData = "0x" + state.stateData
+      const stateProof = state.stateProof
+      let merkleProofs = new Array<String>(stateProof.merkleProofs.length)
+      for (let i = 0; i < stateProof.merkleProofs.length; i++) {
+        merkleProofs[i] = "0x" + stateProof.merkleProofs[i]
       }
-      const snapshot = "0x" + accountState[2]
-      const stateProofs = state.stateProofs
-      let merkleProofs = new Array<String>(stateProofs.length)
-      for (let i = 0; i < stateProofs.length; i++) {
-        merkleProofs[i] = "0x" + stateProofs[i]
+      const dataProof = {
+        leaf: "0x" + stateProof.leaf,
+        position: stateProof.position,
+        merkleProofs: merkleProofs,
       }
 
       const extraMerkleProof = state.extraMerkleProof
@@ -218,7 +218,7 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
         extraRoot: "0x" + extraMerkleProof.extraRoot,
         extraMerkleProofs: extraMerkleProofs,
       }
-      let calldata = bridge.interface.encodeFunctionData("withdrawBySnapshot", [account, snapshot, merkleProofs, blockHeader, sigs, signers, extraProof])
+      let calldata = bridge.interface.encodeFunctionData("withdrawBySnapshot", [stateData, dataProof, blockHeader, sigs, signers, extraProof])
       await sendTnx(signer, bridgeAddress, calldata)
     } catch (error) {
       console.log(error)

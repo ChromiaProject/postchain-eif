@@ -115,7 +115,7 @@ contract NFTBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reentr
      */
     function withdrawRequestNFT(
         bytes memory _event,
-        Data.EventProof memory eventProof,
+        Data.Proof memory eventProof,
         bytes memory blockHeader,
         bytes[] memory sigs,
         address[] memory signers,
@@ -127,7 +127,7 @@ contract NFTBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reentr
     }
 
     function _withdrawRequest(
-        Data.EventProof memory eventProof,
+        Data.Proof memory eventProof,
         bytes memory blockHeader,
         bytes[] memory sigs,
         address[] memory signers,

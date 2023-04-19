@@ -21,7 +21,7 @@ contract TokenBridgeDelegator {
 
     function withdrawRequest(
         bytes memory _event,
-        Data.EventProof memory eventProof,
+        Data.Proof memory eventProof,
         bytes memory blockHeader,
         bytes[] memory sigs,
         address[] memory signers,
