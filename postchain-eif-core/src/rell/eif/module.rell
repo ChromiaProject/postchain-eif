@@ -751,59 +751,43 @@ function build_account_state(network_id: integer, beneficiary: text, account: ac
 	// In order of asset type
 	// 0: ERC20
 	val erc20_balances = evm_erc20_balance @* { network_id, beneficiary };
-	val erc20_byte_offset = erc20_balances.size() * 2 * 32; // 2 values per entry
-	state.add(erc20_byte_offset.to_gtv());
-    val assets = ft3.asset @* {};
-    val updated_assets = map<ft3.asset, boolean>();
-	for (balance in erc20_balances) {
-        if (account != null) {
-            var ft3_balance = 0;
-            for (asset in assets) {
-                val token_mapping = token_mapping @? {.asset == asset};
-                if (token_mapping != null) {
-                    if (token_mapping.token.network_id != network_id) {
-                        continue;
-                    }
-                    if (token_mapping.token.address == balance.token.address) {
-                        ft3_balance = ft3.ensure_balance(account, asset).amount;
-                        updated_assets[asset] = true;
-                        state.add(byte_array.from_hex("000000000000000000000000" + balance.token.address.sub(2)).to_gtv());
-                        state.add((balance.amount+ft3_balance).to_gtv());
-                    }
-                }
-            }
-        } else {
-		    state.add(byte_array.from_hex("000000000000000000000000" + balance.token.address.sub(2)).to_gtv());
-		    state.add((balance.amount).to_gtv());
-        }
-
-	}
-
-    // update state for ft3 balance alone if not include in the eif balance above
+    val balances = list<ft3.balance>();
     if (account != null) {
-        for (asset in assets) {
-            if (updated_assets.get_or_null(asset) == null) {
-                val token_mapping = token_mapping @? { .asset == asset };
-                if (token_mapping != null) {
-                    if (token_mapping.token.network_id != network_id) {
-                        continue;
-                    }
-                    val ft3_balance = ft3.ensure_balance(account, asset).amount;
-                    state.add(byte_array.from_hex("000000000000000000000000" + token_mapping.token.address.sub(2)).to_gtv());
-                    state.add((ft3_balance).to_gtv());
+        val ft3_balances = ft3.balance @* { .account == account };
+        for (ft3_balance in ft3_balances) {
+            val token_mapping = token_mapping @? {.asset == ft3_balance.asset};
+            if (token_mapping != null) {
+                if (token_mapping.token.network_id != network_id) {
+                    continue;
                 }
+                balances.add(ft3_balance);
             }
         }
     }
+	val erc20_byte_offset = (erc20_balances.size() + balances.size()) * 2 * 32; // 2 values per entry
+	state.add(erc20_byte_offset.to_gtv());
+
+    // update state for eif balance
+	for (balance in erc20_balances) {
+		state.add(byte_array.from_hex("000000000000000000000000" + balance.token.address.sub(2)).to_gtv());
+		state.add((balance.amount).to_gtv());
+    }
+
+    // update state for ft3 balance
+    for (balance in balances) {
+        val token_mapping = token_mapping @ {.asset == balance.asset};
+        state.add(byte_array.from_hex("000000000000000000000000" + token_mapping.token.address.sub(2)).to_gtv());
+        state.add((balance.amount).to_gtv());
+    }
 
 	// 1: ERC721
-	val erc721_balances = evm_erc721_balance @* { network_id, beneficiary };
-	val erc721_byte_offset = erc721_balances.size() * 2 * 32; // 2 values per entry
-	state.add(erc721_byte_offset.to_gtv());
-	for (balance in erc721_balances) {
-		state.add(byte_array.from_hex("000000000000000000000000" + balance.token.address.sub(2)).to_gtv());
-		state.add(balance.token.token_id.to_gtv());
-	}
+	// val erc721_balances = evm_erc721_balance @* { network_id, beneficiary };
+	// val erc721_byte_offset = erc721_balances.size() * 2 * 32; // 2 values per entry
+	// state.add(erc721_byte_offset.to_gtv());
+	// for (balance in erc721_balances) {
+	// 	state.add(byte_array.from_hex("000000000000000000000000" + balance.token.address.sub(2)).to_gtv());
+	// 	state.add(balance.token.token_id.to_gtv());
+	// }
 	// Add new asset types here
 	// ------------------------ //
 	return state;
