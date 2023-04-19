@@ -175,7 +175,7 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
   const withdrawBySnapshot = async () => {
     const signer = library.getSigner()
     try {
-      let data = await client.query('get_account_state_merkle_proof', { "blockHeight": BigNumber.from(blockHeight), "accountNumber": BigNumber.from(accountNUmber)})
+      let data = await client.query('get_account_state_merkle_proof', { "blockHeight": parseInt(blockHeight), "accountNumber": parseInt(accountNUmber)})
       let state = JSON.parse(JSON.stringify(data))
       const bridge = new ethers.Contract(
         bridgeAddress,
@@ -195,11 +195,10 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
 
       const accountState = state.accountState
       const account = {
-        blockHeight: accountState.blockHeight,
-        accountNumber: accountState.accountNumber,
+        blockHeight: accountState[0],
+        accountNumber: accountState[1],
       }
-      const snapshot = "0x" + accountState.snaphot
-
+      const snapshot = "0x" + accountState[2]
       const stateProofs = state.stateProofs
       let merkleProofs = new Array<String>(stateProofs.length)
       for (let i = 0; i < stateProofs.length; i++) {
@@ -211,6 +210,7 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
       for (let i = 0; i < extraMerkleProof.extraMerkleProofs.length; i++) {
         extraMerkleProofs[i] = "0x" + extraMerkleProof.extraMerkleProofs[i]
       }
+
       const extraProof = {
         leaf: "0x" + extraMerkleProof.leaf,
         hashedLeaf: "0x" + extraMerkleProof.hashedLeaf,
@@ -218,7 +218,7 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
         extraRoot: "0x" + extraMerkleProof.extraRoot,
         extraMerkleProofs: extraMerkleProofs,
       }
-      let calldata = bridge.interface.encodeFunctionData("withdrawBySnapshot", [account, snapshot, stateProofs, blockHeader, sigs, signers, extraProof])
+      let calldata = bridge.interface.encodeFunctionData("withdrawBySnapshot", [account, snapshot, merkleProofs, blockHeader, sigs, signers, extraProof])
       await sendTnx(signer, bridgeAddress, calldata)
     } catch (error) {
       console.log(error)
@@ -312,14 +312,14 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
       <input 
         type="text" 
         placeholder="Account Number" 
-        value={accountId}
+        value={accountNUmber}
         onChange={(evt) => setAccountNumber(evt.target.value)}
         className="input w-full max-w-xs"
       />
       <input 
         type="text" 
         placeholder="Block Height" 
-        value={accountId}
+        value={blockHeight}
         onChange={(evt) => setBlockHeight(evt.target.value)}
         className="input w-full max-w-xs"
       />
