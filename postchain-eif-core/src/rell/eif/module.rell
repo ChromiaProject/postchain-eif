@@ -782,7 +782,7 @@ function build_account_state(network_id: integer, beneficiary: text, account: ac
     // update state for ft3 balance alone if not include in the eif balance above
     if (account != null) {
         for (asset in assets) {
-            if (updated_assets[asset] == false) {
+            if (updated_assets.get_or_null(asset) == null) {
                 val token_mapping = token_mapping @? { .asset == asset };
                 if (token_mapping != null) {
                     if (token_mapping.token.network_id != network_id) {
