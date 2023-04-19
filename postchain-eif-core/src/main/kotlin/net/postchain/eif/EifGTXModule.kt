@@ -103,7 +103,7 @@ fun accountStateMerkleProofQuery(config: Unit, ctx: EContext, args: Gtv): Gtv {
         "accountState" to accountState,
         "blockHeader" to gtv(blockHeader),
         "blockWitness" to blockWitness,
-        "stateProofs" to GtvArray(gtvProofs.toTypedArray()),
+        "stateProofs" to gtv(gtvProofs),
         "extraMerkleProof" to extraMerkleProof
     )
 }

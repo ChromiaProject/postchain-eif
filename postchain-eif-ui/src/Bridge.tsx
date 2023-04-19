@@ -12,6 +12,8 @@ import BridgeArtifacts from "./postchain-eif-contracts/artifacts/contracts/Token
 import { restClient, gtxClient, util } from "postchain-client"
 import { hexZeroPad, keccak256 } from "ethers/lib/utils";
 import { intToHex } from "ethjs-util";
+import { Signature } from "./types";
+import { createAuthDesc } from "./util";
 
 const postchainURL = process.env.REACT_APP_POSTCHAIN_URL || ""
 const blockchainRID = process.env.REACT_APP_POSTCHAIN_BRID || ""
@@ -44,6 +46,8 @@ const sendTnx = async (signer, to, calldata) => {
 const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenAddress: string, bridgeAddress: string, tokenType: string, tokenId: number }) => {
   const { library, chainId, account } = useWeb3React();
   const [accountId, setAccountId] = useState("")
+  const [accountNUmber, setAccountNumber] = useState("")
+  const [blockHeight, setBlockHeight] = useState("")
   const fetchTokenInfo = async () => {
     var tokenContract;
     let balance;
@@ -168,6 +172,59 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
     }
   }
 
+  const withdrawBySnapshot = async () => {
+    const signer = library.getSigner()
+    try {
+      let data = await client.query('get_account_state_merkle_proof', { "blockHeight": BigNumber.from(blockHeight), "accountNumber": BigNumber.from(accountNUmber)})
+      let state = JSON.parse(JSON.stringify(data))
+      const bridge = new ethers.Contract(
+        bridgeAddress,
+        BridgeArtifacts.abi,
+        library
+      )
+
+      const blockHeader = "0x" + state.blockHeader
+      const blockWitness = state.blockWitness
+      blockWitness.sort((a, b) => (a.pubkey > b.pubkey) ? 1 : ((a.pubkey < b.pubkey) ? -1 : 0))
+      let sigs = new Array<string>(blockWitness.length)
+      let signers = new Array<string>(blockWitness.length)
+      for (let i = 0; i < blockWitness.length; i++) {
+        sigs[i] = "0x" + blockWitness[i].sig
+        signers[i] = "0x" + blockWitness[i].pubkey
+      }
+
+      const accountState = state.accountState
+      const account = {
+        blockHeight: accountState.blockHeight,
+        accountNumber: accountState.accountNumber,
+      }
+      const snapshot = "0x" + accountState.snaphot
+
+      const stateProofs = state.stateProofs
+      let merkleProofs = new Array<String>(stateProofs.length)
+      for (let i = 0; i < stateProofs.length; i++) {
+        merkleProofs[i] = "0x" + stateProofs[i]
+      }
+
+      const extraMerkleProof = state.extraMerkleProof
+      let extraMerkleProofs = new Array<String>(extraMerkleProof.extraMerkleProofs.length)
+      for (let i = 0; i < extraMerkleProof.extraMerkleProofs.length; i++) {
+        extraMerkleProofs[i] = "0x" + extraMerkleProof.extraMerkleProofs[i]
+      }
+      const extraProof = {
+        leaf: "0x" + extraMerkleProof.leaf,
+        hashedLeaf: "0x" + extraMerkleProof.hashedLeaf,
+        position: extraMerkleProof.position,
+        extraRoot: "0x" + extraMerkleProof.extraRoot,
+        extraMerkleProofs: extraMerkleProofs,
+      }
+      let calldata = bridge.interface.encodeFunctionData("withdrawBySnapshot", [account, snapshot, stateProofs, blockHeader, sigs, signers, extraProof])
+      await sendTnx(signer, bridgeAddress, calldata)
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
   const withdraw = async (eventHash: string) => {
     const signer = library.getSigner();
     const zeroPaddedEventHash = "0x" + eventHash
@@ -252,6 +309,23 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
         onChange={(evt) => setAccountId(evt.target.value)}
         className="input w-full max-w-xs"
       />
+      <input 
+        type="text" 
+        placeholder="Account Number" 
+        value={accountId}
+        onChange={(evt) => setAccountNumber(evt.target.value)}
+        className="input w-full max-w-xs"
+      />
+      <input 
+        type="text" 
+        placeholder="Block Height" 
+        value={accountId}
+        onChange={(evt) => setBlockHeight(evt.target.value)}
+        className="input w-full max-w-xs"
+      />
+      <button type="button" className="btn btn-outline btn-accent" onClick={() => {withdrawBySnapshot()}}>
+        Withdraw By Snapshot (Emergency)
+      </button>
       <button className="btn">
         {data?.name}
         <div className="ml-2 badge">{data?.symbol}</div>
@@ -310,6 +384,8 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
   const [balance, setBalance] = useState(BigNumber.from(0))
   const [deposit, setDeposit] = useState(BigNumber.from(0))
   const [amount, setAmount] = useState(0)
+  const [height, setHeight] = useState("")
+  const [blockRid, setBlockRid] = useState("")
   const [assetId, setAssetId] = useState("")
   const [accountId, setAccountId] = useState("")
   const [authDescId, setAuthDescId] = useState("")
@@ -366,6 +442,45 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         }
       })
     })
+  }
+
+  const postchainRegisterEVMAccount = async () => {
+    try {
+      const messageTemplate = "Create account for EVM wallet:\n{1}\n\nDisposable key:\n{2}"
+      const evmKey = account.slice(2) || "" // Remove '0x'
+      const message = messageTemplate
+                        .replace("{1}", evmKey.toLowerCase())
+                        .replace("{2}", userPUB.toString("hex"))
+      var tx = client.newTransaction([userPUB])
+      const signer = library.getSigner()
+      var sig: string = await signer.signMessage(message);
+      sig = sig.slice(2)
+      var r = sig.slice(0, 64)
+      var s = sig.slice(64, 128)
+      var v = parseInt(sig.slice(128, 130), 16)
+      const signature: Signature = [
+        r,
+        s,
+        v
+      ]
+      tx.addOperation("ft3.evm.register_account", evmKey.toLowerCase(), createAuthDesc(userPUB.toString("hex")), signature)
+      tx.addOperation("nop", Date.now())
+      tx.sign(userPRIV, userPUB)
+      let txRID = tx.getTxRID()
+      tx.send((err) => {
+        if (err !== null) {
+          console.log(err)
+          return
+        }
+        toast.promise(waitConfirmation(txRID), {
+          loading: `Transaction submitted. Wait for confirmation...`,
+          success: <b>Transaction confirmed!</b>,
+          error: <b>Transaction failed!.</b>,
+        })
+      })
+    } catch (error) {
+      console.log(error)
+    }
   }
 
   const postchainRegisterAccount = async () => {
@@ -727,6 +842,21 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
     }
   }, [library, tokenAddress, account]);
 
+  const triggerMassExit = async () => {
+    const signer = library.getSigner()
+    try {
+      const bridge = new ethers.Contract(
+        bridgeAddress,
+        BridgeArtifacts.abi,
+        library
+      )
+      const calldata = bridge.interface.encodeFunctionData("triggerMassExit", [BigNumber.from(height), Buffer.from(blockRid, "hex")])
+      await sendTnx(signer, bridgeAddress, calldata)
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
   const allowToken = async () => {
     const signer = library.getSigner()
     try {
@@ -908,11 +1038,14 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
               value={assetId}
               onChange={(evt) => setAssetId(evt.target.value)}
               className="input w-full max-w-xs"
-            />            
+            />
             <div>
               <div className="justify-center card-actions">
-              <button onClick={postchainRegisterAccount} type="button" className="btn btn-outline btn-accent">
+                <button onClick={postchainRegisterAccount} type="button" className="btn btn-outline btn-accent">
                   Register User Account
+                </button>
+                <button onClick={postchainRegisterEVMAccount} type="button" className="btn btn-outline btn-accent">
+                  Register EVM Account
                 </button>
                 <button onClick={postchainRegisterAdminAccount} type="button" className="btn btn-outline btn-accent">
                   Register Admin Account
@@ -925,6 +1058,28 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
                 </button>
                 <button onClick={postchainAddTokenMapping} type="button" className="btn btn-outline btn-accent">
                   Add Token Mapping
+                </button>
+              </div>
+            </div>
+
+            <input 
+              type="text" 
+              placeholder="Mass Exit Block Height" 
+              value={height}
+              onChange={(evt) => setHeight(evt.target.value)}
+              className="input w-full max-w-xs"
+            />
+            <input 
+              type="text" 
+              placeholder="Mass Exit Block Rid" 
+              value={blockRid}
+              onChange={(evt) => setBlockRid(evt.target.value)}
+              className="input w-full max-w-xs"
+            />
+            <div>
+              <div className="justify-center card-actions">
+                <button onClick={triggerMassExit} type="button" className="btn btn-outline btn-accent">
+                  Mass Exit (Emergency Only)
                 </button>
               </div>
             </div>
