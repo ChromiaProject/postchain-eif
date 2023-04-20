@@ -204,7 +204,7 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
         fun enqueueTx(data: ByteArray): Transaction? {
             try {
                 val tx = node.getBlockchainInstance().blockchainEngine.getConfiguration().getTransactionFactory()
-                    .decodeTransaction(data)
+                        .decodeTransaction(data)
                 node.getBlockchainInstance().blockchainEngine.getTransactionQueue().enqueue(tx)
                 return tx
             } catch (e: Exception) {
@@ -227,10 +227,10 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
             enqueueTx(makeEifStateOp(bcRid, i.toLong()))
             val l = i.toLong()
             val state = SimpleGtvEncoder.encodeGtv(
-                gtv(
-                    GtvInteger(l),
-                    GtvByteArray(ds.digest(BigInteger.valueOf(l).toByteArray()))
-                )
+                    gtv(
+                            GtvInteger(l),
+                            GtvByteArray(ds.digest(BigInteger.valueOf(l).toByteArray()))
+                    )
             )
             leafHashes[l] = ds.digest(state)
         }
@@ -268,12 +268,12 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
         // Verify account state merkle proof
         for (pos in 0..15) {
             val args = gtv(
-                "blockHeight" to gtv(currentBlockHeight),
-                "accountNumber" to gtv(pos.toLong())
+                    "blockHeight" to gtv(currentBlockHeight),
+                    "accountNumber" to gtv(pos.toLong())
             )
             val gtvProof = node.getBlockchainInstance().blockchainEngine.getBlockQueries().query(
-                "get_account_state_merkle_proof",
-                args
+                    "get_account_state_merkle_proof",
+                    args
             ).get().asDict()
 
             val merkleProofs = gtvProof["stateProof"]!!.asDict()["merkleProofs"]!!.asArray()
@@ -291,10 +291,10 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
         val l = 16L
         enqueueTx(makeEifStateOp(bcRid, l))
         val state = SimpleGtvEncoder.encodeGtv(
-            gtv(
-                GtvInteger(l),
-                GtvByteArray(ds.digest(BigInteger.valueOf(l).toByteArray()))
-            )
+                gtv(
+                        GtvInteger(l),
+                        GtvByteArray(ds.digest(BigInteger.valueOf(l).toByteArray()))
+                )
         )
         leafHashes[l] = ds.digest(state)
 
@@ -316,26 +316,27 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
         val eventAndStateData2 = GtvDictionary.build(mapOf(EIF to GtvByteArray(EMPTY_HASH + eifStateRoot2)))
         val eventAndStateDataHash2 = eventAndStateData2.merkleHash(GtvMerkleHashCalculator(Secp256K1CryptoSystem()))
 
-        // Verify account state merkle proof for pos 16 only, other account has no change
-        val args = gtv(
-            "blockHeight" to gtv(currentBlockHeight),
-            "accountNumber" to gtv(16L)
-        )
-        val gtvProof = node.getBlockchainInstance().blockchainEngine.getBlockQueries().query(
-            "get_account_state_merkle_proof",
-            args
-        ).get().asDict()
+        for (pos in 0..16) {
+            val args = gtv(
+                    "blockHeight" to gtv(currentBlockHeight),
+                    "accountNumber" to gtv(pos.toLong())
+            )
+            val gtvProof = node.getBlockchainInstance().blockchainEngine.getBlockQueries().query(
+                    "get_account_state_merkle_proof",
+                    args
+            ).get().asDict()
 
-        val merkleProofs = gtvProof["stateProof"]!!.asDict()["merkleProofs"]!!.asArray()
-        val proofs = merkleProofs.map { it.asByteArray() }
-        val stateRoot = getMerkleProof(proofs, 16, leafHashes[16L]!!, ds::hash)
-        assertEquals(stateRoot.toHex(), eifStateRoot2.toHex())
+            val merkleProofs = gtvProof["stateProof"]!!.asDict()["merkleProofs"]!!.asArray()
+            val proofs = merkleProofs.map { it.asByteArray() }
+            val stateRoot = getMerkleProof(proofs, pos, leafHashes[pos.toLong()]!!, ds::hash)
+            assertEquals(stateRoot.toHex(), eifStateRoot2.toHex())
 
-        val headerExtraData = gtvProof["blockHeader"]!!.asByteArray().slice(7 * HASH_LENGTH until 8 * HASH_LENGTH).toByteArray()
-        assertEquals(eventAndStateDataHash2.toHex(), headerExtraData.toHex())
+            val headerExtraData = gtvProof["blockHeader"]!!.asByteArray().slice(7 * HASH_LENGTH until 8 * HASH_LENGTH).toByteArray()
+            assertEquals(eventAndStateDataHash2.toHex(), headerExtraData.toHex())
 
-        val pubkey = gtvProof["blockWitness"]!!.asArray()[0].asDict()["pubkey"]!!.asByteArray()
-        assertEquals(pubkey.toHex(), getEthereumAddress(node.pubKey.hexStringToByteArray()).toHex())
+            val pubkey = gtvProof["blockWitness"]!!.asArray()[0].asDict()["pubkey"]!!.asByteArray()
+            assertEquals(pubkey.toHex(), getEthereumAddress(node.pubKey.hexStringToByteArray()).toHex())
+        }
     }
 
     @Test
