@@ -103,6 +103,10 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         _allowedToken[token] = true;
     }
 
+    /**
+     * Note: the mass exit block should be the block at which snapshot was updated
+     *          with state root was stored properly in the block header extra data.
+     */
     function triggerMassExit(uint height, bytes32 blockRid) onlyOwner public {
         require(!isMassExit, "TokenBridge: mass exit already set");
         isMassExit = true;
@@ -113,6 +117,10 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         isMassExit = false;
     }
 
+    /**
+     * Note: the mass exit block should be the block at which snapshot was updated
+     *          with state root was stored properly in the block header extra data.
+     */
     function updateMassExitBlock(uint height, bytes32 blockRid) onlyOwner whenMassExit public {
         massExitBlock = PostchainBlock(height, blockRid);
     }
@@ -173,6 +181,9 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         require(_events[eventProof.leaf] == false, "TokenBridge: event hash was already used");
         {
             (uint height, bytes32 blockRid, bytes32 eventRoot, ) = Postchain.verifyBlockHeader(blockHeader, extraProof);
+            if (isMassExit) {
+                require(height < massExitBlock.height, "TokenBridge: only can withdraw request before the mass exit block height");
+            }
             if (!validator.isValidSignatures(validator.getValidatorHeight(height), blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
             if (!MerkleProof.verify(eventProof.merkleProofs, eventProof.leaf, eventProof.position, eventRoot)) revert("TokenBridge: invalid merkle proof");
         }
@@ -229,7 +240,11 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         emit DepositedERC20(msg.sender, wd.token, ft3_account_id, networkId, amount, name, symbol, decimals);
     }
 
-    /// @dev withdraw all account assets in the postchain snapshot when mass exit was triggered
+    /**
+     * @dev withdraw all account assets in the postchain snapshot when mass exit was triggered
+     * Note: the mass exit block should be the block at which snapshot was updated
+     *          with state root was stored properly in the block header extra data.
+     */
     function withdrawBySnapshot(
         bytes calldata snapshot,
         Data.Proof memory stateProof,
@@ -241,7 +256,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         require(_snapshots[stateProof.leaf] == false, "TokenBridge: snapshot already used");
         require(stateProof.leaf == keccak256(snapshot), "TokenBridge: snapshot data is not correct");
         (uint height, bytes32 blockRid, , bytes32 stateRoot) = Postchain.verifyBlockHeader(blockHeader, extraProof);
-        require(height <= massExitBlock.height, "TokenBridge: account state number should less than or equal to mass exit block");
+        require(blockRid == massExitBlock.blockRid && height == massExitBlock.height, "TokenBridge: snapshot block should be the same with mass exit block");
         if (!validator.isValidSignatures(validator.getValidatorHeight(height), blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
         if (!MerkleProof.verify(stateProof.merkleProofs, stateProof.leaf, stateProof.position, stateRoot)) revert("TokenBridge: invalid merkle proof");
 
