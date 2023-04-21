@@ -318,7 +318,7 @@ operation __evm_block(network_id: integer, evm_block_height: integer, evm_block_
                             og.chromia.IOriginal.creator_name: dip.Text.T("User")
                         ]
                     );
-                    og.Minter.mint_non_fungible_original(ft3_account, original_type, dip.Meta.Engine.access(ft3_account));
+                    og.Minter.mint_non_fungible_original(ft3_account, original_type);
                 }
             }
         }
@@ -635,7 +635,7 @@ operation claim_ERC721(network_id: integer, token_address: text, beneficiary: te
         ]
     );
     val account = require(acc.account @? { account_id }, "account does not exist: " + account_id);
-    og.Minter.mint_non_fungible_original(account, original_type, dip.Meta.Engine.access(account));
+    og.Minter.mint_non_fungible_original(account, original_type);
 
     emit_withdraw(network_id, beneficiary, account, withdraw_info);
 }
