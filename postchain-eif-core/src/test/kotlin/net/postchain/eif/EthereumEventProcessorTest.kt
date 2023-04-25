@@ -13,7 +13,6 @@ import net.postchain.eif.contracts.TokenBridge
 import net.postchain.gtv.*
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtx.data.OpData
-import nl.komponents.kovenant.Promise
 import org.awaitility.Awaitility
 import org.awaitility.Duration
 import org.junit.jupiter.api.AfterEach
@@ -34,6 +33,7 @@ import org.web3j.tx.TransactionManager
 import org.web3j.tx.gas.DefaultGasProvider
 import org.web3j.tx.response.PollingTransactionReceiptProcessor
 import java.math.BigInteger
+import java.util.concurrent.CompletableFuture
 
 @Testcontainers(disabledWithoutDocker = true)
 class EthereumEventProcessorTest {
@@ -98,7 +98,7 @@ class EthereumEventProcessorTest {
 
         // Mock query for last evm block in this test
         val blockQueriesMock: BlockQueries = mock {
-            on { query(eq("get_last_evm_block"), any()) } doReturn Promise.of(GtvNull)
+            on { query(eq("get_last_evm_block"), any()) } doReturn CompletableFuture.completedFuture(GtvNull)
         }
         val engineMock: BlockchainEngine = mock {
             on { getBlockQueries() } doReturn blockQueriesMock
@@ -208,7 +208,7 @@ class EthereumEventProcessorTest {
 
         // Mock query for last evm block in this test
         val blockQueriesMock: BlockQueries = mock {
-            on { query(eq("get_last_evm_block"), any()) } doReturn Promise.of(GtvNull)
+            on { query(eq("get_last_evm_block"), any()) } doReturn CompletableFuture.completedFuture(GtvNull)
         }
         val engineMock: BlockchainEngine = mock {
             on { getBlockQueries() } doReturn blockQueriesMock
