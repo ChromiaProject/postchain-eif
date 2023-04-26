@@ -483,52 +483,6 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
     }
   }
 
-  const postchainRegisterAccount = async () => {
-    try {
-      var tx = client.newTransaction([userPUB])
-      tx.addOperation("register_user_account", userPUB)
-      tx.addOperation("nop", Date.now())
-      tx.sign(userPRIV, userPUB)
-      let txRID = tx.getTxRID()
-      tx.send((err) => {
-        if (err !== null) {
-          console.log(err)
-          return
-        }
-        toast.promise(waitConfirmation(txRID), {
-          loading: `Transaction submitted. Wait for confirmation...`,
-          success: <b>Transaction confirmed!</b>,
-          error: <b>Transaction failed!.</b>,
-        })
-      })
-    } catch (error) {
-      console.log(error)
-    }
-  }
-
-  const postchainRegisterAdminAccount = async () => {
-    try {
-      var tx = client.newTransaction([adminPUB])
-      tx.addOperation("register_admin_account")
-      tx.addOperation("nop", Date.now())
-      tx.sign(adminPRIV, adminPUB)
-      let txRID = tx.getTxRID()
-      tx.send((err) => {
-        if (err !== null) {
-          console.log(err)
-          return
-        }
-        toast.promise(waitConfirmation(txRID), {
-          loading: `Transaction submitted. Wait for confirmation...`,
-          success: <b>Transaction confirmed!</b>,
-          error: <b>Transaction failed!.</b>,
-        })
-      })
-    } catch (error) {
-      console.log(error)
-    }
-  }
-
   const postchainRegisterChromiaBaseOriginals =async () => {
     try {
       var tx = client.newTransaction([adminPUB])
@@ -1041,14 +995,8 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
             />
             <div>
               <div className="justify-center card-actions">
-                <button onClick={postchainRegisterAccount} type="button" className="btn btn-outline btn-accent">
-                  Register User Account
-                </button>
                 <button onClick={postchainRegisterEVMAccount} type="button" className="btn btn-outline btn-accent">
                   Register EVM Account
-                </button>
-                <button onClick={postchainRegisterAdminAccount} type="button" className="btn btn-outline btn-accent">
-                  Register Admin Account
                 </button>
                 <button onClick={postchainCreateAsset} type="button" className="btn btn-outline btn-accent">
                   Create New Asset
