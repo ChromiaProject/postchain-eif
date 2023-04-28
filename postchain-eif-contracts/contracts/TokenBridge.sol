@@ -23,6 +23,7 @@ interface IValidator {
 contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
     uint8 constant ERC20_ACCOUNT_STATE_BYTE_SIZE = 64;
+    uint constant EMERGENCY_DURATION = 90 days;
 
     using Postchain for bytes32;
     using MerkleProof for bytes32[];
@@ -34,6 +35,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
     uint256 public networkId;
     bool public isMassExit;
     PostchainBlock public massExitBlock;
+    uint256 public emergencyTimestamp;
 
     // Each postchain event will be used to claim only one time.
     mapping (bytes32 => bool) private _events;
@@ -97,6 +99,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         }
         networkId = id;
         validator = _validator;
+        emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
     }
 
     function allowToken(IERC20 token) onlyOwner public {
@@ -293,6 +296,18 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         (success, _decimals) = address(token).staticcall(abi.encodeWithSignature("decimals()"));
         if (success) {
             decimals = abi.decode(_decimals, (uint8));
+        }
+    }
+
+    /**
+     * @notice this function will be use only in emergency case
+     * by allow admin/owner (multi-sig wallet) to withdraw all the remaining balance after a specific period of time.
+     */
+    function emergencyWithdraw(IERC20 token, address payable beneficiary) external onlyOwner {
+        require(block.timestamp > emergencyTimestamp, "TokenBridge: cannot do emergency withdrawl before setting timestamp");
+        uint tokenBalance = token.balanceOf(address(this));
+        if (tokenBalance > 0) {
+            token.transfer(beneficiary, tokenBalance);
         }
     }
 }

@@ -101,6 +101,43 @@ describe("Token Bridge Test", () => {
         })
     })
 
+    describe("Emergency Withdraw", async () => {
+        it("Emergency Withdraw", async () => {
+            const [deployer, user, beneficiary] = await ethers.getSigners()
+            const tokenInstance = new TestToken__factory(deployer).attach(tokenAddress)
+            const toMint = ethers.utils.parseEther("10000")
+
+            await tokenInstance.mint(user.address, toMint)
+            expect(await tokenInstance.totalSupply()).to.eq(toMint)
+            expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint)
+
+            const bridge = new TokenBridge__factory(user).attach(bridgeAddress)
+            const toDeposit = ethers.utils.parseEther("100")
+            const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
+            await tokenApproveInstance.approve(bridgeAddress, toDeposit)
+            await bridge.deposit(tokenAddress, toDeposit, ft3_account_id)
+
+            // normal user cannot call emergencyWithdraw
+            await expect(bridge.emergencyWithdraw(tokenAddress, beneficiary.address)).to.be.revertedWith("Ownable: caller is not the owner")
+
+            const adminBridge = new TokenBridge__factory(deployer).attach(bridgeAddress)
+            // admin or owner cannot call emergencyWithdraw before setting time
+            await expect(adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address)).to.be.revertedWith("TokenBridge: cannot do emergency withdrawl before setting timestamp")
+
+            // admin can call emergencyWithdraw after setting time
+            expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(0)
+            expect(await adminBridge._balances(tokenAddress)).to.eq(toDeposit)
+            const nighttyDays = 90 * 24 * 60 * 60
+            const blockNum= await ethers.provider.getBlockNumber()
+            const block = await ethers.provider.getBlock(blockNum)
+            const timestamp = block.timestamp + nighttyDays
+            await ethers.provider.send('evm_setNextBlockTimestamp', [timestamp])
+            await adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address)
+            expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(toDeposit)
+            expect(await adminBridge._balances(tokenAddress)).to.eq(toDeposit)
+        })
+    })
+
     describe("Withdraw by normal user", async () => {
         it("User can request withdraw by providing properly proof data", async () => {
             const [deployer, user] = await ethers.getSigners()
