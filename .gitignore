@@ -22,3 +22,4 @@ target
 */*.pid
 *.pid
 *.jar
+.flattened-pom.xml
