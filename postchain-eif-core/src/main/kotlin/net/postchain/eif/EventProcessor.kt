@@ -4,6 +4,7 @@ import mu.KLogging
 import net.postchain.core.BlockchainEngine
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.hexStringToByteArray
+import net.postchain.concurrent.util.get
 import net.postchain.core.framework.AbstractBlockchainProcess
 import net.postchain.gtv.*
 import net.postchain.concurrent.util.get
