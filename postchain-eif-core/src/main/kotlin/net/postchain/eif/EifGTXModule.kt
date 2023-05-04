@@ -2,7 +2,9 @@
 
 package net.postchain.eif
 
-import net.postchain.base.*
+import net.postchain.base.BaseBlockBuilderExtension
+import net.postchain.base.BaseBlockHeader
+import net.postchain.base.BaseBlockWitness
 import net.postchain.base.data.DatabaseAccess
 import net.postchain.base.snapshot.EventPageStore
 import net.postchain.base.snapshot.SimpleDigestSystem
@@ -31,10 +33,10 @@ const val EIF: String = "eif"
 const val LEVELS_PER_PAGE = 2
 
 class EifGTXModule : SimpleGTXModule<Unit>(
-    Unit, mapOf(), mapOf(
+        Unit, mapOf(), mapOf(
         "get_event_merkle_proof" to ::eventMerkleProofQuery,
         "get_account_state_merkle_proof" to ::accountStateMerkleProofQuery
-    )
+)
 ) {
 
     init {
@@ -56,7 +58,7 @@ class EifGTXModule : SimpleGTXModule<Unit>(
 
     override fun makeBlockBuilderExtensions(): List<BaseBlockBuilderExtension> {
         return listOf(EifImplementation(SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)),
-            LEVELS_PER_PAGE
+                LEVELS_PER_PAGE
         ))
     }
 
@@ -78,33 +80,34 @@ fun eventMerkleProofQuery(config: Unit, ctx: EContext, args: Gtv): Gtv {
     val eventProof = eventProof(ctx, blockHeight, eventInfo)
     val extraMerkleProof = extraMerkleProof(db, ctx, blockHeight)
     return gtv(
-        "eventData" to gtv(eventInfo.data),
-        "blockHeader" to gtv(blockHeader),
-        "blockWitness" to blockWitness,
-        "eventProof" to eventProof,
-        "extraMerkleProof" to extraMerkleProof
+            "eventData" to gtv(eventInfo.data),
+            "blockHeader" to gtv(blockHeader),
+            "blockWitness" to blockWitness,
+            "eventProof" to eventProof,
+            "extraMerkleProof" to extraMerkleProof
     )
 }
 
+/**
+ * blockHeight should be the latest block height that the global snapshot was updated.
+ * That mean the block header's extra data should contain the state root hash as well.
+ */
 fun accountStateMerkleProofQuery(config: Unit, ctx: EContext, args: Gtv): Gtv {
     val argsDict = args.asDict()
     val blockHeight = argsDict["blockHeight"]!!.asInteger()
     val accountNumber = argsDict["accountNumber"]!!.asInteger()
     val db = DatabaseAccess.of(ctx)
+    val accountState = db.getAccountState(ctx, PREFIX, blockHeight, accountNumber) ?: return GtvNull
     val blockHeader = SimpleGtvEncoder.encodeGtv(blockHeaderData(db, ctx, blockHeight))
     val blockWitness = blockWitnessData(db, ctx, blockHeight)
-    val accountState = accountState(db.getAccountState(ctx, PREFIX, blockHeight, accountNumber))
-    val snapshot = SnapshotPageStore(ctx,
-        LEVELS_PER_PAGE, SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)), PREFIX)
-    val proofs = snapshot.getMerkleProof(blockHeight, accountNumber)
-    val gtvProofs = proofs.map(::gtv)
+    val stateProof = stateProof(ctx, blockHeight, accountState)
     val extraMerkleProof = extraMerkleProof(db, ctx, blockHeight)
     return gtv(
-        "accountState" to accountState,
-        "blockHeader" to gtv(blockHeader),
-        "blockWitness" to blockWitness,
-        "stateProofs" to GtvArray(gtvProofs.toTypedArray()),
-        "extraMerkleProof" to extraMerkleProof
+            "stateData" to gtv(accountState.data),
+            "blockHeader" to gtv(blockHeader),
+            "blockWitness" to blockWitness,
+            "stateProof" to stateProof,
+            "extraMerkleProof" to extraMerkleProof
     )
 }
 
@@ -114,34 +117,42 @@ private fun eventProof(ctx: EContext, blockHeight: Long, event: DatabaseAccess.E
     val proofs = es.getMerkleProof(blockHeight, event.pos)
     val gtvProofs = proofs.map(::gtv)
     return gtv(
-        "leaf" to gtv(event.hash),
-        "position" to gtv(event.pos),
-        "merkleProofs" to gtv(gtvProofs)
+            "leaf" to gtv(event.hash),
+            "position" to gtv(event.pos),
+            "merkleProofs" to gtv(gtvProofs)
     )
 }
 
-private fun accountState(state: DatabaseAccess.AccountState?): Gtv {
+private fun stateProof(ctx: EContext, blockHeight: Long, state: DatabaseAccess.AccountState?): Gtv {
     if (state == null) return GtvNull
-    return gtv(gtv(state.blockHeight), gtv(state.stateN), gtv(state.data))
+    val ds = SimpleDigestSystem(MessageDigest.getInstance(KECCAK256))
+    val ss = SnapshotPageStore(ctx, LEVELS_PER_PAGE, ds, PREFIX)
+    val proofs = ss.getMerkleProof(blockHeight, state.stateN)
+    val gtvProofs = proofs.map(::gtv)
+    return gtv(
+            "leaf" to gtv(ds.digest(state.data)),
+            "position" to gtv(state.stateN),
+            "merkleProofs" to gtv(gtvProofs)
+    )
 }
 
 private fun blockHeaderData(
-    db: DatabaseAccess,
-    ctx: EContext,
-    blockHeight: Long
+        db: DatabaseAccess,
+        ctx: EContext,
+        blockHeight: Long
 ): Gtv {
     val merkleHashCalculator = GtvMerkleHashCalculator(Secp256K1CryptoSystem())
     val blockRid = db.getBlockRID(ctx, blockHeight) ?: return GtvNull
     val bh = BaseBlockHeader(db.getBlockHeader(ctx, blockRid), merkleHashCalculator).blockHeaderRec
     return gtv(
-        bh.gtvBlockchainRid,
-        gtv(blockRid),
-        bh.gtvPreviousBlockRid,
-        gtv(bh.gtvMerkleRootHash.merkleHash(merkleHashCalculator)),
-        bh.gtvTimestamp,
-        bh.gtvHeight,
-        gtv(bh.gtvDependencies.merkleHash(merkleHashCalculator)),
-        gtv(bh.gtvExtra.merkleHash(merkleHashCalculator)),
+            bh.gtvBlockchainRid,
+            gtv(blockRid),
+            bh.gtvPreviousBlockRid,
+            gtv(bh.gtvMerkleRootHash.merkleHash(merkleHashCalculator)),
+            bh.gtvTimestamp,
+            bh.gtvHeight,
+            gtv(bh.gtvDependencies.merkleHash(merkleHashCalculator)),
+            gtv(bh.gtvExtra.merkleHash(merkleHashCalculator)),
     )
 }
 
@@ -161,29 +172,29 @@ private fun extraMerkleProof(db: DatabaseAccess, ctx: EContext, blockHeight: Lon
     val gtvProofs = proofs.map(::gtv)
     val leaf = gtvExtra[EIF]!! as GtvByteArray
     val hashedLeaf = MerkleBasics.hashingFun(
-        byteArrayOf(MerkleBasics.HASH_PREFIX_LEAF) + encodeGtv(leaf), cryptoSystem)
+            byteArrayOf(MerkleBasics.HASH_PREFIX_LEAF) + encodeGtv(leaf), cryptoSystem)
     return gtv(
-        "leaf" to leaf,
-        "hashedLeaf" to gtv(hashedLeaf),
-        "position" to gtv(position.toLong()),
-        "extraRoot" to gtv(gtvExtra.merkleHash(calculator)),
-        "extraMerkleProofs" to gtv(gtvProofs))
+            "leaf" to leaf,
+            "hashedLeaf" to gtv(hashedLeaf),
+            "position" to gtv(position.toLong()),
+            "extraRoot" to gtv(gtvExtra.merkleHash(calculator)),
+            "extraMerkleProofs" to gtv(gtvProofs))
 }
 
 private fun blockWitnessData(
-    db: DatabaseAccess,
-    ctx: EContext,
-    blockHeight: Long
+        db: DatabaseAccess,
+        ctx: EContext,
+        blockHeight: Long
 ): Gtv {
     val blockRid = db.getBlockRID(ctx, blockHeight) ?: return GtvNull
     val witness = BaseBlockWitness.fromBytes(db.getWitnessData(ctx, blockRid))
     val signatures = witness.getSignatures()
     return gtv(
-        signatures.map {
-            gtv(
-                "sig" to GtvByteArray(encodeSignatureWithV(blockRid, it.subjectID, it.data)),
-                "pubkey" to GtvByteArray(getEthereumAddress(it.subjectID))
-            )
-        }
+            signatures.map {
+                gtv(
+                        "sig" to GtvByteArray(encodeSignatureWithV(blockRid, it.subjectID, it.data)),
+                        "pubkey" to GtvByteArray(getEthereumAddress(it.subjectID))
+                )
+            }
     )
 }

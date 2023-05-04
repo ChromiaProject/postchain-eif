@@ -17,8 +17,10 @@
     "typechain": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat typechain",
     "coverage": "cross-env CODE_COVERAGE=true hardhat coverage --solcoverjs ./.solcover.js --temp artifacts --testfiles \"./test/**/*.ts\"",
     "deploy": "npx hardhat deploy:bridge",
-    "prepare-upgrade": "npx hardhat prepare:bridge",
-    "upgrade-contract": "npx hardhat upgrade:bridge",
+    "prepare:bridge": "npx hardhat prepare:bridge",
+    "upgrade:bridge": "npx hardhat upgrade:bridge",
+    "prepare:nft": "npx hardhat prepare:nft",
+    "upgrade:nft": "npx hardhat upgrade:nft",
     "deploy:token": "npx hardhat deploy:token"
   },
   "author": "",

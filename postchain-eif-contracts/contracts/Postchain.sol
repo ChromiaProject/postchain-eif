@@ -40,8 +40,6 @@ library Postchain {
         bytes32 extraDataHashedLeaf;
     }
 
-
-
     function verifyEvent(bytes32 _hash, bytes memory _event) internal pure returns (IERC20, address, uint256, uint256) {
         Event memory evt = abi.decode(_event, (Event));
         bytes32 hash = keccak256(_event);

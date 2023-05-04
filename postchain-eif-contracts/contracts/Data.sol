@@ -10,7 +10,7 @@ library Data {
         bytes32[] extraMerkleProofs;
     }
 
-    struct EventProof {
+    struct Proof {
         bytes32 leaf;
         uint position;
         bytes32[] merkleProofs;

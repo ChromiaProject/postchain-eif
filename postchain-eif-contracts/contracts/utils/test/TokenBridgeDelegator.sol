@@ -15,13 +15,13 @@ contract TokenBridgeDelegator {
         return token.approve(_spender, _amount);
     }
 
-    function deposit(IERC20 token, uint256 amount) public returns (bool) {
-        return _bridge.deposit(token, amount);
+    function deposit(IERC20 token, uint256 amount, bytes32 ft3_account_id) public returns (bool) {
+        return _bridge.deposit(token, amount, ft3_account_id);
     }
 
     function withdrawRequest(
         bytes memory _event,
-        Data.EventProof memory eventProof,
+        Data.Proof memory eventProof,
         bytes memory blockHeader,
         bytes[] memory sigs,
         address[] memory signers,

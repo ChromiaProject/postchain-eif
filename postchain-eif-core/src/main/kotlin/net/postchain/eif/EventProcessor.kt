@@ -7,6 +7,7 @@ import net.postchain.common.hexStringToByteArray
 import net.postchain.concurrent.util.get
 import net.postchain.core.framework.AbstractBlockchainProcess
 import net.postchain.gtv.*
+import net.postchain.concurrent.util.get
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtx.data.OpData
 import org.web3j.abi.EventEncoder

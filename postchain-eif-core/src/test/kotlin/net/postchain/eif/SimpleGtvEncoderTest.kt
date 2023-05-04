@@ -3,8 +3,8 @@ package net.postchain.eif
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
 import net.postchain.gtv.*
-import org.junit.jupiter.api.Test
 import org.bouncycastle.jce.provider.BouncyCastleProvider
+import org.junit.jupiter.api.Test
 import java.security.Security
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

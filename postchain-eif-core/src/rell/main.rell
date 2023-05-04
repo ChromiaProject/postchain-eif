@@ -1,0 +1,16 @@
+module;
+
+/* For testing */
+import ^.access.admin;
+import ^.eif;
+import ^.dip.dip_basic_dev.*;
+import ^.ft3.ft3_basic_dev.*;
+import ^.originals.originals_basic_dev.*;
+import ^.originals.tests.extensions;
+import dip_owner_access: ^.dip.external.access.owner_based;
+import originals_owner_access: ^.originals.external.access.owner_based;
+
+/* For release */
+//import dip.dip_basic.*;
+//import ft3.ft3_basic.*;
+//import originals.originals_basic.*;

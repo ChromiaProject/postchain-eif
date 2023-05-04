@@ -4,6 +4,7 @@ import assertk.assert
 import assertk.assertions.*
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
+import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
 import net.postchain.core.BlockchainEngine
 import net.postchain.core.block.BlockQueries
@@ -21,6 +22,7 @@ import org.mockito.kotlin.*
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.datatypes.Address
+import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto.Credentials
 import org.web3j.protocol.Web3j
@@ -48,6 +50,9 @@ class EthereumEventProcessorTest {
     // and the address created must be added to /geth-compose/geth/test.json
     private val credentials = Credentials
         .create("0x0000000000000000000000000000000001000000000000000000000000000000")
+    private val accountId = Bytes32("fc91c4abaff09f4c67a0ab84d4e9afd37c929978bea3fa1790403ab6ee85bf33"
+        .hexStringToByteArray())
+    private val validatorContract = Address("0x0000000000000000000000000000000000000000")
     private lateinit var web3j: Web3j
     private lateinit var transactionManager: TransactionManager
 
@@ -87,7 +92,9 @@ class EthereumEventProcessorTest {
     fun `Deposit events on ethereum should be parsed and private validated`() {
         val initialMint = 50L
         // Deploy token bridge contract
-        val bridge = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send()
+        val bridge = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
+            initialize(validatorContract).send()
+        }
 
         // Mock query for last evm block in this test
         val blockQueriesMock: BlockQueries = mock {
@@ -112,9 +119,11 @@ class EthereumEventProcessorTest {
             approve(Address(bridge.contractAddress), Uint256(BigInteger.valueOf(initialMint))).send()
         }
 
+        // Allow token
+        bridge.allowToken(Address(testToken.contractAddress)).send()
         // Deposit to postchain
         for (i in 1..5) {
-            bridge.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN)).send()
+            bridge.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), accountId).send()
         }
 
         Awaitility.await()
@@ -163,7 +172,7 @@ class EthereumEventProcessorTest {
             mint(Address(transactionManager.fromAddress), Uint256(max)).send()
             approve(Address(bridge.contractAddress), Uint256(max)).send()
         }
-        bridge.deposit(Address(testToken.contractAddress), Uint256(max)).send()
+        bridge.deposit(Address(testToken.contractAddress), Uint256(max), accountId).send()
 
         Awaitility.await()
             .atMost(Duration.ONE_MINUTE)
@@ -190,8 +199,12 @@ class EthereumEventProcessorTest {
     fun `Events can be received from multiple contracts`() {
         val initialMint = 20L
         // Deploy two token bridge contracts
-        val bridgeFirst = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send()
-        val bridgeSecond = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send()
+        val bridgeFirst = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
+            initialize(validatorContract).send()
+        }
+        val bridgeSecond = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
+            initialize(validatorContract).send()
+        }
 
         // Mock query for last evm block in this test
         val blockQueriesMock: BlockQueries = mock {
@@ -218,9 +231,13 @@ class EthereumEventProcessorTest {
             approve(Address(bridgeSecond.contractAddress), Uint256(BigInteger.TEN)).send()
         }
 
+        // Allow token
+        bridgeFirst.allowToken(Address(testToken.contractAddress)).send()
+        bridgeSecond.allowToken(Address(testToken.contractAddress)).send()
+
         // Deposit to postchain
-        bridgeFirst.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN)).send()
-        bridgeSecond.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN)).send()
+        bridgeFirst.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), accountId).send()
+        bridgeSecond.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), accountId).send()
 
         // Verify we got both events from the different contracts
         Awaitility.await()
@@ -237,7 +254,7 @@ class EthereumEventProcessorTest {
     }
 
     private fun getBinaryFromArtifactResource(resourcePath: String): String {
-        val artifactFile = javaClass.getResource(resourcePath).readText()
+        val artifactFile = javaClass.getResource(resourcePath)?.readText()
         val artifactJson = GsonBuilder().create().fromJson(artifactFile, JsonObject::class.java)
         return artifactJson.get("bytecode").asString
     }

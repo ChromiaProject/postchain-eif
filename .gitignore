@@ -14,6 +14,7 @@ lerna-debug.log*
 
 ### Java & idea
 .idea
+.vscode
 .project
 .settings/
 .classpath
