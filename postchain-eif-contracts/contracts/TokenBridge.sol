@@ -74,7 +74,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
     }
 
     event FundedERC20(address indexed sender, IERC20 indexed token, uint amount);
-    event DepositedERC20(address indexed sender, IERC20 indexed token, bytes32 indexed ft3_account_id, uint networkId, uint amount, string name, string symbol, uint8 decimals);
+    event DepositedERC20(address indexed sender, IERC20 indexed token, uint networkId, uint amount, string name, string symbol, uint8 decimals);
     event WithdrawRequest(address indexed beneficiary, IERC20 indexed token, uint256 value);
     event Withdrawal(address indexed beneficiary, IERC20 indexed token, uint256 value);
     event MassExit(uint indexed height, bytes32 indexed blockRid);
@@ -151,11 +151,11 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         return true;
     }
 
-    function deposit(IERC20 token, uint256 amount, bytes32 ft3_account_id) isAllowToken(token) public returns (bool) {
+    function deposit(IERC20 token, uint256 amount) isAllowToken(token) public returns (bool) {
         (string memory name, string memory symbol, uint8 decimals) = _getTokenInfo(token);
         token.transferFrom(msg.sender, address(this), amount);
         _balances[token] += amount;
-        emit DepositedERC20(msg.sender, token, ft3_account_id, networkId, amount, name, symbol, decimals);
+        emit DepositedERC20(msg.sender, token, networkId, amount, name, symbol, decimals);
         return true;
     }
 
@@ -231,7 +231,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
     /**
      * @dev user can withdraw token back to postchain if they cannot withdraw on EVM chain
      */
-    function withdrawToPostchain(bytes32 _hash, bytes32 ft3_account_id) external nonReentrant {
+    function withdrawToPostchain(bytes32 _hash) external nonReentrant {
         Withdraw storage wd = _withdraw[_hash];
         require(wd.beneficiary == msg.sender, "TokenBridge: no fund for the beneficiary");
         require(wd.block_number <= block.number, "TokenBridge: not mature enough to withdraw the fund");
@@ -240,7 +240,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         uint amount = wd.amount;
         wd.amount = 0;
         (string memory name, string memory symbol, uint8 decimals) = _getTokenInfo(wd.token);
-        emit DepositedERC20(msg.sender, wd.token, ft3_account_id, networkId, amount, name, symbol, decimals);
+        emit DepositedERC20(msg.sender, wd.token, networkId, amount, name, symbol, decimals);
     }
 
     /**

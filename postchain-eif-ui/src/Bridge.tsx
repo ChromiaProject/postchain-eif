@@ -872,7 +872,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         library
       )
       const value = ethers.BigNumber.from(amount).mul(ethers.BigNumber.from(10).pow(unit))
-      const calldata = bridge.interface.encodeFunctionData("deposit", [tokenAddress, value, Buffer.from(accountId, 'hex')])
+      const calldata = bridge.interface.encodeFunctionData("deposit", [tokenAddress, value])
       await sendTnx(signer, bridgeAddress, calldata)
     } catch (error) {
       console.log(error)
@@ -903,7 +903,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         library
       )
       const id = ethers.BigNumber.from(tokenId)
-      const calldata = bridge.interface.encodeFunctionData("depositNFT", [tokenAddress, id, Buffer.from(accountId, 'hex')])
+      const calldata = bridge.interface.encodeFunctionData("depositNFT", [tokenAddress, id])
       await sendTnx(signer, bridgeAddress, calldata)
     } catch (error) {
     }

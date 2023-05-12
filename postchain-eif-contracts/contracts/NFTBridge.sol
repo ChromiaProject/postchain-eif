@@ -52,7 +52,7 @@ contract NFTBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reentr
     }
 
     event FundedERC721(address indexed sender, IERC721 indexed nft, uint tokenId);
-    event DepositedERC721(address indexed sender, IERC721 indexed nft, bytes32 indexed ft3_account_id, uint networkId, uint tokenId, string name, string symbol, string tokenURI);
+    event DepositedERC721(address indexed sender, IERC721 indexed nft, uint networkId, uint tokenId, string name, string symbol, string tokenURI);
     event WithdrawRequestNFT(address indexed beneficiary, IERC721 indexed token, uint256 tokenId);
     event WithdrawalNFT(address indexed beneficiary, IERC721 indexed nft, uint256 tokenId);
 
@@ -101,12 +101,12 @@ contract NFTBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reentr
         return true;
     }
 
-    function depositNFT(IERC721 nft, uint256 tokenId, bytes32 ft3_account_id) isAllowNFT(nft) public returns (bool) {
+    function depositNFT(IERC721 nft, uint256 tokenId) isAllowNFT(nft) public returns (bool) {
         nft.safeTransferFrom(msg.sender, address(this), tokenId);
         _owners[nft][tokenId] = msg.sender;
         (string memory name, string memory symbol, string memory tokenURI) = _getNFTInfo(nft, tokenId);
 
-        emit DepositedERC721(msg.sender, nft, ft3_account_id, networkId, tokenId, name, symbol, tokenURI);
+        emit DepositedERC721(msg.sender, nft, networkId, tokenId, name, symbol, tokenURI);
         return true;
     }
 
@@ -171,7 +171,7 @@ contract NFTBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reentr
         emit WithdrawalNFT(beneficiary, wd.nft, tokenId);
     }
 
-    function withdrawNFT2Postchain(bytes32 _hash, bytes32 ft3_account_id) public nonReentrant {
+    function withdrawNFT2Postchain(bytes32 _hash) public nonReentrant {
         WithdrawNFT storage wd = _withdrawNFT[_hash];
         uint tokenId = wd.tokenId;
         require(wd.beneficiary == msg.sender, "NFTBridge: no nft for the beneficiary");
@@ -179,7 +179,7 @@ contract NFTBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reentr
         require(wd.status == Status.Withdrawable, "NFTBridge: nft is pending or was already claimed");
         wd.status = Status.PostchainWithdrawn;
         (string memory name, string memory symbol, string memory tokenURI) = _getNFTInfo(wd.nft, tokenId);
-        emit DepositedERC721(msg.sender, wd.nft, ft3_account_id, networkId, tokenId, name, symbol, tokenURI);
+        emit DepositedERC721(msg.sender, wd.nft, networkId, tokenId, name, symbol, tokenURI);
     }
 
     /**
