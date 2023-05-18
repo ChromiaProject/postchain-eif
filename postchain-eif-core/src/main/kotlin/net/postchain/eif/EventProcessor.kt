@@ -7,7 +7,6 @@ import net.postchain.common.hexStringToByteArray
 import net.postchain.concurrent.util.get
 import net.postchain.core.framework.AbstractBlockchainProcess
 import net.postchain.gtv.*
-import net.postchain.concurrent.util.get
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtx.data.OpData
 import org.web3j.abi.EventEncoder
@@ -130,40 +129,47 @@ class EvmEventProcessor(
      * Producer thread will read events from ethereum ond add to queue in this action. Main thread will consume them.
      */
     override fun action() {
-        val from = lastReadLogBlockHeight + BigInteger.ONE
+        try {
+            val from = lastReadLogBlockHeight + BigInteger.ONE
 
-        val currentBlockHeight = sendWeb3jRequestWithRetry(web3j.ethBlockNumber()).blockNumber - evmReadOffset
-        // Pacing the reading of logs
-        val to = minOf(currentBlockHeight, from + BigInteger.valueOf(maxReadAhead))
+            val currentBlockHeight = sendWeb3jRequestWithRetry(web3j.ethBlockNumber()).blockNumber - evmReadOffset
+            // Pacing the reading of logs
+            val to = minOf(currentBlockHeight, from + BigInteger.valueOf(maxReadAhead))
 
-        if (to < from) {
-            logger.debug { "No new blocks to read. We are at height: $to" }
-            // Sleep a bit until next attempt
-            sleep(500)
-            return
-        }
+            if (to < from) {
+                logger.debug { "No new blocks to read. We are at height: $to" }
+                // Sleep a bit until next attempt
+                sleep(500)
+                return
+            }
 
-        val filter = EthFilter(
-            DefaultBlockParameter.valueOf(from),
-            DefaultBlockParameter.valueOf(to),
-            contractAddresses
-        )
-        filter.addOptionalTopics(*eventSignatures)
+            val filter = EthFilter(
+                    DefaultBlockParameter.valueOf(from),
+                    DefaultBlockParameter.valueOf(to),
+                    contractAddresses
+            )
+            filter.addOptionalTopics(*eventSignatures)
 
-        val logResponse = sendWeb3jRequestWithRetry(web3j.ethGetLogs(filter))
+            val logResponse = sendWeb3jRequestWithRetry(web3j.ethGetLogs(filter))
 
-        // Ensure events are sorted on txIndex + logIndex, blocks sorted on block number
-        val sortedEncodedLogs = logResponse.logs
-                .map { (it as EthLog.LogObject).get() }
-                .groupBy { EvmBlock(it.blockNumber, it.blockHash) }
-                .mapValues { it.value.sortedWith(compareBy({ event -> event.transactionIndex }, { event -> event.logIndex })) }
-                .toList()
-                .sortedBy { it.first.number }
-                .map(::eventBlockToGtv)
-        processLogEventsAndUpdateOffsets(sortedEncodedLogs, to)
+            // Ensure events are sorted on txIndex + logIndex, blocks sorted on block number
+            val sortedEncodedLogs = logResponse.logs
+                    .map { (it as EthLog.LogObject).get() }
+                    .groupBy { EvmBlock(it.blockNumber, it.blockHash) }
+                    .mapValues { it.value.sortedWith(compareBy({ event -> event.transactionIndex }, { event -> event.logIndex })) }
+                    .toList()
+                    .sortedBy { it.first.number }
+                    .map(::eventBlockToGtv)
+            processLogEventsAndUpdateOffsets(sortedEncodedLogs, to)
 
-        while (isQueueFull()) {
-            logger.debug("Wait for events to be consumed until we read more")
+            while (isQueueFull()) {
+                logger.debug("Wait for events to be consumed until we read more")
+                sleep(500)
+            }
+        } catch (e: Exception) {
+            // We catch all errors in order to keep retrying
+            logger.error("Parsing of EVM logs unexpectedly failed: $e", e)
+            // Sleep a bit and hope that we can recover
             sleep(500)
         }
     }
