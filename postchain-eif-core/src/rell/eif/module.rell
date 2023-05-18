@@ -6,6 +6,10 @@ import dip: ^.dip.core;
 import og: ^.originals.core;
 import ^.ft3_helper.*;
 
+struct module_args {
+    sync_transfers_inside_dapp: boolean;
+}
+
 namespace eif.INonFungibleOriginal {
     val interface = "eif.INonFungibleOriginal";
 
@@ -857,7 +861,11 @@ function get_eth_address(pk: byte_array) = crypto.keccak256(pk).sub(12).to_hex()
 
 function hash_eth_message(msg: text) = crypto.keccak256(("\u0019Ethereum Signed Message:\n" + msg.size().to_text() + msg).to_bytes());
 
+function is_syncing_transfers_inside_dapp() = chain_context.args.sync_transfers_inside_dapp;
+
 @extend(ft3.after_transfer) function after_transfer_eif(inputs: list<ft3.xfer_input>, outputs: list<ft3.xfer_output>) {
+    if (not is_syncing_transfers_inside_dapp()) return;
+
     for (i in inputs) {
         update_account_state(i.account_id, i.asset_id);
     }
