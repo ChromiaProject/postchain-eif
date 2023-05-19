@@ -17,7 +17,7 @@ deploy:
     - main
     - /^support\/.*$/
   script:
-    - mvn $MAVEN_CLI_OPTS deploy -Pgitlab-registry
+    - mvn $MAVEN_CLI_OPTS deploy -Pgitlab-registry -Dversion=0-SNAPSHOT
 
 build:
   stage: build
