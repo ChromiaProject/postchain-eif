@@ -43,6 +43,9 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
     // Each account state snapshot will be used to claim only one time.
     mapping (bytes32 => bool) private _snapshots;
 
+     // temp limit specific to ALICE token. in this deployment we assume that the only enabled token is ALICE
+    mapping (address => uint256) _ALICElimits;
+
     enum Status {
         Pending,
         Withdrawable,
@@ -106,6 +109,10 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         _allowedToken[token] = true;
     }
 
+    function increaseALICELimit(address addr, uint256 amount) onlyOwner public {
+        _ALICElimits[addr] += amount;
+    }
+
     /**
      * Note: the mass exit block should be the block at which snapshot was updated
      *          with state root was stored properly in the block header extra data.
@@ -155,6 +162,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         (string memory name, string memory symbol, uint8 decimals) = _getTokenInfo(token);
         token.transferFrom(msg.sender, address(this), amount);
         _balances[token] += amount;
+        _ALICElimits[msg.sender] += amount;
         emit DepositedERC20(msg.sender, token, ft3_account_id, networkId, amount, name, symbol, decimals);
         return true;
     }
@@ -219,10 +227,12 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         require(wd.block_number <= block.number, "TokenBridge: not mature enough to withdraw the fund");
         require(wd.status == Status.Withdrawable, "TokenBridge: fund is pending or was already claimed");
         require(wd.amount <= _balances[wd.token], "TokenBridge: not enough amount to withdraw");
+        require(wd.amount <= _ALICElimits[msg.sender], "TokenBridge: withdraw more than deposited not allowed");
         wd.status = Status.Withdrawn;
         uint value = wd.amount;
         wd.amount = 0;
         _balances[wd.token] -= value;
+        _ALICElimits[msg.sender] -= value;
         // only support user to withdraw the token that be funded enough on the EVM bridge
         wd.token.transfer(beneficiary, value);
         emit Withdrawal(beneficiary, wd.token, value);
@@ -311,3 +321,4 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         }
     }
 }
+
