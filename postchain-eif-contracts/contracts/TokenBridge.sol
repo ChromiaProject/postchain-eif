@@ -43,8 +43,14 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
     // Each account state snapshot will be used to claim only one time.
     mapping (bytes32 => bool) private _snapshots;
 
-     // temp limit specific to ALICE token. in this deployment we assume that the only enabled token is ALICE
+    // ALICE "limit" for a given address holds this contact's view of what a maximum balance on Chromia side
+    // can be under the condition that transfers are impossible. I.e. withdraw beyond limit is considered
+    // fraudulent as there's no way an account could have enough balance to withdraw.
+    // For system accounts which have inflows we need to manually increase the limit by calling 
+    // increaseALICELimit by the owner.
     mapping (address => uint256) _ALICElimits;
+    uint256 public constant ALICE_MAX_DEPOSIT_LIMIT = 50 * 1000000; // allow deposit up to 50 ALICE
+
 
     enum Status {
         Pending,
@@ -159,6 +165,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
     }
 
     function deposit(IERC20 token, uint256 amount, bytes32 ft3_account_id) isAllowToken(token) public returns (bool) {
+        require(_ALICElimits[msg.sender] + amount <= ALICE_MAX_DEPOSIT_LIMIT, "TokenBridge: deposit too much ALICE");
         (string memory name, string memory symbol, uint8 decimals) = _getTokenInfo(token);
         token.transferFrom(msg.sender, address(this), amount);
         _balances[token] += amount;
