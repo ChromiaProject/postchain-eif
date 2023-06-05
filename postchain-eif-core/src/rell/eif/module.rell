@@ -141,6 +141,20 @@ struct state_data {
     account: list<gtv>;
 }
 
+struct state_address_dto {
+    state_n: integer;
+    evm_address: text;
+}
+
+query get_network_accounts(network_id: integer) : list<state_address_dto>{
+    var accounts = evm_account_link @* {.network_id == network_id};
+    val accounts_dto = list<state_address_dto>();
+    for(account in accounts){
+        accounts_dto.add(state_address_dto(state_n=account.state_n, evm_address=account.evm_beneficiary));
+    }
+    return accounts_dto;
+}
+
 query get_last_evm_block(network_id: integer) { return evm_block @? {network_id} (@sort_desc .evm_block_height, .evm_block_hash) limit 1;}
 
 query get_erc20_withdrawal(network_id: integer, token_address: text, beneficiary: text) {
