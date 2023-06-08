@@ -72,13 +72,13 @@ $ yarn deploy --network goerli --verify --app 0x659E4A3726275EDFD125F52338ECE0D5
 Run below task to prepare upgrade token bridge smart contracts
 
 ```sh
-yarn prepare:bridge --network goerli --verify --address PROXY_ADDRESS
-yarn prepare:nft --network goerli --verify --address PROXY_ADDRESS
+yarn prepare:bridge --network goerli --address PROXY_ADDRESS
+yarn prepare:nft --network goerli --address PROXY_ADDRESS
 ```
 
 ### Upgrade
 
 ```sh
-yarn upgrade:bridge --network goerli --address PROXY_ADDRESS
-yarn upgrade:nft --network goerli --address PROXY_ADDRESS
+yarn upgrade:bridge --network goerli --verify --address PROXY_ADDRESS
+yarn upgrade:nft --network goerli --verify --address PROXY_ADDRESS
 ```
