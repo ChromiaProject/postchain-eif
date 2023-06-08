@@ -88,6 +88,14 @@ task("upgrade:nft")
             await verifyProxyContract(hre, address);
         }
     });
+
+task("import:bridge")
+    .addParam('address', '')
+    .setAction(async ({ address }, hre) => {
+        const factory: TokenBridge__factory = await hre.ethers.getContractFactory("TokenBridge");
+        await hre.upgrades.forceImport(address, factory)
+        console.log("Token bridge has been imported");
+    });
     
 async function verifyProxyContract(hre: HardhatRuntimeEnvironment, proxyAddress: string) {
     // We need to wait a little bit to verify the contract after deployment

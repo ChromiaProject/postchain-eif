@@ -82,3 +82,9 @@ yarn prepare:nft --network goerli --address PROXY_ADDRESS
 yarn upgrade:bridge --network goerli --verify --address PROXY_ADDRESS
 yarn upgrade:nft --network goerli --verify --address PROXY_ADDRESS
 ```
+
+### Force import 
+
+```sh
+yarn import:bridge --network goerli --address PROXY_ADDRESS
+```
