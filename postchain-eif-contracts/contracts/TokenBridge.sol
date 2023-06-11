@@ -49,8 +49,6 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
     // For system accounts which have inflows we need to manually increase the limit by calling 
     // increaseALICELimit by the owner.
     mapping (address => uint256) _ALICElimits;
-    uint256 public constant ALICE_MAX_DEPOSIT_LIMIT = 50 * 1000000; // allow deposit up to 50 ALICE
-
 
     enum Status {
         Pending,
@@ -165,7 +163,6 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
     }
 
     function deposit(IERC20 token, uint256 amount, bytes32 ft3_account_id) isAllowToken(token) public returns (bool) {
-        require(_ALICElimits[msg.sender] + amount <= ALICE_MAX_DEPOSIT_LIMIT, "TokenBridge: deposit too much ALICE");
         (string memory name, string memory symbol, uint8 decimals) = _getTokenInfo(token);
         token.transferFrom(msg.sender, address(this), amount);
         _balances[token] += amount;
