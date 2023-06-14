@@ -48,7 +48,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
     // fraudulent as there's no way an account could have enough balance to withdraw.
     // For system accounts which have inflows we need to manually increase the limit by calling 
     // increaseALICELimit by the owner.
-    mapping (address => uint256) _ALICElimits;
+    mapping (address => uint256) public _ALICElimits;
 
     enum Status {
         Pending,
