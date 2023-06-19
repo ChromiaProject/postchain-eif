@@ -1,4 +1,4 @@
-image: maven:3.8.4-jdk-11
+image: registry.gitlab.com/chromaway/core-tools/chromia-images/maven-docker:1.1.2
 include:
   - project: "chromaway/core-infra/gitlab-automation"
     ref: 1.1.0
