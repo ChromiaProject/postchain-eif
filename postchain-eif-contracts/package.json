@@ -19,6 +19,7 @@
     "deploy": "npx hardhat deploy:bridge",
     "prepare:bridge": "npx hardhat prepare:bridge",
     "upgrade:bridge": "npx hardhat upgrade:bridge",
+    "import:bridge": "npx hardhat import:bridge",
     "prepare:nft": "npx hardhat prepare:nft",
     "upgrade:nft": "npx hardhat upgrade:nft",
     "deploy:token": "npx hardhat deploy:token"
