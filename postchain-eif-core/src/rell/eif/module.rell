@@ -197,6 +197,10 @@ query evm_has_erc721(network_id: integer, token_address: text, token_id: integer
 }
 
 operation __evm_block(network_id: integer, evm_block_height: integer, evm_block_hash: byte_array, events: list<event_data>) {
+    evm_block_fn(network_id, evm_block_height, evm_block_hash, events);
+}
+
+function evm_block_fn(network_id: integer, evm_block_height: integer, evm_block_hash: byte_array, events: list<event_data>) { 
     val evm_block = create evm_block(
         network_id,
         evm_block_height,
@@ -699,7 +703,8 @@ operation withdraw_ERC20(network_id: integer, token_address: text, beneficiary: 
     withdraw_info.add(byte_array.from_hex("000000000000000000000000" + beneficiary.sub(2)).to_gtv());
     withdraw_info.add(amount.to_gtv());
 
-    val ft3_account = acc.account @ { .id == evm.get_account_by_evm_address(byte_array.from_hex(eth_address))!! };
+    val account_id = evm.get_account_by_evm_address(byte_array.from_hex(eth_address));
+    val ft3_account = if (account_id == null) null else acc.account @? { .id == account_id };
     emit_withdraw(network_id, beneficiary, ft3_account, withdraw_info);
 }
 
@@ -740,7 +745,8 @@ operation withdraw_ERC721(network_id: integer, token_address: text, beneficiary:
     withdraw_info.add(byte_array.from_hex("000000000000000000000000" + beneficiary.sub(2)).to_gtv());
     withdraw_info.add(token_id.to_gtv());
 
-    val ft3_account = acc.account @ { .id == evm.get_account_by_evm_address(byte_array.from_hex(eth_address))!! };
+    val account_id = evm.get_account_by_evm_address(byte_array.from_hex(eth_address));
+    val ft3_account = if (account_id == null) null else acc.account @? { .id == account_id };
     emit_withdraw(network_id, beneficiary, ft3_account, withdraw_info);
 }
 
@@ -858,7 +864,7 @@ function deposit_ERC721(network_id: integer, beneficiary: text, token_address: t
     );
 }
 
-function emit_withdraw(network_id: integer, beneficiary: text, account: acc.account, eth_event_data: list<gtv>) {
+function emit_withdraw(network_id: integer, beneficiary: text, account: acc.account?, eth_event_data: list<gtv>) {
     val account_link = get_or_create_evm_account_link(network_id, beneficiary);
     val state = build_account_state(network_id, beneficiary, account);
     val state_data = state_data(
