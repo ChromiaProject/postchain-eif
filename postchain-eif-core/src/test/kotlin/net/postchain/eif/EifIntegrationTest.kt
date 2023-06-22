@@ -4,7 +4,6 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import net.postchain.common.hexStringToByteArray
 import net.postchain.devtools.IntegrationTestSetup
-import net.postchain.devtools.utils.configuration.NodeSetup
 import net.postchain.eif.contracts.TokenBridge
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -66,6 +65,13 @@ class EifIntegrationTest : IntegrationTestSetup() {
                         30
                 )
         )
+
+        with(configOverrides) {
+            setProperty("infrastructure", "base/test")
+            setProperty("ethereum.url", "http://$gethHost:$gethPort")
+            setProperty("ethereum.maxReadAhead", 200)
+            setProperty("ethereum.maxQueueSize", 100)
+        }
     }
 
     @AfterEach
@@ -81,17 +87,8 @@ class EifIntegrationTest : IntegrationTestSetup() {
             initialize(validatorContract).send()
         }
 
-        configOverrides.setProperty("infrastructure", "base/test")
         val nodes = createNodes(1, "/net/postchain/eif/blockchain_config_it.xml")
         val node = nodes[0]
-    }
-
-    override fun addNodeConfigurationOverrides(nodeSetup: NodeSetup) {
-        val gethHost = gethContainer.getServiceHost("geth", 8545)
-        val gethPort = gethContainer.getServicePort("geth", 8545)
-        nodeSetup.nodeSpecificConfigs.setProperty("ethereum.url", "http://$gethHost:$gethPort")
-        nodeSetup.nodeSpecificConfigs.setProperty("ethereum.maxReadAhead", 200)
-        nodeSetup.nodeSpecificConfigs.setProperty("ethereum.maxQueueSize", 100)
     }
 
     private fun getBinaryFromArtifactResource(resourcePath: String): String {
