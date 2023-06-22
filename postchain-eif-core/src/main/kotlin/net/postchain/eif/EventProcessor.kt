@@ -132,7 +132,8 @@ class EvmEventProcessor(
         try {
             val from = lastReadLogBlockHeight + BigInteger.ONE
 
-            val currentBlockHeight = sendWeb3jRequestWithRetry(web3j.ethBlockNumber()).blockNumber - evmReadOffset
+            val blockNumberReply = sendWeb3jRequestWithRetry(web3j.ethBlockNumber()) ?: return
+            val currentBlockHeight = blockNumberReply.blockNumber - evmReadOffset
             // Pacing the reading of logs
             val to = minOf(currentBlockHeight, from + BigInteger.valueOf(maxReadAhead))
 
@@ -150,7 +151,7 @@ class EvmEventProcessor(
             )
             filter.addOptionalTopics(*eventSignatures)
 
-            val logResponse = sendWeb3jRequestWithRetry(web3j.ethGetLogs(filter))
+            val logResponse = sendWeb3jRequestWithRetry(web3j.ethGetLogs(filter)) ?: return
 
             // Ensure events are sorted on txIndex + logIndex, blocks sorted on block number
             val sortedEncodedLogs = logResponse.logs
@@ -296,7 +297,7 @@ class EvmEventProcessor(
     private fun <T : Response<*>> sendWeb3jRequestWithRetry(
         request: Request<*, T>,
         retryTimeout: Long = 500
-    ): T {
+    ): T? {
         val response = try {
             val response = request.send()
             if (response.hasError()) {
@@ -308,7 +309,7 @@ class EvmEventProcessor(
             null
         }
 
-        if (response == null || response.hasError()) {
+        if (isProcessRunning() && (response == null || response.hasError())) {
             if (retryTimeout > 0) {
                 sleep(retryTimeout)
             }
