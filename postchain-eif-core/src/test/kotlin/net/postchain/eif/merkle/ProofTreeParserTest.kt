@@ -1,7 +1,5 @@
 package net.postchain.eif.merkle
 
-import assertk.assert
-import assertk.assertions.isEqualTo
 import net.postchain.common.data.Hash
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
@@ -15,6 +13,7 @@ import net.postchain.gtv.merkle.path.GtvPath
 import net.postchain.gtv.merkle.path.GtvPathFactory
 import net.postchain.gtv.merkle.path.GtvPathSet
 import net.postchain.gtv.merkle.proof.merkleHash
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class ProofTreeParserTest {
@@ -41,7 +40,7 @@ class ProofTreeParserTest {
         val gtvPaths = GtvPathSet(setOf(gtvPath))
         val calculator = GtvMerkleHashCalculator(cryptoSystem)
         val extraProofTree = gtvExtra.generateProof(gtvPaths, calculator)
-        assert(gtvExtra.merkleHash(calculator).toHex()).isEqualTo(extraProofTree.merkleHash(calculator).toHex())
+        assertEquals(gtvExtra.merkleHash(calculator).toHex(), extraProofTree.merkleHash(calculator).toHex())
         val proofs = ProofTreeParser.getProofListAndPosition(extraProofTree.root)
         val treeProofs = proofs.first
         val hashedLeaf = MerkleBasics.hashingFun(
@@ -57,7 +56,7 @@ class ProofTreeParserTest {
         } else {
             dictHashFunction(hashUntilLast, treeProofs[lastIndex])
         }
-        assert(root.toHex()).isEqualTo(gtvExtra.merkleHash(calculator).toHex())
+        assertEquals(root.toHex(), gtvExtra.merkleHash(calculator).toHex())
     }
 
     private fun hashFunction(left: Hash, right: Hash): Hash {

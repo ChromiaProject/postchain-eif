@@ -192,7 +192,7 @@ private fun blockWitnessData(
     return gtv(
             signatures.map {
                 gtv(
-                        "sig" to GtvByteArray(encodeSignatureWithV(blockRid, it.subjectID, it.data)),
+                        "sig" to GtvByteArray(encodeSignatureWithV(blockRid, it)),
                         "pubkey" to GtvByteArray(getEthereumAddress(it.subjectID))
                 )
             }

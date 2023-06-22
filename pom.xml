@@ -18,12 +18,14 @@
 
     <properties>
         <revision>dev</revision>
-        <postchain.version>3.9.1</postchain.version>
+        <postchain.version>3.11.1</postchain.version>
+        <rell.version>0.13.1</rell.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <kotlin.compiler.jvmTarget>17</kotlin.compiler.jvmTarget>
         <testcontainers.version>1.16.2</testcontainers.version>
+        <assertk.version>0.26</assertk.version>
     </properties>
 
     <dependencyManagement>
@@ -62,9 +64,14 @@
             </dependency>
             <dependency>
                 <groupId>net.postchain.rell</groupId>
-                <artifactId>rell</artifactId>
-                <version>0.12.1</version>
+                <artifactId>rell-gtx</artifactId>
+                <version>${rell.version}</version>
                 <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.willowtreeapps.assertk</groupId>
+                <artifactId>assertk-jvm</artifactId>
+                <version>${assertk.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

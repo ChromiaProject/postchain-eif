@@ -5,6 +5,7 @@ import net.postchain.core.BlockchainEngine
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.hexStringToByteArray
 import net.postchain.concurrent.util.get
+import net.postchain.core.BlockchainState
 import net.postchain.core.framework.AbstractBlockchainProcess
 import net.postchain.gtv.*
 import net.postchain.gtv.GtvFactory.gtv
@@ -177,6 +178,14 @@ class EvmEventProcessor(
 
     override fun cleanup() {
         web3j.shutdown()
+    }
+
+    override fun getBlockchainState(): BlockchainState {
+        TODO("Not yet implemented")
+    }
+
+    override fun isSigner(): Boolean {
+        TODO("Not yet implemented")
     }
 
     @Synchronized

@@ -4,9 +4,11 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import net.postchain.common.hexStringToByteArray
 import net.postchain.devtools.IntegrationTestSetup
+import net.postchain.devtools.testinfra.BaseTestInfrastructureFactory
 import net.postchain.eif.contracts.TestToken
 import net.postchain.eif.contracts.TokenBridge
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.testcontainers.containers.wait.strategy.Wait
@@ -23,7 +25,6 @@ import org.web3j.tx.TransactionManager
 import org.web3j.tx.gas.DefaultGasProvider
 import org.web3j.tx.response.PollingTransactionReceiptProcessor
 import java.math.BigInteger
-import kotlin.test.assertEquals
 
 @Testcontainers(disabledWithoutDocker = true)
 class EifIntegrationTest : IntegrationTestSetup() {
@@ -71,7 +72,7 @@ class EifIntegrationTest : IntegrationTestSetup() {
         )
 
         with(configOverrides) {
-            setProperty("infrastructure", "base/test")
+            setProperty("infrastructure", BaseTestInfrastructureFactory::class.qualifiedName)
             setProperty("ethereum.url", "http://$gethHost:$gethPort")
             setProperty("ethereum.maxReadAhead", 200)
             setProperty("ethereum.maxQueueSize", 100)
@@ -112,7 +113,7 @@ class EifIntegrationTest : IntegrationTestSetup() {
         fun sealBlock() {
             currentBlockHeight += 1
             buildBlockAndCommit(node.getBlockchainInstance().blockchainEngine)
-            assertEquals(currentBlockHeight, getBestHeight(node))
+            assertEquals(currentBlockHeight, getLastHeight(node))
         }
 
         repeat(10) { sealBlock() }
