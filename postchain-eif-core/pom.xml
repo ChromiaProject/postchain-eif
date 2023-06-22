@@ -102,6 +102,12 @@
             <artifactId>postchain-devtools</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>net.postchain.rell</groupId>
+            <artifactId>rell-gtx</artifactId>
+            <version>0.13.1</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
