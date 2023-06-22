@@ -104,8 +104,8 @@
         </dependency>
         <dependency>
             <groupId>net.postchain.rell</groupId>
-            <artifactId>rell-gtx</artifactId>
-            <version>0.13.1</version>
+            <artifactId>rell</artifactId>
+            <version>0.12.1</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

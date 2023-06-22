@@ -4,6 +4,7 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import net.postchain.common.hexStringToByteArray
 import net.postchain.devtools.IntegrationTestSetup
+import net.postchain.eif.contracts.TestToken
 import net.postchain.eif.contracts.TokenBridge
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -12,6 +13,7 @@ import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.generated.Bytes32
+import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto.Credentials
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.http.HttpService
@@ -20,6 +22,8 @@ import org.web3j.tx.FastRawTransactionManager
 import org.web3j.tx.TransactionManager
 import org.web3j.tx.gas.DefaultGasProvider
 import org.web3j.tx.response.PollingTransactionReceiptProcessor
+import java.math.BigInteger
+import kotlin.test.assertEquals
 
 @Testcontainers(disabledWithoutDocker = true)
 class EifIntegrationTest : IntegrationTestSetup() {
@@ -82,6 +86,7 @@ class EifIntegrationTest : IntegrationTestSetup() {
 
     @Test
     fun `deposit`() {
+        val initialMint = 100L
         // Deploy token bridge contract
         val bridge = Contract.deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
             initialize(validatorContract).send()
@@ -89,6 +94,28 @@ class EifIntegrationTest : IntegrationTestSetup() {
 
         val nodes = createNodes(1, "/net/postchain/eif/blockchain_config_it.xml")
         val node = nodes[0]
+
+        // Deploy a test token that we mint and then approve transfer of coins to chrL2 contract
+        val testToken = Contract.deployRemoteCall(TestToken::class.java, web3j, transactionManager, gasProvider, testTokenBinary, "").send().apply {
+            mint(Address(transactionManager.fromAddress), Uint256(BigInteger.valueOf(initialMint))).send()
+            approve(Address(bridge.contractAddress), Uint256(BigInteger.valueOf(initialMint))).send()
+        }
+        // Allow token
+        bridge.allowToken(Address(testToken.contractAddress)).send()
+        // Deposit to postchain
+        for (i in 1..5) {
+            bridge.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), accountId).send()
+        }
+
+        var currentBlockHeight = -1L
+
+        fun sealBlock() {
+            currentBlockHeight += 1
+            buildBlockAndCommit(node.getBlockchainInstance().blockchainEngine)
+            assertEquals(currentBlockHeight, getBestHeight(node))
+        }
+
+        repeat(10) { sealBlock() }
     }
 
     private fun getBinaryFromArtifactResource(resourcePath: String): String {
