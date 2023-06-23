@@ -320,7 +320,7 @@
                             <entry key="lib.access.admin">
                                 <dict>
                                     <entry key="admin_pubkey">
-                                        <bytea>02A829E1D7FFFBD856A04B53EC7D478D8896803B571C7700EC464D6A9D4F0E3BBD</bytea>
+                                        <bytea>03A301697BDFCD704313BA48E51D567543F2A182031EFD6915DDC07BBCC4E16070</bytea>
                                     </entry>
                                 </dict>
                             </entry>

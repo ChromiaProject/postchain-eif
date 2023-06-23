@@ -3,10 +3,16 @@ package net.postchain.eif
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import net.postchain.common.hexStringToByteArray
+import net.postchain.concurrent.util.get
+import net.postchain.core.Transaction
+import net.postchain.crypto.KeyPair
+import net.postchain.crypto.devtools.KeyPairHelper
 import net.postchain.devtools.IntegrationTestSetup
 import net.postchain.devtools.testinfra.BaseTestInfrastructureFactory
 import net.postchain.eif.contracts.TestToken
 import net.postchain.eif.contracts.TokenBridge
+import net.postchain.gtv.GtvFactory.gtv
+import net.postchain.gtx.GtxBuilder
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
@@ -82,6 +88,7 @@ class EifIntegrationTest : IntegrationTestSetup() {
     @AfterEach
     override fun tearDown() {
         super.tearDown()
+        web3j.shutdown()
         gethContainer.stop()
     }
 
@@ -93,9 +100,6 @@ class EifIntegrationTest : IntegrationTestSetup() {
             initialize(validatorContract).send()
         }
 
-        val nodes = createNodes(1, "/net/postchain/eif/blockchain_config_it.xml")
-        val node = nodes[0]
-
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contract
         val testToken = Contract.deployRemoteCall(TestToken::class.java, web3j, transactionManager, gasProvider, testTokenBinary, "").send().apply {
             mint(Address(transactionManager.fromAddress), Uint256(BigInteger.valueOf(initialMint))).send()
@@ -103,10 +107,10 @@ class EifIntegrationTest : IntegrationTestSetup() {
         }
         // Allow token
         bridge.allowToken(Address(testToken.contractAddress)).send()
-        // Deposit to postchain
-        for (i in 1..5) {
-            bridge.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), accountId).send()
-        }
+
+        val nodes = createNodes(1, "/net/postchain/eif/blockchain_config_it.xml")
+        val node = nodes[0]
+        val bcRid = systemSetup.blockchainMap[1]!!.rid // Just assume we have chain 1
 
         var currentBlockHeight = -1L
 
@@ -114,6 +118,61 @@ class EifIntegrationTest : IntegrationTestSetup() {
             currentBlockHeight += 1
             buildBlockAndCommit(node.getBlockchainInstance().blockchainEngine)
             assertEquals(currentBlockHeight, getLastHeight(node))
+        }
+
+        fun enqueueTx(data: ByteArray): Transaction? {
+            try {
+                val tx = node.getBlockchainInstance().blockchainEngine.getConfiguration().getTransactionFactory()
+                        .decodeTransaction(data)
+                node.getBlockchainInstance().blockchainEngine.getTransactionQueue().enqueue(tx)
+                return tx
+            } catch (e: Exception) {
+                logger.error(e) { "Can't enqueue tx" }
+            }
+            return null
+        }
+
+        val sigMaker = cryptoSystem.buildSigMaker(KeyPair(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
+
+        fun registerAsset(): ByteArray {
+            val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
+            b.addOperation("ft3.dev_register_asset", gtv("Chromia"), gtv(bcRid.data))
+            return b.finish()
+                    .sign(sigMaker)
+                    .buildGtx()
+                    .encode()
+        }
+        enqueueTx(registerAsset())
+        sealBlock()
+
+        val value = node.getBlockchainInstance().blockchainEngine.getBlockQueries()
+                .query("ft3.get_asset_by_name", gtv(mapOf("name" to gtv("Chromia")))).get()
+        val assetId = value.get(0).get("id")!!
+        fun addNewEvmErc20(): ByteArray {
+            val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
+            b.addOperation("add_new_evm_erc20", gtv(1), gtv(testToken.contractAddress), gtv("Chromia"), gtv("CHR"), gtv(6))
+            return b.finish()
+                    .sign(sigMaker)
+                    .buildGtx()
+                    .encode()
+        }
+
+        fun addTokenMapping(): ByteArray {
+            val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
+            b.addOperation("add_new_token_mapping", gtv(1), gtv(testToken.contractAddress), assetId)
+            return b.finish()
+                    .sign(sigMaker)
+                    .buildGtx()
+                    .encode()
+        }
+
+        enqueueTx(addNewEvmErc20())
+        enqueueTx(addTokenMapping())
+        sealBlock()
+
+        // Deposit to postchain
+        for (i in 1..5) {
+            bridge.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), accountId).send()
         }
 
         repeat(10) { sealBlock() }
