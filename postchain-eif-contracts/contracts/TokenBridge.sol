@@ -24,7 +24,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
 
     uint8 constant ERC20_ACCOUNT_STATE_BYTE_SIZE = 64;
     uint constant EMERGENCY_DURATION = 90 days;
-    uint8 constant WITHDRAW_OFFSET = 85000;
+    uint constant WITHDRAW_OFFSET = 85000;
     using Postchain for bytes32;
     using MerkleProof for bytes32[];
 
