@@ -24,7 +24,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
 
     uint8 constant ERC20_ACCOUNT_STATE_BYTE_SIZE = 64;
     uint constant EMERGENCY_DURATION = 90 days;
-
+    uint constant WITHDRAW_OFFSET = 85000;
     using Postchain for bytes32;
     using MerkleProof for bytes32[];
 
@@ -217,7 +217,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
             wd.token = token;
             wd.beneficiary = beneficiary;
             wd.amount = amount;
-            wd.block_number = block.number + 50;
+            wd.block_number = block.number + WITHDRAW_OFFSET;
             wd.status = Status.Withdrawable;
             _withdraw[hash] = wd;
             emit WithdrawRequest(beneficiary, token, amount);
