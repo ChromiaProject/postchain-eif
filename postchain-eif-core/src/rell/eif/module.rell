@@ -143,7 +143,7 @@ struct state_data {
 
 struct state_address_dto {
     state_n: integer;
-    evm_address: text;
+    evm_address: byte_array;
 }
 
 query get_network_accounts(network_id: integer) : list<state_address_dto>{
@@ -224,15 +224,14 @@ function evm_block_fn(network_id: integer, evm_block_height: integer, evm_block_
             continue;
         }
 
-        val evm_address = byte_array.from_gtv(event.indexed_values[0]);
-        val beneficiary = to_zero_padded_hex(evm_address);
-        val token_address = to_zero_padded_hex(byte_array.from_gtv(event.indexed_values[1]));
-        val evm_account = evm.evm_account @? { .address == evm_address };
+        val beneficiary = byte_array.from_gtv(event.indexed_values[0]);
+        val token_address = byte_array.from_gtv(event.indexed_values[1]);
+        val evm_account = evm.evm_account @? { .address == beneficiary };
 
         when (event.name) {
             "DepositedERC20" -> {
                 // ignore the unsupport token, move to process next events if any
-                val token = evm_erc20 @? { network_id, .address.lower_case() == token_address.lower_case() };
+                val token = evm_erc20 @? { network_id, .address == token_address };
                 if (empty(token)) {
                     log("ignore the unsupport token, move to process next events if any: " + token_address);
                     continue;
@@ -294,7 +293,7 @@ function evm_block_fn(network_id: integer, evm_block_height: integer, evm_block_
             }
             "DepositedERC721" -> {
                 // ignore event if dip instance does not exist
-                val interface = nft_mapping @? { network_id, .address.lower_case() == token_address.lower_case() }.interface;
+                val interface = nft_mapping @? { network_id, .address == token_address }.interface;
                 if (empty(interface)) {
                     log("nft token was not mapping yet: " + token_address);
                     continue;
@@ -351,7 +350,7 @@ function evm_block_fn(network_id: integer, evm_block_height: integer, evm_block_
 
 operation add_new_evm_erc20(network_id: integer, token_address: byte_array, name: text, symbol: text, decimals: integer) {
     admin.require_admin("Only admin can add new token mapping");
-    require(empty(evm_erc20 @? { network_id, .address.lower_case() == token_address.lower_case() }), "token already existed");
+    require(empty(evm_erc20 @? { network_id, .address == token_address }), "token already existed");
     create evm_erc20(
         network_id,
         address = token_address,
@@ -365,7 +364,7 @@ operation add_new_token_mapping(network_id: integer, token_address: byte_array, 
     admin.require_admin("Only admin can add new token mapping");
 
     val token = require(
-        evm_erc20 @? { network_id, .address.lower_case() == token_address.lower_case() },
+        evm_erc20 @? { network_id, .address == token_address },
         "Token does not exist: " + token_address
     );
 
@@ -429,7 +428,7 @@ operation add_eif_nft_mapping(network_id: integer, token_address: byte_array) {
 
 operation deposit_ft3_token(auth_id, network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: integer) {
     require(amount > 0, "amount should larger than 0");
-    val token = require(evm_erc20 @? { network_id, .address.lower_case() == token_address.lower_case() }, "token is not support");
+    val token = require(evm_erc20 @? { network_id, .address == token_address }, "token is not support");
     val token_mapping = require(token_mapping @? { token }, "token is not support");
     val asset = require(ft3.asset @? { .id == token_mapping.asset.id }, "asset does not exist");
 
@@ -447,7 +446,7 @@ operation deposit_ft3_token(auth_id, network_id: integer, token_address: byte_ar
 
 operation bridge_ft3_token_to_evm(auth_id, network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: integer) {
     require(amount > 0, "amount should larger than 0");
-    val token = require(evm_erc20 @? { network_id, .address.lower_case() == token_address.lower_case() }, "token is not support");
+    val token = require(evm_erc20 @? { network_id, .address == token_address }, "token is not support");
     val token_mapping = require(token_mapping @? { token }, "token is not support");
     val asset = require(ft3.asset @? { .id == token_mapping.asset.id }, "asset does not exist");
 
@@ -505,7 +504,7 @@ operation bridge_non_fungible_original_to_evm(auth_id, asset_id: byte_array, net
     og.Ownership.transfer(account, instance, ft3_burn_account.id, 1);
 
     require(
-        nft_mapping @? { network_id, .address.lower_case() == token_address.lower_case() }.interface, 
+        nft_mapping @? { network_id, .address == token_address }.interface, 
         "nft token was not mapping yet: " + token_address
     );
 
@@ -514,7 +513,7 @@ operation bridge_non_fungible_original_to_evm(auth_id, asset_id: byte_array, net
     var symbol = dip.Text.get_value(instance, eif.INonFungibleOriginal.symbol) ?: "";
     var uri = dip.Text.get_value(instance, eif.INonFungibleOriginal.uri) ?: "";
 
-    var token = evm_erc721 @? { network_id, .address.lower_case() == token_address.lower_case(), token_id };
+    var token = evm_erc721 @? { network_id, .address == token_address, token_id };
     if (empty(token)) {
         token = create evm_erc721(
             network_id,
@@ -559,7 +558,7 @@ operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiar
     require(participants[0].to_hex() == pk, "ft3 participant is not correct, " + participants[0].to_hex() + ", " + pk);
 
     val token = require(
-        evm_erc20 @? { network_id, .address.lower_case() == token_address.lower_case() }, 
+        evm_erc20 @? { network_id, .address == token_address }, 
         "unsupport token: " + token_address
     );
     val token_mapping = require(
@@ -613,12 +612,12 @@ operation claim_ERC721(network_id: integer, token_address: byte_array, beneficia
     require(participants[0].to_hex() == pk, "ft3 participant is not correct, " + participants[0].to_hex() + ", " + pk);
 
     val token = require(
-        evm_erc721 @? { network_id, .address.lower_case() == token_address.lower_case(), token_id }, 
+        evm_erc721 @? { network_id, .address == token_address, token_id }, 
         "token does not exist: " + token_address + " : " + token_id
     );
 
     val interface = require(
-        nft_mapping @? { network_id, .address.lower_case() == token_address.lower_case() }.interface, 
+        nft_mapping @? { network_id, .address == token_address }.interface, 
         "nft token was not mapping yet: " + token_address
     );
     require(interface.name == eif.INonFungibleOriginal.interface, "interface is not support: " + interface.name);
@@ -677,7 +676,7 @@ operation withdraw_ERC20(network_id: integer, token_address: byte_array, benefic
     require(participants.size() == 1, "only support single auth");
     require(participants[0].to_hex() == pk, "ft3 participant is not correct, " + participants[0].to_hex() + ", " + pk);
 
-    val token = evm_erc20 @? { network_id, .address.lower_case() == token_address.lower_case() };
+    val token = evm_erc20 @? { network_id, .address == token_address };
     if (empty(token)) {
         return;
     }
@@ -704,7 +703,7 @@ operation withdraw_ERC20(network_id: integer, token_address: byte_array, benefic
     withdraw_info.add(byte_array.from_hex(to_zero_padded_hex(beneficiary)).to_gtv());
     withdraw_info.add(amount.to_gtv());
 
-    val account_id = evm.get_account_by_evm_address(byte_array.from_hex(eth_address));
+    val account_id = evm.get_account_by_evm_address(eth_address);
     val ft3_account = if (account_id == null) null else acc.account @? { .id == account_id };
     emit_withdraw(network_id, beneficiary, ft3_account, withdraw_info);
 }
@@ -720,7 +719,7 @@ operation withdraw_ERC721(network_id: integer, token_address: byte_array, benefi
     require(participants.size() == 1, "only support single auth");
     require(participants[0].to_hex() == pk, "ft3 participant is not correct, " + participants[0].to_hex() + ", " + pk);    
 
-    val token = evm_erc721 @? { network_id, .address.lower_case() == token_address.lower_case(), token_id };
+    val token = evm_erc721 @? { network_id, .address == token_address, token_id };
     if (empty(token)) {
         return;
     }
@@ -746,7 +745,7 @@ operation withdraw_ERC721(network_id: integer, token_address: byte_array, benefi
     withdraw_info.add(byte_array.from_hex(to_zero_padded_hex(beneficiary)).to_gtv());
     withdraw_info.add(token_id.to_gtv());
 
-    val account_id = evm.get_account_by_evm_address(byte_array.from_hex(eth_address));
+    val account_id = evm.get_account_by_evm_address(eth_address);
     val ft3_account = if (account_id == null) null else acc.account @? { .id == account_id };
     emit_withdraw(network_id, beneficiary, ft3_account, withdraw_info);
 }
@@ -865,7 +864,7 @@ function deposit_ERC721(network_id: integer, beneficiary: byte_array, token_addr
     );
 }
 
-function emit_withdraw(network_id: integer, beneficiary: byte_array, account: acc.account, eth_event_data: list<gtv>) {
+function emit_withdraw(network_id: integer, beneficiary: byte_array, account: acc.account?, eth_event_data: list<gtv>) {
     val account_link = get_or_create_evm_account_link(network_id, beneficiary);
     val state = build_account_state(network_id, beneficiary, account);
     val state_data = state_data(
