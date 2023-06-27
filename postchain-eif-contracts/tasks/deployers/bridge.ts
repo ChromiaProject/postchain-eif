@@ -47,44 +47,54 @@ task("deploy:bridge")
 
 task("prepare:bridge")
     .addParam('address', '')
-    .setAction(async ({ address, verify}, hre ) => {
+    .setAction(async ({ address}, hre ) => {
         const factory: TokenBridge__factory = await hre.ethers.getContractFactory("TokenBridge");
         const upgrade = await hre.upgrades.prepareUpgrade(address, factory);
         console.log("New logic contract of token bridge has been prepared for upgrade at: ", upgrade);
-
-        if (verify) {
-            await verifyProxyContract(hre, upgrade);
-        }
     });
 
 task("prepare:nft")
-    .addParam('address', '')
-    .setAction(async ({ address, verify}, hre ) => {
+    .addParam('address', '')    
+    .setAction(async ({ address}, hre ) => {
         const factory: NFTBridge__factory = await hre.ethers.getContractFactory("NFTBridge");
         const upgrade = await hre.upgrades.prepareUpgrade(address, factory);
         console.log("New logic contract of nft bridge has been prepared for upgrade at: ", upgrade);
-
-        if (verify) {
-            await verifyProxyContract(hre, upgrade);
-        }
     });
 
 task("upgrade:bridge")
     .addParam('address', '')
-    .addFlag('verify', 'Verify contracts at Etherscan')
-    .setAction(async ({ address }, hre) => {
+    .addFlag('verify', 'Verify contracts at Etherscan')    
+    .setAction(async ({ address, verify}, hre) => {
         const factory: TokenBridge__factory = await hre.ethers.getContractFactory("TokenBridge");
         await hre.upgrades.upgradeProxy(address, factory);
         console.log("Token bridge has been upgraded");
+        await delay(60000);
+
+        if (verify) {
+            await verifyProxyContract(hre, address);
+        }
     });
 
 task("upgrade:nft")
     .addParam('address', '')
     .addFlag('verify', 'Verify contracts at Etherscan')
-    .setAction(async ({ address }, hre) => {
+    .setAction(async ({ address, verify}, hre) => {
         const factory: NFTBridge__factory = await hre.ethers.getContractFactory("NFTBridge");
         await hre.upgrades.upgradeProxy(address, factory);
         console.log("NFT bridge has been upgraded");
+
+        await delay(60000);
+        if (verify) {
+            await verifyProxyContract(hre, address);
+        }
+    });
+
+task("import:bridge")
+    .addParam('address', '')
+    .setAction(async ({ address }, hre) => {
+        const factory: TokenBridge__factory = await hre.ethers.getContractFactory("TokenBridge");
+        await hre.upgrades.forceImport(address, factory)
+        console.log("Token bridge has been imported");
     });
     
 async function verifyProxyContract(hre: HardhatRuntimeEnvironment, proxyAddress: string) {
