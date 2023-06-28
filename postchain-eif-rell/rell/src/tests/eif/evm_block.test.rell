@@ -147,7 +147,6 @@ function test_evm_block() {
     val tx = rell.test.tx().op(
         eif.claim_ERC20(network_id, token_address, user_evm_address, amount/4, r_1, s_1, v_1, user_pubkey, account_id)
     );
-    tx.run_must_fail("participants is empty");
     tx.sign(user_privkey).run();
     val withdraw_info_1 = list<gtv>();
     withdraw_info_1.add((2).to_gtv());

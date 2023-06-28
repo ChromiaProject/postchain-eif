@@ -11,6 +11,13 @@
 
     <artifactId>postchain-eif-rell</artifactId>
 
+    <pluginRepositories>
+        <pluginRepository>
+            <id>rell-maven</id>
+            <url>https://gitlab.com/api/v4/projects/37668820/packages/maven</url>
+        </pluginRepository>
+    </pluginRepositories>
+
     <build>
         <plugins>
             <plugin>
@@ -27,7 +34,21 @@
                             <arguments>install</arguments>
                         </configuration>
                     </execution>
+                </executions>
+            </plugin>
 
+            <plugin>
+                <groupId>net.postchain.rell</groupId>
+                <artifactId>rell-maven-plugin</artifactId>
+                <version>0.10.1</version>
+
+                <executions>
+                    <execution>
+                        <id>rell test</id>
+                        <goals>
+                            <goal>rell-integration-test</goal>
+                        </goals>
+                    </execution>
                 </executions>
             </plugin>
         </plugins>

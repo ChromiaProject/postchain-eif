@@ -45,5 +45,5 @@ blockchains:
       <<: *rell_test_args
 
 compile:
-  source: rell/src
+  source: src
   rellVersion: 0.10.11
