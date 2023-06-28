@@ -1,0 +1,16 @@
+{
+    "name": "@eif/rell",
+    "version": "1.0.0",
+    "description": "eif rell code",
+    "scripts": {
+      "install:rell-modules": "node scripts/install-dependencies.ts",
+      "postinstall": "rm -rf rell/src/lib && npm run install:rell-modules"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+      "fs-extra": "^10.1.0"
+    }
+  }
+  
