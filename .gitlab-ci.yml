@@ -48,7 +48,6 @@ variables:
   POSTGRES_USER: postchain
   POSTGRES_PASSWORD: postchain
   POSTCHAIN_DB_URL: jdbc:postgresql://postgres/postchain
-  CHR_DB_URL: postgres
   # Instruct Testcontainers to use the daemon of DinD.
   DOCKER_HOST: tcp://docker:2375
   # Instruct Docker not to start over TLS.

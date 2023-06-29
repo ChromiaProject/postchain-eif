@@ -46,3 +46,6 @@ blockchains:
 compile:
   source: src
   rellVersion: 0.10.11
+
+database:
+  host: postgres
