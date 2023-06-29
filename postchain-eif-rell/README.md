@@ -9,5 +9,5 @@ yarn install
 ## Test
 
 ```sh
-chr test --settings rell/config.yml
+chr test
 ```
