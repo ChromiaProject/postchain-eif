@@ -3,7 +3,7 @@
 ## Install rell module dependencies
 
 ```sh
-yarn install
+npm install
 ```
 
 ## Test
