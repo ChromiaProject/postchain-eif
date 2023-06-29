@@ -48,27 +48,30 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
   const [accountId, setAccountId] = useState("")
   const [accountNUmber, setAccountNumber] = useState("")
   const [blockHeight, setBlockHeight] = useState("")
+  // Remove 0x to pass address like byte_array
+  let token_address = tokenAddress.slice(2) || ""
+  let beneficiary = account?.slice(2) || ""
   const fetchTokenInfo = async () => {
     var tokenContract;
     let balance;
     let withdraws;
     if (tokenType === "ERC721") {
       tokenContract = new ethers.Contract(tokenAddress, ERC721TokenArtifacts.abi, library);
-      const hasToken = await client.query('evm_has_erc721', { "network_id": chainId, "token_address": tokenAddress.toLowerCase(), "beneficiary": account.toLowerCase(), "token_id": tokenId })
+      const hasToken = await client.query('evm_has_erc721', { "network_id": chainId, "token_address": token_address.toLowerCase(), "beneficiary": beneficiary.toLowerCase(), "token_id": tokenId })
       balance = hasToken ? 1 : 0;
       withdraws = await client.query('get_erc721_withdrawal', {
         'network_id': chainId,
-        'token_address': tokenAddress.toLowerCase(),
+        'token_address': token_address.toLowerCase(),
         'token_id': tokenId,
-        'beneficiary': account.toLowerCase()
+        'beneficiary': beneficiary.toLowerCase()
       });
     } else {
       tokenContract = new ethers.Contract(tokenAddress, ERC20TokenArtifacts.abi, library);
-      balance = await client.query('evm_balance_of_erc20', { "network_id": chainId, "token_address": tokenAddress.toLowerCase(), "beneficiary": account.toLowerCase() })
+      balance = await client.query('evm_balance_of_erc20', { "network_id": chainId, "token_address": token_address.toLowerCase(), "beneficiary": beneficiary.toLowerCase() })
       withdraws = await client.query('get_erc20_withdrawal', {
         'network_id': chainId,
-        'token_address': tokenAddress.toLowerCase(),
-        'beneficiary': account.toLowerCase()
+        'token_address': token_address.toLowerCase(),
+        'beneficiary': beneficiary.toLowerCase()
       });
     }
     const name = await tokenContract.name();
@@ -109,7 +112,7 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
       if (typeof arg === 'number') {
         event += hexZeroPad(intToHex(arg), 32).substring(2)
       } else if (typeof arg === 'string') {
-        event += hexZeroPad(arg, 32).substring(2)
+        event += hexZeroPad("0x" + arg, 32).substring(2)
       }
     })
     let eventHash = keccak256(DecodeHexStringToByteArray(event))
@@ -391,6 +394,9 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
   const [authDescId, setAuthDescId] = useState("")
   const [withdrawAmount, setWithdrawAmount] = useState(0)
   const [unit, setUnit] = useState(18)
+  // Remove 0x to pass address like byte_array
+  let token_address = tokenAddress.slice(2) || ""
+  let beneficiary = account?.slice(2) || ""
   const tokenId = 380
   const userPUB = Buffer.from(
     "038f888dec563b5bc253e87abc90afd26c3287021d10236ea19d248043dc39e0b8",
@@ -447,7 +453,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
   const postchainRegisterEVMAccount = async () => {
     try {
       const messageTemplate = "Create account for EVM wallet:\n{1}\n\nDisposable key:\n{2}"
-      const evmKey = account.slice(2) || "" // Remove '0x'
+      const evmKey = account?.slice(2) || "" // Remove '0x'
       const message = messageTemplate
                         .replace("{1}", evmKey.toLowerCase())
                         .replace("{2}", userPUB.toString("hex"))
@@ -532,7 +538,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
   const postchainAddEifNftMapping = async () => {
     try {
       var tx = client.newTransaction([adminPUB])
-      tx.addOperation("add_eif_nft_mapping", chainId, tokenAddress.toLowerCase())
+      tx.addOperation("add_eif_nft_mapping", chainId, token_address.toLowerCase())
       tx.addOperation("nop", Date.now())
       tx.sign(adminPRIV, adminPUB)
       let txRID = tx.getTxRID()
@@ -580,7 +586,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
   const postchainAddTokenMapping = async () => {
     try {
       var tx = client.newTransaction([adminPUB])
-      tx.addOperation("add_new_token_mapping", chainId, tokenAddress.toLowerCase(), Buffer.from(assetId, 'hex'))
+      tx.addOperation("add_new_token_mapping", chainId, token_address.toLowerCase(), Buffer.from(assetId, 'hex'))
       tx.addOperation("nop", Date.now())
       tx.sign(adminPRIV, adminPUB)
       let txRID = tx.getTxRID()
@@ -607,7 +613,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       let symbol: string = await tokenContract.symbol()
       let decimals: number = await tokenContract.decimals()
       var tx = client.newTransaction([adminPUB])
-      tx.addOperation("add_new_evm_erc20", chainId, tokenAddress.toLowerCase(), name, symbol, decimals)
+      tx.addOperation("add_new_evm_erc20", chainId, token_address.toLowerCase(), name, symbol, decimals)
       tx.addOperation("nop", Date.now())
       tx.sign(adminPRIV, adminPUB)
       let txRID = tx.getTxRID()
@@ -639,10 +645,10 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       var v = parseInt(signature.substring(128, 130), 16) - 27
 
       if (tokenType === "ERC721") {
-        tx.addOperation("withdraw_ERC721", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), tokenId, r, s, v, pk)
+        tx.addOperation("withdraw_ERC721", chainId, token_address.toLowerCase(), beneficiary.toLowerCase(), tokenId, r, s, v, pk)
       } else {
         const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
-        tx.addOperation("withdraw_ERC20", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount), r, s, v, pk)
+        tx.addOperation("withdraw_ERC20", chainId, token_address.toLowerCase(), beneficiary.toLowerCase(), parseInt(amount), r, s, v, pk)
       }
       tx.addOperation("nop", Date.now())
       tx.sign(userPRIV, userPUB)
@@ -675,10 +681,10 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       var v = parseInt(signature.substring(128, 130), 16) - 27
 
       if (tokenType === "ERC721") {
-        tx.addOperation("claim_ERC721", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), tokenId, r, s, v, pk, Buffer.from(accountId, "hex"))
+        tx.addOperation("claim_ERC721", chainId, token_address.toLowerCase(), beneficiary.toLowerCase(), tokenId, r, s, v, pk, Buffer.from(accountId, "hex"))
       } else {
         const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
-        tx.addOperation("claim_ERC20", chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount), r, s, v, pk, Buffer.from(accountId, "hex"))
+        tx.addOperation("claim_ERC20", chainId, token_address.toLowerCase(), beneficiary.toLowerCase(), parseInt(amount), r, s, v, pk, Buffer.from(accountId, "hex"))
       }
       tx.addOperation("nop", Date.now())
       tx.sign(userPRIV, userPUB)
@@ -704,10 +710,10 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       var tx = client.newTransaction([userPUB])
       const auth = [Buffer.from(accountId, 'hex'), Buffer.from(authDescId, 'hex')]
       if (tokenType === "ERC721") {
-        tx.addOperation("deposit_non_fungible_original", auth, Buffer.from(assetId, 'hex'), chainId, tokenAddress.toLowerCase(), account.toLowerCase())
+        tx.addOperation("deposit_non_fungible_original", auth, Buffer.from(assetId, 'hex'), chainId, token_address.toLowerCase(), beneficiary.toLowerCase())
       } else {
         const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
-        tx.addOperation("deposit_ft3_token", auth, chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount))
+        tx.addOperation("deposit_ft3_token", auth, chainId, token_address.toLowerCase(), beneficiary.toLowerCase(), parseInt(amount))
       }
       tx.addOperation("nop", Date.now())
       tx.sign(userPRIV, userPUB)
@@ -733,10 +739,10 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       var tx = client.newTransaction([userPUB])
       const auth = [Buffer.from(accountId, 'hex'), Buffer.from(authDescId, 'hex')]
       if (tokenType === "ERC721") {
-        tx.addOperation("bridge_non_fungible_original_to_evm", auth, Buffer.from(assetId, 'hex'), chainId, tokenAddress.toLowerCase(), account.toLowerCase())
+        tx.addOperation("bridge_non_fungible_original_to_evm", auth, Buffer.from(assetId, 'hex'), chainId, token_address.toLowerCase(), beneficiary.toLowerCase())
       } else {
         const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
-        tx.addOperation("bridge_ft3_token_to_evm", auth, chainId, tokenAddress.toLowerCase(), account.toLowerCase(), parseInt(amount))
+        tx.addOperation("bridge_ft3_token_to_evm", auth, chainId, token_address.toLowerCase(), beneficiary.toLowerCase(), parseInt(amount))
       }
       tx.addOperation("nop", Date.now())
       tx.sign(userPRIV, userPUB)
