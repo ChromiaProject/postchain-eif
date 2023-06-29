@@ -1,0 +1,71 @@
+namespace Cache.Integer {
+    entity attribute_value {
+        key Dip.attribute, value: integer;
+        mutable count: integer;
+    }
+    
+    @extend(Dip.Integer.Hooks.before_add_value)
+    function (Dip.instance, Dip.attribute, value: integer) {
+        handle_new_value(attribute, value);
+    }
+    
+    @extend(Dip.Integer.Hooks.before_update_value) 
+    function (Dip.Integer.integer_attribute, value: integer) {
+        handle_new_value(integer_attribute.attribute, value);
+        handle_old_value(integer_attribute);
+    }
+    
+    @extend(Dip.Integer.Hooks.before_set_value)
+    function (Dip.instance, Dip.attribute, Dip.Integer.integer_attribute?, new_value: integer) {
+        handle_new_value(attribute, new_value);
+        
+        if (empty(integer_attribute)) return;
+        
+        handle_old_value(integer_attribute);
+    }
+    
+    @extend(Dip.Integer.Hooks.before_remove_value)
+    function (Dip.Integer.integer_attribute) {
+        handle_old_value(integer_attribute);
+    }
+    
+    function get_values(Dip.attribute) {
+        Dip.util.ensure_type(Dip.Attribute.type.integer, attribute.type);
+        
+        return attribute_value @* { attribute } (
+            attribute = attribute.dclass.name + "." + attribute.name,
+            value = .value,
+            count = .count
+        );
+    }
+    
+    function handle_new_value(Dip.attribute, value: integer) {
+        val attribute_value = attribute_value @? {
+            .attribute == attribute,
+            .value == value            
+        };
+        
+        if (attribute_value??) {
+            attribute_value.count++;
+        } else {
+            create attribute_value(
+                attribute = attribute,
+                value = value,
+                count = 1
+            );
+        }
+    }
+    
+    function handle_old_value(Dip.Integer.integer_attribute) {
+        val attribute_value = attribute_value @ { 
+            .attribute == integer_attribute.attribute,
+            .value == integer_attribute.value
+        };
+        
+        if (attribute_value.count == 1) {
+            delete attribute_value;
+        } else {
+            attribute_value.count--;
+        }
+    }
+}

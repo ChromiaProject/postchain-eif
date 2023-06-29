@@ -1,0 +1,113 @@
+
+query get_metadata(
+    chain: name, 
+    contract_address: text, 
+    id: integer, 
+    remove_interfaces: boolean = true
+) {
+    // TODO: Add a function which returns one instance
+    val response = Attribute.find_instances(
+        chromia.IExternal.id, 
+        metadata_id(chain, contract_address, id).to_gtv(), 
+        Filter.p_from(), 
+        2
+    );
+    
+    require(response.results.size() == 1);
+    
+    return Mapper.map_instance(response.results[0], 
+        [
+            Mapper.map_attributes_by_meta_tag("metadata_attribute")             
+        ],
+        if (remove_interfaces) [Mapper.option.remove_interface] else []
+    );
+}
+
+query get_all_attributes(
+    chain: name,
+    contract_address: text, 
+    id: integer, 
+    remove_interfaces: boolean = true
+) {
+    val response = Attribute.find_instances(
+        chromia.IExternal.id, 
+        metadata_id(chain, contract_address, id).to_gtv(), 
+        Filter.p_from(), 
+        2
+    );
+    
+    require(response.results.size() == 1);
+    
+    return Mapper.map_instance(response.results[0], 
+        [
+            Mapper.map_all_attributes()
+        ],
+        if (remove_interfaces) [Mapper.option.remove_interface] else []
+    );
+}
+
+query get_attributes_by_meta(
+    chain: name, 
+    contract_address: text, 
+    id: integer, 
+    attribute_annotation: text,
+    remove_interfaces: boolean = true
+) {
+    val response = Attribute.find_instances(
+        chromia.IExternal.id, 
+        metadata_id(chain, contract_address, id).to_gtv(), 
+        Filter.p_from(), 
+        2
+    );
+    
+    if (empty(response.results)) return null;
+    
+    val options = [
+        Mapper.option.remove_null_values
+    ];
+    
+    if (remove_interfaces) {
+        options.add(Mapper.option.remove_interface);
+    }
+    
+    return Mapper.map_instance(response.results[0], 
+        [
+            Mapper.map_attributes([
+                chromia.IExternal.name,
+                chromia.IExternal.description,
+                chromia.IExternal.external_url
+            ]),
+            map_image(),
+            Mapper.map_attributes_by_meta_categories(
+                [attribute_annotation], 
+                Mapper.to_list("attributes"),
+                Mapper.with_meta([Meta.Category(attribute_annotation)])
+            )
+        ],
+        options
+    );
+}
+
+query get_image_storage_details(chain: name, contract_address: text, id: integer) {
+    val response = Attribute.find_instances(
+        chromia.IExternal.id, 
+        metadata_id(chain, contract_address, id).to_gtv(), 
+        Filter.p_from(), 
+        2
+    );
+    
+    require(response.results.size() == 1);
+    
+    val instance = response.results[0];
+    val file = File.get_value(instance, chromia.IExternal.image);
+    val image_type = Text.get_value(instance, chromia.IExternal.image_type);
+    
+    if (empty(file) or empty(image_type)) return null;
+    
+    return (
+        hub_brid = file.hub_brid,
+        hub_location = file.hub_location,
+        hash = file.hash,
+        content_type = image_type
+    );
+}

@@ -1,0 +1,461 @@
+
+namespace Mapper {
+	enum option {
+		remove_interface,
+		// TODO: add an option which handles case where removing interface leads 
+		// to attribute name conflicts in resulting map
+		
+		// Excludes attributes with null values from the resulting map
+		remove_null_values 
+	}
+	
+	/*
+	 * Used to represent keys in resulting map. When `remove_interface` options is used, then 
+	 * prefix is ignored and only name is used as a map key. Otherwise resulting key has following
+	 * format: `<prefix>.<name>`. 
+	 */
+	struct key_name {
+		prefix: text? = null;
+		name;
+	}
+	
+	// TODO: Improve logic for removing interface name from attribute name. Ideally all processing should be 
+	// handled in a single place after all attributes are read from database, instead of having logic
+	// spread in multiple different places like it is now, i.e. in direct, to_list and to_map mappers.
+	
+	/*
+	 *  Maps instance entity to a map<name, gtv?> using provided mapping rules
+	 */
+	
+	function map_instance(
+		instance, 
+		mappers: list<(instance, map<name, gtv?>, list<option>) -> unit>,
+		options: list<option> = []
+	): map<name, gtv?> {
+		val instance_map = map<name, gtv?>();
+		  
+		  for (mapper in mappers) {
+			mapper(instance, instance_map, options);
+		  }
+		  
+		return instance_map;
+	}
+	
+	/***************************************************************************************
+	 *								 Mapping rules
+	 ***************************************************************************************/
+	
+	/*
+	 *	Reads instance attributes provided in the list
+	 */
+	
+	function map_attributes(
+		attribute_names: list<Attribute.I>, 
+		mapper: (map<name, gtv?>, map<key_name, gtv?>, list<option>) -> unit = direct(),
+		meta: list<Meta.meta>? = null
+	): (instance, map<name, gtv?>, list<option>) -> unit {
+		return _map_attributes(*, *, *, attribute_names, mapper, meta);
+	}
+	
+	function _map_attributes(
+		instance, 
+		instance_map: map<name, gtv?>, 
+		options: list<option>,
+		attribute_names: list<Attribute.I>, 
+		mapper: (map<name, gtv?>, map<key_name, gtv?>, list<option>) -> unit,
+		meta: list<Meta.meta>?
+	) {
+		val attributes = attribute_names 
+			@* {} ((
+				key_name(prefix = $.interface, name=$.name), 
+				decorate_with_meta_if_needed($, Attribute.get_value(instance, $), meta, options)
+			)); 
+		
+		mapper(instance_map, map(attributes), options);
+	}
+	
+	/*
+	 *  Reads all instance attributes defined in provided interface list 
+	 */
+	
+	function map_attributes_of_interfaces(
+		interfaces: list<Interface.dclass>,
+		mapper: (map<name, gtv?>, map<key_name, gtv?>, list<option>) -> unit = direct(),
+		meta: list<Meta.meta>? = null
+	): (instance, map<name, gtv?>, list<option>) -> unit {
+		return _map_attributes_of_interfaces(*, *, *, interfaces, mapper, meta);
+	}
+	
+	function _map_attributes_of_interfaces(
+		instance, 
+		instance_map: map<name, gtv?>, 
+		options: list<option>,
+		interfaces: list<Interface.dclass>,
+		mapper: (map<name, gtv?>, map<key_name, gtv?>, list<option>) -> unit,
+		meta: list<Meta.meta>?
+	) {
+		val attributes = attribute 
+			@* { .dclass in interfaces }
+			@* {} ((
+				key_name(prefix=$.dclass.name, name=$.name), 
+				decorate_with_meta_if_needed(
+					_get_attribute_name_from_attribute($),
+					Attribute.get_value(instance, _get_attribute_name_from_attribute($)),
+					meta,
+					options
+				)
+			)); 
+			
+		mapper(instance_map, map(attributes), options);
+	}
+	
+	/*
+	 *  Reads all instance attributes that implement one of the interfaces provided in the list.
+	 *  It is also possible to specify mapping rules for children instances.  
+	 */
+	
+	function map_attributes_implementing_interface(
+		interfaces: list<Interface.dclass>,
+		children_mappers: list<(instance, map<name, gtv?>, list<option>) -> unit> = [map_all_attributes()],
+		mapper: (map<name, gtv?>, map<key_name, gtv?>, list<option>) -> unit = direct(),
+		meta: list<Meta.meta>? = null
+	): (instance, map<name, gtv?>, list<option>) -> unit {
+		return _map_attributes_implementing_interface(*, *, *, children_mappers, interfaces, mapper, meta);
+	}
+	
+	function _map_attributes_implementing_interface(
+		instance, 
+		instance_map: map<name, gtv?>, 
+		options: list<option>,
+		children_mappers: list<(instance, map<name, gtv?>, list<option>) -> unit>,
+		interfaces: list<Interface.dclass>,
+		mapper: (map<name, gtv?>, map<key_name, gtv?>, list<option>) -> unit,
+		meta: list<Meta.meta>?
+	) {
+		val mapped_instances = (
+			ia: Instance.instance_attribute, 
+			id: instance_dclass
+		) @* {
+			ia.instance == instance,
+			id.dclass in interfaces,
+			id.instance == ia.value		
+		} ((
+			key_name(prefix=ia.attribute.dclass.name, name=ia.attribute.name), 
+			decorate_with_meta_if_needed(
+				_get_attribute_name_from_attribute(ia.attribute),
+				map_instance(ia.value, children_mappers, options).to_gtv(),
+				meta,
+				options
+			)
+		));
+		
+		mapper(instance_map, map<key_name, gtv?>(mapped_instances), options);
+	}
+	
+	/*
+	 *  Reads all instance attributes  
+	 */
+	
+	function map_all_attributes(
+		mapper: (map<name, gtv?>, map<key_name, gtv?>, list<option>) -> unit = direct(),
+		meta: list<Meta.meta>? = null
+	): (instance, map<name, gtv?>, list<option>) -> unit {
+		return _map_all_attributes(*, *, *, mapper, meta);
+	}
+	
+	function _map_all_attributes(
+		instance,
+		instance_map: map<name, gtv?>,
+		options: list<option>,
+		mapper: (map<name, gtv?>, map<key_name, gtv?>, list<option>) -> unit,
+		meta: list<Meta.meta>?
+	) {
+		var interfaces = Interface.get_all_in_instance(instance);
+		 
+		val attributes = attribute  
+			@* { .dclass in interfaces } (attribute)
+			@* {} ((
+				key_name(prefix=$.dclass.name, name=$.name), 
+				decorate_with_meta_if_needed(
+					_get_attribute_name_from_attribute($),
+					get_value(instance, _get_attribute_name_from_attribute($), options),
+					meta,
+					options
+				)
+			)); 
+			
+		mapper(instance_map, map(attributes), options);
+	}
+	
+	/*
+	 *  Manually adds attributes to instance map.
+	 *  Used to add attributes which are already fetched to avoid unnecessary db access.  
+	 */
+	
+	function add_attributes(
+		attributes: map<name, gtv?>, 
+		mapper: (map<name, gtv?>, map<key_name, gtv?>, list<option>) -> unit = direct()
+	): (instance, map<name, gtv?>, list<option>) -> unit {
+		return _add_attributes(*, *, *, attributes, mapper);
+	}
+	
+	function _add_attributes(
+		instance,
+		instance_map: map<name, gtv?>,
+		options: list<option>,
+		attributes: map<name, gtv?>,
+		mapper: (map<name, gtv?>, map<key_name, gtv?>, list<option>) -> unit
+	) {
+		val result = map<key_name, gtv?>();
+		for ((k, v) in attributes) {
+			result[key_name(prefix=null, name=k)] = v;
+		}
+		mapper(instance_map, result, options);
+	}
+	
+	/*
+     *  Reads all instance attributes by meta tag 
+     */
+    function map_attributes_by_meta_tag(
+        meta_tag: text,
+        mapper: (map<name, gtv?>, map<Mapper.key_name, gtv?>, list<Mapper.option>) -> unit = Mapper.direct(),
+        meta: list<Meta.meta>? = null
+    ): (instance, map<name, gtv?>, list<Mapper.option>) -> unit {
+        return _map_attributes_by_meta_tag(*, *, *, meta_tag, mapper, meta);
+    }
+    
+    function _map_attributes_by_meta_tag(     
+        instance, 
+        instance_map: map<name, gtv?>,
+        options: list<Mapper.option>,
+        meta_tag: text,
+        mapper: (map<name, gtv?>, map<Mapper.key_name, gtv?>, list<Mapper.option>) -> unit,
+        meta: list<Meta.meta>?
+    ) {
+        val interfaces = Interface.get_all_in_instance(instance);
+        
+        val attributes = (a: attribute,  m: AttributeMeta.attribute_meta) @* {
+            a.dclass in interfaces,
+            m.meta_key == meta_tag,
+            m.attribute == a
+        } ((
+            Mapper.key_name(prefix=a.dclass.name, name=a.name), 
+            Mapper.decorate_with_meta_if_needed(
+                Mapper._get_attribute_name_from_attribute(a),
+                Attribute.get_value(instance, Mapper._get_attribute_name_from_attribute(a)),
+                meta,
+                options
+            )
+        ));
+        
+        mapper(instance_map, map(attributes), options);
+    }
+    
+    /*
+     *  Reads all instance attributes by meta categories
+     */
+    function map_attributes_by_meta_categories(
+        categories: list<text>,
+        mapper: (map<name, gtv?>, map<Mapper.key_name, gtv?>, list<Mapper.option>) -> unit = Mapper.direct(),
+        meta: list<Meta.meta>? = null
+    ): (instance, map<name, gtv?>, list<Mapper.option>) -> unit {
+        return _map_attributes_by_meta_categories(*, *, *, categories, mapper, meta);
+    }
+    
+    function _map_attributes_by_meta_categories(     
+        instance, 
+        instance_map: map<name, gtv?>,
+        options: list<Mapper.option>,
+        categories: list<text>,
+        mapper: (map<name, gtv?>, map<Mapper.key_name, gtv?>, list<Mapper.option>) -> unit,
+        meta: list<Meta.meta>?
+    ) {
+        val interfaces = Interface.get_all_in_instance(instance);
+        
+        val attributes = (a: attribute,  m: AttributeMeta.attribute_meta) @* {
+            a.dclass in interfaces,
+            m.category in categories,
+            m.attribute == a
+        } ((
+            Mapper.key_name(prefix=a.dclass.name, name=a.name), 
+            Mapper.decorate_with_meta_if_needed(
+                Mapper._get_attribute_name_from_attribute(a),
+                Attribute.get_value(instance, Mapper._get_attribute_name_from_attribute(a)),
+                meta,
+                options
+            )
+        ));
+        
+        mapper(instance_map, map(attributes), options);
+    }
+	
+	/***************************************************************************************
+	 *								 Mapping functions
+	 ***************************************************************************************/
+	
+	/*
+	 *	 Adds attributes map directly (merges) to instance map
+	 */
+	 
+	function direct(): (map<name, gtv?>, map<key_name, gtv?>, list<option>) -> unit {
+		return _direct(*);
+	}
+	
+	function _direct(
+		instance_map: map<name, gtv?>, 
+		attributes_map: map<key_name, gtv?>, 
+		options: list<option>
+	) {
+		var result = map<name, gtv?>();
+		for ((k, v) in attributes_map) {
+		    if (v == null and option.remove_null_values in options) continue;
+		    
+		    val _key = if (option.remove_interface in options) k.name else get_key_name(k);
+            
+            result[_key] = v;
+        }
+		instance_map.put_all(result);
+	}
+	
+	/*
+	 *  Assigns attributes map to `name` key in instance map
+	 */
+	 
+	function to_map(name): (map<name, gtv?>, map<key_name, gtv?>, list<option>) -> unit {
+		return _map(*, *, *, name);
+	}
+	
+	function _map(
+		instance_map: map<name, gtv?>, 
+		attributes_map: map<key_name, gtv?>, 
+		options: list<option>,
+		name
+	) {
+		var result = map<name, gtv?>();
+        for ((k, v) in attributes_map) {
+            if (v == null and option.remove_null_values in options) continue;
+            
+            val _key = if (option.remove_interface in options) k.name else get_key_name(k);
+            
+            result[_key] = v;
+        }
+		instance_map[name] = result.to_gtv();
+	}
+	
+	/*
+	 *  Assigns attributes map values as a list to `name` key in instance map
+	 */
+	 
+	function to_list(name): (map<name, gtv?>, map<key_name, gtv?>, list<option>) -> unit {
+		return _list(*, *, *, name);
+	}
+	
+	function _list(
+		instance_map: map<name, gtv?>, 
+		attributes_map: map<key_name, gtv?>,
+		options: list<option>, 
+		name
+	) {
+	    val values: list<gtv?>;
+	    if (option.remove_null_values in options) {
+	        values = attributes_map.values() @* { $ != null };
+	    } else {
+	        values = attributes_map.values();
+	    }
+	    
+		instance_map[name] = values.to_gtv();
+	}
+
+	function with_meta(meta: list<Meta.meta>) = meta;
+	
+	/***************************************************************************************
+	 *									  Helper 
+	 ***************************************************************************************/
+			
+	function _get_attribute_name_from_attribute(attribute) =
+		Attribute.I(interface = attribute.dclass.name, name = attribute.name);
+		
+	function remove_interfaces(instance_map: map<name, gtv?>, options: list<option>) {
+		var result = map<name, gtv?>();
+		  for ((name, value) in instance_map) {
+				  
+		  }
+		  return result;
+	}
+	
+	function get_key_name(key_name) {
+		return if (key_name.prefix??) key_name.prefix + "." + key_name.name else key_name.name;
+	}
+	
+	function get_value(instance, attribute_name: Attribute.I, options: list<option>) {
+	   val attribute = Attribute.get(attribute_name);
+        
+        when (attribute.type) {
+            Attribute.type.boolean -> 
+                return Boolean.get_value(instance, attribute_name)?.to_gtv();
+            Attribute.type.byte_array -> 
+                return ByteArray.get_value(instance, attribute_name)?.to_gtv();
+            Attribute.type.decimal -> 
+                return Decimal.get_value(instance, attribute_name)?.to_gtv();
+            Attribute.type.instance -> 
+                return Instance.get_value(instance, attribute_name)?.to_gtv();
+            Attribute.type.integer -> 
+                return Integer.get_value(instance, attribute_name)?.to_gtv();
+            Attribute.type.text -> 
+                return Text.get_value(instance, attribute_name)?.to_gtv();
+            Attribute.type.file -> 
+                return File.get_value(instance, attribute_name)?.to_gtv();
+            Attribute.type.ordered_container -> 
+                return list_map_instance_elements(List.unpack(instance, attribute_name), options);
+            Attribute.type.unordered_container -> 
+                return list_map_instance_elements(Set.unpack(instance, attribute_name), options);
+            Attribute.type.addressable_container -> 
+                return map_map_instance_elements(Map.unpack(instance, attribute_name), options);
+            else -> {
+                require(false, "Unimplemented path"); return null;
+            }
+        }
+	}
+	
+	function list_map_instance_elements(collection: (type: Attribute.type, values: gtv)?, options: list<option>): gtv? {
+	    if (collection == null) return null;
+	    
+	    if (collection.type == Attribute.type.instance) {
+	        return list<instance>.from_gtv(collection.values) @* {} (
+	            map_instance($, [map_all_attributes()], options)
+	        ).to_gtv();
+	    } else {
+	        return collection.values.to_gtv();
+	    }
+	}
+	
+    function map_map_instance_elements(collection: (types: (K: Attribute.type, V: Attribute.type), values: map<gtv, gtv>)?, options: list<option>): gtv? {
+        if (collection == null) return null;
+        
+        if (collection.types.K == Attribute.type.instance or collection.types.V == Attribute.type.instance) {
+            return map(
+                collection.values @* {} (
+                    _map_if_instance(collection.types.K, $[0], options),
+                    _map_if_instance(collection.types.V, $[1], options)
+                )
+            ).to_gtv();
+        } else {
+            return collection.values.to_gtv();
+        }
+    }
+	
+	function decorate_with_meta_if_needed(Attribute.I, value: gtv?, meta: list<Meta.meta>?, options: list<option>): gtv? {
+		if (empty(meta) or (empty(value) and option.remove_null_values in options)) return value;
+		
+		val result = map<name, gtv?>(Attribute.get_meta(I, meta));
+		
+		result["value"] = value?.to_gtv();
+		
+		return result.to_gtv();
+	}
+	
+	function _map_if_instance(Attribute.type, value: gtv, options: list<option>) {
+	    return if (type == Attribute.type.instance) map_instance(instance.from_gtv(value), [map_all_attributes()], options).to_gtv() else value.to_gtv();
+	}
+}
+

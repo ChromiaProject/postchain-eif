@@ -1,0 +1,44 @@
+
+enum contract_type {
+    ERC721,
+    ERC1155
+}
+
+function supported_contract_types() = contract_type.values() @* {} ( .name );
+
+namespace chromia.IExternal {
+    val interface = "chromia.IExternal";
+    
+    val id = Attribute.I(interface, name = "id");
+    val external_id = Attribute.I(interface, name = "external_id");
+    val contract_address = Attribute.I(interface, name = "contract_address");
+    val chain = Attribute.I(interface, name = "chain");
+    val contract_type = Attribute.I(interface, name = "contract_type");
+    val name = Attribute.I(interface, name = "name");
+    val description = Attribute.I(interface, name = "description");
+    val external_url = Attribute.I(interface, name = "external_url");
+    val image = Attribute.I(interface, name = "image");
+    val image_type = Attribute.I(interface, name = "image_type");
+    
+    function register(account) {
+        InterfaceFactory.new(
+            interface,
+            [
+                id: Type(Text.T(), [Unique(), CompositeValue([contract_address, external_id, chain])]),
+                external_id: Type(Integer.T()),
+                contract_address: Type(Text.T()),
+                chain: Type(Text.T()),
+                contract_type: Type(Text.T(), [OneOf(supported_contract_types())]),
+                name: Type(Text.T()),
+                description: Type(Text.T()),
+                external_url: Type(Text.T(), [Optional()]),
+                image: Type(File.T()),
+                image_type: Type(Text.T())
+            ],
+            account = account,
+            is_open = true
+        );
+    }
+    
+    function get() = Interface.get(interface);
+}

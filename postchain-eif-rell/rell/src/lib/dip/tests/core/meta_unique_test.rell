@@ -1,0 +1,566 @@
+@test 
+module;
+
+import ^^^.tests.*;
+import ^.mocks;
+
+function test_creating_instance_with_non_unique_boolean_attribute_value_fails() {
+    val admin = register_admin();
+    mocks.IBooleanAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IBooleanAttributeInterface.interface, [
+        mocks.IBooleanAttributeInterface.boolean_attribute: Boolean.T(true)
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.IBooleanAttributeInterface.interface, [
+        mocks.IBooleanAttributeInterface.boolean_attribute: Boolean.T(true)
+    ])
+    .sign(admin.keypair)
+    .run_must_fail();
+}
+
+function test_creating_instance_with_unique_boolean_attribute_value_succeeds() {
+    val admin = register_admin();
+    mocks.IBooleanAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IBooleanAttributeInterface.interface, [
+        mocks.IBooleanAttributeInterface.boolean_attribute: Boolean.T(true)
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.IBooleanAttributeInterface.interface, [
+        mocks.IBooleanAttributeInterface.boolean_attribute: Boolean.T(false)
+    ])
+    .sign(admin.keypair)
+    .run();
+}
+
+function test_creating_instance_with_non_unique_integer_attribute_value_fails() {
+    val admin = register_admin();
+    mocks.IIntegerAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IIntegerAttributeInterface.interface, [
+        mocks.IIntegerAttributeInterface.integer_attribute: Integer.T(100)
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.IIntegerAttributeInterface.interface, [
+        mocks.IIntegerAttributeInterface.integer_attribute: Integer.T(100)
+    ])
+    .sign(admin.keypair)
+    .run_must_fail();
+}
+
+function test_creating_instance_with_unique_integer_attribute_value_succeeds() {
+    val admin = register_admin();
+    mocks.IIntegerAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IIntegerAttributeInterface.interface, [
+        mocks.IIntegerAttributeInterface.integer_attribute: Integer.T(100)
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.IIntegerAttributeInterface.interface, [
+        mocks.IIntegerAttributeInterface.integer_attribute: Integer.T(200)
+    ])
+    .sign(admin.keypair)
+    .run();
+}
+
+function test_setting_non_unique_integer_attribute_value_fails() {
+    val admin = register_admin();
+    mocks.IIntegerAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IIntegerAttributeInterface.interface, [
+        mocks.IIntegerAttributeInterface.integer_attribute: Integer.T(100)
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.IIntegerAttributeInterface.interface, [
+        mocks.IIntegerAttributeInterface.integer_attribute: Integer.T(200)
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();
+    
+    set_type_attribute_meta_op(
+        admin.auth_id, 
+        instance, 
+        mocks.IIntegerAttributeInterface.integer_attribute, 
+        (100).to_gtv()
+    )
+    .sign(admin.keypair)
+    .run_must_fail();    
+}
+
+function test_setting_unique_integer_attribute_value_succeeds() {
+    val admin = register_admin();
+    mocks.IIntegerAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IIntegerAttributeInterface.interface, [
+        mocks.IIntegerAttributeInterface.integer_attribute: Integer.T(100)
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.IIntegerAttributeInterface.interface, [
+        mocks.IIntegerAttributeInterface.integer_attribute: Integer.T(200)
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();
+    
+    set_type_attribute_meta_op(
+        admin.auth_id, 
+        instance, 
+        mocks.IIntegerAttributeInterface.integer_attribute, 
+        (300).to_gtv()
+    )
+    .sign(admin.keypair)
+    .run();    
+}
+
+function test_creating_instance_with_non_unique_text_attribute_value_fails() {
+    val admin = register_admin();
+    mocks.ITextAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.ITextAttributeInterface.interface, [
+        mocks.ITextAttributeInterface.text_attribute: Text.T("foo")
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.ITextAttributeInterface.interface, [
+        mocks.ITextAttributeInterface.text_attribute: Text.T("foo")
+    ])
+    .sign(admin.keypair)
+    .run_must_fail();
+}
+
+function test_creating_instance_with_unique_text_attribute_value_succeeds() {
+    val admin = register_admin();
+    mocks.ITextAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.ITextAttributeInterface.interface, [
+        mocks.ITextAttributeInterface.text_attribute: Text.T("foo")
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.ITextAttributeInterface.interface, [
+        mocks.ITextAttributeInterface.text_attribute: Text.T("bar")
+    ])
+    .sign(admin.keypair)
+    .run();    
+}
+
+function test_setting_unique_text_attribute_value_succeeds() {
+    val admin = register_admin();
+    mocks.ITextAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.ITextAttributeInterface.interface, [
+        mocks.ITextAttributeInterface.text_attribute: Text.T("foo")
+    ])
+    .sign(admin.keypair)    
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.ITextAttributeInterface.interface, [
+        mocks.ITextAttributeInterface.text_attribute: Text.T("bar")
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();
+    
+    set_type_attribute_meta_op(
+        admin.auth_id, 
+        instance, 
+        mocks.ITextAttributeInterface.text_attribute, 
+        "text".to_gtv()
+    )
+    .sign(admin.keypair)
+    .run();
+}
+
+function test_setting_non_unique_text_attribute_value_fails() {
+    val admin = register_admin();
+    mocks.ITextAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.ITextAttributeInterface.interface, [
+        mocks.ITextAttributeInterface.text_attribute: Text.T("foo")
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.ITextAttributeInterface.interface, [
+        mocks.ITextAttributeInterface.text_attribute: Text.T("bar")
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();
+    
+    set_type_attribute_meta_op(
+        admin.auth_id, 
+        instance, 
+        mocks.ITextAttributeInterface.text_attribute, 
+        "foo".to_gtv()
+    )
+    .sign(admin.keypair)
+    .run_must_fail();
+}
+
+function test_creating_instance_with_unique_decimal_attribute_value_succeeds() {
+    val admin = register_admin();
+    mocks.IDecimalAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IDecimalAttributeInterface.interface, [
+        mocks.IDecimalAttributeInterface.decimal_attribute: Decimal.T(3.14)        
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.IDecimalAttributeInterface.interface, [
+        mocks.IDecimalAttributeInterface.decimal_attribute: Decimal.T(2.71)
+    ])
+    .sign(admin.keypair)
+    .run();
+}
+
+function test_creating_instance_with_non_unique_decimal_attribute_value_fails() {
+    val admin = register_admin();
+    mocks.IDecimalAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IDecimalAttributeInterface.interface, [
+        mocks.IDecimalAttributeInterface.decimal_attribute: Decimal.T(3.14)
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.IDecimalAttributeInterface.interface, [
+        mocks.IDecimalAttributeInterface.decimal_attribute: Decimal.T(3.14)
+    ])
+    .sign(admin.keypair)
+    .run_must_fail();
+}
+
+function test_setting_non_unique_decimal_attribute_value_fails() {
+    val admin = register_admin();
+    mocks.IDecimalAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IDecimalAttributeInterface.interface, [
+        mocks.IDecimalAttributeInterface.decimal_attribute: Decimal.T(3.14)
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.IDecimalAttributeInterface.interface, [
+        mocks.IDecimalAttributeInterface.decimal_attribute: Decimal.T(2.71)
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();
+    
+    set_type_attribute_meta_op(
+        admin.auth_id,
+        instance,
+        mocks.IDecimalAttributeInterface.decimal_attribute,
+        (3.14).to_gtv()
+    )
+    .sign(admin.keypair)
+    .run_must_fail();
+}
+
+function test_setting_unique_decimal_attribute_value_succeeds() {
+    val admin = register_admin();
+    mocks.IDecimalAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IDecimalAttributeInterface.interface, [
+        mocks.IDecimalAttributeInterface.decimal_attribute: Decimal.T(3.14)
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.IDecimalAttributeInterface.interface, [
+        mocks.IDecimalAttributeInterface.decimal_attribute: Decimal.T(2.71)
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();
+    
+    set_type_attribute_meta_op(
+        admin.auth_id,
+        instance,
+        mocks.IDecimalAttributeInterface.decimal_attribute,
+        (1.61).to_gtv()
+    )
+    .sign(admin.keypair)
+    .run();
+}
+
+function test_creating_instance_with_unique_byte_array_attribute_value_succeeds() {
+    val admin = register_admin();
+    mocks.IByteArrayAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IByteArrayAttributeInterface.interface, [
+        mocks.IByteArrayAttributeInterface.byte_array_attribute: ByteArray.T(x"123456")
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.IByteArrayAttributeInterface.interface, [
+        mocks.IByteArrayAttributeInterface.byte_array_attribute: ByteArray.T(x"abcdef")
+    ])
+    .sign(admin.keypair)
+    .run();
+}
+
+function test_creating_instance_with_non_unique_byte_array_attribute_value_fails() {
+    val admin = register_admin();
+    mocks.IByteArrayAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IByteArrayAttributeInterface.interface, [
+        mocks.IByteArrayAttributeInterface.byte_array_attribute: ByteArray.T(x"123456")
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.IByteArrayAttributeInterface.interface, [
+        mocks.IByteArrayAttributeInterface.byte_array_attribute: ByteArray.T(x"123456")
+    ])
+    .sign(admin.keypair)
+    .run_must_fail();
+}
+
+function test_setting_unique_byte_array_attribute_value_succeeds() {
+    val admin = register_admin();
+    mocks.IByteArrayAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IByteArrayAttributeInterface.interface, [
+        mocks.IByteArrayAttributeInterface.byte_array_attribute: ByteArray.T(x"123456")
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.IByteArrayAttributeInterface.interface, [
+        mocks.IByteArrayAttributeInterface.byte_array_attribute: ByteArray.T(x"abcdef")
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();
+    
+    set_type_attribute_meta_op(
+        admin.auth_id, 
+        instance, 
+        mocks.IByteArrayAttributeInterface.byte_array_attribute, 
+        x"098765".to_gtv()
+    )
+    .sign(admin.keypair)
+    .run();    
+}
+
+function test_setting_non_unique_byte_array_attribute_value_fails() {
+    val admin = register_admin();
+    mocks.IByteArrayAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IByteArrayAttributeInterface.interface, [
+        mocks.IByteArrayAttributeInterface.byte_array_attribute: ByteArray.T(x"123456")
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.IByteArrayAttributeInterface.interface, [
+        mocks.IByteArrayAttributeInterface.byte_array_attribute: ByteArray.T(x"abcdef")
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();
+    
+    set_type_attribute_meta_op(
+        admin.auth_id, 
+        instance, 
+        mocks.IByteArrayAttributeInterface.byte_array_attribute, 
+        x"123456".to_gtv()
+    )
+    .sign(admin.keypair)
+    .run_must_fail();
+}
+
+function test_creating_instance_with_unique_file_attribute_value_succeeds() {
+    val admin = register_admin();
+    mocks.IFileAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IFileAttributeInterface.interface, [
+        mocks.IFileAttributeInterface.file_attribute: File.T(
+            File.data(hash = x"123456", hub_brid = x"abcdef", hub_location = "http://localhost:7740")
+        )
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.IFileAttributeInterface.interface, [
+        mocks.IFileAttributeInterface.file_attribute: File.T(
+            File.data(hash = x"987654", hub_brid = x"abcdef", hub_location = "http://localhost:7740")
+        )
+    ])
+    .sign(admin.keypair)
+    .run();
+}
+
+function test_creating_instance_with_non_unique_file_attribute_value_fails() {
+    val admin = register_admin();
+    mocks.IFileAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IFileAttributeInterface.interface, [
+        mocks.IFileAttributeInterface.file_attribute: File.T(
+            File.data(hash = x"123456", hub_brid = x"abcdef", hub_location = "http://localhost:7740")
+        )
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.IFileAttributeInterface.interface, [
+        mocks.IFileAttributeInterface.file_attribute: File.T(
+            File.data(hash = x"123456", hub_brid = x"abcdef", hub_location = "http://localhost:7740")
+        )
+    ])
+    .sign(admin.keypair)
+    .run_must_fail();
+}
+
+function test_setting_unique_file_attribute_value_succeeds() {
+    val admin = register_admin();
+    mocks.IFileAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IFileAttributeInterface.interface, [
+        mocks.IFileAttributeInterface.file_attribute: File.T(
+            File.data(hash = x"123456", hub_brid = x"abcdef", hub_location = "http://localhost:7740")
+        )
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.IFileAttributeInterface.interface, [
+        mocks.IFileAttributeInterface.file_attribute: File.T(
+            File.data(hash = x"987654", hub_brid = x"abcdef", hub_location = "http://localhost:7740")
+        )
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();
+    
+    set_type_attribute_meta_op(
+        admin.auth_id,
+        instance,
+        mocks.IFileAttributeInterface.file_attribute,
+        File.data(hash = x"121212", hub_brid = x"abcdef", hub_location = "http://localhost:7740").to_gtv()
+    )
+    .sign(admin.keypair)
+    .run();
+}
+
+function test_setting_non_unique_file_attribute_value_fails() {
+    val admin = register_admin();
+    mocks.IFileAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IFileAttributeInterface.interface, [
+        mocks.IFileAttributeInterface.file_attribute: File.T(
+            File.data(hash = x"123456", hub_brid = x"abcdef", hub_location = "http://localhost:7740")
+        )
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    def_instance_op(admin.auth_id, mocks.IFileAttributeInterface.interface, [
+        mocks.IFileAttributeInterface.file_attribute: File.T(
+            File.data(hash = x"987654", hub_brid = x"abcdef", hub_location = "http://localhost:7740")
+        )
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();
+    
+    set_type_attribute_meta_op(
+        admin.auth_id,
+        instance,
+        mocks.IFileAttributeInterface.file_attribute,
+        File.data(hash = x"123456", hub_brid = x"abcdef", hub_location = "http://localhost:7740").to_gtv()
+    )
+    .sign(admin.keypair)
+    .run_must_fail();
+}
+
+function test_unique_constraint_cannot_be_used_with_list_attribute() {
+    val admin = register_admin();
+    mocks.IListAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IListAttributeInterface.interface, [
+        mocks.IListAttributeInterface.list_attribute: List.T(Attribute.type.integer, [1, 2, 3].to_gtv())
+    ])
+    .sign(admin.keypair)
+    .run_must_fail();
+}
+
+function test_unique_constraint_cannot_be_used_with_set_attribute() {
+    val admin = register_admin();
+    mocks.ISetAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.ISetAttributeInterface.interface, [
+        mocks.ISetAttributeInterface.set_attribute: Set.T(Attribute.type.integer, [4, 5, 6].to_gtv())
+    ])
+    .sign(admin.keypair)
+    .run_must_fail();
+}
+
+function test_unique_constraint_cannot_be_used_with_map_attribute() {
+    val admin = register_admin();
+    mocks.IMapAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IMapAttributeInterface.interface, [
+        mocks.IMapAttributeInterface.map_attribute: Map.T(
+            Map.types(K=Attribute.type.integer, V=Attribute.type.integer),
+            map<gtv, gtv>([
+                (1).to_gtv(): (1).to_gtv(), 
+                (2).to_gtv(): (2).to_gtv(), 
+                (3).to_gtv(): (3).to_gtv()
+            ])
+        )
+    ])
+    .sign(admin.keypair)
+    .run_must_fail();
+    
+}
+
+function test_unique_constraint_cannot_be_used_with_instance_attribute() {
+    val admin = register_admin();
+    mocks.IInstanceAttributeInterface.register(admin);
+    mocks.IIntegerAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IIntegerAttributeInterface.interface, [
+        mocks.IIntegerAttributeInterface.integer_attribute: Integer.T(10)
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();
+    
+    def_instance_op(admin.auth_id, mocks.IInstanceAttributeInterface.interface, [
+        mocks.IInstanceAttributeInterface.instance_attribute: Instance.T(instance)
+    ])
+    .sign(admin.keypair)
+    .run_must_fail();
+}

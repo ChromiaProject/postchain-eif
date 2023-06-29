@@ -1,0 +1,16 @@
+
+import ^.access.admin;
+
+operation init(base_url: text) {
+    admin.require_admin();
+    
+    val account = admin.register_account();
+    chromia.IExternal.register(account);
+    config.image_base_url = base_url;
+}
+
+// TODO: Do we need base url per contract?
+operation set_image_base_url(url: text) {
+    admin.require_admin();    
+    config.image_base_url = url;
+}

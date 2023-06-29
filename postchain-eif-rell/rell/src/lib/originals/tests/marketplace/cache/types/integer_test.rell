@@ -1,0 +1,243 @@
+@test module;
+
+import ^^^^^.tests.*;
+import ^^^^^^.dip.tests.*;
+import ^^^^^^.ft3_helper.tests.*;
+import ^^^^^^.originals.marketplace.cache.types.*;
+
+namespace ITest {
+    val interface = "ITest";
+    
+    val foo = Attribute.I(interface, name = "foo");
+    val color_number = Attribute.I(interface, name = "color_number");
+    
+    function register(auth_data) {
+        def_interface_op(auth_data.auth_id, interface, [
+            foo: Type(Integer.T(), [Mutable()]),
+            color_number: Type(Integer.T(), [Mutable(), Optional()])
+        ])
+        .sign(auth_data.keypair)
+        .run();
+    }
+    
+    function get() = Interface.get(interface);
+    
+    function create_instance(user: auth_data, attributes: map<Attribute.I, attribute_type>) {
+        rell.test.tx()
+            .op(def_instance_op(
+                user.auth_id, 
+                ITest.interface, 
+                attributes
+            ))
+            .nop()
+            .sign(user.keypair)
+            .run();
+
+        return get_last_instance();
+    }
+}
+
+function test_attribute_value_can_be_cached() {
+    val admin = register_admin();
+    
+    ITest.register(admin);
+    
+    ITest.create_instance(
+        admin,
+        [
+            ITest.foo: Integer.T(20)
+        ]
+    );
+    
+    val values = Cache.Integer.get_values(Attribute.get(ITest.foo));
+    
+    val expected_values = [
+        (
+            attribute = Attribute.get_name(ITest.foo),
+            value = 20,
+            count = 1
+        )
+    ];
+    
+    assert_equals(values, expected_values);
+}
+
+function test_multiple_attribute_values_can_be_cached() {
+    val admin = register_admin();
+    
+    ITest.register(admin);
+    
+    ITest.create_instance(
+        admin,
+        [
+            ITest.foo: Integer.T(20)
+        ]
+    );
+    
+    ITest.create_instance(
+        admin,
+        [
+            ITest.foo: Integer.T(10)
+        ]
+    );    
+    
+    val values = Cache.Integer.get_values(Attribute.get(ITest.foo));
+    
+    val expected_values = [
+        (
+            attribute = Attribute.get_name(ITest.foo),
+            value = 20,
+            count = 1
+        ),
+        (
+            attribute = Attribute.get_name(ITest.foo),
+            value = 10,
+            count = 1
+        )
+    ];
+    
+    assert_equals(values, expected_values);    
+}
+
+function test_updated_attribute_value_can_be_cached() {
+    val admin = register_admin();
+    
+    ITest.register(admin);
+    
+    ITest.create_instance(
+        admin,
+        [
+            ITest.foo: Integer.T(20)
+        ]
+    );
+    
+    val instance = get_last_instance();
+    
+    set_type_attribute_meta_op(admin.auth_id, instance, ITest.foo, (10).to_gtv())
+        .sign(admin.keypair)
+        .run();
+    
+    val values = Cache.Integer.get_values(Attribute.get(ITest.foo));
+    
+    val expected_values = [
+        (
+            attribute = Attribute.get_name(ITest.foo),
+            value = 10,
+            count = 1
+        )
+    ];
+    
+    assert_equals(values, expected_values);    
+}
+
+function test_multiple_attributes_with_same_value_can_be_cached() {
+    val admin = register_admin();
+    
+    ITest.register(admin);
+    
+    ITest.create_instance(
+        admin,    
+        [
+            ITest.foo: Integer.T(30)
+        ]
+    );
+    
+    ITest.create_instance(
+        admin,
+        [
+            ITest.foo: Integer.T(30)
+        ]
+    );
+        
+    val values = Cache.Integer.get_values(Attribute.get(ITest.foo));
+    
+    val expected_values = [
+        (
+            attribute = Attribute.get_name(ITest.foo),
+            value = 30,
+            count = 2
+        )
+    ];
+    
+    assert_equals(values, expected_values);
+}
+
+function test_removing_value_before_update_cache() {
+    val admin = register_admin();
+    
+    ITest.register(admin);
+    
+    ITest.create_instance(
+        admin,    
+        [
+            ITest.foo: Integer.T(30)
+        ]
+    );
+    
+    ITest.create_instance(
+        admin,
+        [
+            ITest.foo: Integer.T(30)
+        ]
+    );
+        
+    val values = Cache.Integer.get_values(Attribute.get(ITest.foo));
+    
+    val expected_values = [
+        (
+            attribute = Attribute.get_name(ITest.foo),
+            value = 30,
+            count = 2
+        )
+    ];
+    
+    assert_equals(values, expected_values);
+}
+
+function test_multiple_attributes_with_different_values_can_be_cached_right() {
+    val admin = register_admin();
+    
+    ITest.register(admin);
+    
+    val color_instance = ITest.create_instance(
+        admin,
+        [
+            ITest.foo: Integer.T(50),
+            ITest.color_number: Integer.T(30)
+        ]
+    );
+    
+    ITest.create_instance(
+        admin,
+        [
+            ITest.foo: Integer.T(30),
+            ITest.color_number: Integer.T(30)
+        ]
+    );
+
+    set_type_attribute_meta_op(
+        admin.auth_id, 
+        color_instance, 
+        ITest.color_number, 
+        (150).to_gtv()
+    )
+    .sign(admin.keypair)
+    .run();
+        
+    val values = Cache.Integer.get_values(Attribute.get(ITest.color_number));
+    
+    val expected_values = [
+        (
+            attribute = Attribute.get_name(ITest.color_number),
+            value = 30,
+            count = 1
+        ),
+        (
+            attribute = Attribute.get_name(ITest.color_number),
+            value = 150,
+            count = 1
+        )
+    ];
+    
+    assert_equals(values, expected_values);
+}

@@ -1,0 +1,11 @@
+@mount("metadata")
+module;
+
+
+import ^.access.admin;
+import ^.dip.core.*;
+import ^.ft3.account.*;
+
+object config {
+    mutable image_base_url: text = "";
+} 

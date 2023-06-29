@@ -1,0 +1,69 @@
+
+namespace Cache.Text {
+    entity attribute_value {
+        key Dip.attribute, value: text;
+        mutable count: integer;
+    }
+    
+    @extend(Dip.Text.Hooks.before_add_value)
+    function (Dip.instance, Dip.attribute, value: text) {
+        handle_new_value(attribute, value);
+    }
+    
+    @extend(Dip.Text.Hooks.before_update_value)
+    function (Dip.Text.text_attribute, value: text) {
+        handle_new_value(text_attribute.attribute, value);
+        handle_old_value(text_attribute);
+    }
+    
+    @extend(Dip.Text.Hooks.before_set_value) 
+    function (Dip.instance, Dip.attribute, Dip.Text.text_attribute?, value: text) {
+        handle_new_value(attribute, value);
+        
+        if (empty(text_attribute)) return;
+        
+        handle_old_value(text_attribute);
+    }
+    
+    @extend(Dip.Text.Hooks.before_remove_value)
+    function (Dip.Text.text_attribute) {
+        handle_old_value(text_attribute);
+    }
+    
+    function get_values(Dip.attribute) {
+        Dip.util.ensure_type(Dip.Attribute.type.text, attribute.type);
+        
+        return attribute_value @* { attribute } (
+            attribute = attribute.dclass.name + "." + attribute.name,
+            value = .value,
+            count = .count
+        );
+    }
+    
+    function handle_new_value(Dip.attribute, value: text) {
+        val attribute_value = attribute_value @? { attribute, value };
+        
+        if (attribute_value??) {
+            attribute_value.count++;
+        } else {
+            create attribute_value(
+                attribute,
+                value,
+                count = 1  
+            );
+        }        
+    }
+    
+    function handle_old_value(Dip.Text.text_attribute) {
+        val attribute_value = attribute_value @ { 
+            text_attribute.attribute, 
+            text_attribute.value
+        };
+        
+        if (attribute_value.count == 1) {
+            delete attribute_value;
+        } else {
+            attribute_value.count--;
+        }        
+    }
+}

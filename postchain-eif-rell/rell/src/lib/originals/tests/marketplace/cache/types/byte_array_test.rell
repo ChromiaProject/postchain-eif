@@ -1,0 +1,183 @@
+@test module;
+
+import ^^^^^.tests.*;
+import ^^^^^^.dip.tests.*;
+import ^^^^^^.ft3_helper.tests.*;
+import ^^^^^^.originals.marketplace.cache.types.*;
+
+namespace IByteArrayTest {
+    val interface = "IByteArrayTest";
+    
+    val byte_arr = Attribute.I(interface, name = "byte_arr");
+    val color_code = Attribute.I(interface, name = "color_code");
+    
+    function register(auth_data) {
+        def_interface_op(auth_data.auth_id, interface, [
+            byte_arr: Type(ByteArray.T(), [Mutable()]),
+            color_code: Type(ByteArray.T(), [Mutable(), Optional()])
+        ])
+        .sign(auth_data.keypair)
+        .run();
+    }
+
+    function get() = Interface.get(interface);
+    
+    function create_instance(user: auth_data, attributes: map<Attribute.I, attribute_type>) {
+        rell.test.tx()
+            .op(def_instance_op(
+                user.auth_id, 
+                IByteArrayTest.interface, 
+                attributes
+            ))
+            .nop()
+            .sign(user.keypair)
+            .run();
+        
+        return get_last_instance();
+    }
+}
+
+function test_attribute_value_can_be_cached() {
+    val admin = register_admin();
+    
+    IByteArrayTest.register(admin);
+    
+    IByteArrayTest.create_instance(
+        admin,
+        [
+            IByteArrayTest.byte_arr: ByteArray.T(x"")
+        ]
+    );
+    
+    val values = Cache.ByteArray.get_values(Attribute.get(IByteArrayTest.byte_arr));
+
+    val expected_values = [
+        (
+            attribute = Attribute.get_name(IByteArrayTest.byte_arr),
+            value = x"",
+            count = 1
+        )
+    ];
+
+    assert_equals(values, expected_values);
+}
+
+function test_multiple_attribute_values_can_be_cached() {
+    val admin = register_admin();
+    
+    IByteArrayTest.register(admin);
+    
+    IByteArrayTest.create_instance(
+        admin,
+        [
+            IByteArrayTest.byte_arr: ByteArray.T(x"")
+        ]
+    );
+    
+    IByteArrayTest.create_instance(
+        admin,
+        [
+            IByteArrayTest.byte_arr: ByteArray.T(x"deadbeef")
+        ]
+    );
+    
+    val values = Cache.ByteArray.get_values(Attribute.get(IByteArrayTest.byte_arr));
+
+    val expected_values = [
+        (
+            attribute = Attribute.get_name(IByteArrayTest.byte_arr),
+            value = x"",
+            count = 1
+        ),
+        (
+            attribute = Attribute.get_name(IByteArrayTest.byte_arr),
+            value = x"deadbeef",
+            count = 1
+        )
+    ];
+
+    assert_equals(values, expected_values);
+}
+
+function test_multiple_attributes_with_same_value_can_be_cached() {
+    val admin = register_admin();
+    
+    IByteArrayTest.register(admin);
+    
+    IByteArrayTest.create_instance(
+        admin,
+        [
+            IByteArrayTest.byte_arr: ByteArray.T(x"")
+        ] 
+    );
+
+    
+    IByteArrayTest.create_instance(
+        admin,
+        [
+            IByteArrayTest.byte_arr: ByteArray.T(x"")
+        ]
+    );
+
+    val values = Cache.ByteArray.get_values(Attribute.get(IByteArrayTest.byte_arr));
+
+    val expected_values = [
+        (
+            attribute = Attribute.get_name(IByteArrayTest.byte_arr),
+            value = x"",
+            count = 2
+        )
+    ];
+
+    assert_equals(values, expected_values);
+}
+
+function test_multiple_attributes_with_different_values_can_be_cached_right() {
+    val admin = register_admin();
+    
+    IByteArrayTest.register(admin);
+    
+    val byte_array_instance = IByteArrayTest.create_instance(
+        admin,
+        [
+            IByteArrayTest.byte_arr: ByteArray.T(x""),
+            IByteArrayTest.color_code: ByteArray.T(x"012345")
+            
+        ]
+    );
+    
+    IByteArrayTest.create_instance(
+        admin,
+        [
+            IByteArrayTest.byte_arr: ByteArray.T(x"deadbeef"),
+            IByteArrayTest.color_code: ByteArray.T(x"012345")
+        ]
+    );
+
+    set_type_attribute_meta_op(
+        admin.auth_id, 
+        byte_array_instance, 
+        IByteArrayTest.color_code, 
+        (x"654321").to_gtv()
+    )
+    .sign(admin.keypair)
+    .run();
+    
+    val values = Cache.ByteArray.get_values(Attribute.get(IByteArrayTest.color_code));
+
+    val expected_values = [
+        (
+            attribute = Attribute.get_name(IByteArrayTest.color_code),
+            value = x"012345",
+            count = 1
+        ),
+        (
+            attribute = Attribute.get_name(IByteArrayTest.color_code),
+            value = x"654321",
+            count = 1
+        )
+    ];
+
+    assert_equals(values, expected_values);
+}
+

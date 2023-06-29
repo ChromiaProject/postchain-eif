@@ -1,0 +1,443 @@
+@test
+module;
+
+import ^.mocks.*;
+import ^^^.tests.*;
+
+function test_instance_can_be_mapped_by_attribute_list() {
+	val instance = create_mock_instance();
+	
+	val instance_map = Mapper.map_instance(instance, [
+		Mapper.map_attributes([TestInterface.foo, TestInterface.bar])
+	]);
+	
+	assert_equals(instance_map, map<name, gtv?>([
+		"TestInterface.foo": "some string".to_gtv(),
+		"TestInterface.bar": (100).to_gtv()
+	]));
+}
+
+function test_instance_attributes_can_be_mapped_to_list() {
+	val instance = create_mock_instance();
+	
+	val instance_map = Mapper.map_instance(instance, [
+		Mapper.map_attributes([TestInterface.foo, TestInterface.bar], Mapper.to_list("some_list"))
+	]);
+	
+	assert_equals(instance_map, map<name, gtv?>([
+		"some_list": ["some string".to_gtv(), (100).to_gtv()].to_gtv()
+	]));
+}
+
+function test_instance_attributes_can_be_mapped_to_map() {
+	val instance = create_mock_instance();
+	
+	val instance_map = Mapper.map_instance(instance, [
+		Mapper.map_attributes([TestInterface.foo, TestInterface.bar], Mapper.to_map("some_map"))
+	]);
+	
+	assert_equals(instance_map, map<name, gtv?>([
+		"some_map": [
+			"TestInterface.foo": "some string".to_gtv(),
+			"TestInterface.bar": (100).to_gtv()
+		].to_gtv()
+	]));
+}
+
+function test_instance_attribute_can_be_mapped_by_interface() {
+	val instance = create_mock_instance();
+	
+	val instance_map = Mapper.map_instance(instance, [
+		Mapper.map_attributes_of_interfaces([TestInterface.get()])
+	]);
+	
+	assert_equals(instance_map, map<name, gtv?>([
+		"TestInterface.foo": "some string".to_gtv(),
+		"TestInterface.bar": (100).to_gtv(),
+		"TestInterface.attr": (500).to_gtv()
+	]));
+}
+
+function test_instance_attributes_can_be_mapped_by_multiple_interfaces() {
+	val instance = create_mock_instance();
+	
+	val instance_map = Mapper.map_instance(instance, [
+		Mapper.map_attributes_of_interfaces([TestInterface.get(), IPlayer.get()])
+	]);
+	
+	assert_equals(instance_map, map<name, gtv?>([
+		"TestInterface.foo": "some string".to_gtv(),
+		"TestInterface.bar": (100).to_gtv(),
+		"TestInterface.attr": (500).to_gtv(),
+		"IPlayer.name": "John".to_gtv(),
+		"IPlayer.age": (30).to_gtv()
+	]));
+}
+
+function test_instance_attributes_can_be_mapped_by_multiple_rules() {
+	val instance = create_mock_instance();
+	
+	val instance_map = Mapper.map_instance(instance, [
+		Mapper.map_attributes_of_interfaces([TestInterface.get()]),
+		Mapper.map_attributes([IPlayer.name, IPlayer.age])
+	]);
+	
+	assert_equals(instance_map, map<name, gtv?>([
+		"TestInterface.foo": "some string".to_gtv(),
+		"TestInterface.bar": (100).to_gtv(),
+		"TestInterface.attr": (500).to_gtv(),
+		"IPlayer.name": "John".to_gtv(),
+		"IPlayer.age": (30).to_gtv()
+	]));
+}
+
+function test_all_instance_attributes_can_be_mapped() {
+	val instance = create_mock_instance();
+	
+	val instance_map = Mapper.map_instance(instance, [
+		Mapper.map_all_attributes()
+	]);
+
+	assert_equals(instance_map, map<name, gtv?>([
+		"TestInterface.foo": "some string".to_gtv(),
+		"TestInterface.bar": (100).to_gtv(),
+		"TestInterface.attr": (500).to_gtv(),
+		"IPlayer.name": "John".to_gtv(),
+		"IPlayer.age": (30).to_gtv()
+	]));
+}
+
+function test_instance_attributes_implementing_interface_can_be_mapped() {
+	val instance = create_mock_instance_with_children();
+	
+	val instance_map = Mapper.map_instance(instance, [
+		Mapper.map_attributes_implementing_interface([IPlayer.get()], mapper = Mapper.to_list("players"))
+	]);
+	
+	assert_equals(instance_map, map<name, gtv?>([
+		"players": [
+			[
+				"IPlayer.name": "Player1".to_gtv(),
+				"IPlayer.age": (20).to_gtv()
+			],
+			[
+				"IPlayer.name": "Player2".to_gtv(),
+				"IPlayer.age": (30).to_gtv()
+			]
+		].to_gtv()
+	]));
+}
+
+function test_mapping_rules_can_be_defined_for_child_instances() {
+	val instance = create_mock_instance_with_children();
+	
+	val instance_map = Mapper.map_instance(instance, [
+		Mapper.map_attributes_implementing_interface([IPlayer.get()], [
+			Mapper.map_attributes([IPlayer.name])
+		])
+	]);
+	
+	assert_equals(instance_map, map<name, gtv?>([
+		"IGame.player1": [
+			"IPlayer.name": "Player1"
+		].to_gtv(),
+		"IGame.player2": [
+			"IPlayer.name": "Player2"
+		].to_gtv()
+	]));
+}
+
+function test_attributes_can_be_manually_added_to_instance_map() {
+	val instance = create_mock_instance();
+	
+	val instance_map = Mapper.map_instance(instance, [
+		Mapper.map_attributes_of_interfaces([IPlayer.get()]),
+		Mapper.add_attributes(["id": x"012345".to_gtv()])
+	]);
+	
+	assert_equals(instance_map, map<name, gtv?>([
+		"IPlayer.name": "John".to_gtv(),
+		"IPlayer.age": (30).to_gtv(),
+		"id": x"012345".to_gtv()
+	]));
+}
+
+function test_interface_name_can_be_removed_from_attribute_name() {
+	val instance = create_mock_instance();
+	
+	val instance_map = Mapper.map_instance(
+		instance, 
+		[
+			Mapper.map_attributes_of_interfaces([IPlayer.get()])
+		],
+		[Mapper.option.remove_interface]
+	);
+	
+	assert_equals(instance_map, map<name, gtv?>([
+		"name": "John".to_gtv(),
+		"age": (30).to_gtv()
+	]));
+}
+
+function test_interface_name_can_be_removed_from_attribute_name_and_mapped_to_map() {
+	val instance = create_mock_instance();
+	
+	val instance_map = Mapper.map_instance(
+		instance, 
+		[
+			Mapper.map_attributes_of_interfaces([IPlayer.get()], Mapper.to_map("player"))
+		],
+		[Mapper.option.remove_interface]
+	);
+	
+	assert_equals(instance_map, map<name, gtv?>([
+		"player": [
+			"name": "John".to_gtv(),
+			"age": (30).to_gtv()
+		].to_gtv()
+	]));
+}
+
+function test_attribute_meta_values_can_be_mapped_by_key() {
+    val instance = create_mock_instance();
+    
+    val instance_map = Mapper.map_instance(
+        instance,
+        [
+            Mapper.map_attributes([IPlayer.name], meta = Mapper.with_meta([Meta.Tag("foo_key")]))
+        ]
+    );
+    
+    assert_equals(instance_map, map<name, gtv?>([
+        "IPlayer.name": [
+            "value": "John".to_gtv(),
+            "foo_key": "foo_value".to_gtv()
+        ].to_gtv()
+    ]));
+}
+
+function test_attribute_meta_values_can_be_mapped_by_category() {
+    val instance = create_mock_instance();
+    
+    val instance_map = Mapper.map_instance(
+        instance,
+        [
+            Mapper.map_attributes([IPlayer.name], meta = Mapper.with_meta([Meta.Category("test_category")]))
+        ]
+    );
+    
+    assert_equals(instance_map, map<name, gtv?>([
+        "IPlayer.name": [
+            "value": "John".to_gtv(),
+            "foo_key": "foo_value".to_gtv(),
+            "bar_key": "bar_value".to_gtv()
+        ].to_gtv()
+    ]));
+}
+
+function test_attribute_meta_values_can_be_mapped_by_category_to_list() {
+    val instance = create_mock_instance();
+    
+    val instance_map = Mapper.map_instance(
+        instance,
+        [
+            Mapper.map_attributes(
+                [
+                    IPlayer.name, 
+                    IPlayer.age
+                ], 
+                Mapper.to_list("attributes"),
+                Mapper.with_meta([Meta.Category("test_category")])
+            )
+        ]
+    );
+    
+    assert_equals(instance_map, map<name, gtv?>([
+        "attributes": [
+            [
+                "value": "John".to_gtv(),
+                "foo_key": "foo_value".to_gtv(),
+                "bar_key": "bar_value".to_gtv()
+            ],
+            [
+                "value": (30).to_gtv(),
+                "foo_key": "foo_value".to_gtv(),
+                "bar_key": "bar_value".to_gtv()
+            ]
+        ].to_gtv()
+    ]));    
+}
+
+function test_instance_attributes_mapped_by_interface_can_include_attributes_meta() {
+    val instance = create_mock_instance();
+    
+    val instance_map = Mapper.map_instance(
+        instance,
+        [
+            Mapper.map_attributes_of_interfaces(
+                [
+                    IPlayer.get()
+                ],
+                meta = Mapper.with_meta([Meta.Category("test_category")])
+            )
+        ]
+    );
+    
+    assert_equals(instance_map, map<name, gtv?>([
+        "IPlayer.name": [
+            "value": "John".to_gtv(),
+            "foo_key": "foo_value".to_gtv(),
+            "bar_key": "bar_value".to_gtv()
+        ].to_gtv(),
+        "IPlayer.age": [
+            "value": (30).to_gtv(),
+            "foo_key": "foo_value".to_gtv(),
+            "bar_key": "bar_value".to_gtv()
+        ].to_gtv()
+    ]));   
+}
+
+function test_instance_attributes_implementing_interface_can_include_attributes_meta() {
+    val instance = create_mock_instance_with_children();
+    
+    val instance_map = Mapper.map_instance(
+        instance,
+        [
+            Mapper.map_attributes_implementing_interface(
+                [
+                    IPlayer.get()
+                ],
+                meta = Mapper.with_meta([Meta.Category("test_category")])
+            )
+        ]
+    );
+    
+    assert_equals(instance_map, map<name, gtv?>([
+        "IGame.player1": [
+            "value": [
+                "IPlayer.name": "Player1".to_gtv(),
+                "IPlayer.age": (20).to_gtv()
+            ].to_gtv(),
+            "foo_key": "foo_value".to_gtv(),
+            "bar_key": "bar_value".to_gtv()
+        ].to_gtv(),
+        "IGame.player2": [
+            "value": [
+                "IPlayer.name": "Player2".to_gtv(),
+                "IPlayer.age": (30).to_gtv()
+            ].to_gtv(),
+            "foo_key": "foo_value".to_gtv(),
+            "bar_key": "bar_value".to_gtv()         
+        ].to_gtv()
+    ])); 
+}
+
+function test_all_attributes_mapper_can_include_attribute_meta() {
+    val instance = create_mock_instance();
+    
+    val instance_map = Mapper.map_instance(
+        instance,
+        [
+            Mapper.map_all_attributes(
+                meta = Mapper.with_meta([Meta.Category("test_category")])
+            )
+        ]
+    );
+    
+    assert_equals(instance_map, map<name, gtv?>([
+        "TestInterface.foo": [
+            "value": "some string".to_gtv()
+        ].to_gtv(),
+        "TestInterface.bar": [
+            "value": (100).to_gtv()
+        ].to_gtv(),
+        "TestInterface.attr": [
+            "value": (500).to_gtv()
+        ].to_gtv(),        
+        "IPlayer.name": [
+            "value": "John".to_gtv(),
+            "foo_key": "foo_value".to_gtv(),
+            "bar_key": "bar_value".to_gtv()
+        ].to_gtv(),
+        "IPlayer.age": [
+            "value": (30).to_gtv(),
+            "foo_key": "foo_value".to_gtv(),
+            "bar_key": "bar_value".to_gtv()
+        ].to_gtv()
+    ])); 
+}
+
+function test_list_elements_can_be_mapped() {
+    val competition = create_competition_with_players_list();
+    
+    val instance_map = Mapper.map_instance(competition, 
+        [
+            Mapper.map_all_attributes()
+        ]
+    );
+    
+    assert_equals(instance_map, map<name, gtv?>([
+        "ICompetition.players": [
+            [
+                "IPlayer.name": "Player1".to_gtv(),
+                "IPlayer.age": (20).to_gtv()
+            ],
+            [
+                "IPlayer.name": "Player2".to_gtv(),
+                "IPlayer.age": (30).to_gtv()
+            ]
+        ].to_gtv()
+    ]));
+}
+
+function test_set_elements_can_be_mapped() {
+    val players = create_player_set();
+    
+    val instance_map = Mapper.map_instance(players, 
+        [
+            Mapper.map_all_attributes()
+        ]
+    );
+    
+    assert_equals(instance_map, map<name, gtv?>([
+        "IPlayerSet.players": [
+            [
+                "IPlayer.name": "Player1".to_gtv(),
+                "IPlayer.age": (20).to_gtv()
+            ],
+            [
+                "IPlayer.name": "Player2".to_gtv(),
+                "IPlayer.age": (30).to_gtv()
+            ]
+        ].to_gtv()
+    ]));
+}
+
+function test_map_elements_can_be_mapped() {
+    val player_directory = create_player_directory();
+    
+    val instance_map = Mapper.map_instance(player_directory, 
+        [
+            Mapper.map_all_attributes()
+        ]
+    );
+    
+    assert_equals(instance_map, map<name, gtv?>([
+        "IPlayerDirectory.players": [
+            [
+                "player1".to_gtv(), 
+                [
+                    "IPlayer.name": "Player1".to_gtv(),
+                    "IPlayer.age": (20).to_gtv()
+                ].to_gtv()
+            ],
+            [
+                "player2".to_gtv(), 
+                [
+                    "IPlayer.name": "Player2".to_gtv(),
+                    "IPlayer.age": (30).to_gtv()
+                ].to_gtv()
+            ]
+        ].to_gtv()
+    ]));
+}

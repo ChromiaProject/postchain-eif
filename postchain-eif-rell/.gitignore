@@ -1,6 +1,5 @@
 node
 build
 node_modules
-rell/src/lib
 
 .env

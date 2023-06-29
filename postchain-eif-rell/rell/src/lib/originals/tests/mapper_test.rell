@@ -1,0 +1,152 @@
+@test module;
+
+import ^.mocks;
+import ^.helper;
+import ^^.tests.*;
+import ^^^.dip.tests.*;
+
+function mint_mock_original() {
+    val account = create_ft3_test_acc(admin_keypair());
+    init_originals_interfaces_op(account.auth_id).sign(account.keypair).run();
+    val account_id = account.auth_id.account_id;
+    val ft3_account = ft3_a.account @ { account_id };
+    
+    def_prototype_op(
+        account.auth_id,
+        chromia.INonFungibleOriginal.interface,
+        [
+            chromia.IOriginal.name: Text.T("Test Original"),
+            chromia.IOriginal.creator_id: ByteArray.T(account_id),
+            chromia.IOriginal.creator_name: Text.T("Admin")
+        ], 
+        "TestPrototype"
+    ).sign(account.keypair).run();
+    
+    val original = Minter.I(
+        interface_name = chromia.INonFungibleOriginal.interface,
+        types = [:],
+        prototype_name = "TestPrototype"
+    );
+
+    mint_non_fungible_original_op(
+        account.auth_id,
+        original
+    )
+    .sign(account.keypair)
+    .run(); 
+    
+    return (get_last_id(), ft3_account);
+}
+
+function test_original_id_can_be_mapped() {
+    val (original_id, account) = mint_mock_original();
+    
+    val original = Id.get_instance(original_id);
+    
+    val original_map = Dip.Mapper.map_instance(original, [
+        OMapper.map_original_meta([OMapper.type.id])
+    ]);
+    
+    assert_equals(original_map, map<name, gtv?>([
+        "id": original_id.to_gtv()
+    ]));
+}
+
+function test_original_owner_can_be_mapped() {
+    val (original_id, account) = mint_mock_original();
+    
+    val original = Id.get_instance(original_id);
+    
+    val original_map = Dip.Mapper.map_instance(original, [
+        OMapper.map_original_meta([OMapper.type.owner])
+    ]);
+    
+    assert_equals(original_map, map<name, gtv?>([
+        "owner": Ft3Helper.originals_account_id(account.id).to_gtv()
+    ]));
+}
+
+function test_original_prototype_can_be_mapped() {
+    val (original_id, account) = mint_mock_original();
+    
+    val original = Id.get_instance(original_id);
+    
+    val original_map = Dip.Mapper.map_instance(original, [
+        OMapper.map_original_meta([OMapper.type.prototype])
+    ]);
+    
+    assert_equals(original_map, map<name, gtv?>([
+        "prototype": ("TestPrototype").to_gtv()
+    ]));
+}
+
+function test_original_attributes_can_be_mapped_by_meta_with_attributes_meta() {
+    val admin = register_admin();
+    val alice = register_alice();
+    
+    helper.init_originals(admin);
+    
+    val hat = mocks.mint_hat(alice).instance;
+    
+    val original_map = Dip.Mapper.map_instance(hat, 
+        [
+            Dip.Mapper.map_attributes_by_meta_tag(
+                "foo_key", 
+                meta = Dip.Mapper.with_meta([Dip.Meta.Category("test_category")])
+            )
+        ]
+    );
+    
+    assert_equals(original_map, map<name, gtv?>([
+        "tests.IHat.type": [
+            "value": "funny".to_gtv(),
+            "foo_key": "foo_value".to_gtv()
+        ].to_gtv(),        
+        "tests.IHat.age": [
+            "value": (10).to_gtv(),
+            "foo_key": "foo_value".to_gtv(),
+            "bar_key": "bar_value".to_gtv()
+        ].to_gtv()
+    ]));
+}
+
+function test_linked_originals_can_be_mapped_with_attributes_meta() {
+    val admin = register_admin();
+    val alice = register_alice();
+    
+    helper.init_originals(admin);
+    
+    val character = mocks.mint_character(alice).instance;
+    
+    val original_map = Dip.Mapper.map_instance(character,
+        [
+            OMapper.map_linked(meta = Dip.Mapper.with_meta([Dip.Meta.Category("test_category")]))
+        ]
+    );
+    
+    assert_equals(original_map, map<name, gtv?>([
+        "tests.ICharacter.hat": [
+            "value": [
+                "tests.IHat.type":  "funny".to_gtv(), 
+                "tests.IHat.age": (10).to_gtv(),
+                "chromia.IOriginal.name": "Hat".to_gtv(),
+                "chromia.IOriginal.creator_id": alice.auth_id.account_id.to_gtv(),
+                "chromia.IOriginal.creator_name": "User".to_gtv(),
+                "chromia.IOriginal.description": null.to_gtv()
+            ].to_gtv(),
+            "foo_key": "foo_value".to_gtv(),
+            "bar_key": "bar_value".to_gtv()
+        ].to_gtv(),
+        "tests.ICharacter.tShirt": [
+            "value": [
+                "tests.ITShirt.color": "violet".to_gtv(),
+                "chromia.IOriginal.name": "TShirt".to_gtv(),
+                "chromia.IOriginal.creator_id": alice.auth_id.account_id.to_gtv(),
+                "chromia.IOriginal.creator_name": "User".to_gtv(),
+                "chromia.IOriginal.description": null.to_gtv()                
+            ].to_gtv(),
+            "foo_key": "foo_value".to_gtv(),
+            "bar_key": "bar_value".to_gtv()
+        ].to_gtv()
+    ]));
+}

@@ -1,0 +1,70 @@
+namespace Cache.ByteArray {
+    entity attribute_value {
+        key Dip.attribute, value: byte_array;
+        mutable count: integer;
+    }
+
+    @extend(Dip.ByteArray.Hooks.before_add_value)
+    function (Dip.instance, Dip.attribute, value: byte_array) {
+        handle_new_value(attribute, value);
+    }
+
+    @extend(Dip.ByteArray.Hooks.before_update_value) 
+    function (Dip.ByteArray.byte_array_attribute, value: byte_array) {
+        handle_new_value(byte_array_attribute.attribute, value);
+        handle_old_value(byte_array_attribute);
+    }
+    function get_values(Dip.attribute) {
+        Dip.util.ensure_type(Dip.Attribute.type.byte_array, attribute.type);
+        
+        return attribute_value @* { attribute } (
+            attribute = attribute.dclass.name + "." + attribute.name,
+            value = .value,
+            count = .count
+        );
+    }
+
+    @extend(Dip.ByteArray.Hooks.before_set_value)
+    function (Dip.instance, Dip.attribute, Dip.ByteArray.byte_array_attribute?, new_value: byte_array) {
+        handle_new_value(attribute, new_value);
+        
+        if (empty(byte_array_attribute)) return;
+        
+        handle_old_value(byte_array_attribute);
+    }
+
+    @extend(Dip.ByteArray.Hooks.before_remove_value)
+    function (Dip.ByteArray.byte_array_attribute) {
+        handle_old_value(byte_array_attribute);
+    }
+
+    function handle_new_value(Dip.attribute, value: byte_array) {
+        val attribute_value = attribute_value @? {
+            .attribute == attribute,
+            .value == value            
+        };
+        
+        if (attribute_value??) {
+            attribute_value.count++;
+        } else {
+            create attribute_value(
+                attribute = attribute,
+                value = value,
+                count = 1
+            );
+        }
+    }
+
+    function handle_old_value(Dip.ByteArray.byte_array_attribute) {
+        val attribute_value = attribute_value @ { 
+            .attribute == byte_array_attribute.attribute,
+            .value == byte_array_attribute.value
+        };
+        
+        if (attribute_value.count == 1) {
+            delete attribute_value;
+        } else {
+            attribute_value.count--;
+        }
+    }
+}

@@ -1,0 +1,181 @@
+@test module;
+
+import ^^^^^.tests.*;
+import ^^^^^^.dip.tests.*;
+import ^^^^^^.ft3_helper.tests.*;
+import ^^^^^^.originals.marketplace.cache.types.*;
+
+namespace IBooleanTest {
+    val interface = "IBooleanTest";
+    
+    val foo = Attribute.I(interface, name = "foo");
+    val with_color = Attribute.I(interface, name = "with_color");
+    function register(auth_data) {
+        def_interface_op(auth_data.auth_id, interface, [
+            foo: Type(Boolean.T(), [Mutable()]),
+            with_color: Type(Boolean.T(), [Mutable(), Optional()])
+        ])
+        .sign(auth_data.keypair)
+        .run();
+    }
+
+    function get() = Interface.get(interface);
+    
+    function create_instance(user: auth_data, attributes: map<Attribute.I, attribute_type>) {
+        rell.test.tx()
+            .op(def_instance_op(
+                user.auth_id, 
+                IBooleanTest.interface, 
+                attributes
+            ))
+            .nop()
+            .sign(user.keypair)
+            .run();
+        
+        return get_last_instance();
+    }
+}
+
+function test_attribute_value_can_be_cached() {
+    val admin = register_admin();
+    
+    IBooleanTest.register(admin);
+    
+    IBooleanTest.create_instance(
+        admin,
+        [
+            IBooleanTest.foo: Boolean.T(true)
+        ]
+    );
+    
+    val values = Cache.Boolean.get_values(Attribute.get(IBooleanTest.foo));
+
+    val expected_values = [
+        (
+            attribute = Attribute.get_name(IBooleanTest.foo),
+            value = true,
+            count = 1
+        )
+    ];
+
+    assert_equals(values, expected_values);
+}
+
+function test_multiple_attribute_values_can_be_cached() {
+    val admin = register_admin();
+    
+    IBooleanTest.register(admin);
+    
+    IBooleanTest.create_instance(
+        admin,
+        [
+            IBooleanTest.foo: Boolean.T(true)
+        ]
+    );
+    
+    IBooleanTest.create_instance(
+        admin,
+        [
+            IBooleanTest.foo: Boolean.T(false)
+        ]
+    );
+    
+    val values = Cache.Boolean.get_values(Attribute.get(IBooleanTest.foo));
+
+    val expected_values = [
+        (
+            attribute = Attribute.get_name(IBooleanTest.foo),
+            value = true,
+            count = 1
+        ),
+        (
+            attribute = Attribute.get_name(IBooleanTest.foo),
+            value = false,
+            count = 1
+        )        
+    ];
+
+    assert_equals(values, expected_values);
+}
+
+function test_multiple_attributes_with_same_value_can_be_cached() {
+    val admin = register_admin();
+    
+    IBooleanTest.register(admin);
+    
+    IBooleanTest.create_instance(
+        admin,
+        [
+            IBooleanTest.foo: Boolean.T(true)
+        ] 
+    );
+
+    
+    IBooleanTest.create_instance(
+        admin,
+        [
+            IBooleanTest.foo: Boolean.T(true)
+        ]
+    );
+
+    val values = Cache.Boolean.get_values(Attribute.get(IBooleanTest.foo));
+
+    val expected_values = [
+        (
+            attribute = Attribute.get_name(IBooleanTest.foo),
+            value = true,
+            count = 2
+        )
+    ];
+
+    assert_equals(values, expected_values);
+}
+
+function test_multiple_attributes_with_different_values_can_be_cached_right() {
+    val admin = register_admin();
+    
+    IBooleanTest.register(admin);
+    
+    val boolean_instance = IBooleanTest.create_instance(
+        admin,
+        [
+            IBooleanTest.foo: Boolean.T(true),
+            IBooleanTest.with_color: Boolean.T(false)
+        ] 
+    );
+
+    
+    IBooleanTest.create_instance(
+        admin,
+        [
+            IBooleanTest.foo: Boolean.T(true),
+            IBooleanTest.with_color: Boolean.T(false)
+        ]
+    );
+
+    set_type_attribute_meta_op(
+        admin.auth_id, 
+        boolean_instance, 
+        IBooleanTest.with_color, 
+        (true).to_gtv()
+    )
+    .sign(admin.keypair)
+    .run();
+
+    val values = Cache.Boolean.get_values(Attribute.get(IBooleanTest.with_color));
+
+    val expected_values = [
+        (
+            attribute = Attribute.get_name(IBooleanTest.with_color),
+            value = false,
+            count = 1
+        ),
+        (
+            attribute = Attribute.get_name(IBooleanTest.with_color),
+            value = true,
+            count = 1
+        )
+    ];
+
+    assert_equals(values, expected_values);
+}

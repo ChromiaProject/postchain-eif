@@ -1,0 +1,71 @@
+namespace Cache.Decimal {
+    entity attribute_value {
+        key Dip.attribute, value: decimal;
+        mutable count: integer;
+    }
+    
+    @extend(Dip.Decimal.Hooks.before_add_value)
+    function (Dip.instance, Dip.attribute, value: decimal) {
+        handle_new_value(attribute, value);
+    }
+    
+    @extend(Dip.Decimal.Hooks.before_update_value) 
+    function (Dip.Decimal.decimal_attribute, value: decimal) {
+        handle_new_value(decimal_attribute.attribute, value);
+        handle_old_value(decimal_attribute);
+    }
+    
+    @extend(Dip.Decimal.Hooks.before_set_value)
+    function (Dip.instance, Dip.attribute, Dip.Decimal.decimal_attribute?, new_value: decimal) {
+        handle_new_value(attribute, new_value);
+        
+        if (empty(decimal_attribute)) return;
+        
+        handle_old_value(decimal_attribute);
+    }
+    
+    @extend(Dip.Decimal.Hooks.before_remove_value)
+    function (Dip.Decimal.decimal_attribute) {
+        handle_old_value(decimal_attribute);
+    }
+    
+    function get_values(Dip.attribute) {
+        Dip.util.ensure_type(Dip.Attribute.type.decimal, attribute.type);
+        
+        return attribute_value @* { attribute } (
+            attribute = attribute.dclass.name + "." + attribute.name,
+            value = .value,
+            count = .count
+        );
+    }
+    
+    function handle_new_value(Dip.attribute, value: decimal) {
+        val attribute_value = attribute_value @? {
+            .attribute == attribute,
+            .value == value            
+        };
+        
+        if (attribute_value??) {
+            attribute_value.count++;
+        } else {
+            create attribute_value(
+                attribute = attribute,
+                value = value,
+                count = 1
+            );
+        }
+    }
+    
+    function handle_old_value(Dip.Decimal.decimal_attribute) {
+        val attribute_value = attribute_value @ { 
+            .attribute == decimal_attribute.attribute,
+            .value == decimal_attribute.value
+        };
+        
+        if (attribute_value.count == 1) {
+            delete attribute_value;
+        } else {
+            attribute_value.count--;
+        }
+    }
+}

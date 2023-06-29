@@ -1,0 +1,73 @@
+namespace Cache.Boolean {
+    entity attribute_value {
+        key Dip.attribute, value: boolean;
+        mutable count: integer;
+    }
+
+    @extend(Dip.Boolean.Hooks.before_add_value)
+    function (Dip.instance, Dip.attribute, value: boolean) {
+        handle_new_value(attribute, value);
+    }
+
+    @extend(Dip.Boolean.Hooks.before_update_value) 
+    function (Dip.Boolean.boolean_attribute, value: boolean) {
+        handle_new_value(boolean_attribute.attribute, value);
+        handle_old_value(boolean_attribute);
+    }
+
+    @extend(Dip.Boolean.Hooks.before_set_value)
+    function (Dip.instance, Dip.attribute, Dip.Boolean.boolean_attribute?, new_value: boolean) {
+        handle_new_value(attribute, new_value);
+        
+        if (empty(boolean_attribute)) return;
+        
+        handle_old_value(boolean_attribute);
+    }
+
+    @extend(Dip.Boolean.Hooks.before_remove_value)
+    function (Dip.Boolean.boolean_attribute) {
+        handle_old_value(boolean_attribute);
+    }
+
+    function get_values(Dip.attribute) {
+        Dip.util.ensure_type(Dip.Attribute.type.boolean, attribute.type);
+        
+        return attribute_value @* { attribute } (
+            attribute = attribute.dclass.name + "." + attribute.name,
+            value = .value,
+            count = .count
+        );
+    }
+
+    function handle_new_value(Dip.attribute, value: boolean) {
+        val attribute_value = attribute_value @? {
+            .attribute == attribute,
+            .value == value            
+        };
+        
+        if (attribute_value??) {
+            attribute_value.count++;
+        } else {
+            create attribute_value(
+                attribute = attribute,
+                value = value,
+                count = 1
+            );
+        }
+    }
+
+    function handle_old_value(Dip.Boolean.boolean_attribute) {
+        val attribute_value = attribute_value @ { 
+            .attribute == boolean_attribute.attribute,
+            .value == boolean_attribute.value
+        };
+        
+        if (attribute_value.count == 1) {
+            delete attribute_value;
+        } else {
+            attribute_value.count--;
+        }
+    }
+
+
+}

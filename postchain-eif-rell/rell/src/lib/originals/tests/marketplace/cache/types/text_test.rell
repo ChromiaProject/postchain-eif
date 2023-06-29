@@ -1,0 +1,184 @@
+@test module;
+
+import ^^^^^.tests.*;
+import ^^^^^^.dip.tests.*;
+import ^^^^^^.ft3_helper.tests.*;
+import ^^^^^^.originals.marketplace.cache.types.*;
+import ^^^^^^.dip.external.{set_type_attribute_meta_op};
+
+namespace ITestText {
+    val interface = "ITestText";
+    
+    val foo = Attribute.I(interface, name = "foo");
+    val color = Attribute.I(interface, name = "color");
+    
+    function register(auth_data) {
+        def_interface_op(auth_data.auth_id, interface, [
+            foo: Type(Text.T(),[Mutable()]),
+            color: Type(Text.T(), [Mutable(), Optional()])
+        ])
+        .sign(auth_data.keypair)
+        .run();
+    }
+    
+    function get() = Interface.get(interface);
+    
+    function create_instance(user: auth_data, attributes: map<Attribute.I, attribute_type>) {
+        rell.test.tx()
+            .op(def_instance_op(
+                user.auth_id, 
+                ITestText.interface, 
+                attributes
+            ))
+            .nop()
+            .sign(user.keypair)
+            .run();
+
+        return get_last_instance();
+        
+    }
+}
+
+function test_attribute_value_can_be_cached() {
+    val admin = register_admin();
+    
+    ITestText.register(admin);
+    
+    ITestText.create_instance(
+        admin,
+        [
+            ITestText.foo: Text.T("bar")
+        ]
+    );
+    
+    val values = Cache.Text.get_values(Attribute.get(ITestText.foo));
+
+    val expected_values = [
+        (
+            attribute = Attribute.get_name(ITestText.foo),
+            value = "bar",
+            count = 1
+        )
+    ];
+
+    assert_equals(values, expected_values);
+}
+
+function test_multiple_attribute_values_can_be_cached() {
+    val admin = register_admin();
+    
+    ITestText.register(admin);
+    
+    ITestText.create_instance(
+        admin,
+        [
+            ITestText.foo: Text.T("bar")
+        ]
+    );
+    
+    ITestText.create_instance(
+        admin,
+        [
+            ITestText.foo: Text.T("foo")
+        ]
+    );
+    
+    val values = Cache.Text.get_values(Attribute.get(ITestText.foo));
+
+    val expected_values = [
+        (
+            attribute = Attribute.get_name(ITestText.foo),
+            value = "bar",
+            count = 1
+        ),
+        (
+            attribute = Attribute.get_name(ITestText.foo),
+            value = "foo",
+            count = 1
+        )        
+    ];
+
+    assert_equals(values, expected_values);    
+}
+
+function test_multiple_attributes_with_different_values_can_be_cached_right() {
+    val admin = register_admin();
+    
+    ITestText.register(admin);
+    
+    val color_instance = ITestText.create_instance(
+        admin,
+        [
+            ITestText.foo: Text.T("bar"),
+            ITestText.color: Text.T("blue")
+        ] 
+    );
+
+    
+    ITestText.create_instance(
+        admin,
+        [
+            ITestText.foo: Text.T("bar"),
+            ITestText.color: Text.T("blue")
+        ]
+    );
+
+    set_type_attribute_meta_op(
+        admin.auth_id, 
+        color_instance, 
+        ITestText.color, 
+        "green".to_gtv()
+    )
+    .sign(admin.keypair)
+    .run();
+    
+    val values = Cache.Text.get_values(Attribute.get(ITestText.color));
+    val expected_values = [
+        (
+            attribute = Attribute.get_name(ITestText.color),
+            value = "blue",
+            count = 1
+        ),
+        (
+            attribute = Attribute.get_name(ITestText.color),
+            value = "green",
+            count = 1
+        )
+    ];
+
+    assert_equals(values, expected_values);
+
+}
+
+function test_multiple_attributes_with_same_value_can_be_cached() {
+    val admin = register_admin();
+    
+    ITestText.register(admin);
+    
+    ITestText.create_instance(
+        admin,
+        [
+            ITestText.foo: Text.T("bar")
+        ] 
+    );
+
+    
+    ITestText.create_instance(
+        admin,
+        [
+            ITestText.foo: Text.T("bar")
+        ]
+    );
+
+    val values = Cache.Text.get_values(Attribute.get(ITestText.foo));
+
+    val expected_values = [
+        (
+            attribute = Attribute.get_name(ITestText.foo),
+            value = "bar",
+            count = 2
+        )   
+    ];
+
+    assert_equals(values, expected_values);
+}

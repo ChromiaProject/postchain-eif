@@ -1,0 +1,35 @@
+
+import ^^.ft3.account.{
+    account,
+    auth_descriptor,
+    create_account_with_auth
+};
+
+struct module_args {
+    admin_pubkey: pubkey;
+}
+
+function admin_pubkey() = chain_context.args.admin_pubkey;
+
+function admin_auth_descriptor() 
+    = auth_descriptor(
+        "S",
+        [chain_context.args.admin_pubkey],
+        [
+            ["A", "T"].to_gtv(), 
+            chain_context.args.admin_pubkey.to_hex().to_gtv()
+        ],
+        null.to_gtv()
+    );
+
+function account_id() 
+    = admin_auth_descriptor().hash();
+
+function register_account(): account {
+    val admin_auth_descriptor = admin_auth_descriptor();
+    val admin_account = account @? { admin_auth_descriptor.hash() };
+    require(empty(admin_account), "Admin account already registered");
+    
+    val account_id = create_account_with_auth(admin_auth_descriptor);
+    return account @ { account_id };    
+}

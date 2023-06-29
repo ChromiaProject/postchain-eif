@@ -1,0 +1,205 @@
+@test
+module;
+
+import ^^.core.*;
+import ^^.tests.*;
+import ^^.external.*;
+import ^^^.dip.core.*;
+import ^^^.ft3_helper.tests.*;
+
+namespace IHat {
+    val interface = "tests.IHat";
+    
+    function dependencies() = [
+        chromia.INonFungibleOriginal.interface
+    ];
+    
+    val type = Dip.Attribute.I(interface, name = "type");
+    val age = Dip.Attribute.I(interface, name = "age");
+    
+    
+    function register(auth_data) {
+        def_original_interface_op(
+            auth_data.auth_id,
+            interface,
+            [
+                type: Dip.Type(
+                    Dip.Text.T(),
+                    [
+                        Dip.Meta.I(
+                            category = "test_category",
+                            meta_key = "foo_key",
+                            meta_value = "foo_value".to_gtv().to_bytes()
+                        )
+                    ]
+                ),
+                age: Dip.Type(
+                    Dip.Integer.T(),
+                    [
+                        Dip.Meta.I(
+                            category = "test_category",
+                            meta_key = "foo_key",
+                            meta_value = "foo_value".to_gtv().to_bytes()
+                        ),
+                        Dip.Meta.I(
+                            category = "test_category",
+                            meta_key = "bar_key",
+                            meta_value = "bar_value".to_gtv().to_bytes()
+                        )
+                    ]
+                )
+            ],
+            dependencies()
+        )
+        .sign(auth_data.keypair)
+        .run();
+    }
+}
+
+namespace ITShirt {
+    val interface = "tests.ITShirt";
+    
+    function dependencies() = [
+        chromia.INonFungibleOriginal.interface
+    ];
+    
+    val color = Dip.Attribute.I(interface, name = "color");
+    
+    function register(auth_data) {
+        def_original_interface_op(
+            auth_data.auth_id,
+            interface,
+            [
+                color: Dip.Type(Dip.Text.T())
+            ],
+            dependencies()
+        )
+        .sign(auth_data.keypair)
+        .run();
+    }
+}
+
+namespace ICharacter {
+    val interface = "tests.ICharacter";
+    
+    function dependencies() = [
+        chromia.INonFungibleOriginal.interface
+    ];
+    
+    val hat = Dip.Attribute.I(interface, name = "hat");
+    val tShirt = Dip.Attribute.I(interface, name = "tShirt");
+    
+    function register(auth_data) {
+        def_original_interface_op(
+            auth_data.auth_id,
+            interface,
+            [
+                hat: Dip.Type(
+                    Dip.Instance.T(),
+                    [
+                        ImplementsInterface(IHat.interface),
+                        Dip.Meta.I(
+                            category = "test_category",
+                            meta_key = "foo_key",
+                            meta_value = "foo_value".to_gtv().to_bytes()
+                        ),
+                        Dip.Meta.I(
+                            category = "test_category",
+                            meta_key = "bar_key",
+                            meta_value = "bar_value".to_gtv().to_bytes()
+                        )                     
+                    ]
+                ),
+                tShirt: Dip.Type(
+                    Dip.Instance.T(),
+                    [
+                        Dip.Meta.I(
+                            category = "test_category",
+                            meta_key = "foo_key",
+                            meta_value = "foo_value".to_gtv().to_bytes()
+                        ),
+                        Dip.Meta.I(
+                            category = "test_category",
+                            meta_key = "bar_key",
+                            meta_value = "bar_value".to_gtv().to_bytes()
+                        )                      
+                    ]
+                )
+            ],
+            dependencies()
+        )
+        .sign(auth_data.keypair)
+        .run();
+    }
+}
+
+
+
+function mint_hat(auth_data) {
+    IHat.register(auth_data);
+    mint_non_fungible_original_op(
+        auth_data.auth_id,
+        Minter.I(
+            interface_name = IHat.interface,
+            types = [
+                IHat.type: Text.T("funny"),
+                IHat.age: Integer.T(10),
+                chromia.IOriginal.name: Text.T("Hat"),
+                chromia.IOriginal.creator_id: ByteArray.T(auth_data.auth_id.account_id),
+                chromia.IOriginal.creator_name: Text.T("User")                
+            ]
+        )
+    )
+    .sign(auth_data.keypair)
+    .run();
+    
+    val id = get_last_id();
+    return (id = id, instance = Id.get_instance(id));
+}
+
+function mint_tshirt(auth_data) {
+    ITShirt.register(auth_data);
+    mint_non_fungible_original_op(
+        auth_data.auth_id,
+        Minter.I(
+            interface_name = ITShirt.interface,
+            types = [
+                ITShirt.color: Text.T("violet"),
+                chromia.IOriginal.name: Text.T("TShirt"),
+                chromia.IOriginal.creator_id: ByteArray.T(auth_data.auth_id.account_id),
+                chromia.IOriginal.creator_name: Text.T("User")   
+            ]
+        )
+    )
+    .sign(auth_data.keypair)
+    .run();
+    
+    val id = get_last_id();
+    return (id = id, instance = Id.get_instance(id));
+}
+
+function mint_character(auth_data) {
+    val hat_id = mint_hat(auth_data).id;
+    val tshirt_id = mint_tshirt(auth_data).id; 
+    
+    ICharacter.register(auth_data);
+    mint_non_fungible_original_op(
+        auth_data.auth_id,
+        Minter.I(
+            interface_name = ICharacter.interface,
+            types = [
+                ICharacter.hat: Id.T(hat_id),
+                ICharacter.tShirt: Id.T(tshirt_id),
+                chromia.IOriginal.name: Text.T("Character"),
+                chromia.IOriginal.creator_id: ByteArray.T(auth_data.auth_id.account_id),
+                chromia.IOriginal.creator_name: Text.T("User")   
+            ]
+        )
+    )
+    .sign(auth_data.keypair)
+    .run();
+    
+    val id = get_last_id();
+    return (id = id, instance = Id.get_instance(id));
+}
+

@@ -1,0 +1,3 @@
+
+function metadata_id(chain: text, contract_address: text, id: integer) =
+    contract_address + ";" + id + ";" + chain;

@@ -1,0 +1,40 @@
+
+function map_image(
+    mapper: (map<name, gtv?>, map<Mapper.key_name, gtv?>, list<Mapper.option>) -> unit = Mapper.direct(),
+    meta: list<Meta.meta>? = null
+): (instance, map<name, gtv?>, list<Mapper.option>) -> unit {
+    return _map_image(*, *, *, mapper, meta);
+}
+
+function _map_image(
+    instance, 
+    instance_map: map<name, gtv?>, 
+    options: list<Mapper.option>,
+    mapper: (map<name, gtv?>, map<Mapper.key_name, gtv?>, list<Mapper.option>) -> unit,
+    meta: list<Meta.meta>?
+) {
+    val id = Integer.get_value(instance, chromia.IExternal.external_id); 
+    val contract_address = Text.get_value(instance, chromia.IExternal.contract_address);
+    val chain = Text.get_value(instance, chromia.IExternal.chain);
+    
+    val value: map<Mapper.key_name, gtv?>;
+    val image_key = Mapper.key_name(
+        prefix = chromia.IExternal.image.interface,
+        name = chromia.IExternal.image.name
+    );
+    
+    // Build url image in format <base_url>/<chain>/<contract_address>/<id>/image
+    if (not id?? or not contract_address?? or not chain??) {
+        value = [image_key: null];
+    } else {
+        val url = (
+            config.image_base_url + "/" + 
+            chain + "/" +
+            contract_address + "/" + 
+            id + "/image"
+        ).to_gtv();
+        value = [image_key: url];
+    }
+    
+    mapper(instance_map, value, options);
+}

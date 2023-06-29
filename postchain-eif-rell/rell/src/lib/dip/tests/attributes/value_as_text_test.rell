@@ -1,0 +1,154 @@
+@test 
+module;
+
+import ^^^.tests.*;
+import ^^.core.mocks;
+
+function test_text_value_of_integer_attribute_can_be_fetched() {
+    val admin = register_admin();
+    mocks.IIntegerAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IIntegerAttributeInterface.interface, [
+      mocks.IIntegerAttributeInterface.integer_attribute: Integer.T(20)  
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();
+    val value = Attribute.get_value_as_text(instance, mocks.IIntegerAttributeInterface.integer_attribute);
+    assert_equals(value, "20");
+}
+
+function test_text_value_of_integer_attribute_can_be_fetched_when_null() {
+    val admin = register_admin();
+    mocks.IIntegerAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IIntegerAttributeInterface.interface, [:])
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();
+    val value = Attribute.get_value_as_text(instance, mocks.IIntegerAttributeInterface.integer_attribute);
+    assert_equals(value, "null");
+}
+
+function test_text_value_of_boolean_attribute_can_be_fetched() {
+    val admin = register_admin();
+    mocks.IBooleanAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IBooleanAttributeInterface.interface, [
+        mocks.IBooleanAttributeInterface.boolean_attribute: Boolean.T(true)
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();    
+    val value = Attribute.get_value_as_text(instance, mocks.IBooleanAttributeInterface.boolean_attribute);
+    
+    assert_equals(value, "true");
+}
+
+function test_text_value_of_boolean_attribute_can_be_fetched_when_null() {
+    val admin = register_admin();
+    mocks.IBooleanAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IBooleanAttributeInterface.interface, [:])
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();    
+    val value = Attribute.get_value_as_text(instance, mocks.IBooleanAttributeInterface.boolean_attribute);
+    
+    assert_equals(value, "null");
+}
+
+function test_text_value_of_text_attribute_can_be_fetched() {
+    val admin = register_admin();
+    mocks.ITextAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.ITextAttributeInterface.interface, [
+        mocks.ITextAttributeInterface.text_attribute: Text.T("foo")
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();
+    val value = Attribute.get_value_as_text(instance, mocks.ITextAttributeInterface.text_attribute);
+    
+    assert_equals(value, "foo");
+}
+
+function test_text_value_of_text_attribute_can_be_fetched_when_null() {
+    val admin = register_admin();
+    mocks.ITextAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.ITextAttributeInterface.interface, [:])
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();
+    val value = Attribute.get_value_as_text(instance, mocks.ITextAttributeInterface.text_attribute);
+    
+    assert_equals(value, "null");    
+}
+
+function test_text_value_of_decimal_attribute_can_be_fetched() {
+    val admin = register_admin();
+    mocks.IDecimalAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IDecimalAttributeInterface.interface, [
+        mocks.IDecimalAttributeInterface.decimal_attribute: Decimal.T(3.14)
+    ])
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();
+    val value = Attribute.get_value_as_text(instance, mocks.IDecimalAttributeInterface.decimal_attribute);
+    
+    assert_equals(value, "3.14");
+}
+
+function test_text_value_of_decimal_attribute_can_be_fetched_when_null() {
+    val admin = register_admin();
+    mocks.IDecimalAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IDecimalAttributeInterface.interface, [:])
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();
+    val value = Attribute.get_value_as_text(instance, mocks.IDecimalAttributeInterface.decimal_attribute);
+    
+    assert_equals(value, "null");
+}
+
+function test_text_value_of_byte_array_attribute_can_be_fetched() {
+    val admin = register_admin();
+    mocks.IByteArrayAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IByteArrayAttributeInterface.interface, [
+        mocks.IByteArrayAttributeInterface.byte_array_attribute: ByteArray.T(x'123456abcdef')
+    ])    
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();
+    val value = Attribute.get_value_as_text(instance, mocks.IByteArrayAttributeInterface.byte_array_attribute);
+    
+    assert_equals(value, "123456abcdef");
+}
+
+
+function test_text_value_of_byte_array_attribute_can_be_fetched_when_null() {
+    val admin = register_admin();
+    mocks.IByteArrayAttributeInterface.register(admin);
+    
+    def_instance_op(admin.auth_id, mocks.IByteArrayAttributeInterface.interface, [:])    
+    .sign(admin.keypair)
+    .run();
+    
+    val instance = get_last_instance();
+    val value = Attribute.get_value_as_text(instance, mocks.IByteArrayAttributeInterface.byte_array_attribute);
+    
+    assert_equals(value, "null");
+}
