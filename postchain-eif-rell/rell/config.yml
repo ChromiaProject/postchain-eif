@@ -6,7 +6,6 @@ definitions:
         contracts:
           - '0xb7eb5d60dd5610a82a4844beb3f7d750316d3d32'
         skip_to_height: 9149852
-        events: !include configs/events.yml
   - &common_args
     lib.ft3.core:
       my_blockchain_name: My Neighbor Alice
