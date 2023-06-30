@@ -1,200 +1,215 @@
 @test module;
-import ^^.tests.*;
-import ^^^.dip.tests.*;
+
+import originals_external: ^^.external;
+import originals_core: ^^.core;
+import dip_attributes: ^^^.dip.attributes;
+import ft3_helper_tests: ^^^.ft3_helper.tests;
+import originals_external_dev: ^^.external.dev.dev_op;
+import originals_tests_helper: ^.helper;
+import dip_core: ^^^.dip.core;
 
 // should update attributes if creator of the original signs the tx
 // should fail updating attributes if another sign 
 function test_meta_originals_1() {
-	val admin_account = create_ft3_test_acc(admin_keypair());	
-	val bob_account = create_ft3_test_acc(bob_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	val original = Minter.I(
-		interface_name = chromia.INonFungibleOriginal.interface,
-		[
-		    chromia.IOriginal.name: Text.T("Test Original"),
-			chromia.IOriginal.creator_id: ByteArray.T(admin_account.auth_id.account_id),
-			chromia.IOriginal.creator_name: Text.T("Admin")
-		]
-	);
-	
-	mint_non_fungible_original_unsafe_op(
-	    bob_account.auth_id,
-		original
-	).sign(bob_account.keypair).run();
-	val original_id = get_last_id();
-		
-	set_original_attribute_op(
-	    bob_account.auth_id,
-		original_id,
-		chromia.IOriginal.description,
-		"test".to_gtv()
-	).sign(bob_account.keypair).run_must_fail();
-	
-	set_original_attribute_op(
-	    admin_account.auth_id,
-		original_id,
-		chromia.IOriginal.description,
-		"test".to_gtv()
-	).sign(admin_account.keypair).run();
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    val original = originals_core.Minter.I(
+        interface_name = originals_core.chromia.INonFungibleOriginal.interface,
+        [
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T("Test Original"),
+            originals_core.chromia.IOriginal.creator_id: dip_attributes.ByteArray.T(admin.auth_id.account_id),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Admin")
+        ]
+    );
+    
+    originals_external_dev.mint_non_fungible_original_unsafe(
+    admin.auth_id,
+    mock_collection.name,
+    original
+    ).sign(admin.keypair).run();
+    val original_id = originals_tests_helper.get_last_id();
+        
+    originals_external.set_original_attribute(
+        bob.auth_id,
+        original_id,
+        originals_core.chromia.IOriginal.description,
+        "test".to_gtv()
+    ).sign(bob.keypair).run_must_fail();
+    
+    originals_external.set_original_attribute(
+        admin.auth_id,
+        original_id,
+        originals_core.chromia.IOriginal.description,
+        "test".to_gtv()
+    ).sign(admin.keypair).run();
 }
 
 // should update owner mutable attribute if owner signs the tx
 // should fail if another one is the signer
 function test_meta_originals_2() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	val bob_account = create_ft3_test_acc(bob_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	var interface = "ITestDapp";
-	val price = Dip.Attribute.def_I(interface, "price");
-	def_original_interface_op(
-	    admin_account.auth_id,
-		interface, 
-		[
-			price: Type(Integer.T(0), [OwnerMutable()])
-		],
-		[
-			chromia.INonFungibleOriginal.interface
-		]
-	).sign(admin_keypair()).run();
-	
-	val original_def = Minter.I(
-		interface_name = interface,
-		[
-		    chromia.IOriginal.name: Text.T("Test Original"),
-			chromia.IOriginal.creator_id: ByteArray.T(admin_account.auth_id.account_id),
-			chromia.IOriginal.creator_name: Text.T("Admin")
-		]
-	);
-	mint_non_fungible_original_unsafe_op(
-        bob_account.auth_id,
-        original_def
-    ).sign(bob_account.keypair).run();
-	val original_id = get_last_id();
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
 
-	set_original_attribute_op(
-	    admin_account.auth_id,
-	    original_id,
-	    price,
-	    (123).to_gtv()
-	).sign(admin_account.keypair).run_must_fail();
-	
-	set_original_attribute_op(
-	    bob_account.auth_id,
-	    original_id,
-	    price,
-	    (123).to_gtv()
-	).sign(bob_account.keypair).run();
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    var interface = "ITestDapp";
+    val price = dip_core.Attribute.def_I(interface, "price");
+    originals_external.def_original_interface(
+        admin.auth_id,
+        interface, 
+        [
+            price: dip_core.Type(dip_attributes.Integer.T(0), [originals_core.OwnerMutable()])
+        ],
+        [
+            originals_core.chromia.INonFungibleOriginal.interface
+        ]
+    ).sign(ft3_helper_tests.admin_keypair()).run();
+    
+    val original_def = originals_core.Minter.I(
+        interface_name = interface,
+        [
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T("Test Original"),
+            originals_core.chromia.IOriginal.creator_id: dip_attributes.ByteArray.T(admin.auth_id.account_id),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Admin")
+        ]
+    );
+    originals_external_dev.mint_non_fungible_original_unsafe(
+        admin.auth_id,
+                mock_collection.name,
+        original_def
+    ).sign(admin.keypair).run();
+    val original_id = originals_tests_helper.get_last_id();
+
+    originals_external.set_original_attribute(
+        bob.auth_id,
+        original_id,
+        price,
+        (123).to_gtv()
+    ).sign(bob.keypair).run_must_fail();
+    
+    originals_external.set_original_attribute(
+        admin.auth_id,
+        original_id,
+        price,
+        (123).to_gtv()
+    ).sign(admin.keypair).run();
 }
 
 // should add the attribute if creator signs the tx
 // should fail if owner signs the tx
 function test_meta_originals_3() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	val bob_account = create_ft3_test_acc(bob_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();	
-	
-	var interface = "ITestDapp";
-	def_original_interface_op(
-	    admin_account.auth_id,
-	    interface,
-	    [:],
-	    [chromia.INonFungibleOriginal.interface]
-	).sign(admin_keypair()).run();
-	
-	val prototype_def = "PrototypeName";
-	def_original_prototype_op(
-	    admin_account.auth_id,
-		interface,
-		[
-		    chromia.IOriginal.name: Text.T("Test Original"),
-			chromia.IOriginal.creator_id: ByteArray.T(admin_account.auth_id.account_id),
-			chromia.IOriginal.creator_name: Text.T("Admin")
-		],
-		prototype_def
-	).sign(admin_keypair()).run();
-	
-	
-	val original_def = Minter.I(
-	    interface_name = interface,
-	    types=[:],
-	    prototype_name = prototype_def
-	);
-	
-	mint_non_fungible_original_op(
-	    admin_account.auth_id,
-	    original_def
-	).sign(admin_account.keypair).run();
-	val original_id = get_last_id();
-	
-	transfer_original_op(
-	    admin_account.auth_id,
-	    original_id,
-		bob_account.auth_id.account_id
-	).sign(admin_account.keypair).run();
-		
-	set_original_attribute_op(
-	    admin_account.auth_id,
-		original_id,
-		chromia.IOriginal.description,
-		"test".to_gtv()
-	).sign(admin_account.keypair).run();
-	
-	set_original_attribute_op(
-	    bob_account.auth_id,
-	    original_id,
-		chromia.IOriginal.description,
-		"test".to_gtv()
-	).sign(bob_account.keypair).run_must_fail();
+    val admin_account = ft3_helper_tests.register_admin();
+    val bob_account = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin_account);    
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin_account, bob_account, admin_account);
+    var interface = "ITestDapp";
+    originals_external.def_original_interface(
+        admin_account.auth_id,
+        interface,
+        [:],
+        [originals_core.chromia.INonFungibleOriginal.interface]
+    ).sign(ft3_helper_tests.admin_keypair()).run();
+    
+    val prototype_def = "PrototypeName";
+    originals_external.def_original_prototype(
+        admin_account.auth_id,
+        interface,
+        [
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T("Test Original"),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Admin")
+        ],
+        prototype_def
+    ).sign(ft3_helper_tests.admin_keypair()).run();
+    
+    
+    val original_def = originals_core.Minter.I(
+        interface_name = interface,
+        types=[:],
+        prototype_name = prototype_def
+    );
+    
+    originals_external.mint_non_fungible_original(
+        admin_account.auth_id,
+        mock_collection.name,
+        original_def
+    ).sign(admin_account.keypair).run();
+    val original_id = originals_tests_helper.get_last_id();
+    
+    originals_external.transfer_original(
+        admin_account.auth_id,
+        original_id,
+        bob_account.auth_id.account_id
+    ).sign(admin_account.keypair).run();
+        
+    originals_external.set_original_attribute(
+        admin_account.auth_id,
+        original_id,
+        originals_core.chromia.IOriginal.description,
+        "test".to_gtv()
+    ).sign(admin_account.keypair).run();
+    
+    originals_external.set_original_attribute(
+        bob_account.auth_id,
+        original_id,
+        originals_core.chromia.IOriginal.description,
+        "test".to_gtv()
+    ).sign(bob_account.keypair).run_must_fail();
 }
 
 // should set attribute implemented in prototype
-function test_meta_originals_4() {	
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	var interface = "ITestDapp";
-	def_original_interface_op(
-	    admin_account.auth_id,
-	    interface,
-	    [:],
-	    [chromia.INonFungibleOriginal.interface]
-	).sign(admin_keypair()).run();
-	
-	
-	val prototype_def = "PrototypeName";
-	def_original_prototype_op(
-	    admin_account.auth_id,
-		interface,
-		[
-		    chromia.IOriginal.name: Text.T("Test Original"),
-			chromia.IOriginal.creator_id: ByteArray.T(admin_account.auth_id.account_id),
-			chromia.IOriginal.creator_name: Text.T("Admin"),
-			chromia.IOriginal.description: Text.T("This is a description")
-		],
-		prototype_def
-	).sign(admin_keypair()).run();
-	
-	val original_def = Minter.I(
-	    interface_name = interface,
-	    types=[:],
-	    prototype_name = prototype_def
-	);
-	
-	mint_non_fungible_original_op(
-	    admin_account.auth_id,
-	    original_def
-	).sign(admin_account.keypair).run();
-	val original_id = get_last_id();
-	
-	set_prototype_attribute_op(
-	    admin_account.auth_id,
-		prototype_def,
-		chromia.IOriginal.description,
-		"test".to_gtv()
-	).sign(admin_account.keypair).run();
-	
-	val desc = text.from_gtv(get_original_value_q(original_id, chromia.IOriginal.description)!!);
-	assert_equals(desc, "test");
+function test_meta_originals_4() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    
+    var interface = "ITestDapp";
+    originals_external.def_original_interface(
+        admin.auth_id,
+        interface,
+        [:],
+        [originals_core.chromia.INonFungibleOriginal.interface]
+    ).sign(ft3_helper_tests.admin_keypair()).run();
+    
+    
+    val prototype_def = "PrototypeName";
+    originals_external.def_original_prototype(
+        admin.auth_id,
+        interface,
+        [
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T("Test Original"),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Admin"),
+            originals_core.chromia.IOriginal.description: dip_attributes.Text.T("This is a description"),
+            originals_core.chromia.IOriginal.collection_name: dip_attributes.Text.T(mock_collection.name)
+        ],
+        prototype_def
+    ).sign(ft3_helper_tests.admin_keypair()).run();
+    
+    val original_def = originals_core.Minter.I(
+        interface_name = interface,
+        types=[:],
+        prototype_name = prototype_def
+    );
+    
+    originals_external.mint_non_fungible_original(
+        admin.auth_id,
+        mock_collection.name,
+        original_def
+    ).sign(admin.keypair).run();
+    val original_id = originals_tests_helper.get_last_id();
+    
+    originals_external.set_prototype_attribute(
+        admin.auth_id,
+        prototype_def,
+        originals_core.chromia.IOriginal.description,
+        "test".to_gtv()
+    ).sign(admin.keypair).run();
+    
+    val desc = text.from_gtv(originals_external.get_original_value(original_id, originals_core.chromia.IOriginal.description)!!);
+    assert_equals(desc, "test");
 }

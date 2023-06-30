@@ -1,0 +1,88 @@
+@extendable 
+function before_settle(
+    taker_account: ft3_account.account,
+    marketplace.Marketplace.settlement_descriptor
+);
+
+@extendable
+function after_settle(
+    taker_account: ft3_account.account,
+    marketplace.Marketplace.settlement_descriptor
+);
+
+@extendable 
+function before_create_settlement(
+    maker_account: ft3_account.account,
+    maker_descriptor_asset: ft3_core.asset,
+    maker_descriptor_asset_type: marketplace.Marketplace.asset_type,
+    maker_descriptor_amount: integer,
+    taker_descriptor_asset: ft3_core.asset,
+    taker_descriptor_asset_type: marketplace.Marketplace.asset_type,
+    taker_descriptor_amount: integer,
+    expiration: integer,
+    salt: integer,
+    marketplace.Marketplace.settlement_type,
+    maker_evm_signature: byte_array?
+);
+
+@extendable
+function after_create_settlement(
+    marketplace.Marketplace.settlement_descriptor
+);
+
+@extendable 
+function before_delete_settlement(
+    marketplace.Marketplace.settlement_descriptor
+);
+
+@extendable
+function after_delete_settlement(
+    settlement_id: byte_array
+);
+
+@extendable 
+function before_bid(
+    bidder_account: ft3_account.account,
+    amount: integer,
+    marketplace.Marketplace.settlement_descriptor
+);
+
+@extendable
+function after_bid(
+    bidder_account: ft3_account.account,
+    amount: integer,
+    marketplace.Marketplace.settlement_descriptor
+);
+
+@extendable
+function after_make_payment(
+    marketplace.Marketplace.settlement_descriptor
+);
+
+@extendable
+function before_create_or_update_offer(
+    bidder_account: ft3_account.account,
+    offer_amount: integer,
+    asset: ft3_core.asset
+);
+
+@extendable
+function after_create_offer(
+    marketplace.Marketplace.offer
+);
+
+@extendable
+function after_update_offer(
+    marketplace.Marketplace.offer
+);
+
+@extendable
+function before_accept_offer(
+    bidder_account: ft3_account.account,
+    marketplace.Marketplace.offer
+);
+
+@extendable
+function after_accept_offer(
+    marketplace.Marketplace.offer
+);

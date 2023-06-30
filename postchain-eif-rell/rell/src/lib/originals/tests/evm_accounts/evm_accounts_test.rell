@@ -1,0 +1,43 @@
+function test_login() {
+    val keypair = ft3_helper_tests.admin_keypair();
+    val auth_descriptor = ft3_core.acc.auth_descriptor(
+        "S",
+        [keypair.pub],
+        [ ["T"].to_gtv(), keypair.pub.to_hex().to_gtv() ],
+        [ "block_time".to_gtv(), "lt".to_gtv(), originals_tests_mocks.VALID_EXPIRATION.to_gtv() ].to_gtv()
+    );
+    val auth_descriptor_id = auth_descriptor.hash();
+    evm_accounts_external.Operations.login(originals_tests_mocks.ADMIN_ADDRESS, auth_descriptor, originals_tests_mocks.ADMIN_LOGIN_SIG).run();
+    
+    val evm_account_id = evm_accounts_external.Queries.derive_evm_account_id(originals_tests_mocks.ADMIN_ADDRESS);
+    
+    // If this doesn't fail then it successfully authenticated
+    evm_accounts_external.OperationsDev.auth_and_log(evm_account_id, auth_descriptor_id).sign(keypair).run();
+}
+
+function test_logout() {
+    val keypair = ft3_helper_tests.admin_keypair();
+    val auth_descriptor = ft3_core.acc.auth_descriptor(
+        "S",
+        [keypair.pub],
+        [ ["T"].to_gtv(), keypair.pub.to_hex().to_gtv() ],
+        [ "block_time".to_gtv(), "lt".to_gtv(), originals_tests_mocks.VALID_EXPIRATION.to_gtv() ].to_gtv()
+    );
+    val auth_descriptor_id = auth_descriptor.hash();
+    evm_accounts_external.Operations.login(originals_tests_mocks.ADMIN_ADDRESS, auth_descriptor, originals_tests_mocks.ADMIN_LOGIN_SIG).run();
+    val evm_account_id = evm_accounts_external.Queries.derive_evm_account_id(originals_tests_mocks.ADMIN_ADDRESS);
+    
+    assert_gt(ft3_core.acc.get_account_auth_descriptors(evm_account_id).size(), 0);
+    
+    
+    // Signature of: Request to logout for 0x6c0228eb11a3c5866f740db5baa8e5bcdb15a0b7. Auth descriptor hashes: d3639cb848c316a1f90e4152df21388663d500365c5194b0956db849d85d41b8
+    val sig = EvmAccounts.signature(
+        r = x"7ed6268d0f385c7bd1e968ba32ec6e06de940f8991a007a367186293e9361e26",
+        s = x"2c84a69d84741d24a9ab8530686ff1f87bac934ecfdd6370550e6e4c2cb392f4",
+        28
+    );
+        
+    evm_accounts_external.Operations.logout(originals_tests_mocks.ADMIN_ADDRESS, [auth_descriptor_id], sig).run();
+    
+    assert_equals(ft3_core.acc.get_account_auth_descriptors(evm_account_id).size(), 0);
+}

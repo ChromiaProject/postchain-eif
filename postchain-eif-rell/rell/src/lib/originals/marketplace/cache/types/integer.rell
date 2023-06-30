@@ -38,11 +38,27 @@ namespace Cache.Integer {
             count = .count
         );
     }
+
+    function get_min_value(Dip.attribute) {
+        Dip.util.ensure_type(Dip.Attribute.type.integer, attribute.type);
+        
+        return attribute_value @? { attribute } (
+            @sort .value
+        ) limit 1;
+    }
+
+    function get_max_value(Dip.attribute) {
+        Dip.util.ensure_type(Dip.Attribute.type.integer, attribute.type);
+
+        return attribute_value @? { attribute } (
+            @sort_desc .value
+        ) limit 1;
+    }
     
     function handle_new_value(Dip.attribute, value: integer) {
         val attribute_value = attribute_value @? {
             .attribute == attribute,
-            .value == value            
+            .value == value
         };
         
         if (attribute_value??) {
@@ -67,5 +83,26 @@ namespace Cache.Integer {
         } else {
             attribute_value.count--;
         }
+    }
+
+    function get_value_count(Dip.attribute, value: integer) {
+        Dip.util.ensure_type(Dip.Attribute.type.integer, attribute.type);
+        return attribute_value @ { attribute, value } .count;
+    }
+
+    function get_instance_attribute_value(Dip.instance, Dip.attribute) {
+        Dip.util.ensure_type(Dip.Attribute.type.integer, attribute.type);
+
+        val value = Dip.Integer._get_value(instance, attribute);
+        if (empty(value)) return null;
+        
+        val count = attribute_value @? { attribute, value } .count;
+        if (empty(count)) return null;
+
+        return (
+            name = attribute.name,
+            value = value.to_gtv(),
+            count = count
+        );
     }
 }

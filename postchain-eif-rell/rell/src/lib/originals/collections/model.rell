@@ -1,0 +1,44 @@
+entity collection {
+    key name: text;
+    key symbol: text;
+    index projects.project;
+    index author: ft3_account.account;
+    mutable display_name: text;
+    mutable description: text;
+    owner: ft3_account.account;
+    mutable background_image: text;
+    mutable collection_avatar: text;
+    mutable owners_count: integer = 0;
+    mutable trading_volume: integer = 0;
+    mutable nfts_count: integer = 0;
+    mutable reports_count: integer = 0;
+    mutable highest_nft_price: integer = 0;
+    mutable floor_price: integer = 0;
+}
+
+entity collection_original {
+    index collection;
+    // Original can belong only to one collection
+    key originals_core.Id.asset_instance;
+}
+
+entity collection_social_url {
+    key collection, name;
+    mutable url: text;
+}
+
+entity collection_nft_owner {
+    key collection, ft3_account.account;
+    index mutable nfts_count: integer = 0;
+}
+
+entity approved_minter {
+    collection;
+    ft3_account.account;
+}
+
+entity report_collection {
+    key collection, account: ft3_account.account;
+    index account: ft3_account.account;
+    created_at: timestamp = originals_utils.now_from_context();
+}

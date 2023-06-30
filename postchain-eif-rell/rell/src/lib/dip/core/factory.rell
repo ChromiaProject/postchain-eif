@@ -2,158 +2,189 @@ import ^.core.*;
 import ^.util.*;
 
 struct attribute_def {
-	attribute_type;
-	meta: list<Meta.I>;
+    attribute_type;
+    meta: list<Meta.I>;
 }
 
 struct attribute_type {
-	type: Attribute.type;
-	value: gtv?;
-	inner_type: gtv? = null;
+    type: Attribute.type;
+    value: gtv?;
+    inner_type: gtv? = null;
 }
 
 namespace InterfaceFactory {
-	function new(
-		name,
-		attribute_def_list: map<Attribute.I, attribute_def>,
-		depends: list<Interface.dclass> = list(),
-		meta: list<Meta.I> = list(),
-		account: ft3.acc.account,
-		is_open: boolean = false
-	) {
-		validate_name(name);
-		
-		if(not is_open) {
-		    // is owner in meta list
-		    val has_owner = meta @? {.meta_key == InterfaceMeta.type.owner.name} ($) != null;
-    		// Add account as interface owner to meta data
-		    if(not has_owner)
-		      meta.add(0, Owner(account.id));
-		}
-		
-		val dclass = create Interface.dclass (name);
-		Interface.new_dependency(dclass, depends);
-		
-		for ((attribute_name, attribute_def) in attribute_def_list) {
-			validate_name(attribute_name.name);
-			val attribute_type = attribute_def.attribute_type;
-			val attr = create attribute(dclass, attribute_name.name, attribute_type.type);
-			
-			when (attribute_type.type) {
-				Attribute.type.ordered_container -> {
-					val inner_type = Attribute.type.from_gtv(attribute_type.inner_type!!);
-					List.create_type(attr, inner_type);
-				}
-				Attribute.type.unordered_container -> {
-					val inner_type = Attribute.type.from_gtv(attribute_type.inner_type!!);
-					util.ensure_simple_type(inner_type);
-					create Set.set_inner_type(attr, inner_type);
-				}
-				Attribute.type.addressable_container -> {
-					val inner_types = Map.types.from_gtv(attribute_type.inner_type!!);
-					Map.create_type(attr, inner_types.K, inner_types.V);
-				}
-			}			
-			// Add attribute meta data
-			for (m in attribute_def.meta) {				
-				AttributeMeta.add(attr, m);
-			}
-			
-			// Add default value
-			if(attribute_type.value??) {
-				AttributeMeta.add(attr, Default(attribute_type.to_bytes()));
-			}
-		}
-		
-		// Add interface meta data
-		for (m in meta) {
-			InterfaceMeta.add(dclass, m.meta_key, m.meta_value);
-		}
-	}
+    function new(
+        name,
+        attribute_def_list: map<Attribute.I, attribute_def>,
+        depends: list<Interface.dclass> = list(),
+        meta: list<Meta.I> = list(),
+        account: ft3.acc.account,
+        is_open: boolean = false
+    ) {
+        validate_name(name);
+
+        if(not is_open) {
+            // is owner in meta list
+            val has_owner = meta @? {.meta_key == InterfaceMeta.type.owner.name} ($) != null;
+            // Add account as interface owner to meta data
+            if(not has_owner)
+              meta.add(0, Owner(account.id));
+        }
+        
+        val dclass = create Interface.dclass (name);
+        Interface.new_dependency(dclass, depends);
+
+        for ((attribute_name, attribute_def) in attribute_def_list) {
+            validate_name(attribute_name.name);
+            val attribute_type = attribute_def.attribute_type;
+            val attr = create attribute(dclass, attribute_name.name, attribute_type.type);
+            
+            when (attribute_type.type) {
+                Attribute.type.ordered_container -> {
+                    val inner_type = Attribute.type.from_gtv(attribute_type.inner_type!!);
+                    List.create_type(attr, inner_type);
+                }
+                Attribute.type.unordered_container -> {
+                    val inner_type = Attribute.type.from_gtv(attribute_type.inner_type!!);
+                    util.ensure_simple_type(inner_type);
+                    create Set.set_inner_type(attr, inner_type);
+                }
+                Attribute.type.addressable_container -> {
+                    val inner_types = Map.types.from_gtv(attribute_type.inner_type!!);
+                    Map.create_type(attr, inner_types.K, inner_types.V);
+                }
+            }
+            // Add attribute meta data
+            for (m in attribute_def.meta) {        
+                AttributeMeta.add(attr, m);
+            }
+
+            // Add default value
+            if (attribute_type.value??) {
+                _validate_default_attribute_value(attribute_type);
+                AttributeMeta.add(attr, Default(attribute_type.to_bytes()));
+            }
+        }
+        
+        // Add interface meta data
+        for (m in meta) {
+            InterfaceMeta.add(dclass, m.meta_key, m.meta_value);
+        }
+    }
 }
 
 namespace PrototypeFactory {
-	function new(
-		Interface.dclass,
-		attribute_impl_list: map<Attribute.I, attribute_type>,
-		name,
-		prototype_name: text? = null
-	): instance {    
-		val instance = create instance (true);
-	    val interfaces = Interface.get_with_dependencies(dclass);
-	    		
-		create Prototype.prototype (name, instance);
+    function new(
+        Interface.dclass,
+        attribute_impl_list: map<Attribute.I, attribute_type>,
+        name,
+        prototype_name: text? = null,
+        Meta.Engine.access
+    ): instance {
+        val instance = create instance (true);
+        val interfaces = Interface.get_with_dependencies(dclass);
+                
+        create Prototype.prototype (name, instance);
     
-		_create_instance_dclass(
-		    instance,
-            interfaces,
-            dclass
-		);
-		
-		// Link prototype into prototype chain
-		if (prototype_name??) {
-			Prototype.link_instance_prototypes(
-			    instance,
-			    Prototype.get(prototype_name)
-			);
-		}
-		
-		_create_attribute_values(
-		    instance,
-		    interfaces,
-		    attribute_impl_list
-		);  
-		
-		return instance;
-	}
-}
-
-namespace InstanceFactory {
-	function new(
-		Interface.dclass,
-		attribute_impl_list: map<Attribute.I, attribute_type>,
-		prototype_name: text? = null
-	): instance {
-		val instance = create instance (false);
-		val interfaces = Interface.get_with_dependencies(dclass);
-		
-		// Link instance into prototype chain
-		if (prototype_name??) {
-			var protoype = Prototype.get(prototype_name);
-			val distinct_interfaces = Interface.get_all_in_prototype_chain(protoype);
-			
-			require(interfaces.contains_all(distinct_interfaces), "Prototype implements a not known interface");
-			Prototype.link_instance_prototypes(instance, protoype);
-		}
-		
-		val implemented_attributes = 
-    		_create_attribute_values(
-                instance,
-                interfaces,
-                attribute_impl_list
-            );
-            
-        // Should we execute this after setting default values?
-        // Perhaps computed value depends on an attribute that is initalized with default value
-        _create_computed_attribute_values(instance, interfaces);    
-		
-		_create_instance_dclass(
+        _create_instance_dclass(
             instance,
             interfaces,
             dclass
         );
-		
-		// Check if all attributes are implemented or has default values
-		val attributes = Attribute.get_all_in_dclasses(interfaces);
-		attributes.remove_all(implemented_attributes);
-		
-		_initialize_with_default_values(instance, attributes);
-		
-		return instance;
-	}
+        
+        // Link prototype into prototype chain
+        if (prototype_name??) {
+            Prototype.link_instance_prototypes(
+                instance,
+                Prototype.get(prototype_name)
+            );
+        }
+        
+        _create_attribute_values(
+            instance,
+            interfaces,
+            attribute_impl_list,
+            access
+        );  
+        
+        return instance;
+    }
 }
 
-function _create_computed_attribute_values(instance, interfaces: list<Interface.dclass>) {
+namespace InstanceFactory {
+    function new(
+        Interface.dclass,
+        attribute_impl_list: map<Attribute.I, attribute_type>,
+        prototype_name: text? = null,
+        Meta.Engine.access
+    ): instance {
+        val instance = create instance (false);
+        val interfaces = Interface.get_with_dependencies(dclass);
+        
+        // Link instance into prototype chain
+        if (prototype_name??) {
+            var protoype = Prototype.get(prototype_name);
+            val distinct_interfaces = Interface.get_all_in_prototype_chain(protoype);
+            
+            require(interfaces.contains_all(distinct_interfaces), "Prototype implements a not known interface");
+            Prototype.link_instance_prototypes(instance, protoype);
+        }
+        
+        val implemented_attributes = 
+            _create_attribute_values(
+                instance,
+                interfaces,
+                attribute_impl_list,
+                access
+            );
+            
+        // Should we execute this after setting default values?
+        // Perhaps computed value depends on an attribute that is initalized with default value
+        _create_computed_attribute_values(instance, interfaces, access);    
+        
+        _create_instance_dclass(
+            instance,
+            interfaces,
+            dclass
+        );
+        
+        // Check if all attributes are implemented or has default values
+        val attributes = Attribute.get_all_in_dclasses(interfaces);
+        attributes.remove_all(implemented_attributes);
+        
+        _initialize_with_default_values(instance, attributes, access);
+        
+        return instance;
+    }
+}
+
+function _validate_default_attribute_value(attribute_type) {
+    when (attribute_type.type) {
+        Attribute.type.integer -> integer.from_gtv(attribute_type.value!!);
+        Attribute.type.boolean -> boolean.from_gtv(attribute_type.value!!);
+        Attribute.type.text -> text.from_gtv(attribute_type.value!!);
+        Attribute.type.byte_array -> byte_array.from_gtv(attribute_type.value!!);
+        Attribute.type.decimal -> decimal.from_gtv(attribute_type.value!!);
+        Attribute.type.instance -> instance.from_gtv(attribute_type.value!!);
+        Attribute.type.file -> File.data.from_gtv(attribute_type.value!!);
+        Attribute.type.ordered_container,
+        Attribute.type.unordered_container -> {
+            val inner_type_for_validation = Attribute.type.from_gtv(attribute_type.inner_type!!);
+            val value_for_validation = (attribute_type.value!!).to_gtv();
+            
+            _validate_list_inner_type(value_for_validation, inner_type_for_validation);
+        }
+        Attribute.type.addressable_container -> {
+            val inner_types = Map.types.from_gtv(attribute_type.inner_type!!);
+            val attribute_map = map<gtv, gtv>.from_gtv(attribute_type.value!!);
+
+            _validate_list_inner_type(attribute_map.keys().to_gtv(), inner_types.K);
+            _validate_list_inner_type(attribute_map.values().to_gtv(), inner_types.V);
+        }
+    }
+}
+
+function _create_computed_attribute_values(instance, interfaces: list<Interface.dclass>, Meta.Engine.access) {
     // TODO: Extract to a function
     val attributes_meta = (
         a: attribute, 
@@ -165,11 +196,11 @@ function _create_computed_attribute_values(instance, interfaces: list<Interface.
     } (a, am);
     
     for ((attribute, meta) in attributes_meta) {
-        create_computed_attribute_value(instance, attribute, meta);
+        create_computed_attribute_value(instance, attribute, meta, access);
     }
 }
 
-function _initialize_with_default_values(instance, attributes: list<attribute>) {
+function _initialize_with_default_values(instance, attributes: list<attribute>, Meta.Engine.access) {
     for (attr in attributes) {
         val is_implemented = util.is_implemented(instance, attr);
         
@@ -181,7 +212,8 @@ function _initialize_with_default_values(instance, attributes: list<attribute>) 
                 val v = attribute_type.from_gtv(default_value);
                 Attribute.create_value(instance,
                     Attribute.I(interface = attr.dclass.name, name = attr.name),
-                    v.value!!
+                    v.value!!,
+                    access
                 );
             } else {
                 require(AttributeMeta.is_attribute_optional(attr), "Attribute " + attr.name + " is not optional and has no default value");
@@ -191,8 +223,20 @@ function _initialize_with_default_values(instance, attributes: list<attribute>) 
     }
 }
 
+function _validate_list_inner_type(gtv, type: Attribute.type) {
+    when (type) {
+        Attribute.type.boolean -> list<boolean>.from_gtv(gtv);
+        Attribute.type.byte_array -> list<byte_array>.from_gtv(gtv);
+        Attribute.type.decimal -> list<decimal>.from_gtv(gtv); 
+        Attribute.type.instance -> list<instance>.from_gtv(gtv);
+        Attribute.type.integer -> list<integer>.from_gtv(gtv);
+        Attribute.type.text -> list<text>.from_gtv(gtv);
+        else -> require(false, "Unimplemented path");
+    }
+}
+
 @extendable 
-function create_computed_attribute_value(instance, attribute, meta: AttributeMeta.attribute_meta) {
+function create_computed_attribute_value(instance, attribute, meta: AttributeMeta.attribute_meta, Meta.Engine.access) {
     require(
         meta.category == AttributeMeta.category.computed_value.name,
         "Wrong meta category. Expected '%s', found '%s'"
@@ -203,18 +247,20 @@ function create_computed_attribute_value(instance, attribute, meta: AttributeMet
     
     when (meta.meta_key) {
         AttributeMeta.type.composite_value.name -> 
-            _create_composite_value_attribute(instance, attribute, meta_value);
+            _create_composite_value_attribute(instance, attribute, meta_value, access);
     }
 }
 
 function _create_attribute_values(
     instance,
     interfaces: list<Interface.dclass>,
-    attribute_impl_list: map<Attribute.I, attribute_type>
-): list<attribute> {    
+    attribute_impl_list: map<Attribute.I, attribute_type>,
+    Meta.Engine.access
+): list<attribute> {
     val attributes = list<attribute>();
     for ((attribute_name, attribute_type) in attribute_impl_list) {
         val found = interfaces @? {.name == attribute_name.interface};
+        
         require(found, "Attribute '" + Attribute.get_name(attribute_name) + "' not found in instance interfaces");
         
         val value: gtv;
@@ -225,7 +271,8 @@ function _create_attribute_values(
                 InstanceFactory.new(
                     Interface.get($.interface), 
                     $.attributes, 
-                    $.prototype
+                    $.prototype,
+                    access
                 )
             ).to_gtv();
         } else if (_is_instance_def(attribute_type)) {
@@ -233,12 +280,13 @@ function _create_attribute_values(
             value = InstanceFactory.new(
                 Interface.get(def.interface), 
                 def.attributes, 
-                def.prototype
+                def.prototype,
+                access
             ).to_gtv();
         } else {
             value = attribute_type.value!!;
         }
-        val attr = Attribute.create_value(instance, attribute_name, value);
+        val attr = Attribute.create_value(instance, attribute_name, value, access);
         attributes.add(attr);
     }
     
@@ -255,12 +303,13 @@ function _create_instance_dclass(
     }
 }
 
-function _create_composite_value_attribute(instance, attribute, attributes: gtv) {
+function _create_composite_value_attribute(instance, attribute, attributes: gtv, Meta.Engine.access) {
     val a = list<Attribute.I>.from_gtv(attributes);
     val value = Attribute.get_composite_value(instance, a)!!;
     Attribute.create_value(instance,
         Attribute.I(interface = attribute.dclass.name, name = attribute.name),
-        value.to_gtv()
+        value.to_gtv(),
+        access
     );
 }
 
@@ -300,5 +349,5 @@ function _is_instance_def(attribute_type) =
     attribute_type.type == Attribute.type.instance_def;
 
 function Type(attribute_type, meta_list: list<Meta.I> = list()): attribute_def {
-	return attribute_def(attribute_type, meta_list);
+    return attribute_def(attribute_type, meta_list);
 }

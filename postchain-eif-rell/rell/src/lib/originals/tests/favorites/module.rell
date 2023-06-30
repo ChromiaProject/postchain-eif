@@ -1,0 +1,12 @@
+@test module;
+
+import mapper: ^^^.dip.util.pagination_mapper;
+import originals_tests_helper: ^^.tests.helper;
+import originals_util: ^^.util;
+import originals_tests_mocks: ^^.tests.mocks;
+import ft3_helper_tests: ^^^.ft3_helper.tests;
+import ^^.favorites;
+import ^^.projects;
+import favorite_tests: .utils;
+import favorites_external: ^^.favorites.external;
+import collections_tests_helper: ^.collections.helper;

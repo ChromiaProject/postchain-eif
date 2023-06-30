@@ -1,0 +1,114 @@
+namespace ISword {
+    val interface = "ISword";
+    
+    function dependencies(): list<text> {
+        return [
+            originals_core.chromia.INonFungibleOriginal.interface,
+            originals_core.chromia.ITradable.interface
+        ];
+    }
+    
+    val name = dip_core.Attribute.I(interface, name = "name");
+    val attack = dip_core.Attribute.I(interface, name = "attack");
+    
+    function register(ft3_helper_tests.auth_data) {
+        originals_external.def_original_interface(
+            auth_data.auth_id,
+            interface,
+            [
+                name: dip_core.Type(dip_attributes.Text.T()),
+                attack: dip_core.Type(dip_attributes.Integer.T())
+            ],
+            dependencies(),
+            [
+                originals_marketplace.Marketplace.Meta.Category("Swords")
+            ]
+        ).sign(auth_data.keypair).run();
+    }
+    
+    function get() = dip_core.Interface.get(interface);
+}
+
+namespace ICharacter {
+    val interface = "ICharacter";
+    
+    function dependencies(): list<text> {
+        return [
+            originals_core.chromia.INonFungibleOriginal.interface,
+            originals_core.chromia.IHasBadges.interface,
+            originals_core.chromia.ITradable.interface
+        ];
+    }
+    
+    val name = dip_core.Attribute.I(interface, name = "name");
+    val c_class = dip_core.Attribute.I(interface, name = "class");
+    val sword_hand = dip_core.Attribute.I(interface, name = "sword_hand");
+    
+    function register(ft3_helper_tests.auth_data) {
+        originals_external.def_original_interface(
+            auth_data.auth_id,
+            interface,
+            [
+                name: dip_core.Type(dip_attributes.Text.T()),
+                c_class: dip_core.Type(dip_attributes.Text.T(), [
+                        originals_marketplace.Marketplace.Meta.Filter("Class"),
+                        originals_marketplace.Marketplace.Meta.Description("Character class"),
+                        originals_marketplace.Marketplace.Meta.Label("Class")
+                    ]),
+                sword_hand:  dip_core.Type(dip_core.Instance.T(), [dip_core.ImplementsInterface(ISword.interface)])
+            ],
+            dependencies(),
+            [
+                originals_marketplace.Marketplace.Meta.Category("Character")
+            ]
+        ).sign(auth_data.keypair).run();
+    }
+    
+    function get() = dip_core.Interface.get(interface);
+}
+
+function create_mock_instance_with_children(ft3_helper_tests.auth_data, collection_name: text): (byte_array, dip_core.instance) {
+    originals_tests_helper.init_originals(auth_data);
+    
+    ISword.register(auth_data);
+    ICharacter.register(auth_data);
+    
+    val sword_type = originals_core.Minter.I(
+        interface_name = ISword.interface,
+        [
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T("Test Original"),
+            originals_core.chromia.IOriginal.creator_id: dip_attributes.ByteArray.T(auth_data.auth_id.account_id),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Tester"),
+            originals_core.chromia.ITradable.image: dip_attributes.Text.T(originals_tests_mocks.dummy_image),
+            ISword.name: dip_attributes.Text.T("Gram"),
+            ISword.attack: dip_attributes.Integer.T(20)
+        ]
+    );    
+    originals_external.mint_non_fungible_original(
+        auth_data.auth_id,
+        collection_name,
+        sword_type
+    ).sign(auth_data.keypair).run();
+    val (sword_id, sword_instance) = originals_tests_helper.get_last();
+
+    val character_type = originals_core.Minter.I(
+        interface_name = ICharacter.interface,
+        [
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T("Test Original"),
+            originals_core.chromia.IOriginal.creator_id: dip_attributes.ByteArray.T(auth_data.auth_id.account_id),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Tester"),
+            originals_core.chromia.ITradable.image: dip_attributes.Text.T(originals_tests_mocks.dummy_image),
+            ICharacter.name: dip_attributes.Text.T("Perseus"),
+            ICharacter.c_class: dip_attributes.Text.T("Mage"),
+            ICharacter.sword_hand: originals_core.Id.T(sword_id)
+        ]
+    );
+    
+    originals_external.mint_non_fungible_original(
+        auth_data.auth_id,
+        collection_name,
+        character_type
+    ).sign(auth_data.keypair).run();
+    
+    return originals_tests_helper.get_last();
+}

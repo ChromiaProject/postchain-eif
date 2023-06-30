@@ -1,4 +1,5 @@
 @mount("access.whitelist")
 module;
 
-import ^^.ft3.account.*;
+import ft3_account: ^^.ft3.account;
+import util: ^^.originals.util;

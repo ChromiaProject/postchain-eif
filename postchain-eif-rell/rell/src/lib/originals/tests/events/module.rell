@@ -1,0 +1,12 @@
+@test module;
+
+import ft3_helper_tests: ^^^.ft3_helper.tests;
+import ^^.events;
+import ft3_account: ^^^.ft3.account;
+import originals_tests_mocks: ^.mocks;
+import originals_tests_helper: ^.helper;
+import events_external: ^^.events.external;
+import originals_external_dev: ^^.external.dev.dev_op;
+import collections_external: ^^.collections.external;
+import collections_tests_helper: ^.collections.helper;
+import ^^.projects;

@@ -1,0 +1,102 @@
+function get_or_create_favorite_object(favorite_item) {
+    when (FavoriteItemType(favorite_item.type)) {
+        nft -> {
+            return get_or_create_favorite_object_nft(favorite_item);
+        }
+        collection -> {
+            return get_or_create_favorite_object_collection(favorite_item);
+        }
+        project -> {
+            return get_or_create_favorite_object_project(favorite_item);
+        }
+    }
+}
+
+function get_favorite_object(favorite_item) {
+    when (FavoriteItemType(favorite_item.type)) {
+        nft -> {
+            val asset_id = byte_array.from_gtv(favorite_item.id);
+            return favorite_nft @? { originals_core.Id.get_by_id(asset_id) } .favorite_object;
+        }
+        collection -> {
+            val collection_name = text.from_gtv(favorite_item.id);
+            return favorite_collection @? { originals_collections.Collection(collection_name) } .favorite_object;
+        }
+        project -> {
+            val project_name = text.from_gtv(favorite_item.id);
+            return favorite_project @? { projects.Project(project_name) } .favorite_object;
+        }
+    }    
+}
+
+function create_favorite(ft3_account.account, favorite_item) {
+    val favorite_object = get_or_create_favorite_object(favorite_item);
+    favorite_object.favorite_count +=1;
+    
+    create favorite(account, favorite_object = favorite_object);
+}
+
+function remove_favorite(account_id: byte_array, favorite_item) {
+    val favorite_object = require(
+        get_favorite_object(favorite_item),
+        "%s %s hasn't been added to favorites".format(favorite_item.type, favorite_item.id)
+    );
+
+    val favorite = require(
+        favorite @? { favorite_object, .user.id == account_id },
+        "%s %s not found in user %s favorites".format(favorite_item.type, favorite_item.id, account_id)
+    );
+    
+    favorite_object.favorite_count -= 1;
+    delete favorite;
+}
+
+function get_or_create_favorite_object_nft(favorite_item) {
+    val asset_id = byte_array.from_gtv(favorite_item.id);
+    val asset_instance = originals_core.Id.get_by_id(asset_id);
+    var nft_object = favorite_nft @? { asset_instance } .favorite_object;
+    if (empty(nft_object)) {
+        nft_object = create favorite_object(0);
+        create favorite_nft(nft_object, asset_instance);
+    }
+
+    return nft_object;
+}
+
+function get_or_create_favorite_object_collection(favorite_item) {
+    val collection_name = text.from_gtv(favorite_item.id);
+    val collection = originals_collections.Collection(collection_name);
+    var collection_object = favorite_collection @? { collection } .favorite_object;
+    if (empty(collection_object)) {
+        collection_object = create favorite_object(0);
+        create favorite_collection(collection_object, collection);
+    }
+
+    return collection_object;
+}
+
+function get_or_create_favorite_object_project(favorite_item) {
+    val project_name = text.from_gtv(favorite_item.id);
+    val project = projects.Project(project_name);
+    var project_object = favorite_project @? { project } .favorite_object;
+    if (empty(project_object)) {
+        project_object = create favorite_object(0);
+        create favorite_project(project_object, project);
+    }
+
+    return project_object;
+}
+
+function is_favorite_nft(nft: originals_core.Id.asset_instance, account_id: byte_array) = 
+    (f: favorites.favorite, fn: favorites.favorite_nft) @? { 
+        f.favorite_object == fn.favorite_object,
+        fn.nft == nft,
+        f.user.id == account_id
+    }??;
+
+function is_favorite_project(projects.project, caller_id: byte_array) =
+    (f: favorites.favorite, fp: favorites.favorite_project) @? { 
+        f.favorite_object == fp.favorite_object,
+        fp.project == project,
+        f.user.id == caller_id
+    }??;

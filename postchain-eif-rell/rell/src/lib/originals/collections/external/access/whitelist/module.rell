@@ -1,0 +1,19 @@
+import ^^^^^.access.whitelist;
+import ft3_account: ^^^^^.ft3.account;
+import originals_core: ^^^^.core;
+import ^^^^.collections;
+import access: ^;
+
+@extend(access.has_add_original_to_collection_permission) 
+function (ft3_account.account, original: originals_core.Id.asset_instance, collections.collection) {
+    whitelist.require_active(account);
+    access.require_collection_owner_or_approved_minter(account, collection);
+    return true;
+}
+
+@extend(access.has_create_collection_permission)
+function (ft3_account.account) {
+  whitelist.require_active(account);
+
+  return true;
+}

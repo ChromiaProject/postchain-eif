@@ -1,0 +1,20 @@
+function favorite_nft(nft_id: byte_array) = (
+    favorites.favorite_item(
+	    favorites.favorite_type.nft.name,
+	    nft_id.to_gtv()
+    )
+);
+
+function favorite_collection(collection_name: text) = (
+    favorites.favorite_item(
+        favorites.favorite_type.collection.name,
+        collection_name.to_gtv()
+    )
+);
+
+function favorite_project(projects.project) = (
+    favorites.favorite_item(
+        favorites.favorite_type.project.name,
+        project.name.to_gtv()
+    )
+);

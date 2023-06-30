@@ -1,17 +1,10 @@
-@test 
-module;
-
-import ^^^.originals.core.*;
-import ^^^.originals.external;
-import ^^^.ft3_helper.tests.*;
-
-function define_empty_non_fungible_interface(name = "TestNonFungibleInterface", auth_data) {
-    external
-        .def_original_interface_op(
+function define_empty_non_fungible_interface(name = "TestNonFungibleInterface", ft3_helper_tests.auth_data) {
+    originals_external
+        .def_original_interface(
             auth_data.auth_id,
             name,
             [:],
-            [chromia.INonFungibleOriginal.interface]
+            [originals_core.chromia.INonFungibleOriginal.interface]
         )
         .sign(auth_data.keypair)
         .run();
@@ -19,13 +12,13 @@ function define_empty_non_fungible_interface(name = "TestNonFungibleInterface", 
     return name;
 }
 
-function define_empty_fungible_interface(name = "TestFungibleInterface", auth_data) {
-    external
-        .def_original_interface_op(
+function define_empty_fungible_interface(name = "TestFungibleInterface", ft3_helper_tests.auth_data) {
+    originals_external
+        .def_original_interface(
             auth_data.auth_id,
             name,
             [:],
-            [chromia.IFungibleOriginal.interface]
+            [originals_core.chromia.IFungibleOriginal.interface]
         )
         .sign(auth_data.keypair)
         .run();
@@ -33,6 +26,29 @@ function define_empty_fungible_interface(name = "TestFungibleInterface", auth_da
     return name;
 }
 
+function mint_non_fungible_original(ft3_helper_tests.auth_data, collection_name: text) {
+    val interface_name = define_empty_non_fungible_interface(auth_data = auth_data);
+    originals_external
+        .mint_non_fungible_original(
+            auth_data.auth_id,
+            collection_name,
+            originals_core.Minter.I(
+                interface_name, 
+                [
+                    originals_core.chromia.IOriginal.name: dip_attributes.Text.T("Test Original"),
+                    originals_core.chromia.IOriginal.creator_id: dip_attributes.ByteArray.T(auth_data.auth_id.account_id),
+                    originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Admin")
+                ]
+            )
+        )
+        .sign(auth_data.keypair)
+        .run();
 
+    return originals_tests_helper.get_last();
+}
 
-
+val dummy_file = dip_attributes.File.data(
+    hash = x"B184B8584ED5AA7ED7A9928B7B5DB2EE69101430D7DF7D15C9C1CC63EC1D03F9",
+    hub_brid = x"EDB23F52A3322880EC44448303A2ED1360A2C5669EFDA3C9BE739CB618C6DE71",
+    hub_location = "localhost:7740"
+);

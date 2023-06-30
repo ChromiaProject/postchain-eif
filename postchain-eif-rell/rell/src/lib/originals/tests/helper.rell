@@ -1,11 +1,238 @@
-@test
-module;
+@test module;
 
-import ^^^.ft3_helper.tests.*;
-import ^^^.originals.external.*;
+import ft3_helper_tests: ^^^.ft3_helper.tests;
+import projects: ^^.projects;
+import projects_external: ^^.projects.external;
+import originals_marketplace: ^^.marketplace;
+import originals_util: ^^.util;
+import originals_external: ^^.external;
+import originals_tests_mocks: ^.mocks;
+import originals_core: ^^.core;
+import pagination_mapper: ^^^.dip.util.pagination_mapper;
+import collections_external: ^^.collections.external;
+import collections: ^^.collections;
+import collections_tests_mocks: ^.collections.mocks;
+import dip_utils: ^^^.dip.util;
+import dip_attributes: ^^^.dip.attributes;
+import originals_tests: ^;
+import ft3_account: ^^^.ft3.account;
+import marketplace_external: ^^.marketplace.external;
+import dip_core: ^^^.dip.core;
 
-function init_originals(admin: auth_data) {
-    init_originals_interfaces_op(admin.auth_id)
+function default_cursor(page_size: integer = 20, after_rowid: rowid? = null) = 
+    dip_utils.encode_cursor(pagination_mapper.page_cursor(page_size, after_rowid));
+
+function init_originals(admin: ft3_helper_tests.auth_data) {
+    originals_external.init_originals_interfaces(admin.auth_id)
         .sign(admin.keypair)
         .run();
+}
+
+function initialize_mock_interfaces(ft3_helper_tests.auth_data) {
+    collections_tests_mocks.ITradableBertha.register(auth_data);
+    collections_tests_mocks.IBertha.register(auth_data);
+    collections_tests_mocks.IRanch.register(auth_data);
+}
+
+function create_mock_project(ft3_helper_tests.auth_data, projects.simple_project_props = originals_tests_mocks.mock_simple_project) {
+    projects_external.create_project(auth_data.auth_id, simple_project_props)
+        .sign(auth_data.keypair)
+        .nop()
+        .run();
+
+    return projects.project @ {} (
+        @omit @sort_desc .rowid,
+        $
+    ) limit 1;
+}
+
+function register_and_retrieve_accounts(): list<ft3_account.account> {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    val alice = ft3_helper_tests.register_alice();
+    
+    return [
+        ft3_account.account @ {admin.auth_id.account_id},
+        ft3_account.account @ {bob.auth_id.account_id},
+        ft3_account.account @ {alice.auth_id.account_id}
+    ];
+}
+
+function unpack_pretty_gtv(paths: list<text>, gtv) {
+    var value = gtv;
+    for (path in paths) {
+        value = map<text,gtv>.from_gtv_pretty(value)[path];
+    }
+    return value;
+}
+
+function create_mock_collection(
+    owner_auth_data: ft3_helper_tests.auth_data,
+    author_auth_data: ft3_helper_tests.auth_data,
+    admin: ft3_helper_tests.auth_data,
+    name: text = "com.originals.WearablesCollection",
+    display_name: text = "Wearables",
+    description: text = "Empty description",
+    project: projects.project? = null,
+    symbol: text = "WC"
+) {
+
+    var mock_project = 
+        project
+        ?:
+        (projects.project@?{}(@omit @sort_desc .rowid, $)limit 1) 
+        ?: 
+        create_mock_project(admin, originals_tests_mocks.mock_simple_project);
+        
+    collections_external.create_collection(
+        owners_auth_id = owner_auth_data.auth_id,
+        symbol = symbol,
+        name = name,
+        display_name = display_name,
+        description = description,
+        background_image = originals_tests_mocks.mock_image,
+        collection_avatar = originals_tests_mocks.mock_image,
+        author_account_id = author_auth_data.auth_id.account_id,
+        project_name = mock_project.name
+    )
+        .sign(owner_auth_data.keypair)
+        .run();
+    
+    val last_collection = collections.collection @ {} (@omit @sort_desc .rowid, $) limit 1;
+
+    return (last_collection, mock_project);
+}
+
+function list_original(
+    ft3_helper_tests.auth_data,
+    original_id: byte_array,
+    settlement_type: originals_marketplace.Marketplace.settlement_type = originals_marketplace.Marketplace.settlement_type.fixed_price,
+    expiration: integer = originals_tests_mocks.VALID_EXPIRATION,
+    type: originals_marketplace.Marketplace.asset_type = originals_marketplace.Marketplace.asset_type.regular,
+    price: integer = 100,
+    asset_id: byte_array = originals_util.Ft3Helper.get_asset(originals_tests_mocks.ASSET_ID).id,
+    salt: integer = 123,
+    signature: byte_array? = null
+) {
+    marketplace_external.Operations.create_settlement(
+        auth_data.auth_id,
+        original_id,
+        originals_marketplace.Marketplace.asset_type.original,
+        1,
+        asset_id,
+        type,
+        price,
+        expiration,
+        salt,
+        settlement_type,
+        maker_evm_signature = signature
+    )
+    .sign(auth_data.keypair)
+    .run();
+}
+
+function list_original_and_return_settlement_id(
+    ft3_helper_tests.auth_data,
+    original_id: byte_array,
+    settlement_type: originals_marketplace.Marketplace.settlement_type = originals_marketplace.Marketplace.settlement_type.fixed_price,
+    expiration: integer = originals_tests_mocks.VALID_EXPIRATION,
+    type: originals_marketplace.Marketplace.asset_type = originals_marketplace.Marketplace.asset_type.regular,
+    price: integer = 100,
+    asset_id: byte_array = originals_util.Ft3Helper.get_asset(originals_tests_mocks.ASSET_ID).id,
+    salt: integer = 123,
+    signature: byte_array? = null
+) {
+    list_original(auth_data, original_id, settlement_type, expiration, type, price, asset_id, salt, signature);
+
+    return originals_marketplace.Marketplace.derive_settlement_id(auth_data.auth_id.account_id, original_id, salt);
+}
+
+function list_original_and_return_settlement(
+    ft3_helper_tests.auth_data,
+    original_id: byte_array,
+    settlement_type: originals_marketplace.Marketplace.settlement_type = originals_marketplace.Marketplace.settlement_type.fixed_price,
+    expiration: integer = originals_tests_mocks.VALID_EXPIRATION,
+    type: originals_marketplace.Marketplace.asset_type = originals_marketplace.Marketplace.asset_type.regular,
+    price: integer = 100,
+    asset_id: byte_array = originals_util.Ft3Helper.get_asset(originals_tests_mocks.ASSET_ID).id,
+    salt: integer = 123,
+    signature: byte_array? = null
+) {
+    return originals_marketplace.Marketplace.settlement_descriptor @ {
+        list_original_and_return_settlement_id(auth_data, original_id, settlement_type, expiration, type, price, asset_id, salt, signature)
+    };
+}
+
+function non_fungible_mockup(creator_id: byte_array) {
+    return originals_core.Minter.I(
+        interface_name = originals_core.chromia.INonFungibleOriginal.interface,
+        [
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T("Test Original"),
+            originals_core.chromia.IOriginal.creator_id: dip_attributes.ByteArray.T(creator_id),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Admin")
+        ]
+    );
+}
+
+function fungible_mockup(creator_id: byte_array, max_supply: integer = 100) {
+    return originals_core.Minter.I(
+        interface_name = originals_core.chromia.IFungibleOriginal.interface,
+        [
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T("Test Original"),
+            originals_core.chromia.IOriginal.creator_id: dip_attributes.ByteArray.T(creator_id),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Admin"),
+            originals_core.chromia.IFungibleOriginal.max_supply: dip_attributes.Integer.T(max_supply)
+        ]
+    );
+}
+
+function mint_mock_non_fungible_original(ft3_helper_tests.auth_data, collection_name: text) {
+    val original = non_fungible_mockup(auth_data.auth_id.account_id);
+
+    originals_external.mint_non_fungible_original(
+        auth_data.auth_id,
+        collection_name,
+        original
+    ).sign(auth_data.keypair).run();
+    
+    return get_last();
+}
+
+function fractional_type() = originals_core.Minter.I(
+    interface_name = originals_core.chromia.IFractionalizedOriginal.interface,
+    types = [:]
+);
+
+function mint_mock_fungible_original(ft3_helper_tests.auth_data, collection_name: text, max_supply: integer, mint_amount: integer) {
+    val original = fungible_mockup(auth_data.auth_id.account_id, max_supply);
+    
+    originals_external.create_fungible_original(
+        auth_data.auth_id,
+        collection_name,
+        original,
+        mint_amount
+    ).sign(auth_data.keypair).run();
+    
+    return get_last();
+}
+
+function get_last_minted_asset_instance() {
+    return originals_core.Id.asset_instance @ {} limit 1;
+}
+
+function get_asset() = originals_util.Ft3Helper.get_asset(originals_tests_mocks.ASSET_ID);
+
+function get_asset_id() = get_asset().id;
+
+function get_last_id() {
+    return originals_core.Id.asset_instance @ {} (.asset.id, @omit @sort_desc .rowid) limit 1;
+}
+
+function get_last(): (byte_array, dip_core.instance) {
+    val id = get_last_id();
+    
+    return (
+        id,
+        originals_core.Id.get_instance(id)
+    );
 }

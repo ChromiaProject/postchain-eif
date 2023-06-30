@@ -1,0 +1,8 @@
+@log 
+entity event {
+    type: event_type;
+    index ft3_core.asset,
+    from: ft3_account.account,
+    to: ft3_account.account;
+    params: byte_array;
+}

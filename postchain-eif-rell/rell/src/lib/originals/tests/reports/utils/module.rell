@@ -1,0 +1,5 @@
+@test module;
+
+import ^^^.projects;
+import ^^^.collections;
+import ^^^.reports;

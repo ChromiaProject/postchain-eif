@@ -9,7 +9,7 @@
       },
       "originals": {
         "repository": "git@bitbucket.org:chromawallet/originals-dip.git",
-        "branch": "c1f4c2d13cd6ca496c115312a55a8eda572391a1",
+        "branch": "dev",
         "subdirectory": "rell/src/",
         "createDirectory": false
       }

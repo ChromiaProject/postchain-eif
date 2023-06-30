@@ -1,0 +1,32 @@
+function settlement_descriptor_to_struct(Marketplace.settlement_descriptor) {
+    return event_settlement_descriptor(
+        id = settlement_descriptor.id,
+        taker_descriptor = payment_descriptor_to_struct(settlement_descriptor.taker_descriptor),
+        maker_descriptor = payment_descriptor_to_struct(settlement_descriptor.maker_descriptor),
+        expiration = settlement_descriptor.expiration,
+        salt = settlement_descriptor.salt,
+        settlement_descriptor.settlement_type
+    );
+}
+
+function payment_descriptor_to_struct(Marketplace.payment_descriptor) {
+    return event_payment_descriptor(
+        ft3_asset_to_struct(payment_descriptor.asset),
+        payment_descriptor.asset_type,
+        payment_descriptor.amount,
+        ft3_account_to_struct(payment_descriptor.account)
+    );
+}
+
+function ft3_asset_to_struct(ft3_core.asset) {
+    return event_ft3_asset(
+        asset.id,
+        asset.name
+    );
+}
+
+function ft3_account_to_struct(ft3_core.acc.account) {
+    return event_ft3_account(
+        account.id
+    );
+}

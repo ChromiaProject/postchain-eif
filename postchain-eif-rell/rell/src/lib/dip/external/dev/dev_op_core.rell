@@ -1,5 +1,5 @@
 
-operation create_instance_op() {
-	require_dev();
-	create instance();
+operation create_instance() {
+    require_dev();
+    create instance();
 }

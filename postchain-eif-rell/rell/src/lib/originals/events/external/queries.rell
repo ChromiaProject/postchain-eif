@@ -1,0 +1,34 @@
+query find_nft_activity(event_types: list<text>, asset_id: byte_array?, collection: text?, project: text?, cursor: text) {
+    val decoded_cursor = pagination_mapper.decode_cursor(cursor);
+    require(decoded_cursor.page_size <= 100, "page_size must be 100 or less");
+                
+    val event_results = events.event @* {
+        if (decoded_cursor.after_rowid??) (event.rowid > decoded_cursor.after_rowid!!) else true,
+        .type in events.event_types_from_names(event_types),
+        if (asset_id != null) .asset.id == asset_id else true,
+        if (collection != null)
+          exists(
+              collections.collection_original @* {
+                  .asset_instance.asset == event.asset,
+                  .collection.name == collection
+              }
+          )
+        else true,
+        if (project != null)
+          exists(
+              collections.collection_original @* {
+                  .asset_instance.asset == event.asset,
+                  .collection.project.name_lowercased == project.lower_case()
+              }
+          )
+        else true
+    } (
+        @omit @sort event.rowid,
+        pagination_mapper.pagination_result(
+            data = events.event_to_event_dto($).to_gtv_pretty(),
+            rowid = .rowid
+        )
+    ) limit pagination_mapper.fetch_data_size(decoded_cursor);
+    
+    return pagination_mapper.make_page(event_results, decoded_cursor);
+}

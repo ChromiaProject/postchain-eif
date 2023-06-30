@@ -1,0 +1,14 @@
+@mount("evm_accounts")
+namespace Operations {
+    operation login(address: text, ft3.acc.auth_descriptor, EvmAccounts.signature) {
+        EvmAccounts.login(address.lower_case(), auth_descriptor, signature);
+    }
+    
+    operation logout(
+        address: text,
+        auth_descriptor_ids: list<byte_array>,
+        EvmAccounts.signature
+    ) {
+        EvmAccounts.logout(address.lower_case(), auth_descriptor_ids, signature);
+    }
+}

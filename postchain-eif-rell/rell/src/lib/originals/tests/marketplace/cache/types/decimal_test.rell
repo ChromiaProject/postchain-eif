@@ -1,30 +1,34 @@
 @test module;
 
-import ^^^^^.tests.*;
-import ^^^^^^.dip.tests.*;
-import ^^^^^^.ft3_helper.tests.*;
-import ^^^^^^.originals.marketplace.cache.types.*;
+import originals_core: ^^^^^.core;
+import dip_core: ^^^^^^.dip.core;
+import originals_external: ^^^^^.external;
+import ft3_helper_tests: ^^^^^^.ft3_helper.tests;
+import dip_attributes: ^^^^^^.dip.attributes;
+import dip_external: ^^^^^^.dip.external;
+import marketplace_cache_types: ^^^^^.marketplace.cache.types;
+import ^^^^^^.dip.tests.{get_last_instance};
 
 namespace IDecimalTest {
     val interface = "IDecimalTest";
     
-    val foo = Attribute.I(interface, name = "foo");
-    val color_number = Attribute.I(interface, name = "color_number");
+    val foo = dip_core.Attribute.I(interface, name = "foo");
+    val color_number = dip_core.Attribute.I(interface, name = "color_number");
 
-    function register(auth_data) {
-        def_interface_op(auth_data.auth_id, interface, [
-            foo: Type(Decimal.T(), [Mutable()]),
-            color_number: Type(Decimal.T(), [Mutable(), Optional()])
+    function register(ft3_helper_tests.auth_data) {
+        dip_external.def_interface(auth_data.auth_id, interface, [
+            foo: dip_core.Type(dip_attributes.Decimal.T(), [dip_core.Mutable()]),
+            color_number: dip_core.Type(dip_attributes.Decimal.T(), [dip_core.Mutable(), dip_core.Optional()])
         ])
         .sign(auth_data.keypair)
         .run();
     }
 
-    function get() = Interface.get(interface);
+    function get() = dip_core.Interface.get(interface);
     
-    function create_instance(user: auth_data, attributes: map<Attribute.I, attribute_type>) {
+    function create_instance(user: ft3_helper_tests.auth_data, attributes: map<dip_core.Attribute.I, dip_core.attribute_type>) {
         rell.test.tx()
-            .op(def_instance_op(
+            .op(dip_external.def_instance(
                 user.auth_id, 
                 IDecimalTest.interface, 
                 attributes
@@ -36,23 +40,23 @@ namespace IDecimalTest {
     }
 }
 
-function test_attribute_value_can_be_cached() {
-    val admin = register_admin();
+function test_attribute_value_can_be_marketplace_cache_typesd() {
+    val admin = ft3_helper_tests.register_admin();
     
     IDecimalTest.register(admin);
     
     IDecimalTest.create_instance(
         admin,
         [
-            IDecimalTest.foo: Decimal.T(1.1)
+            IDecimalTest.foo: dip_attributes.Decimal.T(1.1)
         ]
     );
     
-    val values = Cache.Decimal.get_values(Attribute.get(IDecimalTest.foo));
+    val values = marketplace_cache_types.Cache.Decimal.get_values(dip_core.Attribute.get(IDecimalTest.foo));
 
     val expected_values = [
         (
-            attribute = Attribute.get_name(IDecimalTest.foo),
+            attribute = dip_core.Attribute.get_name(IDecimalTest.foo),
             value = 1.1,
             count = 1
         )
@@ -61,35 +65,35 @@ function test_attribute_value_can_be_cached() {
     assert_equals(values, expected_values);
 }
 
-function test_multiple_attribute_values_can_be_cached() {
-    val admin = register_admin();
+function test_multiple_attribute_values_can_be_marketplace_cache_typesd() {
+    val admin = ft3_helper_tests.register_admin();
     
     IDecimalTest.register(admin);
     
     IDecimalTest.create_instance(
         admin,
         [
-            IDecimalTest.foo: Decimal.T(1.1)
+            IDecimalTest.foo: dip_attributes.Decimal.T(1.1)
         ]
     );
     
     IDecimalTest.create_instance(
         admin,
         [
-            IDecimalTest.foo: Decimal.T(1.2)
+            IDecimalTest.foo: dip_attributes.Decimal.T(1.2)
         ]
     );
     
-    val values = Cache.Decimal.get_values(Attribute.get(IDecimalTest.foo));
+    val values = marketplace_cache_types.Cache.Decimal.get_values(dip_core.Attribute.get(IDecimalTest.foo));
 
     val expected_values = [
         (
-            attribute = Attribute.get_name(IDecimalTest.foo),
+            attribute = dip_core.Attribute.get_name(IDecimalTest.foo),
             value = 1.1,
             count = 1
         ),
         (
-            attribute = Attribute.get_name(IDecimalTest.foo),
+            attribute = dip_core.Attribute.get_name(IDecimalTest.foo),
             value = 1.2,
             count = 1
         )
@@ -98,15 +102,15 @@ function test_multiple_attribute_values_can_be_cached() {
     assert_equals(values, expected_values);
 }
 
-function test_multiple_attributes_with_same_value_can_be_cached() {
-    val admin = register_admin();
+function test_multiple_attributes_with_same_value_can_be_marketplace_cache_typesd() {
+    val admin = ft3_helper_tests.register_admin();
     
     IDecimalTest.register(admin);
     
     IDecimalTest.create_instance(
         admin,
         [
-            IDecimalTest.foo: Decimal.T(1.1)
+            IDecimalTest.foo: dip_attributes.Decimal.T(1.1)
         ] 
     );
 
@@ -114,15 +118,15 @@ function test_multiple_attributes_with_same_value_can_be_cached() {
     IDecimalTest.create_instance(
         admin,
         [
-            IDecimalTest.foo: Decimal.T(1.1)
+            IDecimalTest.foo: dip_attributes.Decimal.T(1.1)
         ]
     );
 
-    val values = Cache.Decimal.get_values(Attribute.get(IDecimalTest.foo));
+    val values = marketplace_cache_types.Cache.Decimal.get_values(dip_core.Attribute.get(IDecimalTest.foo));
 
     val expected_values = [
         (
-            attribute = Attribute.get_name(IDecimalTest.foo),
+            attribute = dip_core.Attribute.get_name(IDecimalTest.foo),
             value = 1.1,
             count = 2
         )
@@ -131,28 +135,28 @@ function test_multiple_attributes_with_same_value_can_be_cached() {
     assert_equals(values, expected_values);
 }
 
-function test_multiple_attributes_with_different_values_can_be_cached_right() {
-    val admin = register_admin();
+function test_multiple_attributes_with_different_values_can_be_marketplace_cache_typesd_right() {
+    val admin = ft3_helper_tests.register_admin();
     
     IDecimalTest.register(admin);
     
     val color_instance = IDecimalTest.create_instance(
         admin,
         [
-            IDecimalTest.foo: Decimal.T(1.1),
-            IDecimalTest.color_number: Decimal.T(2.5)
+            IDecimalTest.foo: dip_attributes.Decimal.T(1.1),
+            IDecimalTest.color_number: dip_attributes.Decimal.T(2.5)
         ]
     );
     
     IDecimalTest.create_instance(
         admin,
         [
-            IDecimalTest.foo: Decimal.T(1.2),
-            IDecimalTest.color_number: Decimal.T(2.5)
+            IDecimalTest.foo: dip_attributes.Decimal.T(1.2),
+            IDecimalTest.color_number: dip_attributes.Decimal.T(2.5)
         ]
     );
     
-    set_type_attribute_meta_op(
+    dip_external.set_type_attribute_meta(
         admin.auth_id, 
         color_instance, 
         IDecimalTest.color_number, 
@@ -161,16 +165,16 @@ function test_multiple_attributes_with_different_values_can_be_cached_right() {
     .sign(admin.keypair)
     .run();
 
-    val values = Cache.Decimal.get_values(Attribute.get(IDecimalTest.color_number));
+    val values = marketplace_cache_types.Cache.Decimal.get_values(dip_core.Attribute.get(IDecimalTest.color_number));
 
     val expected_values = [
         (
-            attribute = Attribute.get_name(IDecimalTest.color_number),
+            attribute = dip_core.Attribute.get_name(IDecimalTest.color_number),
             value = 2.5,
             count = 1
         ),
         (
-            attribute = Attribute.get_name(IDecimalTest.color_number),
+            attribute = dip_core.Attribute.get_name(IDecimalTest.color_number),
             value = 10.5,
             count = 1
         )

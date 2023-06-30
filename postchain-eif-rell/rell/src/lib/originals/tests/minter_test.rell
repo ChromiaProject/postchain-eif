@@ -1,477 +1,989 @@
 @test module;
-import ^^.tests.*;
-import ^^^.dip.tests.*;
 
-function non_fungible_mockup(creator_id: byte_array) {
-    return Minter.I(
-        interface_name = chromia.INonFungibleOriginal.interface,
-        [
-            chromia.IOriginal.name: Text.T("Test Original"),
-            chromia.IOriginal.creator_id: ByteArray.T(creator_id),
-            chromia.IOriginal.creator_name: Text.T("Admin")
-        ]
-    );
-}
+import dip_core: ^^^.dip.core;
+import originals_core: ^^.core;
+import originals_external_dev: ^^.external.dev.dev_op;
+import originals_external: ^^.external;
+import originals_tests_helper: ^.helper;
+import originals_tests_mocks: ^.mocks;
+import collections_test_helper: ^.collections.helper;
+import extensions: ^.extensions;
+import dip_attributes: ^^^.dip.attributes;
+import dip_external: ^^^.dip.external;
+import ft3_helper_tests: ^^^.ft3_helper.tests;
+import originals_util: ^^.util;
+import ^^^.dip.tests.{get_last_instance};
+import originals_tests_helper: ^.helper;
 
-function fungible_mockup(creator_id: byte_array, max_supply: integer = 100) {
-    return Minter.I(
-        interface_name = chromia.IFungibleOriginal.interface,
-        [
-            chromia.IOriginal.name: Text.T("Test Original"),
-            chromia.IOriginal.creator_id: ByteArray.T(creator_id),
-            chromia.IOriginal.creator_name: Text.T("Admin"),
-            chromia.IFungibleOriginal.max_supply: Integer.T(max_supply)
-        ]
-    );
-}
-
-function mint_mock_non_fungible_original(auth_data) {
-    val original = non_fungible_mockup(auth_data.auth_id.account_id);
-
-    mint_non_fungible_original_op(
-        auth_data.auth_id,
-        original
-    ).sign(auth_data.keypair).run();
-    
-    return get_last();
-}
-
-function mint_mock_fungible_original(auth_data, max_supply: integer, mint_amount: integer) {
-    val original = fungible_mockup(auth_data.auth_id.account_id, max_supply);
-    
-    create_fungible_original_op(
-        auth_data.auth_id,
-        original,
-        mint_amount
-    ).sign(auth_data.keypair).run();
-    
-    return get_last();
-}
 
 // should fail if original interface is not implemented
 function test_mint_0() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	
-	var interface = "ITest";
-	def_interface_op(
-	    admin_account.auth_id,
-	    interface, [:]
-	).sign(admin_keypair()).run();
-	
-	val original = Minter.I(
-	    interface_name = interface,
-	    types = [:]
-	);
-	
-	mint_non_fungible_original_op(
-	    admin_account.auth_id,
-	    original
-	).sign(admin_account.keypair).run_must_fail();
-	
-	create_fungible_original_op(
-	    admin_account.auth_id,
-	    original, 
-	    1
-	).sign(admin_account.keypair).run_must_fail();
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    
+    var interface = "ITest";
+    dip_external.def_interface(
+        admin.auth_id,
+        interface, [:]
+    ).sign(admin.keypair).run();
+    
+    val original = originals_core.Minter.I(
+        interface_name = interface,
+        types = [:]
+    );
+    
+    originals_external.mint_non_fungible_original(
+        admin.auth_id,
+        mock_collection.name,
+        original
+    ).sign(admin.keypair).run_must_fail();
+    
+    originals_external.create_fungible_original(
+        admin.auth_id,
+        mock_collection.name,
+        original, 
+        1
+    ).sign(admin.keypair).run_must_fail();
 }
 
 // should mint non fungible original
 function test_mint_1() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	val (mock_id, mock_instance) = mint_mock_non_fungible_original(admin_account);
-	
-	assert_true(Ft3Helper.owns_original(admin_account.auth_id.account_id, mock_id));
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val (mock_id, mock_instance) = originals_tests_helper.mint_mock_non_fungible_original(admin, mock_collection.name);
+    
+    assert_true(originals_util.Ft3Helper.owns_original(admin.auth_id.account_id, mock_id));
 }
 
 // should mint non fungible original unsafe
 function test_mint_2() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	val bob_account = create_ft3_test_acc(bob_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	mint_non_fungible_original_unsafe_op(
-	    bob_account.auth_id,
-	    non_fungible_mockup(bob_account.auth_id.account_id)
-	).sign(bob_account.keypair).run();
-	
-	assert_true(Ft3Helper.owns_original(bob_account.auth_id.account_id, get_last_id()));
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    
+    originals_external_dev.mint_non_fungible_original_unsafe(
+        admin.auth_id,
+        mock_collection.name,
+        originals_tests_helper.non_fungible_mockup(admin.auth_id.account_id)
+    ).sign(admin.keypair).run();
+    
+    assert_true(originals_util.Ft3Helper.owns_original(admin.auth_id.account_id, originals_tests_helper.get_last_id()));
 }
 
 // should fail minting non fungible original if the creator is not the signer
 function test_mint_3() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	val bob_account = create_ft3_test_acc(bob_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	mint_non_fungible_original_op(
-	    admin_account.auth_id,
-	    non_fungible_mockup(bob_account.auth_id.account_id)
-	).sign(bob_account.keypair).run_must_fail();
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    originals_external.mint_non_fungible_original(
+        admin.auth_id,
+        mock_collection.name,
+        originals_tests_helper.non_fungible_mockup(bob.auth_id.account_id)
+    ).sign(bob.keypair).run_must_fail();
 }
 
 // should mint fungible original
 function test_mint_4() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	val (mock_id, mock_instance) = mint_mock_fungible_original(admin_account, 100, 20);
-	
-	assert_true(Ft3Helper.owns_original(admin_account.auth_id.account_id, mock_id));
-	assert_equals(Ft3Helper.get_asset_balance(admin_account.auth_id.account_id, mock_id), 20);
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    val (mock_id, mock_instance) = originals_tests_helper.mint_mock_fungible_original(admin, mock_collection.name, 100, 20);
+    
+    assert_true(originals_util.Ft3Helper.owns_original(admin.auth_id.account_id, mock_id));
+    assert_equals(originals_util.Ft3Helper.get_asset_balance(admin.auth_id.account_id, mock_id), 20);
 }
 
 // should create fungible original
 // should mint further supply
 function test_mint_5() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	val (mock_id, mock_instance) = mint_mock_fungible_original(admin_account, 100, 20);
-	
-	mint_fungible_original_op(
-	    admin_account.auth_id,
-	    mock_id,
-	    20
-	).sign(admin_account.keypair).run();
-	assert_equals(Ft3Helper.get_asset_balance(admin_account.auth_id.account_id, mock_id), 40);
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    val (mock_id, mock_instance) = originals_tests_helper.mint_mock_fungible_original(admin, mock_collection.name, 100, 20);
+    
+    originals_external.mint_fungible_original(
+        admin.auth_id,
+        mock_id,
+        20
+    ).sign(admin.keypair).run();
+    assert_equals(originals_util.Ft3Helper.get_asset_balance(admin.auth_id.account_id, mock_id), 40);
 }
 
 // should create fungible original
 // should fail if max supply is reached
 function test_mint_6() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	val bob_account = create_ft3_test_acc(bob_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	val (mock_id, mock_instance) = mint_mock_fungible_original(admin_account, 100, 20);
-	
-	mint_fungible_original_op(
-	    admin_account.auth_id,
-	    mock_id,
-	    100
-	).sign(admin_account.keypair).run_must_fail();
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    val (mock_id, mock_instance) = originals_tests_helper.mint_mock_fungible_original(admin, mock_collection.name, 100, 20);
+    
+    originals_external.mint_fungible_original(
+        admin.auth_id,
+        mock_id,
+        100
+    ).sign(admin.keypair).run_must_fail();
 }
 
 // should fail creating original if creator is not signer
 function test_mint_7() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	val bob_account = create_ft3_test_acc(bob_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	create_fungible_original_op(
-	    admin_account.auth_id,
-	    fungible_mockup(admin_account.auth_id.account_id),
-	    20
-	).sign(bob_account.keypair).run_must_fail();
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+
+    originals_external.create_fungible_original(
+        admin.auth_id,
+        mock_collection.name,
+        originals_tests_helper.fungible_mockup(admin.auth_id.account_id),
+        20
+    ).sign(bob.keypair).run_must_fail();
 }
 
 // should fail minting further supply if creator is not signer
 function test_mint_8() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	val bob_account = create_ft3_test_acc(bob_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	val (mock_id, mock_instance) = mint_mock_fungible_original(admin_account, 100, 20);
-	
-	mint_fungible_original_op(
-	    admin_account.auth_id,
-	    mock_id,
-	    20
-	).sign(bob_account.keypair).run_must_fail();
-	
-	mint_fungible_original_op(
-	    bob_account.auth_id,
-	    mock_id,
-	    20
-	).sign(bob_account.keypair).run_must_fail();
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    val (mock_id, mock_instance) = originals_tests_helper.mint_mock_fungible_original(admin, mock_collection.name, 100, 20);
+    
+    originals_external.mint_fungible_original(
+        admin.auth_id,
+        mock_id,
+        20
+    ).sign(bob.keypair).run_must_fail();
+    
+    originals_external.mint_fungible_original(
+        bob.auth_id,
+        mock_id,
+        20
+    ).sign(bob.keypair).run_must_fail();
 }
 
 // should create fungible original unsafe
 function test_mint_9() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	create_fungible_original_unsafe_op(
-	    admin_account.auth_id,
-	    fungible_mockup(admin_account.auth_id.account_id),
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    originals_external_dev.create_fungible_original_unsafe(
+        admin.auth_id,
+        mock_collection.name,
+        originals_tests_helper.fungible_mockup(admin.auth_id.account_id),
         40
-	).sign(admin_account.keypair).run();
-	
-	var original_id = get_last_id();
-	assert_true(Ft3Helper.owns_original(admin_account.auth_id.account_id, original_id));
-	assert_equals(Ft3Helper.get_asset_balance(admin_account.auth_id.account_id, original_id), 40);
+    ).sign(admin.keypair).run();
+    
+    var original_id = originals_tests_helper.get_last_id();
+    assert_true(originals_util.Ft3Helper.owns_original(admin.auth_id.account_id, original_id));
+    assert_equals(originals_util.Ft3Helper.get_asset_balance(admin.auth_id.account_id, original_id), 40);
 }
 
 // should create fungible original unsafe
 // should mint further supply unsafe
 function test_mint_10() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	val bob_account = create_ft3_test_acc(bob_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	create_fungible_original_unsafe_op(
-	    admin_account.auth_id,
-	    fungible_mockup(admin_account.auth_id.account_id),
-	    40
-	).sign(admin_account.keypair).run();
-	var original_id = get_last_id();
-	assert_true(Ft3Helper.owns_original(admin_account.auth_id.account_id, original_id));
-	assert_equals(Ft3Helper.get_asset_balance(admin_account.auth_id.account_id, original_id), 40);
-	
-	mint_fungible_original_unsafe_op(
-	    admin_account.auth_id,
-	    original_id,
-	    20
-	).sign(admin_account.keypair).run();
-	
-	mint_fungible_original_unsafe_op(
-	    bob_account.auth_id,
-	    original_id,
-	    20
-	).sign(bob_account.keypair).run();
-	
-	assert_equals(Ft3Helper.get_asset_balance(admin_account.auth_id.account_id, original_id), 60);
-	assert_equals(Ft3Helper.get_asset_balance(bob_account.auth_id.account_id, original_id), 20);
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    originals_external_dev.create_fungible_original_unsafe(
+        admin.auth_id,
+        mock_collection.name,
+        originals_tests_helper.fungible_mockup(admin.auth_id.account_id),
+        40
+    ).sign(admin.keypair).run();
+    var original_id = originals_tests_helper.get_last_id();
+    assert_true(originals_util.Ft3Helper.owns_original(admin.auth_id.account_id, original_id));
+    assert_equals(originals_util.Ft3Helper.get_asset_balance(admin.auth_id.account_id, original_id), 40);
+    
+    originals_external_dev.mint_fungible_original_unsafe(
+        admin.auth_id,
+        original_id,
+        20
+    ).sign(admin.keypair).run();
+    
+    originals_external_dev.mint_fungible_original_unsafe(
+        bob.auth_id,
+        original_id,
+        20
+    ).sign(bob.keypair).run();
+    
+    assert_equals(originals_util.Ft3Helper.get_asset_balance(admin.auth_id.account_id, original_id), 60);
+    assert_equals(originals_util.Ft3Helper.get_asset_balance(bob.auth_id.account_id, original_id), 20);
 }
 
 // should mint non fungible original to acccount
 function test_mint_11() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	val bob_account = create_ft3_test_acc(bob_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	mint_non_fungible_original_to_account_op(
-	    admin_account.auth_id,
-	    non_fungible_mockup(admin_account.auth_id.account_id),
-	    bob_account.auth_id.account_id
-	).sign(admin_account.keypair).run();
-	val id = get_last_id();
-	
-	assert_true(Ft3Helper.owns_original(bob_account.auth_id.account_id, id));
-	assert_false(Ft3Helper.owns_original(admin_account.auth_id.account_id, id));
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    originals_external.mint_non_fungible_original_to_account(
+        admin.auth_id,
+        mock_collection.name,
+        originals_tests_helper.non_fungible_mockup(admin.auth_id.account_id),
+        bob.auth_id.account_id
+    ).sign(admin.keypair).run();
+    val id = originals_tests_helper.get_last_id();
+    
+    assert_true(originals_util.Ft3Helper.owns_original(bob.auth_id.account_id, id));
+    assert_false(originals_util.Ft3Helper.owns_original(admin.auth_id.account_id, id));
 }
 
 // should mint fungible original to account
 function test_mint_12() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	val bob_account = create_ft3_test_acc(bob_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	create_fungible_original_op(
-	    admin_account.auth_id,
-	    fungible_mockup(admin_account.auth_id.account_id, 150),
-	    100
-	).sign(admin_account.keypair).run();
-	val id = get_last_id();
-	
-	assert_equals(Ownership.amount_owned_of_original(admin_account.auth_id.account_id, Id.get_instance(id)), 100);
-	
-	mint_fungible_original_to_account_op(
-	    admin_account.auth_id,
-	    id,
-	    bob_account.auth_id.account_id,
-	    50
-	).sign(admin_account.keypair).run();
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
 
-	assert_equals(Ownership.amount_owned_of_original(admin_account.auth_id.account_id, Id.get_instance(id)), 100);
-	assert_equals(Ownership.amount_owned_of_original(bob_account.auth_id.account_id, Id.get_instance(id)), 50);
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    originals_external.create_fungible_original(
+        admin.auth_id,
+        mock_collection.name,
+        originals_tests_helper.fungible_mockup(admin.auth_id.account_id, 150),
+        100
+    ).sign(admin.keypair).run();
+    val id = originals_tests_helper.get_last_id();
+    
+    assert_equals(originals_core.Ownership.amount_owned_of_original(admin.auth_id.account_id, originals_core.Id.get_instance(id)), 100);
+    
+    originals_external.mint_fungible_original_to_account(
+        admin.auth_id,
+        id,
+        bob.auth_id.account_id,
+        50
+    ).sign(admin.keypair).run();
+
+    assert_equals(originals_core.Ownership.amount_owned_of_original(admin.auth_id.account_id, originals_core.Id.get_instance(id)), 100);
+    assert_equals(originals_core.Ownership.amount_owned_of_original(bob.auth_id.account_id, originals_core.Id.get_instance(id)), 50);
 }
 
 // should mint non fungible original batches
 function test_mint_13() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	val bob_account = create_ft3_test_acc(bob_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	
-	mint_non_fungible_original_batch_op(
-	    admin_account.auth_id,
-	    non_fungible_mockup(admin_account.auth_id.account_id),
-	    5
-	).sign(admin_account.keypair).run();
-	
-	assert_equals(Ownership.get_unlocked_instances_from_owner(admin_account.auth_id.account_id, integer.MAX_VALUE, 0).size(), 5);
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    originals_external.mint_non_fungible_original_batch(
+        admin.auth_id,
+        mock_collection.name,
+        originals_tests_helper.non_fungible_mockup(admin.auth_id.account_id),
+        5
+    ).sign(admin.keypair).run();
+
+    val result = originals_external.get_unlocked_originals_from_owner(admin.auth_id.account_id, originals_tests_mocks.default_cursor);
+    
+    assert_equals(result.data.size(), 5);
 }
 
 // should mint non fungible original to account in batches
 function test_mint_14() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	val bob_account = create_ft3_test_acc(bob_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	mint_non_fungible_original_to_account_batch_op(
-	    admin_account.auth_id,
-	    non_fungible_mockup(admin_account.auth_id.account_id),
-	    bob_account.auth_id.account_id,
-	    5
-	).sign(admin_account.keypair).run();
-	
-	assert_equals(Ownership.get_unlocked_instances_from_owner(admin_account.auth_id.account_id, integer.MAX_VALUE, 0).size(), 0);
-	assert_equals(Ownership.get_unlocked_instances_from_owner(bob_account.auth_id.account_id, integer.MAX_VALUE, 0).size(), 5);
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    originals_external.mint_non_fungible_original_to_account_batch(
+        admin.auth_id,
+        mock_collection.name,
+        originals_tests_helper.non_fungible_mockup(admin.auth_id.account_id),
+        bob.auth_id.account_id,
+        5
+    ).sign(admin.keypair).run();
+
+    val admin_instances = originals_external.get_unlocked_originals_from_owner(admin.auth_id.account_id, originals_tests_mocks.default_cursor);
+    val bob_instances = originals_external.get_unlocked_originals_from_owner(bob.auth_id.account_id, originals_tests_mocks.default_cursor);
+    
+    assert_equals(admin_instances.data.size(), 0);
+    assert_equals(bob_instances.data.size(), 5);
 }
 
 // should mint non fungible original unsafe in batches
 function test_mint_15() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	val bob_account = create_ft3_test_acc(bob_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	mint_non_fungible_original_unsafe_batch_op(
-	    bob_account.auth_id,
-	    non_fungible_mockup(bob_account.auth_id.account_id),
-	    5
-	).sign(bob_account.keypair).run();
-	
-	assert_equals(Ownership.get_unlocked_instances_from_owner(admin_account.auth_id.account_id, integer.MAX_VALUE, 0).size(), 0);
-	assert_equals(Ownership.get_unlocked_instances_from_owner(bob_account.auth_id.account_id, integer.MAX_VALUE, 0).size(), 5);
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    originals_external_dev.mint_non_fungible_original_unsafe_batch(
+        admin.auth_id,
+        mock_collection.name,
+        originals_tests_helper.non_fungible_mockup(admin.auth_id.account_id),
+        5
+    ).sign(admin.keypair).run();
+    
+    val admin_instances = originals_external.get_unlocked_originals_from_owner(admin.auth_id.account_id, originals_tests_mocks.default_cursor);
+    val bob_instances = originals_external.get_unlocked_originals_from_owner(bob.auth_id.account_id, originals_tests_mocks.default_cursor);
+
+    assert_equals(admin_instances.data.size(), 5);
+    assert_equals(bob_instances.data.size(), 0);
 }
 
 // should fail minting non fungible original if mint amount is negative or zero
 function test_mint_16() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	val bob_account = create_ft3_test_acc(bob_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	mint_non_fungible_original_batch_op(
-        admin_account.auth_id,
-	    non_fungible_mockup(admin_account.auth_id.account_id),
-	    integer.MIN_VALUE
-	).sign(admin_account.keypair).run_must_fail();
-	
-	mint_non_fungible_original_unsafe_batch_op(
-	    bob_account.auth_id,
-	    non_fungible_mockup(bob_account.auth_id.account_id),
-	    -1
-	).sign(bob_account.keypair).run_must_fail();
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    originals_external.mint_non_fungible_original_batch(
+        admin.auth_id,
+        mock_collection.name,
+        originals_tests_helper.non_fungible_mockup(admin.auth_id.account_id),
+        integer.MIN_VALUE
+    ).sign(admin.keypair).run_must_fail();
+    
+    originals_external_dev.mint_non_fungible_original_unsafe_batch(
+        bob.auth_id,
+        mock_collection.name,
+        originals_tests_helper.non_fungible_mockup(bob.auth_id.account_id),
+        -1
+    ).sign(bob.keypair).run_must_fail();
 }
 
 // should mint and link directly at initiation
 function test_mint_17() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	var interface = "ITestDapp";
-	def_original_interface_op(
-	    admin_account.auth_id,
-		interface,
-		[:],
-		[chromia.INonFungibleOriginal.interface]
-	).sign(admin_keypair()).run();
-	
-	
-	val prototype_def = "PrototypeName";
-	def_original_prototype_op(
-	    admin_account.auth_id,
-		interface,
-		[
-		    chromia.IOriginal.name: Text.T("Test Original"),
-			chromia.IOriginal.creator_id: ByteArray.T(admin_account.auth_id.account_id),
-			chromia.IOriginal.creator_name: Text.T("Admin")
-		],
-		prototype_def
-	).sign(admin_keypair()).run();
-	
-	var interface_character = "ICharacter";
-	val character_sword = Dip.Attribute.def_I(interface_character, "sword");
-	
-	def_original_interface_op(
-	    admin_account.auth_id,
-		interface_character,
-		[
-			character_sword: Type(Instance.T(), [Optional(), OwnerMutable()])
-		],
-		[interface]
-	).sign(admin_keypair()).run();
-	
-	var interface_sword = "ISword";	
-	def_original_interface_op(
-	    admin_account.auth_id,
-		interface_sword,
-		[:],
-		[interface]
-	).sign(admin_keypair()).run();
-	
-	val sword_type = Minter.I(
-	    interface_name = interface_sword,
-	    types = [:],
-	    prototype_name = prototype_def
-	);
-	mint_non_fungible_original_op(
-	    admin_account.auth_id,
-	    sword_type
-	).sign(admin_account.keypair).run();
-	val sword_instance = get_last_instance();
-	val sword_id = Id.get_id(sword_instance);
-	
-	val character_type_fail = Minter.I(
-	    interface_name = interface_character,
-	    types = [
-		  character_sword: Instance.T(sword_instance)
-	    ],
-	    prototype_name = prototype_def
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    var interface = "ITestDapp";
+    originals_external.def_original_interface(
+        admin.auth_id,
+        interface,
+        [:],
+        [originals_core.chromia.INonFungibleOriginal.interface]
+    ).sign(ft3_helper_tests.admin_keypair()).run();
+    
+    
+    val prototype_def = "PrototypeName";
+    originals_external.def_original_prototype(
+        admin.auth_id,
+        interface,
+        [
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T("Test Original"),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Admin")
+        ],
+        prototype_def
+    ).sign(ft3_helper_tests.admin_keypair()).run();
+    
+    var interface_character = "ICharacter";
+    val character_sword = dip_core.Attribute.def_I(interface_character, "sword");
+    
+    originals_external.def_original_interface(
+        admin.auth_id,
+        interface_character,
+        [
+            character_sword: dip_core.Type(dip_attributes.Instance.T(), [dip_core.Optional(), originals_core.OwnerMutable()])
+        ],
+        [interface]
+    ).sign(ft3_helper_tests.admin_keypair()).run();
+    
+    var interface_sword = "ISword";    
+    originals_external.def_original_interface(
+        admin.auth_id,
+        interface_sword,
+        [:],
+        [interface]
+    ).sign(ft3_helper_tests.admin_keypair()).run();
+    
+    val sword_type = originals_core.Minter.I(
+        interface_name = interface_sword,
+        types = [:],
+        prototype_name = prototype_def
     );
-	
-	mint_non_fungible_original_op(
-	    admin_account.auth_id,
-	    character_type_fail
-	).sign(admin_account.keypair).run_must_fail();	
-	
-	val character_type = Minter.I(
-	    interface_name = interface_character, 
-	    types = [
-		  character_sword: Id.T(sword_id)
-	    ],
-	    prototype_name = prototype_def
+    originals_external.mint_non_fungible_original(
+        admin.auth_id,
+        mock_collection.name,
+        sword_type
+    ).sign(admin.keypair).run();
+    val sword_instance = get_last_instance();
+    val sword_id = originals_core.Id.get_id(sword_instance);
+    
+    val character_type_fail = originals_core.Minter.I(
+        interface_name = interface_character,
+        types = [
+          character_sword: dip_attributes.Instance.T(sword_instance)
+        ],
+        prototype_name = prototype_def
     );
-	
-	mint_non_fungible_original_op(
-	    admin_account.auth_id,
-	    character_type
-	).sign(admin_account.keypair).run();
-	val character_instance = get_last_instance();
-	val character_id = Id.get_id(character_instance);
-	
-	assert_true(Ownership.is_linked(sword_instance));
-	assert_false(Ft3Helper.owns_original(admin_account.auth_id.account_id, sword_id));
-	assert_equals(Ownership.get_base_instance(sword_instance), character_instance);
+    
+    originals_external.mint_non_fungible_original(
+        admin.auth_id,
+        mock_collection.name,
+        character_type_fail
+    ).sign(admin.keypair).run_must_fail();    
+    
+    val character_type = originals_core.Minter.I(
+        interface_name = interface_character, 
+        types = [
+          character_sword: originals_core.Id.T(sword_id)
+        ],
+        prototype_name = prototype_def
+    );
+    
+    originals_external.mint_non_fungible_original(
+        admin.auth_id,
+        mock_collection.name,
+        character_type
+    ).sign(admin.keypair).run();
+    val character_instance = get_last_instance();
+    val character_id = originals_core.Id.get_id(character_instance);
+    
+    assert_true(originals_core.Ownership.is_linked(sword_instance));
+    assert_false(originals_util.Ft3Helper.owns_original(admin.auth_id.account_id, sword_id));
+    assert_equals(originals_core.Ownership.get_base_instance(sword_instance), character_instance);
 }
 
 // should fail if interface depends on fungible original and has public/owner mutable attributes
 function test_mint_18() {
-	val admin_account = create_ft3_test_acc(admin_keypair());
-	init_originals_interfaces_op(admin_account.auth_id).sign(admin_account.keypair).run();
-	
-	val interface = "ITestDapp";
-	val id = Dip.Attribute.I(interface, name = "id");
-	val name = Dip.Attribute.I(interface, name = "name");
-	
-	def_original_interface_op(
-	    admin_account.auth_id,
-		interface,
-		[
-			id: Type(Integer.T(), [Mutable()]),
-			name: Type(Text.T())
-		],
-		[chromia.IFungibleOriginal.interface]
-	).sign(admin_keypair()).run_must_fail();
-	
-	def_original_interface_op(
-	    admin_account.auth_id,
-		interface,
-		[
-			id: Type(Integer.T(), [OwnerMutable()])
-		],
-		[chromia.IFungibleOriginal.interface]
-	).sign(admin_keypair()).run_must_fail();
-	
-	def_original_interface_op(
-	    admin_account.auth_id,
-		interface,
-		[
-			id: Type(Integer.T(), [CreatorMutable()])
-		],
-		[chromia.IFungibleOriginal.interface]
-	).sign(admin_keypair()).run();
+    val admin = ft3_helper_tests.register_admin();
+    originals_tests_helper.init_originals(admin);
+    
+    val interface = "ITestDapp";
+    val id = dip_core.Attribute.I(interface, name = "id");
+    val name = dip_core.Attribute.I(interface, name = "name");
+    
+    originals_external.def_original_interface(
+        admin.auth_id,
+        interface,
+        [
+            id: dip_core.Type(dip_attributes.Integer.T(), [dip_attributes.Mutable()]),
+            name: dip_core.Type(dip_attributes.Text.T())
+        ],
+        [originals_core.chromia.IFungibleOriginal.interface]
+    ).sign(ft3_helper_tests.admin_keypair()).run_must_fail();
+    
+    originals_external.def_original_interface(
+        admin.auth_id,
+        interface,
+        [
+            id: dip_core.Type(dip_attributes.Integer.T(), [originals_core.OwnerMutable()])
+        ],
+        [originals_core.chromia.IFungibleOriginal.interface]
+    ).sign(ft3_helper_tests.admin_keypair()).run_must_fail();
+    
+    originals_external.def_original_interface(
+        admin.auth_id,
+        interface,
+        [
+            id: dip_core.Type(dip_attributes.Integer.T(), [originals_core.ApprovedMinterMutable()])
+        ],
+        [originals_core.chromia.IFungibleOriginal.interface]
+    ).sign(ft3_helper_tests.admin_keypair()).run();
+}
+
+function test_is_should_succeed_to_get_last_minted_original_id() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    val (mock_id, mock_instance) = originals_tests_helper.mint_mock_non_fungible_original(admin, mock_collection.name);
+    val original_id = originals_external.get_last_minted_original_id();
+    
+    assert_equals(mock_id, mock_id);
+}
+
+function test_get_last_minted_original_id_q_should_retun_null_if_no_original_was_minted() {
+    val admin = ft3_helper_tests.register_admin();
+    originals_tests_helper.init_originals(admin);
+        
+    val original_id = originals_external.get_last_minted_original_id();
+
+    assert_null(original_id);
+}
+
+function test_minted_non_fungible_original_has_asset_name_equal_to_name_attribute_of_prototype() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    val prototype_def = "PrototypeName";
+    var interface = "ITest";
+    var original_name = "Test original name";
+
+    originals_tests_helper.init_originals(admin);
+
+    originals_external.def_original_interface(
+        admin.auth_id,
+        interface,
+        [:],
+        [originals_core.chromia.INonFungibleOriginal.interface]
+    ).sign(ft3_helper_tests.admin_keypair()).run();
+
+    originals_external.def_original_prototype(
+        admin.auth_id,
+        interface,
+        [
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Admin"),
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T(original_name)
+        ],
+        prototype_def
+    ).sign(ft3_helper_tests.admin_keypair()).run();
+
+    val orig_type = originals_core.Minter.I(
+        interface_name = interface,
+        types = [:],
+        prototype_name = prototype_def
+    );    
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    originals_external.mint_non_fungible_original(admin.auth_id, mock_collection.name, orig_type).sign(admin.keypair).run();
+
+    val (id, instance) = originals_tests_helper.get_last();
+    val asset_name = (originals_util.Ft3Helper.get_asset(id)).name;
+    assert_equals(asset_name, original_name);
+}
+
+function test_minted_non_fungible_original_has_asset_name_equal_to_name_attribute() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    val prototype_def = "PrototypeName";
+    var interface = "ITest";
+    var original_name = "Test original name";
+
+    originals_tests_helper.init_originals(admin);
+
+    originals_external.def_original_interface(
+        admin.auth_id,
+        interface,
+        [:],
+        [originals_core.chromia.INonFungibleOriginal.interface]
+    ).sign(ft3_helper_tests.admin_keypair()).run();
+
+    originals_external.def_original_prototype(
+        admin.auth_id,
+        interface,
+        [
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Admin")
+        ],
+        prototype_def
+    ).sign(ft3_helper_tests.admin_keypair()).run();
+
+    val orig_type = originals_core.Minter.I(
+        interface_name = interface,
+        types = [
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T(original_name)
+        ],
+        prototype_name = prototype_def
+    );
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    originals_external.mint_non_fungible_original(admin.auth_id, mock_collection.name, orig_type).sign(admin.keypair).run();
+
+    val (id, instance) = originals_tests_helper.get_last();
+    val asset_name = (originals_util.Ft3Helper.get_asset(id)).name;
+    assert_equals(asset_name, original_name);
+}
+
+function test_minting_should_fail_when_original_name_is_not_initialized() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    val prototype_def = "PrototypeName";
+    var interface = "ITest";
+
+    originals_tests_helper.init_originals(admin);
+
+    originals_external.def_original_interface(
+        admin.auth_id,
+        interface,
+        [:],
+        [originals_core.chromia.INonFungibleOriginal.interface]
+    ).sign(ft3_helper_tests.admin_keypair()).run();
+
+    originals_external.def_original_prototype(
+        admin.auth_id,
+        interface,
+        [:],
+        prototype_def
+    ).sign(ft3_helper_tests.admin_keypair()).run();
+
+    val orig_type = originals_core.Minter.I(
+        interface_name = interface,
+        types = [
+            originals_core.chromia.IOriginal.creator_id: dip_attributes.ByteArray.T(admin.auth_id.account_id),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Admin")
+        ],
+        prototype_name = prototype_def
+    );
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    originals_external.mint_non_fungible_original(admin.auth_id, mock_collection.name, orig_type).sign(admin.keypair).run_must_fail();
+}
+
+function test_mint_non_fungible_original_fails_when_minter_id_and_creator_id_defined_on_prototype_are_not_equal() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+
+    dip_external.def_prototype(
+        admin.auth_id,
+        originals_core.chromia.INonFungibleOriginal.interface,
+        [
+            originals_core.chromia.IOriginal.creator_id: dip_attributes.ByteArray.T(alice.auth_id.account_id)
+        ],
+        "TestPrototype"
+    )
+    .sign(admin.keypair)
+    .run();
+
+    val original = originals_core.Minter.I(
+        interface_name = originals_core.chromia.INonFungibleOriginal.interface,
+        [
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T("Test Original"),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Alice")
+        ],
+        prototype_name = "TestPrototype"
+    );
+    
+    originals_external.mint_non_fungible_original(
+        admin.auth_id,
+        mock_collection.name,
+        original
+    )
+    .sign(admin.keypair)
+    .run_must_fail();
+}
+
+function test_minted_non_fungible_original_has_creator_id_equal_to_minter_id_if_creator_id_is_not_initialized() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val original = originals_core.Minter.I(
+        interface_name = originals_core.chromia.INonFungibleOriginal.interface,
+        [
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T("Test Original"),
+            originals_core.chromia.IOriginal.creator_id: dip_attributes.ByteArray.T(),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Alice")
+        ]
+    );
+    
+    originals_external.mint_non_fungible_original(
+        admin.auth_id,
+        mock_collection.name,
+        original
+    )
+    .sign(admin.keypair)
+    .run();
+
+    val instance = get_last_instance();
+    assert_equals(
+        admin.auth_id.account_id,
+        dip_attributes.ByteArray.get_value(instance, originals_core.chromia.IOriginal.creator_id)
+    );
+}
+
+function test_hooks_are_called_when_minting_non_fungible_original() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);    
+    val (mock_id, mock_instance) = originals_tests_helper.mint_mock_non_fungible_original(admin, mock_collection.name);
+    
+    assert_true(originals_util.Ft3Helper.owns_original(admin.auth_id.account_id, mock_id));
+        
+    assert_equals(extensions.minter_hooks_state.is_after_mint_called, true);
+    assert_equals(extensions.minter_hooks_state.after_mint_account_id, admin.auth_id.account_id);
+    assert_equals(extensions.minter_hooks_state.after_mint_original_id, mock_id);
+    assert_equals(extensions.minter_hooks_state.after_mint_quantity, 1);
+}
+
+function test_hooks_are_called_when_minting_fungible_original() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    originals_tests_helper.init_originals(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);    
+    val (mock_id, mock_instance) = originals_tests_helper.mint_mock_fungible_original(admin, mock_collection.name, 100, 20);
+        
+    assert_equals(extensions.minter_hooks_state.is_after_mint_called, true);
+    assert_equals(extensions.minter_hooks_state.after_mint_account_id, admin.auth_id.account_id);
+    assert_equals(extensions.minter_hooks_state.after_mint_original_id, mock_id);
+    assert_equals(extensions.minter_hooks_state.after_mint_quantity, 20);
+}
+
+function test_add_original_to_collection_after_minting_non_fungible_original() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin); 
+    val (bertha_id, bertha_instance) = collections_test_helper.create_cow(admin, mock_collection.name);
+    
+    val collection_originals = collections_test_helper.find_assets_instance_in_collection(mock_collection.name);
+  
+    assert_equals(collection_originals, [bertha_id]);
+}
+
+function test_add_original_to_collection_after_minting_non_fungible_original_to_account() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin); 
+    originals_external.mint_non_fungible_original_to_account(
+        admin.auth_id,
+        mock_collection.name,
+        originals_tests_helper.non_fungible_mockup(admin.auth_id.account_id),
+        alice.auth_id.account_id
+    )
+        .sign(admin.keypair)
+        .run();
+        
+    val original_id = originals_tests_helper.get_last_id();
+    val collection_originals = collections_test_helper.find_assets_instance_in_collection(mock_collection.name);
+
+    assert_equals(collection_originals, [original_id]);
+}
+
+function test_add_originals_to_collection_after_minting_non_fungible_original_batch() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+
+    originals_external.mint_non_fungible_original_batch(
+        admin.auth_id,
+        mock_collection.name,
+        originals_tests_helper.non_fungible_mockup(admin.auth_id.account_id),
+        3
+    )
+        .sign(admin.keypair)
+        .run();
+
+    val collection_originals = collections_test_helper.find_assets_instance_in_collection(mock_collection.name);
+
+    assert_equals(collection_originals.size(), 3);
+}
+
+function test_add_originals_to_collection_after_minting_non_fungible_original_to_account_batch() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+
+    originals_external.mint_non_fungible_original_to_account_batch(
+        admin.auth_id,
+        mock_collection.name,
+        originals_tests_helper.non_fungible_mockup(admin.auth_id.account_id),
+        alice.auth_id.account_id,
+        3
+    )
+        .sign(admin.keypair)
+        .run();
+
+    val collection_originals = collections_test_helper.find_assets_instance_in_collection(mock_collection.name);
+
+    assert_equals(collection_originals.size(), 3);
+}
+
+function test_add_original_to_collection_after_creating_fungible_original() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val (fungible_id, fungible_instance) = originals_tests_helper.mint_mock_fungible_original(admin, mock_collection.name, 100, 20);
+
+    val collection_originals = collections_test_helper.find_assets_instance_in_collection(mock_collection.name);
+
+    assert_equals(collection_originals, [fungible_id]);
+}
+
+function test_add_original_to_collection_after_creating_fungible_original_to_account() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val original = originals_tests_helper.fungible_mockup(admin.auth_id.account_id, 20);
+
+    originals_external.create_fungible_original_to_account(
+        admin.auth_id,
+        mock_collection.name,
+        original,
+        alice.auth_id.account_id,
+        10
+    ).sign(admin.keypair).run();
+
+    val (fungible_id, _) = originals_tests_helper.get_last();
+    val collection_originals = collections_test_helper.find_assets_instance_in_collection(mock_collection.name);
+
+    assert_equals(collection_originals, [fungible_id]);
+}
+
+function test_add_original_to_collection_after_creating_fungible_original_and_minting_more_fungible_supply() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val (fungible_id, fungible_instance) = originals_tests_helper.mint_mock_fungible_original(admin, mock_collection.name, 100, 20);
+        
+    originals_external.mint_fungible_original(
+        admin.auth_id,
+        fungible_id,
+        20
+    )
+        .sign(admin.keypair)
+        .run();
+
+    val collection_originals = collections_test_helper.find_assets_instance_in_collection(mock_collection.name);
+
+    assert_equals(collection_originals, [fungible_id]);
+}
+
+function test_add_original_to_collection_after_creating_fungible_original_and_minting_more_fungible_supply_to_account() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val (fungible_id, fungible_instance) = originals_tests_helper.mint_mock_fungible_original(admin, mock_collection.name, 100, 20);
+        
+    originals_external.mint_fungible_original_to_account(
+        admin.auth_id,
+        fungible_id,
+        alice.auth_id.account_id,
+        20
+    )
+        .sign(admin.keypair)
+        .run();
+
+    val collection_originals = collections_test_helper.find_assets_instance_in_collection(mock_collection.name);
+
+    assert_equals(collection_originals, [fungible_id]);
+}
+
+function test_mint_adds_collection_name_attribute() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin); 
+    val (bertha_id, bertha_instance) = collections_test_helper.create_cow(admin, mock_collection.name);
+    
+    val collection_name = dip_attributes.Text.get_value(bertha_instance, originals_core.chromia.IOriginal.collection_name);
+  
+    assert_equals(collection_name, mock_collection.name);
+}
+
+function test_mint_fails_if_collection_name_conflicts_with_prototype() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    val prototype_def = "PrototypeName";
+    var interface = "ITest";
+    var original_name = "Test original name";
+
+    originals_tests_helper.init_originals(admin);
+
+    originals_external.def_original_interface(
+        admin.auth_id,
+        interface,
+        [:],
+        [originals_core.chromia.INonFungibleOriginal.interface]
+    ).sign(ft3_helper_tests.admin_keypair()).run();
+
+    originals_external.def_original_prototype(
+        admin.auth_id,
+        interface,
+        [
+            originals_core.chromia.IOriginal.creator_id: dip_attributes.ByteArray.T(admin.auth_id.account_id),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Admin"),
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T(original_name),
+            originals_core.chromia.IOriginal.collection_name: dip_attributes.Text.T("WrongCollectionName")
+        ],
+        prototype_def
+    ).sign(ft3_helper_tests.admin_keypair()).run();
+
+    val orig_type = originals_core.Minter.I(
+        interface_name = interface,
+        types = [:],
+        prototype_name = prototype_def
+    );    
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    originals_external.mint_non_fungible_original(admin.auth_id, mock_collection.name, orig_type).sign(admin.keypair).run_must_fail();
+}
+
+function test_mint_fails_if_collection_name_conflicts_with_explicit_attribute() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    val prototype_def = "PrototypeName";
+    var interface = "ITest";
+    var original_name = "Test original name";
+
+    originals_tests_helper.init_originals(admin);
+
+    originals_external.def_original_interface(
+        admin.auth_id,
+        interface,
+        [:],
+        [originals_core.chromia.INonFungibleOriginal.interface]
+    ).sign(ft3_helper_tests.admin_keypair()).run();
+
+    val orig_type = originals_core.Minter.I(
+        interface_name = interface,
+        types = [
+            originals_core.chromia.IOriginal.creator_id: dip_attributes.ByteArray.T(admin.auth_id.account_id),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Admin"),
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T(original_name),
+            originals_core.chromia.IOriginal.collection_name: dip_attributes.Text.T("WrongCollectionName")
+        ]
+    );    
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    originals_external.mint_non_fungible_original(admin.auth_id, mock_collection.name, orig_type).sign(admin.keypair).run_must_fail();
 }

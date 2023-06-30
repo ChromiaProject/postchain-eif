@@ -1,0 +1,22 @@
+function events_to_event_dtos(events: list<event>): list<event_dto> {
+    val event_dtos = list<event_dto>();
+    for (event in events) {
+        event_dtos.add(event_to_event_dto(event));
+    }
+    return event_dtos;
+}
+
+function event_to_event_dto(event): event_dto {
+    return event_dto(
+        asset = (
+                id = event.asset.id,
+            name = event.asset.name
+        ),
+        type = event.type.name,
+        from_id = event.from.id,
+        to_id = event.to.id,
+        params = gtv.from_bytes(event.params),
+        tx_rid = event.transaction.tx_rid,
+        timestamp = event.transaction.block.timestamp
+    );
+}

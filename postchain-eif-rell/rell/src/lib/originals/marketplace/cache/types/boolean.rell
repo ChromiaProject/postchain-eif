@@ -69,5 +69,24 @@ namespace Cache.Boolean {
         }
     }
 
+    function get_value_count(Dip.attribute, value: boolean) {
+        Dip.util.ensure_type(Dip.Attribute.type.boolean, attribute.type);
+        return attribute_value @ { attribute, value } .count;
+    }
 
+    function get_instance_attribute_value(Dip.instance, Dip.attribute) {
+        Dip.util.ensure_type(Dip.Attribute.type.boolean, attribute.type);
+
+        val value = Dip.Boolean._get_value(instance, attribute);
+        if (empty(value)) return null;
+   
+        val count = attribute_value @? { attribute, value } .count;
+        if (empty(count)) return null;
+        
+        return (
+            name = attribute.name,
+            value = value.to_gtv(),
+            count = count
+        );
+    }
 }

@@ -1,0 +1,223 @@
+@test module;
+
+import originals_marketplace: ^^^.marketplace;
+import marketplace_cache: ^^^.marketplace.cache;
+import originals_tests_marketplace_mocks: ^^.marketplace.mocks;
+import dip_core: ^^^^.dip.core;
+import originals_external: ^^^.external;
+import ft3_helper_tests: ^^^^.ft3_helper.tests;
+import originals_tests_helper: ^^.helper;
+import collections_tests_helper: ^^.collections.helper;
+import utils: ^.utils;
+import originals_tests_mocks: ^.mocks;
+
+
+function test_it_should_succeed_to_get_instance_attribute_value_of_boolean_type() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+
+    originals_tests_marketplace_mocks.IMockOriginalWithBooleanAttribute.register(admin);
+    val (_, instance) = utils.create_mock_original_with_boolean_attribute(admin, mock_collection.name);
+
+    val value = marketplace_cache.get_instance_attribute_value(
+        instance, 
+        dip_core.Attribute.get(originals_tests_marketplace_mocks.IMockOriginalWithBooleanAttribute.is_boolean)
+    );
+
+    assert_equals(value, (
+        name = "is_boolean",
+        value = true.to_gtv(),
+        count = 1
+    ));
+}
+
+function test_it_should_succeed_to_get_instance_attribute_value_of_byte_array_type() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+
+    originals_tests_marketplace_mocks.IMockOriginalWithByteArrayAttribute.register(admin);
+    val (_, instance) = utils.create_mock_original_with_byte_array_attribute(admin, mock_collection.name);
+
+    val value = marketplace_cache.get_instance_attribute_value(
+        instance, 
+        dip_core.Attribute.get(originals_tests_marketplace_mocks.IMockOriginalWithByteArrayAttribute.byte_array)
+    );
+
+    assert_equals(value, (
+        name = "byte_array",
+        value = x"abcd".to_gtv(),
+        count = 1
+    ));
+}
+
+function test_it_should_succeed_to_get_instance_attribute_value_of_decimal_type() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+
+    originals_tests_marketplace_mocks.IMockOriginalWithDecimalAttribute.register(admin);
+    val (_, instance) = utils.create_mock_original_with_decimal_attribute(admin, mock_collection.name);
+
+    val value = marketplace_cache.get_instance_attribute_value(
+        instance, 
+        dip_core.Attribute.get(originals_tests_marketplace_mocks.IMockOriginalWithDecimalAttribute.decimal)
+    );
+
+    assert_equals(value, (
+        name = "decimal",
+        value = (0.12).to_gtv(),
+        count = 1
+    ));    
+}
+
+function test_it_should_succeed_to_get_instance_attribute_value_of_integer_type() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+
+    originals_tests_marketplace_mocks.IMockOriginalWithIntegerAttribute.register(admin);
+    val (_, instance) = utils.create_mock_original_with_integer_attribute(admin, mock_collection.name);
+
+    val value = marketplace_cache.get_instance_attribute_value(
+        instance, 
+        dip_core.Attribute.get(originals_tests_marketplace_mocks.IMockOriginalWithIntegerAttribute.integer)
+    );
+
+    assert_equals(value, (
+        name = "integer",
+        value = (12).to_gtv(),
+        count = 1
+    ));    
+}
+
+function test_it_should_succeed_to_get_instance_attribute_value_of_text_type() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    utils.register_test_asset_and_mint_to_account(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val (_, bertha) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    val value = marketplace_cache.get_instance_attribute_value(
+        bertha, 
+        dip_core.Attribute.get(originals_tests_marketplace_mocks.ITradableBertha.face)
+    );
+
+    assert_equals(value, (
+        name = "face",
+        value = "neutral".to_gtv(),
+        count = 1
+    )); 
+}
+
+function test_get_instance_attribute_value_returns_null_for_non_primitive_types() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    originals_tests_marketplace_mocks.IMockOriginalWithFileAttribute.register(admin);
+    val (_, instance) = utils.create_mock_original_with_file_attribute(admin, mock_collection.name);
+
+    val value = marketplace_cache.get_instance_attribute_value(
+        instance, 
+        dip_core.Attribute.get(originals_tests_marketplace_mocks.IMockOriginalWithFileAttribute.file)
+    );
+
+    assert_null(value);
+}
+
+function test_it_should_succeed_to_get_value_count_of_boolean_type() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    originals_tests_marketplace_mocks.IMockOriginalWithBooleanAttribute.register(admin);
+    utils.create_mock_original_with_boolean_attribute(admin, mock_collection.name);
+    
+    val count = marketplace_cache.types.Cache.Boolean.get_value_count(
+        dip_core.Attribute.get(originals_tests_marketplace_mocks.IMockOriginalWithBooleanAttribute.is_boolean), 
+        true
+    );
+
+    assert_equals(count, 1);
+}
+
+function test_it_should_succeed_to_get_value_count_of_byte_array_type() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    originals_tests_marketplace_mocks.IMockOriginalWithByteArrayAttribute.register(admin);
+    utils.create_mock_original_with_byte_array_attribute(admin, mock_collection.name);
+    
+    val count = marketplace_cache.types.Cache.ByteArray.get_value_count(
+        dip_core.Attribute.get(originals_tests_marketplace_mocks.IMockOriginalWithByteArrayAttribute.byte_array), 
+        x"abcd"
+    );
+
+    assert_equals(count, 1);
+}
+
+function test_it_should_succeed_to_get_value_count_of_decimal_type() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    originals_tests_marketplace_mocks.IMockOriginalWithDecimalAttribute.register(admin);
+    utils.create_mock_original_with_decimal_attribute(admin, mock_collection.name);
+
+    val count = marketplace_cache.types.Cache.Decimal.get_value_count(
+        dip_core.Attribute.get(originals_tests_marketplace_mocks.IMockOriginalWithDecimalAttribute.decimal), 
+        0.12
+    );
+
+    assert_equals(count, 1);
+}
+
+function test_it_should_succeed_to_get_value_count_of_integer_type() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    originals_tests_helper.init_originals(admin);
+    originals_tests_marketplace_mocks.IMockOriginalWithIntegerAttribute.register(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    utils.create_mock_original_with_integer_attribute(admin, mock_collection.name);
+    
+    val count = marketplace_cache.types.Cache.Integer.get_value_count(
+        dip_core.Attribute.get(originals_tests_marketplace_mocks.IMockOriginalWithIntegerAttribute.integer), 
+        12
+    );
+
+    assert_equals(count, 1);
+}
+
+function test_it_should_succeed_to_get_value_count_of_text_type() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    originals_tests_marketplace_mocks.ITradableBertha.register(admin);
+    collections_tests_helper.create_cow(admin, mock_collection.name);
+    
+    val count = marketplace_cache.types.Cache.Text.get_value_count(
+        dip_core.Attribute.get(originals_tests_marketplace_mocks.ITradableBertha.face), 
+        "neutral"
+    );
+
+    assert_equals(count, 1);
+}

@@ -1,0 +1,380 @@
+function test_before_create_settlement() {
+    val admin = ft3_helper_tests.register_admin();
+    marketplace_test_utils.register(admin);
+    
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);  
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    originals_tests_helper.list_original(admin, bertha_id);
+    
+    assert_true(extensions.marketplace_hooks_state.called_before_create_settlement);
+    val inputs = [
+        (ft3_account.account @ {admin.auth_id.account_id}).to_gtv(),
+        bertha_id.to_gtv(),
+        originals_marketplace.Marketplace.asset_type.original.to_gtv(),
+        integer(1).to_gtv(),
+        originals_util.Ft3Helper.get_asset(marketplace_test_utils.ASSET_ID).id.to_gtv(),
+        originals_marketplace.Marketplace.asset_type.regular.to_gtv(),
+        integer(100).to_gtv(),
+        originals_tests_mocks.VALID_EXPIRATION.to_gtv(),
+        integer(123).to_gtv(),
+        originals_marketplace.Marketplace.settlement_type.fixed_price.to_gtv(),
+        null.to_gtv()
+    ];
+    assert_equals(inputs.to_gtv().to_bytes(), extensions.marketplace_hooks_state.before_create_settlement_inputs);
+}
+
+function test_after_create_settlement() {
+    val admin = ft3_helper_tests.register_admin();
+    marketplace_test_utils.register(admin);
+    
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);  
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    val settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, bertha_id, 123);
+    originals_tests_helper.list_original(admin, bertha_id);
+    
+    assert_true(extensions.marketplace_hooks_state.called_after_create_settlement);
+    val sd = originals_marketplace.Marketplace.settlement_descriptor @ {settlement_id};
+    assert_equals(sd.to_gtv().to_bytes(), extensions.marketplace_hooks_state.after_create_settlement_inputs);
+}
+
+function test_before_delete_settlement() {
+    val admin = ft3_helper_tests.register_admin();
+    marketplace_test_utils.register(admin);
+    
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);  
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    val settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, bertha_id, 123);
+    originals_tests_helper.list_original(admin, bertha_id);
+    
+    val sd = originals_marketplace.Marketplace.settlement_descriptor @ {settlement_id};
+    
+    marketplace_external.OperationsDev.delete_settlement(admin.auth_id, settlement_id, originals_tests_mocks.VALID_EXPIRATION + 1).sign(admin.keypair).run();
+    
+    assert_true(extensions.marketplace_hooks_state.called_before_delete_settlement);
+    assert_equals(sd.to_gtv().to_bytes(), extensions.marketplace_hooks_state.before_delete_settlement_inputs);
+}
+
+function test_after_delete_settlement() {
+    val admin = ft3_helper_tests.register_admin();
+    marketplace_test_utils.register(admin);
+    
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);  
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    val settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, bertha_id, 123);
+    originals_tests_helper.list_original(admin, bertha_id);
+        
+    marketplace_external.OperationsDev.delete_settlement(admin.auth_id, settlement_id, originals_tests_mocks.VALID_EXPIRATION + 1).sign(admin.keypair).run();
+    
+    assert_true(extensions.marketplace_hooks_state.called_after_delete_settlement);
+    assert_equals(settlement_id.to_gtv().to_bytes(), extensions.marketplace_hooks_state.after_delete_settlement_inputs);
+}
+
+function test_before_delete_settlement_register_cancelled_event() {
+    val admin = marketplace_test_utils.login_evm(ft3_helper_tests.admin_keypair(), originals_tests_mocks.ADMIN_ADDRESS, originals_tests_mocks.ADMIN_LOGIN_SIG);
+    val oracle = admin;
+    marketplace_test_utils.register(admin);
+
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);  
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+    
+    marketplace_external.Operations.register_evm_asset(marketplace_test_utils.NULL_ADDRESS, originals_marketplace.Marketplace.evm_type.fungible, null, null)
+        .sign(oracle.keypair).run();
+    val evm_native_asset_id = marketplace_external.Queries.derive_fungible_evm_asset_id(marketplace_test_utils.NULL_ADDRESS);
+        
+    marketplace_external.OperationsDev.create_settlement(
+        admin.auth_id,
+        bertha_id,
+        originals_marketplace.Marketplace.asset_type.original,
+        1,
+        evm_native_asset_id,
+        originals_marketplace.Marketplace.asset_type.evm_asset,
+        50,
+        originals_tests_mocks.VALID_EXPIRATION,
+        123,
+        originals_marketplace.Marketplace.settlement_type.evm,
+        marketplace_test_utils.DUMMY_SIGNATURE
+    ).sign(admin.keypair).run();
+        
+    val sd = originals_marketplace.Marketplace.settlement_descriptor @ {marketplace_test_utils.DUMMY_SIGNATURE};
+    
+    marketplace_external.Operations.register_cancelled_event(marketplace_test_utils.DUMMY_SIGNATURE).sign(oracle.keypair).run();
+        
+    assert_true(extensions.marketplace_hooks_state.called_before_delete_settlement);
+    assert_equals(sd.to_gtv().to_bytes(), extensions.marketplace_hooks_state.before_delete_settlement_inputs);
+}
+
+function test_after_delete_settlement_register_cancelled_event() {
+    val admin = marketplace_test_utils.login_evm(ft3_helper_tests.admin_keypair(), originals_tests_mocks.ADMIN_ADDRESS, originals_tests_mocks.ADMIN_LOGIN_SIG);
+    val oracle = admin;
+    marketplace_test_utils.register(admin);
+
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);  
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+    
+    marketplace_external.Operations.register_evm_asset(marketplace_test_utils.NULL_ADDRESS, originals_marketplace.Marketplace.evm_type.fungible, null, null)
+        .sign(oracle.keypair).run();
+    val evm_native_asset_id = marketplace_external.Queries.derive_fungible_evm_asset_id(marketplace_test_utils.NULL_ADDRESS);
+        
+    marketplace_external.OperationsDev.create_settlement(
+        admin.auth_id,
+        bertha_id,
+        originals_marketplace.Marketplace.asset_type.original,
+        1,
+        evm_native_asset_id,
+        originals_marketplace.Marketplace.asset_type.evm_asset,
+        50,
+        originals_tests_mocks.VALID_EXPIRATION,
+        123,
+        originals_marketplace.Marketplace.settlement_type.evm,
+        marketplace_test_utils.DUMMY_SIGNATURE
+    ).sign(admin.keypair).run();
+    
+    marketplace_external.Operations.register_cancelled_event(marketplace_test_utils.DUMMY_SIGNATURE).sign(oracle.keypair).run();
+        
+    assert_true(extensions.marketplace_hooks_state.called_after_delete_settlement);
+    assert_equals(marketplace_test_utils.DUMMY_SIGNATURE.to_gtv().to_bytes(), extensions.marketplace_hooks_state.after_delete_settlement_inputs);
+}
+
+function test_before_settle() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    marketplace_test_utils.register(admin, bob);
+    
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);  
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    originals_tests_helper.list_original(admin, bertha_id);
+    
+    val settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, bertha_id, 123);
+    val sd = originals_marketplace.Marketplace.settlement_descriptor @ {settlement_id};
+    
+    marketplace_external.Operations.settle(
+        bob.auth_id,
+        settlement_id
+    ).sign(bob.keypair).run();
+        
+    assert_true(extensions.marketplace_hooks_state.called_before_settle);
+    assert_equals([
+        (ft3_account.account @ {bob.auth_id.account_id}).to_gtv(),
+        sd.to_gtv()
+    ].to_gtv().to_bytes(), extensions.marketplace_hooks_state.before_settle_inputs);
+}
+
+function test_after_settle() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    marketplace_test_utils.register(admin, bob);
+    
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);  
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    originals_tests_helper.list_original(admin, bertha_id);    
+    
+    val settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, bertha_id, 123);
+    val sd = originals_marketplace.Marketplace.settlement_descriptor @ {settlement_id};
+    
+    marketplace_external.Operations.settle(
+        bob.auth_id,
+        settlement_id
+    ).sign(bob.keypair).run();
+        
+    assert_true(extensions.marketplace_hooks_state.called_after_settle);
+    assert_equals([
+        (ft3_account.account @ {bob.auth_id.account_id}).to_gtv(),
+        sd.to_gtv()
+    ].to_gtv().to_bytes(), extensions.marketplace_hooks_state.after_settle_inputs);
+}
+
+function test_before_settle_close_auction() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    marketplace_test_utils.register(admin, bob);
+    
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);  
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    originals_tests_helper.list_original(admin, bertha_id, settlement_type = originals_marketplace.Marketplace.settlement_type.auction);
+    
+    var settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, bertha_id, 123);
+    val sd = originals_marketplace.Marketplace.settlement_descriptor @ {settlement_id};
+    
+    marketplace_external.Operations.bid(bob.auth_id, settlement_id, 100)
+        .sign(bob.keypair).run();
+
+    
+    marketplace_external.OperationsDev.close_auction(
+        settlement_id,
+        originals_tests_mocks.VALID_EXPIRATION + 1
+    ).sign(bob.keypair).run();
+        
+    assert_true(extensions.marketplace_hooks_state.called_before_settle);
+    assert_equals([
+        (ft3_account.account @ {bob.auth_id.account_id}).to_gtv(),
+        sd.to_gtv()
+    ].to_gtv().to_bytes(), extensions.marketplace_hooks_state.before_settle_inputs);
+}
+
+function test_after_settle_close_auction() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    marketplace_test_utils.register(admin, bob);
+    
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);  
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    originals_tests_helper.list_original(admin, bertha_id, settlement_type = originals_marketplace.Marketplace.settlement_type.auction);
+    
+    var settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, bertha_id, 123);
+    val sd = originals_marketplace.Marketplace.settlement_descriptor @ {settlement_id};
+
+    marketplace_external.Operations.bid(bob.auth_id, settlement_id, 100)
+        .sign(bob.keypair).run();
+
+    
+    marketplace_external.OperationsDev.close_auction(
+        settlement_id,
+        originals_tests_mocks.VALID_EXPIRATION + 1
+    ).sign(bob.keypair).run();
+        
+    assert_true(extensions.marketplace_hooks_state.called_after_settle);
+    assert_equals([
+        (ft3_account.account @ {bob.auth_id.account_id}).to_gtv(),
+        sd.to_gtv()
+    ].to_gtv().to_bytes(), extensions.marketplace_hooks_state.after_settle_inputs);
+}
+
+function test_before_settle_register_settled_event() {
+    val admin = marketplace_test_utils.login_evm(ft3_helper_tests.admin_keypair(), originals_tests_mocks.ADMIN_ADDRESS, originals_tests_mocks.ADMIN_LOGIN_SIG);
+    val bob = marketplace_test_utils.login_evm(ft3_helper_tests.bob_keypair(), originals_tests_mocks.BOB_ADDRESS, originals_tests_mocks.BOB_LOGIN_SIG);
+    marketplace_test_utils.register(admin, bob);
+        
+    val oracle = admin;
+    
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);  
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+    
+    marketplace_external.Operations.register_evm_asset(marketplace_test_utils.NULL_ADDRESS, originals_marketplace.Marketplace.evm_type.fungible, null, null)
+        .sign(oracle.keypair).run();
+    val evm_native_asset_id = marketplace_external.Queries.derive_fungible_evm_asset_id(marketplace_test_utils.NULL_ADDRESS);
+    
+
+    marketplace_external.OperationsDev.create_settlement(
+        admin.auth_id,
+        bertha_id,
+        originals_marketplace.Marketplace.asset_type.original,
+        1,
+        evm_native_asset_id,
+        originals_marketplace.Marketplace.asset_type.evm_asset,
+        50,
+        originals_tests_mocks.VALID_EXPIRATION,
+        123,
+        originals_marketplace.Marketplace.settlement_type.evm,
+        marketplace_test_utils.DUMMY_SIGNATURE
+    ).sign(admin.keypair).run();
+        
+    val sd = originals_marketplace.Marketplace.settlement_descriptor @ {marketplace_test_utils.DUMMY_SIGNATURE};
+    
+    marketplace_external.Operations
+        .register_settled_event(originals_tests_mocks.BOB_ADDRESS, marketplace_test_utils.DUMMY_SIGNATURE)
+        .sign(oracle.keypair)
+        .run();
+    
+    assert_true(extensions.marketplace_hooks_state.called_before_settle);
+    assert_equals([
+        (ft3_account.account @ {bob.auth_id.account_id}).to_gtv(),
+        sd.to_gtv()
+    ].to_gtv().to_bytes(), extensions.marketplace_hooks_state.before_settle_inputs);
+}
+
+function test_after_settle_register_settled_event() {
+    val admin = marketplace_test_utils.login_evm(ft3_helper_tests.admin_keypair(), originals_tests_mocks.ADMIN_ADDRESS, originals_tests_mocks.ADMIN_LOGIN_SIG);
+    val bob = marketplace_test_utils.login_evm(ft3_helper_tests.bob_keypair(), originals_tests_mocks.BOB_ADDRESS, originals_tests_mocks.BOB_LOGIN_SIG);
+    marketplace_test_utils.register(admin, bob);
+        
+    val oracle = admin;
+    
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);  
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+    
+    marketplace_external.Operations.register_evm_asset(marketplace_test_utils.NULL_ADDRESS, originals_marketplace.Marketplace.evm_type.fungible, null, null)
+        .sign(oracle.keypair).run();
+    val evm_native_asset_id = marketplace_external.Queries.derive_fungible_evm_asset_id(marketplace_test_utils.NULL_ADDRESS);
+    
+
+    marketplace_external.OperationsDev.create_settlement(
+        admin.auth_id,
+        bertha_id,
+        originals_marketplace.Marketplace.asset_type.original,
+        1,
+        evm_native_asset_id,
+        originals_marketplace.Marketplace.asset_type.evm_asset,
+        50,
+        originals_tests_mocks.VALID_EXPIRATION,
+        123,
+        originals_marketplace.Marketplace.settlement_type.evm,
+        marketplace_test_utils.DUMMY_SIGNATURE
+    ).sign(admin.keypair).run();
+    
+    val sd = originals_marketplace.Marketplace.settlement_descriptor @ {marketplace_test_utils.DUMMY_SIGNATURE};
+        
+    marketplace_external.Operations
+        .register_settled_event(originals_tests_mocks.BOB_ADDRESS, marketplace_test_utils.DUMMY_SIGNATURE)
+        .sign(oracle.keypair)
+        .run();
+    
+    assert_true(extensions.marketplace_hooks_state.called_after_settle);
+    assert_equals([
+        (ft3_account.account @ {bob.auth_id.account_id}).to_gtv(),
+        sd.to_gtv()
+    ].to_gtv().to_bytes(), extensions.marketplace_hooks_state.after_settle_inputs);
+}
+
+function test_before_bid() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    marketplace_test_utils.register(admin, bob);
+    
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);  
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    originals_tests_helper.list_original(admin, bertha_id, settlement_type = originals_marketplace.Marketplace.settlement_type.auction);
+    
+    var settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, bertha_id, 123);
+    
+    marketplace_external.Operations.bid(bob.auth_id, settlement_id, 100)
+        .sign(bob.keypair).run();
+    
+    assert_true(extensions.marketplace_hooks_state.called_before_bid);
+    assert_equals([
+        (ft3_account.account @ {bob.auth_id.account_id}).to_gtv(),
+        integer(100).to_gtv(),
+        (originals_marketplace.Marketplace.settlement_descriptor @ {settlement_id}).to_gtv()
+    ].to_gtv().to_bytes(), extensions.marketplace_hooks_state.before_bid_inputs);
+}
+
+function test_after_bid() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    marketplace_test_utils.register(admin, bob);
+    
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);  
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    originals_tests_helper.list_original(admin, bertha_id, settlement_type = originals_marketplace.Marketplace.settlement_type.auction);
+    
+    var settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, bertha_id, 123);
+    
+    marketplace_external.Operations.bid(bob.auth_id, settlement_id, 100)
+        .sign(bob.keypair).run();
+    
+    assert_true(extensions.marketplace_hooks_state.called_after_bid);
+    assert_equals([
+        (ft3_account.account @ {bob.auth_id.account_id}).to_gtv(),
+        integer(100).to_gtv(),
+        (originals_marketplace.Marketplace.settlement_descriptor @ {settlement_id}).to_gtv()
+    ].to_gtv().to_bytes(), extensions.marketplace_hooks_state.after_bid_inputs);
+}

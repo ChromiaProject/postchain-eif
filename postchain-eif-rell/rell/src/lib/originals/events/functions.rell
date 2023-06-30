@@ -1,0 +1,9 @@
+function event_type_from_name(name): event_type {
+    val event_type = event_type.values() @? {.name == name};
+    require(event_type != null, "%s is not a valid event_type".format(name));
+    return event_type!!;
+}
+
+function event_types_from_names(names: list<text>): list<event_type> {
+    return names @* {} (event_type_from_name($));
+}

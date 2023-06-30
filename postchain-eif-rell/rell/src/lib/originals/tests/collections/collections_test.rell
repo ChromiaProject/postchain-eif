@@ -1,0 +1,1295 @@
+function test_it_should_succeed_to_create_collection() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    assert_equals(collections.collection @ {} (@sum 1), 0);
+  
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    val collection = collections.collection @? { .name == mock_collection.name };
+
+    assert_equals(collection?.to_struct(), struct<collections.collection>(
+        name = mock_collection.name,
+        symbol = mock_collection.symbol,
+        project = mock_project,
+        author = ft3_account.account @ {.id == bob.auth_id.account_id },
+        display_name = mock_collection.display_name,
+        description = mock_collection.description,
+        owner = ft3_account.account @ { .id == admin.auth_id.account_id },
+        background_image = mock_collection.background_image,
+        collection_avatar = mock_collection.collection_avatar
+    ));
+}
+
+function test_it_should_fail_to_create_collection_when_signature_is_missing() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    val bob = ft3_helper_tests.register_bob();
+
+    collections_external.create_collection(
+        owners_auth_id = alice.auth_id,
+        name = "com.originals.WearablesCollection",
+        display_name = "Wearables",
+        description = "Empty description",
+        background_image = originals_tests_mocks.mock_image,
+        collection_avatar = originals_tests_mocks.mock_image,
+        author_account_id = bob.auth_id.account_id,
+        project_name = originals_tests_helper.create_mock_project(admin, originals_tests_mocks.mock_simple_project).name,
+        symbol = "WC"
+    )
+        .run_must_fail();
+}
+
+function test_it_should_fail_to_create_collection_when_wrong_signature_is_provided() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    val bob = ft3_helper_tests.register_bob();
+
+    collections_external.create_collection(
+        owners_auth_id = alice.auth_id,
+        name = "com.originals.WearablesCollection",
+        display_name = "Wearables",
+        description = "Empty description",
+        background_image = originals_tests_mocks.mock_image,
+        collection_avatar = originals_tests_mocks.mock_image,
+        author_account_id = bob.auth_id.account_id, 
+        project_name = originals_tests_helper.create_mock_project(admin, originals_tests_mocks.mock_simple_project).name,
+        symbol = "WC"
+    )
+        .sign(bob.keypair)
+        .run_must_fail();
+}
+
+function test_it_should_fail_to_create_collection_when_collection_with_the_same_name_already_exists() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+
+    collections_external.create_collection(
+        admin.auth_id,
+        mock_collection.name,
+        mock_collection.symbol,
+        mock_collection.display_name,
+        mock_collection.description,
+        originals_tests_mocks.mock_image,
+        originals_tests_mocks.mock_image,
+        bob.auth_id.account_id,
+        mock_project.name
+    )
+        .sign(admin.keypair)
+        .run_must_fail();
+}
+
+function test_it_should_fail_to_create_collection_with_invalid_collection_params_length() {
+    val alice = ft3_helper_tests.register_alice();
+    val bob = ft3_helper_tests.register_bob();
+    val admin = ft3_helper_tests.register_admin();
+
+    val dummy_image = dip_attributes.File.data(
+        hash = x"",
+        hub_brid = x"",
+        hub_location = ""
+    );
+
+    val mock_project = originals_tests_helper.create_mock_project(admin, originals_tests_mocks.mock_simple_project);
+    collections_external.create_collection(
+        alice.auth_id,
+        "WC",
+        "",
+        "",
+        "",
+        originals_tests_mocks.mock_image,
+        originals_tests_mocks.mock_image,
+        bob.auth_id.account_id,
+        mock_project.name
+    )
+        .sign(alice.keypair)
+        .run_must_fail();
+}
+
+function test_it_should_succeed_to_find_originals_by_collection_for_account() {
+    val bob = ft3_helper_tests.register_bob();
+    val admin = ft3_helper_tests.register_admin();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);  
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+  
+    val originals = collections_external.find_originals_by_collection_for_account(
+        admin.auth_id.account_id,
+        mock_collection.name,
+        originals_tests_helper.default_cursor()
+    );
+    val expected_response = mapper.paged_result(
+        next_cursor = null,
+        data = [bertha_id.to_gtv()]
+    );
+
+    assert_equals(originals, expected_response);
+}
+
+function test_it_should_not_find_originals_by_collection_for_account_when_account_does_not_own_originals_from_collection() {
+    val alice = ft3_helper_tests.register_alice();
+    val bob = ft3_helper_tests.register_bob();
+    val admin = ft3_helper_tests.register_admin();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+  
+    val originals = collections_external.find_originals_by_collection_for_account(
+        bob.auth_id.account_id,
+        mock_collection.name,
+        originals_tests_helper.default_cursor()
+    );
+    val expected_response = mapper.paged_result(
+        next_cursor = null,
+        data = []
+    );
+    
+    assert_equals(originals, expected_response);
+}
+
+function test_it_should_succeed_to_find_originals_by_collection() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+  
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    val originals = collections_external.find_originals_by_collection(mock_collection.name, originals_tests_helper.default_cursor());
+    val expected_response = mapper.paged_result(
+        next_cursor = null,
+        data = [bertha_id.to_gtv()]
+    );
+    
+    assert_equals(originals, expected_response);
+}
+
+function test_it_should_succeed_to_find_collection_by_original_id() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+  
+    val collection = collections_external.find_collection_by_original_id(bertha_id);
+
+    val expected_response = (
+        name = mock_collection.name,
+        project = (
+            id = mock_project.rowid,
+            name = mock_project.name,
+            avatar = mock_project.avatar
+        ),
+        author = bob.auth_id.account_id,
+        display_name = mock_collection.display_name,
+        description = mock_collection.description,
+        owner = admin.auth_id.account_id,
+        background_image = mock_collection.background_image,
+        collection_avatar = mock_collection.collection_avatar,
+        socials = list<(name:text, url:text)>(),
+        nfts_count = 1,
+        owners_count = 1,
+        floor_price = 0,
+        volume = 0,
+        last_four_nfts = [(
+            originals_core.Id.get_by_id(bertha_id)
+        )]
+    );
+
+    assert_equals(collection, expected_response);
+}
+
+function test_collection_cannot_be_found_by_original_id_when_original_is_not_in_collection() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);  
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+  
+    val collection = collections_external.find_collection_by_original_id(x'affe');
+    assert_null(collection);
+}
+
+function test_it_should_find_collection_details_by_name() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    collections_external.add_social_url_to_collection(admin.auth_id, mock_collection.name, "twitter", "http://www.twitter.com")
+        .sign(admin.keypair)
+        .run();
+
+    val found_collection = collections_external.find_collection_details_by_name(mock_collection.name);
+
+    assert_equals(found_collection, (
+        name = mock_collection.name,
+        project = (
+            id = mock_project.rowid,
+            name = mock_project.name,
+            avatar = mock_project.avatar
+        ),
+        author = bob.auth_id.account_id,
+        display_name = mock_collection.display_name,
+        description = mock_collection.description,
+        owner = admin.auth_id.account_id,
+        background_image = mock_collection.background_image,
+        collection_avatar = mock_collection.collection_avatar,
+        socials = [(
+            name = "twitter",
+            url = "http://www.twitter.com"
+        )],
+        nfts_count = 1,
+        owners_count = mock_collection.owners_count,
+        floor_price = 0,
+        volume = 0,
+        last_four_nfts = [(
+            originals_core.Id.get_by_id(bertha_id)
+        )]
+    ));
+}
+
+function test_it_should_find_collection_floor_price() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    collections_tests_helper.register_test_asset_and_mint_to_account(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    originals_tests_helper.list_original(admin, bertha_id);
+
+    val found_collection = collections_external.find_collection_details_by_name(mock_collection.name);
+
+    assert_equals(found_collection?.floor_price, 100);
+}
+
+function test_it_should_find_collection_trading_volume() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    collections_tests_helper.register_test_asset_and_mint_to_account(alice);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    originals_tests_helper.list_original(admin, bertha_id);
+
+    val settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, bertha_id, 123);
+ 
+    marketplace_external.Operations.settle(
+        alice.auth_id,
+        settlement_id
+    ).sign(alice.keypair).run();
+
+    val found_collection = collections_external.find_collection_details_by_name(mock_collection.name);
+
+    assert_equals(found_collection?.volume, 100);
+}
+
+function test_it_should_find_collection_trading_volume_increased_after_auction_closed() {
+    val alice = ft3_helper_tests.register_alice();
+    val bob = ft3_helper_tests.register_bob();
+    val admin = ft3_helper_tests.register_admin();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(alice);
+    collections_tests_helper.register_test_asset_and_mint_to_account(bob);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(alice, bob, admin);
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(alice, mock_collection.name);
+
+    marketplace_external.Operations.create_settlement(
+        alice.auth_id,
+        bertha_id,
+           originals_marketplace.Marketplace.asset_type.original,
+        1,
+        originals_util.Ft3Helper.get_asset(collections_tests_mocks.ASSET_ID).id,
+        originals_marketplace.Marketplace.asset_type.regular,
+        99,
+        collections_tests_mocks.VALID_EXPIRATION,
+        123,
+        originals_marketplace.Marketplace.settlement_type.auction,
+        null
+    )
+        .sign(alice.keypair)
+        .run();
+
+    val collection_before_auction = collections_external.find_collection_details_by_name(mock_collection.name);
+    
+    assert_equals(collection_before_auction?.volume, 0);
+
+    val settlement_id = marketplace_external.Queries.derive_settlement_id(alice.auth_id.account_id, bertha_id, 123);
+
+    marketplace_external.Operations.bid(bob.auth_id, settlement_id, 100)
+        .sign(bob.keypair)
+        .run();
+
+    marketplace_external.OperationsDev.close_auction(settlement_id, collections_tests_mocks.VALID_EXPIRATION + 1)
+        .sign(alice.keypair)
+        .run();
+
+    val collection_after_auction = collections_external.find_collection_details_by_name(mock_collection.name);
+
+    assert_equals(collection_after_auction?.volume, 100);
+}
+
+function test_it_should_fail_to_add_socials_to_collection_if_collection_does_not_exist() {
+    val alice = ft3_helper_tests.register_alice();
+
+    collections_external.add_social_url_to_collection(alice.auth_id, "collection_name", "twitter", "http://www.twitter.com")
+        .sign(alice.keypair)
+        .run_must_fail();
+}
+
+function test_is_should_fail_to_add_socials_to_collection_with_invalid_collection_owner() {
+    val bob = ft3_helper_tests.register_bob();
+    val admin = ft3_helper_tests.register_admin();
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+
+    collections_external.add_social_url_to_collection(bob.auth_id, mock_collection.name, "twitter", "http://www.twitter.com")
+        .sign(bob.keypair)
+        .run_must_fail();
+}
+
+function test_find_collection_nfts_count() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    val nfts_count = collections_external.find_collection_nfts_count(mock_collection.name);
+
+    assert_equals(nfts_count, 1); 
+}
+
+function test_collection_nfts_count_returns_null_if_collection_does_not_exist() {
+    val alice = ft3_helper_tests.register_alice();
+    val nfts_count = collections_external.find_collection_nfts_count("invalid");
+
+    assert_equals(nfts_count, null);
+}
+
+function test_collection_nft_owner_is_created_when_original_added_to_collection() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    val alice = ft3_helper_tests.register_alice(); 
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(alice);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(alice, bob, admin);
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(alice, mock_collection.name);
+
+    val collection_nft_owner = collections_tests_helper.find_collection_nft_owner(mock_collection, alice);
+
+    assert_equals(mock_collection.owners_count, 1);
+    assert_equals(collection_nft_owner?.nfts_count, 1);
+}
+
+function test_find_highest_price_nft_in_collection_after_fixed_price_purchase() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    collections_tests_helper.register_test_asset_and_mint_to_account(bob);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    originals_tests_helper.list_original(admin, bertha_id);
+
+    val settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, bertha_id, 123);
+ 
+    marketplace_external.Operations.settle(
+        bob.auth_id,
+        settlement_id
+    ).sign(bob.keypair).run();
+
+    assert_equals(collections_tests_helper.find_highest_nft_price_in_collection(mock_collection.name), 100);
+}
+
+function test_collection_owners_count_is_more_than_one() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    originals_external.mint_non_fungible_original_to_account(
+        admin.auth_id,
+        mock_collection.name,
+        collections_tests_helper.create_mock_original_definition(admin), 
+        bob.auth_id.account_id
+    )
+        .sign(admin.keypair)
+        .run();
+
+    val (last_original_id, last_original_instance) = collections_tests_helper.originals_tests_helper.get_last();
+
+    assert_equals(mock_collection.owners_count, 2);
+}
+
+function test_collection_nft_owner_more_than_one() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice(); 
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(alice);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(alice, alice, admin);
+    val (original_id_one, original_instance_one) = collections_tests_helper.create_cow(alice, mock_collection.name);
+    val (original_two_one, original_instance_two) = collections_tests_helper.create_cow(alice, mock_collection.name);
+
+    val collection_nft_owner = collections_tests_helper.find_collection_nft_owner(mock_collection, alice);
+    assert_equals(mock_collection.owners_count, 1);
+    assert_equals(collection_nft_owner?.nfts_count, 2);
+}
+
+function test_find_collection_owners_count_and_nft_owner_count_when_original_is_transfered_without_selling() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    val collection_nft_owner_before_transfer = collections_tests_helper.find_collection_nft_owner(mock_collection, admin);
+
+    assert_equals(collection_nft_owner_before_transfer?.to_struct(), struct<collections.collection_nft_owner>(
+        collection = mock_collection,
+        account = ft3_account.account @ { .id == admin.auth_id.account_id },
+        nfts_count = 1
+    ));
+    assert_equals(mock_collection.owners_count, 1);
+
+    originals_external.transfer_original(
+        admin.auth_id,
+        bertha_id,
+        alice.auth_id.account_id
+    )
+        .sign(admin.keypair)
+        .run();
+
+    val collection_nft_owner_after_transfer = collections_tests_helper.find_collection_nft_owner(mock_collection, alice);
+
+    assert_equals(collection_nft_owner_after_transfer?.to_struct(), struct<collections.collection_nft_owner>(
+        collection = mock_collection,
+        account = ft3_account.account @ { .id == alice.auth_id.account_id },
+        nfts_count = 1
+    ));
+    assert_equals(mock_collection.owners_count, 1);
+}
+
+function test_collection_owners_count_is_set_to_zero_when_owner_has_no_more_originals() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(alice);
+    collections_tests_helper.register_test_asset_and_mint_to_account(bob);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(alice, bob, admin);
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(alice, mock_collection.name);
+
+    originals_tests_helper.list_original(alice, bertha_id);
+
+    val from_collection_nft_owner = collections_tests_helper.find_collection_nft_owner(mock_collection, alice);
+
+    assert_equals(from_collection_nft_owner?.nfts_count, 1);
+
+    val settlement_id = marketplace_external.Queries.derive_settlement_id(alice.auth_id.account_id, bertha_id, 123);
+ 
+    marketplace_external.Operations.settle(
+        bob.auth_id,
+        settlement_id
+    ).sign(bob.keypair).run();
+
+    val to_collection_nft_owner = collections_tests_helper.find_collection_nft_owner(mock_collection, bob);
+
+    assert_equals(from_collection_nft_owner?.nfts_count, 0);
+    assert_equals(to_collection_nft_owner?.nfts_count, 1);
+}
+
+function test_find_highest_price_nft_in_collection_after_auction_completes() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    collections_tests_helper.register_test_asset_and_mint_to_account(bob);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    originals_tests_helper.list_original(admin, bertha_id, price = 99, settlement_type = originals_marketplace.Marketplace.settlement_type.auction);
+
+    val settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, bertha_id, 123);
+
+    marketplace_external.Operations.bid(bob.auth_id, settlement_id, 100)
+        .sign(bob.keypair).run();
+ 
+    marketplace_external.OperationsDev.close_auction(
+        settlement_id,
+        collections_tests_mocks.VALID_EXPIRATION + 1
+    )
+        .sign(bob.keypair)
+        .run();
+    
+    assert_equals(collections_tests_helper.find_highest_nft_price_in_collection(mock_collection.name), 100);
+}
+
+function test_find_highest_price_nft_in_collection_updated_after_fixed_price_purchase() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    collections_tests_helper.register_test_asset_and_mint_to_account(bob);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val (original_one_id, original_one_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+    val (original_two_id, original_two_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    originals_tests_helper.list_original(admin, original_one_id);
+
+    val first_settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, original_one_id, 123);
+ 
+    marketplace_external.Operations.settle(
+        bob.auth_id,
+        first_settlement_id
+    ).sign(bob.keypair).run();
+
+    assert_equals(collections_tests_helper.find_highest_nft_price_in_collection(mock_collection.name), 100);
+
+    originals_tests_helper.list_original(admin, original_two_id, price = 120);
+
+    val second_settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, original_two_id, 123);
+ 
+    marketplace_external.Operations.settle(
+        bob.auth_id,
+        second_settlement_id
+    ).sign(bob.keypair).run();
+
+    assert_equals(collections_tests_helper.find_highest_nft_price_in_collection(mock_collection.name), 120);
+}
+
+function test_find_highest_price_nft_in_collection_updated_after_auction_completes() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    val bob = ft3_helper_tests.register_bob();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    collections_tests_helper.register_test_asset_and_mint_to_account(bob);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    val (original_one_id, original_one_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+    val (original_two_id, original_two_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    originals_tests_helper.list_original(admin, original_one_id, price = 99, settlement_type = originals_marketplace.Marketplace.settlement_type.auction);
+
+    val first_settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, original_one_id, 123);
+
+    marketplace_external.Operations.bid(bob.auth_id, first_settlement_id, 100)
+        .sign(bob.keypair).run();
+ 
+    marketplace_external.OperationsDev.close_auction(
+        first_settlement_id,
+        collections_tests_mocks.VALID_EXPIRATION + 1
+    )
+        .sign(bob.keypair)
+        .run();
+    
+    assert_equals(collections_tests_helper.find_highest_nft_price_in_collection(mock_collection.name), 100);
+    
+    originals_tests_helper.list_original(admin, original_two_id, price = 99, settlement_type = originals_marketplace.Marketplace.settlement_type.auction);
+
+    val second_settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, original_two_id, 123);
+
+    marketplace_external.Operations.bid(bob.auth_id, second_settlement_id, 120)
+        .sign(bob.keypair).run();
+ 
+    marketplace_external.OperationsDev.close_auction(
+        second_settlement_id,
+        collections_tests_mocks.VALID_EXPIRATION + 1
+    )
+        .sign(bob.keypair)
+        .run();
+    
+    assert_equals(collections_tests_helper.find_highest_nft_price_in_collection(mock_collection.name), 120);
+}
+
+function test_highest_price_nft_does_not_update_if_nft_fixed_price_is_smaller_than_existing() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    val bob = ft3_helper_tests.register_bob();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    collections_tests_helper.register_test_asset_and_mint_to_account(bob);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    val (original_one_id, original_one_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+    val (original_two_id, original_two_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    originals_tests_helper.list_original(admin, original_one_id);
+
+    val first_settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, original_one_id, 123);
+ 
+    marketplace_external.Operations.settle(
+        bob.auth_id,
+        first_settlement_id
+    ).sign(bob.keypair).run();
+
+    assert_equals(collections_tests_helper.find_highest_nft_price_in_collection(mock_collection.name), 100);
+    
+    originals_tests_helper.list_original(admin, original_two_id, price = 90);
+
+    val second_settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, original_two_id, 123);
+ 
+    marketplace_external.Operations.settle(
+        bob.auth_id,
+        second_settlement_id
+    ).sign(bob.keypair).run();
+
+    assert_equals(collections_tests_helper.find_highest_nft_price_in_collection(mock_collection.name), 100);
+}
+
+function test_highest_price_nft_does_not_update_if_nft_auction_price_is_smaller_than_existing() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    val bob = ft3_helper_tests.register_bob();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    collections_tests_helper.register_test_asset_and_mint_to_account(bob);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    val (original_one_id, original_one_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+    val (original_two_id, original_two_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    originals_tests_helper.list_original(admin, original_one_id, price = 99, settlement_type = originals_marketplace.Marketplace.settlement_type.auction);
+
+    val first_settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, original_one_id, 123);
+
+    marketplace_external.Operations.bid(bob.auth_id, first_settlement_id, 100)
+        .sign(bob.keypair).run();
+ 
+    marketplace_external.OperationsDev.close_auction(
+        first_settlement_id,
+        collections_tests_mocks.VALID_EXPIRATION + 1
+    )
+        .sign(bob.keypair)
+        .run();
+    
+    assert_equals(collections_tests_helper.find_highest_nft_price_in_collection(mock_collection.name), 100);
+
+    originals_tests_helper.list_original(admin, original_two_id, price = 90, settlement_type = originals_marketplace.Marketplace.settlement_type.auction);
+
+    val second_settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, original_two_id, 123);
+
+    marketplace_external.Operations.bid(bob.auth_id, second_settlement_id, 95)
+        .sign(bob.keypair).run();
+ 
+    marketplace_external.OperationsDev.close_auction(
+        second_settlement_id,
+        collections_tests_mocks.VALID_EXPIRATION + 1
+    )
+        .sign(bob.keypair)
+        .run();
+    
+    assert_equals(collections_tests_helper.find_highest_nft_price_in_collection(mock_collection.name), 100);
+}
+
+function test_find_collection_details_by_name_returns_the_four_most_recent_originals_out_of_five() {
+    val admin = ft3_helper_tests.register_admin();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, admin, admin);
+
+    val (original_id_one, original_instance_one) = collections_tests_helper.create_cow(admin, mock_collection.name);
+    val (original_id_two, original_instance_two) = collections_tests_helper.create_cow(admin, mock_collection.name);
+    val (original_id_three, original_instance_three) = collections_tests_helper.create_cow(admin, mock_collection.name);
+    val (original_id_four, original_instance_four) = collections_tests_helper.create_cow(admin, mock_collection.name);
+    val (original_id_five, original_instance_five) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    val found_collection = collections_external.find_collection_details_by_name(mock_collection.name);
+    assert_equals(found_collection?.last_four_nfts, [
+        (
+            originals_core.Id.get_by_id(original_id_five)
+        ),
+        (
+            originals_core.Id.get_by_id(original_id_four)
+        ),
+        (
+            originals_core.Id.get_by_id(original_id_three)
+        ),
+        (
+            originals_core.Id.get_by_id(original_id_two)
+        )
+    ]);
+}
+
+function test_floor_price_is_updated_after_create_settlement() {
+    val admin = ft3_helper_tests.register_admin();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    collections_tests_helper.register_test_asset_and_mint_to_account(admin);
+    
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);
+    val (bertha_id, _) = collections_tests_helper.create_cow(admin, mock_collection.name);
+    val (bertha2_id, _) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    originals_tests_helper.list_original(admin, bertha_id, price = 200);
+    assert_equals(mock_collection.floor_price, 200);
+
+    originals_tests_helper.list_original(admin, bertha2_id, price = 100);
+    assert_equals(mock_collection.floor_price, 100);
+}
+
+function test_floor_price_is_updated_after_bid() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    collections_tests_helper.register_test_asset_and_mint_to_account(alice);
+    
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);
+    val (bertha_id, _) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    val settlement_id = originals_tests_helper.list_original_and_return_settlement_id(admin, bertha_id, price = 100, settlement_type = originals_marketplace.Marketplace.settlement_type.auction);
+
+    marketplace_external.Operations.bid(alice.auth_id, settlement_id, 200).sign(alice.keypair).run();
+    assert_equals(mock_collection.floor_price, 200);
+}
+
+function test_floor_price_is_updated_after_settle() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    collections_tests_helper.register_test_asset_and_mint_to_account(alice);
+    
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);
+    val (bertha_id, _) = collections_tests_helper.create_cow(admin, mock_collection.name);
+    val (bertha2_id, _) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    originals_tests_helper.list_original(admin, bertha_id, price = 200);
+    val settlement_id = originals_tests_helper.list_original_and_return_settlement_id(admin, bertha2_id, price = 100);
+    assert_equals(mock_collection.floor_price, 100);
+
+    marketplace_external.Operations.settle(alice.auth_id, settlement_id).sign(alice.keypair).run();
+    assert_equals(mock_collection.floor_price, 200);
+}
+
+function test_floor_price_is_updated_after_settle_with_same_price_floor_settlements() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    collections_tests_helper.register_test_asset_and_mint_to_account(alice);
+    
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);
+    val (bertha_id, _) = collections_tests_helper.create_cow(admin, mock_collection.name);
+    val (bertha2_id, _) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    originals_tests_helper.list_original(admin, bertha_id, price = 100);
+    val settlement_id = originals_tests_helper.list_original_and_return_settlement_id(admin, bertha2_id, price = 100);
+    assert_equals(mock_collection.floor_price, 100);
+
+    marketplace_external.Operations.settle(alice.auth_id, settlement_id).sign(alice.keypair).run();
+    assert_equals(mock_collection.floor_price, 100);
+}
+
+function test_floor_price_is_updated_after_settle_with_same_price_floor_settlements_2() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    collections_tests_helper.register_test_asset_and_mint_to_account(alice);
+    
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);
+    val (bertha_id, _) = collections_tests_helper.create_cow(admin, mock_collection.name);
+    val (bertha2_id, _) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    val settlement_id = originals_tests_helper.list_original_and_return_settlement_id(admin, bertha_id, price = 100);
+    originals_tests_helper.list_original(admin, bertha2_id, price = 100);
+    assert_equals(mock_collection.floor_price, 100);
+
+    marketplace_external.Operations.settle(alice.auth_id, settlement_id).sign(alice.keypair).run();
+    assert_equals(mock_collection.floor_price, 100);
+}
+
+function test_floor_price_is_updated_after_settle_with_only_one_settlement() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    collections_tests_helper.register_test_asset_and_mint_to_account(alice);
+    
+    val (mock_collection, _) = originals_tests_helper.create_mock_collection(admin, admin, admin);
+    val (bertha_id, _) = collections_tests_helper.create_cow(admin, mock_collection.name);
+    val (bertha2_id, _) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    val settlement_id = originals_tests_helper.list_original_and_return_settlement_id(admin, bertha2_id, price = 100);
+    assert_equals(mock_collection.floor_price, 100);
+
+    marketplace_external.Operations.settle(alice.auth_id, settlement_id).sign(alice.keypair).run();
+    assert_equals(mock_collection.floor_price, 0);
+}
+
+function test_collection_owners_count_after_offer_is_accepted() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    marketplace_test_utils.register_test_asset_and_mint_to_account(admin, alice);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    assert_equals(mock_collection.owners_count, 0);
+
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    marketplace_test_utils.create_or_update_offer_of_unlisted_nft(alice, bertha_id);
+
+    marketplace_external.Operations.accept_offer(admin.auth_id, bertha_id, alice.auth_id.account_id)
+        .sign(admin.keypair)
+        .run();
+
+    assert_equals(mock_collection.owners_count, 1);
+}
+
+function test_collection_nft_owners_count_after_offer_is_accepted() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    marketplace_test_utils.register_test_asset_and_mint_to_account(admin, alice);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+
+    val from_collection_nft_owner = collections_tests_helper.find_collection_nft_owner(mock_collection, admin);
+
+    assert_equals(from_collection_nft_owner?.account?.id, admin.auth_id.account_id);
+    assert_equals(from_collection_nft_owner?.nfts_count, 1);
+
+    marketplace_test_utils.create_or_update_offer_of_unlisted_nft(alice, bertha_id);
+
+    marketplace_external.Operations.accept_offer(admin.auth_id, bertha_id, alice.auth_id.account_id)
+        .sign(admin.keypair)
+        .run();
+
+    assert_equals(from_collection_nft_owner?.nfts_count, 0);
+    val to_collection_nft_owner = collections_tests_helper.find_collection_nft_owner(mock_collection, alice);
+
+    assert_equals(to_collection_nft_owner?.account?.id, alice.auth_id.account_id);
+    assert_equals(to_collection_nft_owner?.nfts_count, 1);
+}
+
+function test_add_approved_user() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, admin, admin);
+    
+    collections_external.add_approved_minter(admin.auth_id, alice.auth_id.account_id, mock_collection.name).sign(admin.keypair).run();
+}
+
+function test_add_approved_minter_fail_if_not_owner() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    val bob = ft3_helper_tests.register_bob();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, admin, admin);
+    
+    val failure = collections_external.add_approved_minter(alice.auth_id, bob.auth_id.account_id, mock_collection.name).sign(alice.keypair).run_must_fail();
+    assert_true(failure.message.contains("This action is reserved for collection owner. Collection '%s' is owned by '%s'".format(mock_collection.display_name, mock_collection.owner.id)));
+}
+
+function test_add_approved_minter_fail_if_already_exists() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, admin, admin);
+    
+    collections_external.add_approved_minter(admin.auth_id, alice.auth_id.account_id, mock_collection.name).sign(admin.keypair).run();
+    val failure = NOP().op(collections_external.add_approved_minter(admin.auth_id, alice.auth_id.account_id, mock_collection.name)).sign(admin.keypair).run_must_fail();
+    assert_true(failure.message.contains("Account is already an approved minter"));
+}
+
+function test_mint_fails_if_not_approved_user_or_collection_owner() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, admin, admin);
+        
+    originals_external.mint_non_fungible_original(
+        alice.auth_id,
+        mock_collection.name,
+        collections_tests_helper.create_mock_original_definition(alice)
+    ).sign(alice.keypair).run_must_fail();
+}
+
+function test_appproved_minter_succeeds_calling_mint_non_fungible_original() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, admin, admin);
+    
+    collections_external.add_approved_minter(admin.auth_id, alice.auth_id.account_id, mock_collection.name).sign(admin.keypair).run();
+    
+    collections_tests_helper.create_cow(alice, mock_collection.name);
+}
+
+function test_appproved_minter_succeeds_calling_mint_non_fungible_original_to_account() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, admin, admin);
+    
+    collections_external.add_approved_minter(admin.auth_id, alice.auth_id.account_id, mock_collection.name).sign(admin.keypair).run();
+    
+    originals_external.mint_non_fungible_original_to_account(
+        alice.auth_id,
+        mock_collection.name,
+        collections_tests_helper.create_mock_original_definition(alice),
+        admin.auth_id.account_id
+    ).sign(alice.keypair).run();
+}
+
+function test_appproved_minter_succeeds_calling_mint_non_fungible_original_batch() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, admin, admin);
+    
+    collections_external.add_approved_minter(admin.auth_id, alice.auth_id.account_id, mock_collection.name).sign(admin.keypair).run();
+    
+    originals_external.mint_non_fungible_original_batch(
+        alice.auth_id,
+        mock_collection.name,
+        collections_tests_helper.create_mock_original_definition(alice),
+        10
+    ).sign(alice.keypair).run();
+}
+
+function test_appproved_minter_succeeds_calling_mint_non_fungible_original_to_account_batch() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, admin, admin);
+    
+    collections_external.add_approved_minter(admin.auth_id, alice.auth_id.account_id, mock_collection.name).sign(admin.keypair).run();
+    
+    originals_external.mint_non_fungible_original_to_account_batch(
+        alice.auth_id,
+        mock_collection.name,
+        collections_tests_helper.create_mock_original_definition(alice),
+        admin.auth_id.account_id,
+        10
+    ).sign(alice.keypair).run();
+}
+
+function test_appproved_minter_succeeds_calling_create_fungible_original() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, admin, admin);
+    
+    collections_external.add_approved_minter(admin.auth_id, alice.auth_id.account_id, mock_collection.name).sign(admin.keypair).run();
+    
+    originals_tests_helper.mint_mock_fungible_original(
+        alice,
+        mock_collection.name,
+        10,
+        10
+    );
+}
+
+function test_appproved_minter_succeeds_calling_create_fungible_original_to_account() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, admin, admin);
+    
+    collections_external.add_approved_minter(admin.auth_id, alice.auth_id.account_id, mock_collection.name).sign(admin.keypair).run();
+    
+    originals_external.create_fungible_original_to_account(
+        alice.auth_id,
+        mock_collection.name,
+        originals_tests_helper.fungible_mockup(alice.auth_id.account_id, 100),
+        admin.auth_id.account_id,
+        10
+    ).sign(alice.keypair).run();
+}
+
+function test_appproved_minter_succeeds_mint_fungible_original() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, admin, admin);
+    
+    collections_external.add_approved_minter(admin.auth_id, alice.auth_id.account_id, mock_collection.name).sign(admin.keypair).run();
+    
+    val (fungible_id, _) = originals_tests_helper.mint_mock_fungible_original(
+        alice,
+        mock_collection.name,
+        10,
+        1
+    );
+
+    originals_external.mint_fungible_original(
+        alice.auth_id,
+        fungible_id
+    ).sign(alice.keypair).run();
+}
+
+function test_appproved_minter_succeeds_mint_fungible_original_to_account() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+    
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, admin, admin);
+    
+    collections_external.add_approved_minter(admin.auth_id, alice.auth_id.account_id, mock_collection.name).sign(admin.keypair).run();
+    
+    val (fungible_id, _) = originals_tests_helper.mint_mock_fungible_original(
+        alice,
+        mock_collection.name,
+        10,
+        1
+    );
+
+    originals_external.mint_fungible_original_to_account(
+        alice.auth_id,
+        fungible_id,
+        admin.auth_id.account_id
+    ).sign(alice.keypair).run();
+}
+
+function test_update_collection_details() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+
+    collections_external.update_collection_details(admin.auth_id, mock_collection.name, "updated name", "updated description")
+        .sign(admin.keypair)
+        .run();
+
+    assert_equals(mock_collection.display_name, "updated name");
+    assert_equals(mock_collection.description, "updated description");
+}
+
+function test_cannot_update_collection_details_when_not_collection_owner() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+
+    collections_external.update_collection_details(bob.auth_id, mock_collection.name, "updated name", "updated description")
+        .sign(bob.keypair)
+        .run_must_fail();
+}
+
+function test_cannot_update_collection_details_when_collection_is_not_found() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+
+    collections_external.update_collection_details(admin.auth_id, "invalid_name", "updated name", "updated description")
+        .sign(admin.keypair)
+        .run_must_fail();
+}
+
+function test_cannot_update_collection_details_when_description_length_is_not_valid() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+
+    collections_external.update_collection_details(admin.auth_id, mock_collection.name, "updated name", "")
+        .sign(admin.keypair)
+        .run_must_fail();
+}
+
+function test_update_collection_social_url() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+
+    collections_external.add_social_url_to_collection(admin.auth_id, mock_collection.name, "twitter", "http://www.twitter.com")
+        .sign(admin.keypair)
+        .run();
+
+    collections_external.update_collection_social_url(admin.auth_id, mock_collection.name, "twitter", "http://www.google.com")
+        .sign(admin.keypair)
+        .run();
+
+    val found_collection = collections_external.find_collection_details_by_name(mock_collection.name);
+
+    assert_equals(found_collection?.socials, [(
+        name = "twitter",
+        url = "http://www.google.com"
+    )]);
+}
+
+function test_cannot_update_collection_social_url_if_not_collection_owner() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+
+    collections_external.add_social_url_to_collection(admin.auth_id, mock_collection.name, "twitter", "http://www.twitter.com")
+        .sign(admin.keypair)
+        .run();
+
+    collections_external.update_collection_social_url(bob.auth_id, mock_collection.name, "twitter", "http://www.google.com")
+        .sign(bob.keypair)
+        .run_must_fail();
+}
+
+function test_cannot_update_collection_social_url_when_collection_is_not_found() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+
+    collections_external.add_social_url_to_collection(admin.auth_id, mock_collection.name, "twitter", "http://www.twitter.com")
+        .sign(admin.keypair)
+        .run();
+
+    collections_external.update_collection_social_url(admin.auth_id, "invalid_name", "twitter", "http://www.google.com")
+        .sign(admin.keypair)
+        .run_must_fail();
+}
+
+function test_cannot_update_collection_social_url_when_social_url_already_exists_in_collection() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+
+    collections_external.add_social_url_to_collection(admin.auth_id, mock_collection.name, "twitter", "http://www.twitter.com")
+        .sign(admin.keypair)
+        .run();
+
+    collections_external.update_collection_social_url(admin.auth_id, mock_collection.name, "twitter", "http://www.twitter.com")
+        .sign(admin.keypair)
+        .run_must_fail();
+}
+
+function test_update_collection_avatar() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+
+    val update_avatar = "filehub://filehub.originals_core.chromia.com/1";
+    collections_external.update_collection_avatar(
+        admin.auth_id,
+        mock_collection.name,
+        update_avatar
+    )
+        .sign(admin.keypair)
+        .run();
+
+    assert_equals(mock_collection.collection_avatar, update_avatar);
+}
+
+function test_cannot_update_collection_avatar_if_not_collection_owner() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+
+    collections_external.update_collection_avatar(
+        bob.auth_id,
+        mock_collection.name,
+        "filehub://filehub.originals_core.chromia.com/1"
+    )
+        .sign(bob.keypair)
+        .run_must_fail();
+}

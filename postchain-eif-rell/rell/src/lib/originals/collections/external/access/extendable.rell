@@ -1,0 +1,5 @@
+@extendable
+function has_create_collection_permission(account): boolean;
+
+@extendable
+function has_add_original_to_collection_permission(account, original: originals_core.Id.asset_instance, collection): boolean;

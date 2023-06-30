@@ -1,0 +1,81 @@
+@test module;
+
+import collections_external: ^^^.collections.external;
+import projects: ^^^.projects;
+import ft3_helper_tests: ^^^^.ft3_helper.tests;
+import originals_core: ^^^.core;
+import dip_attributes: ^^^^.dip.attributes;
+import originals_external: ^^^^.originals.external;
+import originals_external_dev: ^^^.external.dev.dev_op;
+import dip_core: ^^^^.dip.core;
+import mapper: ^^^^.dip.util.pagination_mapper;
+import originals_tests_helper: ^^.helper;
+import originals_tests_mocks: ^^.mocks;
+import collections_tests_mocks: ^^.collections.mocks;
+import ^^^^.dip.tests.{NOP};
+import ^^^.collections;
+
+function register_test_asset_and_mint_to_account(acc1: ft3_helper_tests.auth_data, acc2: ft3_helper_tests.auth_data? = null) {
+    val ASSET_NAME = "CHR";
+    val ASSET_AMOUNT = 1000;
+    
+    val accounts: list<byte_array> = [acc1.auth_id.account_id];
+    if (acc2??) accounts.add(acc2.auth_id.account_id);
+    
+    originals_external_dev.create_asset_and_mint_to_accounts(ASSET_NAME, accounts, ASSET_AMOUNT)
+        .sign(acc1.keypair)
+        .run();
+}
+
+
+function create_cow(ft3_helper_tests.auth_data, collection_name: text) { 
+    NOP().op(originals_external.mint_non_fungible_original(
+        auth_data.auth_id,
+        collection_name,
+        create_mock_original_definition(auth_data)
+    )).sign(auth_data.keypair).run();
+    return originals_tests_helper.get_last();
+}
+
+function create_ranch(ft3_helper_tests.auth_data, collection_name: text, cows: list<byte_array>) {
+    val original = originals_core.Minter.I(
+        interface_name = collections_tests_mocks.IRanch.interface, [
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T("Test Original 2"),
+            originals_core.chromia.IOriginal.creator_id: dip_attributes.ByteArray.T(auth_data.auth_id.account_id),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Alice"),
+            originals_core.chromia.ITradable.image: dip_attributes.Text.T(originals_tests_mocks.mock_image),
+            collections_tests_mocks.IRanch.cows: dip_attributes.Set.T(dip_attributes.Attribute.type.id, value=cows.to_gtv())
+        ]
+    );
+    
+    NOP().op(originals_external.mint_non_fungible_original(
+        auth_data.auth_id,
+        collection_name,
+        original
+    )).sign(auth_data.keypair).run();
+    return originals_tests_helper.get_last();
+}
+
+function default_cursor() = mapper.encode_cursor(mapper.page_cursor(page_size = 20, after_rowid = null));
+
+function find_highest_nft_price_in_collection(name) 
+    = collections.collection @? { name } .highest_nft_price;
+
+function find_assets_instance_in_collection(collection_name: text)
+    = collections.collection_original @* { .collection.name == collection_name } .asset_instance.asset.id;
+
+function create_mock_original_definition(ft3_helper_tests.auth_data) =
+    originals_core.Minter.I(
+        interface_name = collections_tests_mocks.ITradableBertha.interface, [
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T("Test Original"),
+            originals_core.chromia.IOriginal.creator_id: dip_attributes.ByteArray.T(auth_data.auth_id.account_id),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Admin"),
+            originals_core.chromia.ITradable.image: dip_attributes.Text.T(originals_tests_mocks.mock_image)
+        ]
+    );
+
+function find_collection_nft_owner(collections.collection, ft3_helper_tests.auth_data) =
+    collections.collection_nft_owner @? {
+        collection,
+        .account.id == auth_data.auth_id.account_id
+    };

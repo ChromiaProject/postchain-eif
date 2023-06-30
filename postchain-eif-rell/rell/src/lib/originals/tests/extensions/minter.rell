@@ -1,0 +1,14 @@
+object minter_hooks_state {
+    mutable is_after_mint_called: boolean = false;
+    mutable after_mint_account_id: byte_array = x"";
+    mutable after_mint_original_id: byte_array = x"";
+    mutable after_mint_quantity: integer = 0;   
+}
+
+@extend(originals_core.Minter.Hooks.after_mint) 
+function (account: ft3_account.account, original: dip_basic.Dip.instance, quantity: integer) {
+    minter_hooks_state.is_after_mint_called = true;
+    minter_hooks_state.after_mint_account_id = account.id;
+    minter_hooks_state.after_mint_original_id = originals_core.Id.get_id(original);
+    minter_hooks_state.after_mint_quantity = quantity;        
+}

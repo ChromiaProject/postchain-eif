@@ -1,0 +1,57 @@
+namespace OperationsDev {
+    operation create_settlement(
+        auth_id,
+        maker_descriptor_asset_id: byte_array,
+        maker_descriptor_asset_type: Marketplace.asset_type,
+        maker_descriptor_amount: integer,
+        taker_descriptor_asset_id: byte_array,
+        taker_descriptor_asset_type: Marketplace.asset_type,
+        taker_descriptor_amount: integer,
+        expiration: integer,
+        salt: integer,
+        Marketplace.settlement_type,
+        maker_evm_signature: byte_array?
+    ) {
+        val maker_account = do_auth(auth_id, ["T"]);
+        Marketplace.create_settlement(
+            maker_account,
+            maker_descriptor_asset_id,
+            maker_descriptor_asset_type,
+            maker_descriptor_amount,
+            taker_descriptor_asset_id,
+            taker_descriptor_asset_type,
+            taker_descriptor_amount,
+            expiration,
+            salt,
+            settlement_type,
+            maker_evm_signature,
+            false
+        );
+    }
+    
+    operation close_auction(
+        settlement_id: byte_array,
+        last_block_timestamp: integer
+    ) {
+        Marketplace._close_auction(settlement_id, last_block_timestamp);
+    }
+    
+    operation bid(
+        auth_id,
+        settlement_id: byte_array,
+        bid_amount: integer,
+        last_block_timestamp: integer
+    ) {
+        val bidder_account = do_auth(auth_id, ["T"]);
+        Marketplace._bid(bidder_account, settlement_id, bid_amount, last_block_timestamp);
+    }
+    
+    operation delete_settlement(
+        auth_id,
+        original_id: byte_array,
+        last_block_time: integer
+    ) {
+        val signer_account = do_auth(auth_id, ["T"]);
+        Marketplace._delete_settlement(signer_account, original_id, last_block_time);
+    }
+}

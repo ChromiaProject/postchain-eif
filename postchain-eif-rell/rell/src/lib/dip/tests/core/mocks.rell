@@ -11,7 +11,7 @@ namespace TestInterface {
     val attr = Attribute.I(interface, name = "attr");
     
     function register(auth_data) {
-        def_interface_op(auth_data.auth_id, interface, [
+        def_interface(auth_data.auth_id, interface, [
             foo: Type(Text.T()),
             bar: Type(Integer.T()),
             attr: Type(Integer.T())
@@ -28,7 +28,7 @@ namespace IPlayer {
     val age = Attribute.I(interface, name = "age");
     
     function register(auth_data) {
-        def_interface_op(auth_data.auth_id, interface, [
+        def_interface(auth_data.auth_id, interface, [
             name: Type(
                 Text.T(),
                 [
@@ -74,7 +74,7 @@ namespace IGame {
     
     
     function register(auth_data) {
-        def_interface_op(auth_data.auth_id, interface, [
+        def_interface(auth_data.auth_id, interface, [
             player1: Type(Instance.T(), [
                 ImplementsInterface(IPlayer.interface),
                 Meta.I(
@@ -113,8 +113,8 @@ namespace TestPlayer {
     
     function dependencies() = [TestInterface.interface, IPlayer.interface];
     
-    function register(auth_data) {        
-        def_interface_op(auth_data.auth_id, interface, 
+    function register(auth_data) {
+        def_interface(auth_data.auth_id, interface, 
             [:], 
             dependencies()
         ).sign(auth_data.keypair).run();
@@ -129,7 +129,7 @@ namespace ICompetition {
     val players = Attribute.I(interface, name = "players");
     
     function register(auth_data) {
-        def_interface_op(auth_data.auth_id, 
+        def_interface(auth_data.auth_id, 
             interface,
             [
                 players: Type(List.T(Attribute.type.instance))
@@ -146,7 +146,7 @@ namespace IPlayerDirectory {
     val players = Attribute.I(interface, name = "players");
     
     function register(auth_data) {
-        def_interface_op(auth_data.auth_id, 
+        def_interface(auth_data.auth_id, 
             interface,
             [
                 players: Type(Map.T(Map.types(K=Attribute.type.text, V=Attribute.type.instance)))
@@ -163,7 +163,7 @@ namespace IPlayerSet {
     val players = Attribute.I(interface, name = "players");
     
     function register(auth_data) {
-        def_interface_op(auth_data.auth_id, 
+        def_interface(auth_data.auth_id, 
             interface,
             [
                 players: Type(Set.T(Attribute.type.instance))
@@ -180,7 +180,7 @@ function create_mock_instance(): instance {
     IPlayer.register(admin);
     TestPlayer.register(admin);
     
-    def_instance_op(admin.auth_id, TestPlayer.interface, [
+    def_instance(admin.auth_id, TestPlayer.interface, [
         TestInterface.foo: Text.T("some string"),
         TestInterface.bar: Integer.T(100),
         TestInterface.attr: Integer.T(500),
@@ -197,21 +197,21 @@ function create_mock_instance_with_children(): instance {
     IGame.register(admin);
     
     
-    def_instance_op(admin.auth_id, IPlayer.interface, [
+    def_instance(admin.auth_id, IPlayer.interface, [
         IPlayer.name: Text.T("Player1"),
         IPlayer.age: Integer.T(20)
     ]).sign(admin.keypair).run();
     
     val player1 = get_last_instance();
     
-    def_instance_op(admin.auth_id, IPlayer.interface, [
+    def_instance(admin.auth_id, IPlayer.interface, [
         IPlayer.name: Text.T("Player2"),
         IPlayer.age: Integer.T(30)
     ]).sign(admin.keypair).run();
     
     val player2 = get_last_instance();
     
-    def_instance_op(admin.auth_id, IGame.interface, [
+    def_instance(admin.auth_id, IGame.interface, [
         IGame.player1: Instance.T(player1),
         IGame.player2: Instance.T(player2),
         IGame.count: Integer.T(0)
@@ -225,21 +225,21 @@ function create_competition_with_players_list(): instance {
     IPlayer.register(admin);
     ICompetition.register(admin);
     
-    def_instance_op(admin.auth_id, IPlayer.interface, [
+    def_instance(admin.auth_id, IPlayer.interface, [
         IPlayer.name: Text.T("Player1"),
         IPlayer.age: Integer.T(20)
     ]).sign(admin.keypair).run();
     
     val player1 = get_last_instance();
     
-    def_instance_op(admin.auth_id, IPlayer.interface, [
+    def_instance(admin.auth_id, IPlayer.interface, [
         IPlayer.name: Text.T("Player2"),
         IPlayer.age: Integer.T(30)
     ]).sign(admin.keypair).run();
     
     val player2 = get_last_instance();
     
-    def_instance_op(admin.auth_id, ICompetition.interface, [
+    def_instance(admin.auth_id, ICompetition.interface, [
         ICompetition.players: List.T(Attribute.type.instance, [player1, player2].to_gtv())
     ]).sign(admin.keypair).run();
     
@@ -251,21 +251,21 @@ function create_player_set(): instance {
     IPlayer.register(admin);
     IPlayerSet.register(admin);
     
-    def_instance_op(admin.auth_id, IPlayer.interface, [
+    def_instance(admin.auth_id, IPlayer.interface, [
         IPlayer.name: Text.T("Player1"),
         IPlayer.age: Integer.T(20)
     ]).sign(admin.keypair).run();
     
     val player1 = get_last_instance();
     
-    def_instance_op(admin.auth_id, IPlayer.interface, [
+    def_instance(admin.auth_id, IPlayer.interface, [
         IPlayer.name: Text.T("Player2"),
         IPlayer.age: Integer.T(30)
     ]).sign(admin.keypair).run();
     
     val player2 = get_last_instance();
     
-    def_instance_op(admin.auth_id, IPlayerSet.interface, [
+    def_instance(admin.auth_id, IPlayerSet.interface, [
         IPlayerSet.players: Set.T(Attribute.type.instance, [player1, player2].to_gtv())
     ]).sign(admin.keypair).run();
     
@@ -277,21 +277,21 @@ function create_player_directory(): instance {
     IPlayer.register(admin);
     IPlayerDirectory.register(admin);
     
-    def_instance_op(admin.auth_id, IPlayer.interface, [
+    def_instance(admin.auth_id, IPlayer.interface, [
         IPlayer.name: Text.T("Player1"),
         IPlayer.age: Integer.T(20)
     ]).sign(admin.keypair).run();
     
     val player1 = get_last_instance();
     
-    def_instance_op(admin.auth_id, IPlayer.interface, [
+    def_instance(admin.auth_id, IPlayer.interface, [
         IPlayer.name: Text.T("Player2"),
         IPlayer.age: Integer.T(30)
     ]).sign(admin.keypair).run();
     
     val player2 = get_last_instance();
     
-    def_instance_op(admin.auth_id, IPlayerDirectory.interface, [
+    def_instance(admin.auth_id, IPlayerDirectory.interface, [
         IPlayerDirectory.players: Map.T(
             Map.types(K=Attribute.type.text, V=Attribute.type.instance), 
             [
@@ -310,7 +310,7 @@ namespace IBooleanAttributeInterface {
     val boolean_attribute = Attribute.I(interface, name = "boolean_attribute");
     
     function register(auth_data) {
-        def_interface_op(auth_data.auth_id, interface, [
+        def_interface(auth_data.auth_id, interface, [
             boolean_attribute: Type(Boolean.T(), [Unique(), Mutable(), Optional()])
         ])
         .sign(auth_data.keypair)
@@ -324,7 +324,7 @@ namespace IIntegerAttributeInterface {
     val integer_attribute = Attribute.I(interface, name = "integer_attribute");
     
     function register(auth_data) {
-        def_interface_op(auth_data.auth_id, interface, [
+        def_interface(auth_data.auth_id, interface, [
             integer_attribute: Type(Integer.T(), [Unique(), Mutable(), Optional()])
         ])
         .sign(auth_data.keypair)
@@ -338,7 +338,7 @@ namespace ITextAttributeInterface {
     val text_attribute = Attribute.I(interface, name = "text_attribute");
     
     function register(auth_data) {
-        def_interface_op(auth_data.auth_id, interface, [
+        def_interface(auth_data.auth_id, interface, [
             text_attribute: Type(Text.T(), [Unique(), Mutable(), Optional()])
         ])
         .sign(auth_data.keypair)
@@ -352,7 +352,7 @@ namespace IDecimalAttributeInterface {
     val decimal_attribute = Attribute.I(interface, name = "decimal_attribute");
     
     function register(auth_data) {
-        def_interface_op(auth_data.auth_id, interface, [
+        def_interface(auth_data.auth_id, interface, [
             decimal_attribute: Type(Decimal.T(), [Unique(), Mutable(), Optional()])
         ])
         .sign(auth_data.keypair)
@@ -366,7 +366,7 @@ namespace IByteArrayAttributeInterface {
     val byte_array_attribute = Attribute.I(interface, name = "byte_array_attribute");
     
     function register(auth_data) {
-        def_interface_op(auth_data.auth_id, interface, [
+        def_interface(auth_data.auth_id, interface, [
             byte_array_attribute: Type(ByteArray.T(), [Unique(), Mutable(), Optional()])
         ])
         .sign(auth_data.keypair)
@@ -380,7 +380,7 @@ namespace IFileAttributeInterface {
     val file_attribute = Attribute.I(interface, name = "file_attribute");
     
     function register(auth_data) {
-        def_interface_op(auth_data.auth_id, interface, [
+        def_interface(auth_data.auth_id, interface, [
             file_attribute: Type(File.T(), [Unique(), Mutable()])
         ])
         .sign(auth_data.keypair)
@@ -394,7 +394,7 @@ namespace IListAttributeInterface {
     val list_attribute = Attribute.I(interface, name = "list_attribute");
     
     function register(auth_data) {
-        def_interface_op(auth_data.auth_id, interface, [
+        def_interface(auth_data.auth_id, interface, [
             list_attribute: Type(List.T(Attribute.type.integer), [Unique()])
         ])
         .sign(auth_data.keypair)
@@ -408,7 +408,7 @@ namespace ISetAttributeInterface {
     val set_attribute = Attribute.I(interface, name = "set_attribute");
     
     function register(auth_data) {
-        def_interface_op(auth_data.auth_id, interface, [
+        def_interface(auth_data.auth_id, interface, [
             set_attribute: Type(Set.T(Attribute.type.integer), [Unique()])
         ])
         .sign(auth_data.keypair)
@@ -422,7 +422,7 @@ namespace IMapAttributeInterface {
     val map_attribute = Attribute.I(interface, name = "map_attribute");
     
     function register(auth_data) {
-        def_interface_op(auth_data.auth_id, interface, [
+        def_interface(auth_data.auth_id, interface, [
             map_attribute: Type(
                 Map.T(Map.types(K=Attribute.type.integer, V=Attribute.type.integer)),
                 [
@@ -441,7 +441,7 @@ namespace IInstanceAttributeInterface {
     val instance_attribute = Attribute.I(interface, name = "instance_attribute");
     
     function register(auth_data) {
-        def_interface_op(auth_data.auth_id, interface, [
+        def_interface(auth_data.auth_id, interface, [
             instance_attribute: Type(Instance.T(), [Unique()])
         ])
         .sign(auth_data.keypair)

@@ -1,5 +1,10 @@
 @mount('originals')
 module;
 
-import ^.core.*;
 import ^.external.access;
+import ^^.access.admin;
+import ^^.ft3_helper;
+import originals_core: ^.core;
+import dip_core: ^^.dip.core;
+import dip_utils: ^^.dip.util;
+import ^.collections;

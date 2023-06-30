@@ -1,296 +1,316 @@
 
-operation init_originals_interfaces_op(auth_id) {
-    val account = do_auth(auth_id, ["T"]);
-    initialize_original_interfaces(account);
+operation init_originals_interfaces(ft3_helper.auth_id) {
+    admin.require_admin();
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
+    originals_core.initialize_original_interfaces(account);
 }
 
-operation def_original_interface_op(
-    auth_id,
-	name,
-	attributes: map<Dip.Attribute.I, Dip.attribute_def>,
-	depends: list<text> = list(),
-	meta: list<Dip.Meta.I> = list(),
-	is_open: boolean = false
+operation def_original_interface(
+    ft3_helper.auth_id,
+    name,
+    attributes: map<dip_core.Attribute.I, dip_core.attribute_def>,
+    depends: list<text> = list(),
+    meta: list<dip_core.Meta.I> = list()
  ) {
-	val account = do_auth(auth_id, ["T"]);
-	val dclasses = Dip.Interface.get_all(depends);
-	access.require_interface_definition_permission(account, dclasses);
-	Wrapper.InterfaceFactory.new(account, name, attributes, dclasses, meta, is_open);
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
+    val dclasses = dip_core.Interface.get_all(depends);
+    access.require_interface_definition_permission(account, dclasses);
+    originals_core.Wrapper.InterfaceFactory.new(account, name, attributes, dclasses, meta, true);
 }
  
-operation def_original_prototype_op(
-    auth_id,
-	interface_name: text,
-	attributes: map<Dip.Attribute.I, Dip.attribute_type>,
-	name,
-	prototype_name: text? = null
+operation def_original_prototype(
+    ft3_helper.auth_id,
+    interface_name: text,
+    attributes: map<dip_core.Attribute.I, dip_core.attribute_type>,
+    name,
+    prototype_name: text? = null
  ) {
-    val account = do_auth(auth_id, ["T"]);
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
     
-    var prototype = if (prototype_name??) Dip.Prototype.get(prototype_name) else null;
-    val dclass = Dip.Interface.get(interface_name);
+    var prototype = if (prototype_name??) dip_core.Prototype.get(prototype_name) else null;
+    val dclass = dip_core.Interface.get(interface_name);
     access.require_prototype_definition_permission(account, dclass, prototype);
-	Wrapper.PrototypeFactory.new(dclass, attributes, name, prototype_name);
+    originals_core.Wrapper.PrototypeFactory.new(dclass, attributes, name, prototype_name, dip_core.Meta.Engine.access(account));
 }
 
-operation mint_non_fungible_original_op(
-    auth_id,
-	definition: Minter.I
+operation mint_non_fungible_original(
+    ft3_helper.auth_id,
+    collection_name: text,
+    definition: originals_core.Minter.I
 ) {
-    val account = do_auth(auth_id, ["T"]);
-	access.require_minting_permission(account, Dip.Interface.get(definition.interface_name));
-	Minter.mint_non_fungible_original(account, definition);
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
+    access.require_minting_permission(account, dip_core.Interface.get(definition.interface_name), collections.Collection(collection_name));
+    originals_core.Minter.mint_non_fungible_original(account, collection_name, definition, dip_core.Meta.Engine.access(account));
 }
 
-operation mint_non_fungible_original_to_account_op(
-    auth_id,
-	definition: Minter.I,
-	to_account_id: byte_array
+operation mint_non_fungible_original_to_account(
+    ft3_helper.auth_id,
+    collection_name: text,
+    definition: originals_core.Minter.I,
+    to_account_id: byte_array
 ) {
-    val account = do_auth(auth_id, ["T"]);
-    access.require_minting_permission(account, Dip.Interface.get(definition.interface_name));
-	Minter.mint_non_fungible_original_to_account(account, definition, to_account_id);
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
+    access.require_minting_permission(account, dip_core.Interface.get(definition.interface_name), collections.Collection(collection_name));
+    originals_core.Minter.mint_non_fungible_original_to_account(account, collection_name, definition, to_account_id, dip_core.Meta.Engine.access(account));
 }
 
-operation mint_non_fungible_original_batch_op(
-    auth_id,
-	definition: Minter.I,
-	quantity: integer
+operation mint_non_fungible_original_batch(
+    ft3_helper.auth_id,
+    collection_name: text,
+    definition: originals_core.Minter.I,
+    quantity: integer
 ) {
-    val account = do_auth(auth_id, ["T"]);
-    access.require_minting_permission(account, Dip.Interface.get(definition.interface_name));
-	Minter.mint_non_fungible_original_batch(account, definition, quantity);
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
+    access.require_minting_permission(account, dip_core.Interface.get(definition.interface_name), collections.Collection(collection_name));
+    originals_core.Minter.mint_non_fungible_original_batch(account, collection_name, definition, quantity, dip_core.Meta.Engine.access(account));
 }
 
-operation mint_non_fungible_original_to_account_batch_op(
-    auth_id,
-	definition: Minter.I,
-	to_account_id: byte_array,
-	quantity: integer
+operation mint_non_fungible_original_to_account_batch(
+    ft3_helper.auth_id,
+    collection_name: text,
+    definition: originals_core.Minter.I,
+    to_account_id: byte_array,
+    quantity: integer
 ) {
-    val account = do_auth(auth_id, ["T"]);
-    access.require_minting_permission(account, Dip.Interface.get(definition.interface_name));
-	Minter.mint_non_fungible_original_to_account_batch(account, definition, to_account_id, quantity);
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
+    access.require_minting_permission(account, dip_core.Interface.get(definition.interface_name), collections.Collection(collection_name));
+    originals_core.Minter.mint_non_fungible_original_to_account_batch(account, collection_name, definition, to_account_id, quantity, dip_core.Meta.Engine.access(account));
 }
 
-operation create_fungible_original_op(
-    auth_id,
-	definition: Minter.I,
-	quantity: integer = 1
+operation create_fungible_original(
+    ft3_helper.auth_id,
+    collection_name: text,
+    definition: originals_core.Minter.I,
+    quantity: integer = 1
 ) {
-    val account = do_auth(auth_id, ["T"]);
-    access.require_minting_permission(account, Dip.Interface.get(definition.interface_name));
-	Minter.create_fungible_original(account, definition, quantity);
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
+    access.require_minting_permission(account, dip_core.Interface.get(definition.interface_name), collections.Collection(collection_name));
+    originals_core.Minter.create_fungible_original(account, collection_name, definition, quantity, dip_core.Meta.Engine.access(account));
 }
 
-operation create_fungible_original_to_account_op(
-    auth_id,
-	definition: Minter.I,
-	to_account_id: byte_array,
-	quantity: integer = 1
+operation create_fungible_original_to_account(
+    ft3_helper.auth_id,
+    collection_name: text,
+    definition: originals_core.Minter.I,
+    to_account_id: byte_array,
+    quantity: integer = 1
 ) {
-    val account = do_auth(auth_id, ["T"]);
-    access.require_minting_permission(account, Dip.Interface.get(definition.interface_name));
-	Minter.create_fungible_original_to_account(account, definition, to_account_id, quantity);
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
+    access.require_minting_permission(account, dip_core.Interface.get(definition.interface_name), collections.Collection(collection_name));
+    originals_core.Minter.create_fungible_original_to_account(account, collection_name, definition, to_account_id, quantity, dip_core.Meta.Engine.access(account));
 }
 
-operation mint_fungible_original_op(
-    auth_id,
-	fungible_id: byte_array,
-	quantity: integer = 1
+operation mint_fungible_original(
+    ft3_helper.auth_id,
+    fungible_id: byte_array,
+    quantity: integer = 1
 ) {
-    val account = do_auth(auth_id, ["T"]);
-    val instance = Id.get_instance(fungible_id);
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
+    val instance = originals_core.Id.get_instance(fungible_id);
     
-    val dclass = Dip.instance_dclass @ {instance, .direct == true} .dclass;
-    access.require_minting_permission(account, Dip.Interface.get(dclass.name));
-	Minter.mint_fungible_original(account, fungible_id, quantity);
+    val dclass = dip_core.instance_dclass @ {instance, .direct == true} .dclass;
+    access.require_minting_permission(
+        account,
+        dip_core.Interface.get(dclass.name),
+        collections.Collection_by_original_id(fungible_id)
+    );
+    originals_core.Minter.mint_fungible_original(account, fungible_id, quantity);
 }
 
-operation mint_fungible_original_to_account_op(
-    auth_id,
-	fungible_id: byte_array,
-	to_account_id: byte_array,
-	quantity: integer = 1
+operation mint_fungible_original_to_account(
+    ft3_helper.auth_id,
+    fungible_id: byte_array,
+    to_account_id: byte_array,
+    quantity: integer = 1
 ) {
-    val account = do_auth(auth_id, ["T"]);
-    val instance = Id.get_instance(fungible_id);
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
+    val instance = originals_core.Id.get_instance(fungible_id);
     
-    val dclass = Dip.instance_dclass @ {instance, .direct == true} .dclass;
-	access.require_minting_permission(account, Dip.Interface.get(dclass.name));
-	Minter.mint_fungible_original_to_account(account, fungible_id, to_account_id, quantity);
+    val dclass = dip_core.instance_dclass @ {instance, .direct == true} .dclass;
+    access.require_minting_permission(
+        account,
+        dip_core.Interface.get(dclass.name),
+        collections.Collection_by_original_id(fungible_id)
+    );
+    originals_core.Minter.mint_fungible_original_to_account(account, fungible_id, to_account_id, quantity);
 }
 
-operation link_original_op(
-    auth_id,
-	attribute_name: Dip.Attribute.I,
-	base_id: byte_array,
-	child_id: byte_array
+operation link_original(
+    ft3_helper.auth_id,
+    attribute_name: dip_core.Attribute.I,
+    base_id: byte_array,
+    child_id: byte_array
 ) {
-    val account = do_auth(auth_id, ["T"]);
-    val instance = Id.get_instance(base_id);
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
+    val instance = originals_core.Id.get_instance(base_id);
     
-    Dip.Meta.Engine.execute_access(instance, attribute_name, Dip.Meta.Engine.access(account));
-	Ownership.link_instance(
-	    account, 
-		attribute_name,
-		Id.get_instance(base_id),
-		Id.get_instance(child_id)
-	);
+    dip_core.Meta.Engine.execute_access(instance, attribute_name, dip_core.Meta.Engine.access(account));
+    originals_core.Ownership.link_instance(
+        account, 
+        attribute_name,
+        originals_core.Id.get_instance(base_id),
+        originals_core.Id.get_instance(child_id),
+        dip_core.Meta.Engine.access(account)
+    );
 }
 
-operation unlink_original_op(
-    auth_id,
-	attribute_name: Dip.Attribute.I,
-	base_id: byte_array,
-	child_id: byte_array? = null
+operation unlink_original(
+    ft3_helper.auth_id,
+    attribute_name: dip_core.Attribute.I,
+    base_id: byte_array,
+    child_id: byte_array? = null
 ) {
-    val account = do_auth(auth_id, ["T"]);
-    val instance = Id.get_instance(base_id);
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
+    val instance = originals_core.Id.get_instance(base_id);
     
-    Dip.Meta.Engine.execute_access(instance, attribute_name, Dip.Meta.Engine.access(account));
-	Ownership.unlink_instance(
-	    account, 
-		attribute_name,
-		Id.get_instance(base_id),
-		if (child_id??) Id.get_instance(child_id) else null
-	);
+    dip_core.Meta.Engine.execute_access(instance, attribute_name, dip_core.Meta.Engine.access(account));
+    originals_core.Ownership.unlink_instance(
+        account, 
+        attribute_name,
+        originals_core.Id.get_instance(base_id),
+        if (child_id??) originals_core.Id.get_instance(child_id) else null,
+        dip_core.Meta.Engine.access(account)
+    );
 }
 
-operation transfer_original_op(
-    auth_id,
-	original_id: byte_array,
-	account_to_id: byte_array,
-	quantity: integer = 1
+operation transfer_original(
+    ft3_helper.auth_id,
+    original_id: byte_array,
+    account_to_id: byte_array,
+    quantity: integer = 1
 ) {
-    val account = do_auth(auth_id, ["T"]);
-	Ownership.transfer(
-	    account,
-		Id.get_instance(original_id),
-		account_to_id,
-		quantity
-	);
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
+    originals_core.Ownership.transfer(
+        account,
+        originals_core.Id.get_instance(original_id),
+        account_to_id,
+        quantity
+    );
 }
 
-operation fractionalize_non_fungible_original_op(
-    auth_id,
-	original_id: byte_array,
-	fractional_type: Minter.I,
-	fractions: integer
+operation fractionalize_non_fungible_original(
+    ft3_helper.auth_id,
+    original_id: byte_array,
+    fractional_type: originals_core.Minter.I,
+    fractions: integer
 ) {
-    val account = do_auth(auth_id, ["T"]);
-	Ownership.fractionalize(
-	    account,
-		Id.get_instance(original_id),
-		fractional_type,
-		fractions
-	);
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
+    originals_core.Ownership.fractionalize(
+        account,
+        originals_core.Id.get_instance(original_id),
+        fractional_type,
+        fractions,
+        dip_core.Meta.Engine.access(account)
+    );
 }
 
-operation set_original_attribute_op(
-    auth_id,
-	original_id: byte_array,
-	attribute_name: Dip.Attribute.I,
-	value: gtv
-) {	
-    val account = do_auth(auth_id, ["T"]);
-    val instance = Id.get_instance(original_id);
+operation set_original_attribute(
+    ft3_helper.auth_id,
+    original_id: byte_array,
+    attribute_name: dip_core.Attribute.I,
+    value: gtv
+) {
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
+    val instance = originals_core.Id.get_instance(original_id);
     
-    Dip.Meta.Engine.execute_access(instance, attribute_name, Dip.Meta.Engine.access(account));
+    dip_core.Meta.Engine.execute_access(instance, attribute_name, dip_core.Meta.Engine.access(account));
     
-	Wrapper.Attribute.set_value(
-		instance,
-		attribute_name,
-		value
-	);
+    originals_core.Wrapper.Attribute.set_value(
+        instance,
+        attribute_name,
+        value,
+        dip_core.Meta.Engine.access(account)
+    );
 }
 
-operation set_original_attributes_op(
-    auth_id,
-	original_id: byte_array,
-	attributes: map<Dip.Attribute.I, gtv>
-) {	
-    val account = do_auth(auth_id, ["T"]);	
-    val instance = Id.get_instance(original_id);
+operation set_original_attributes(
+    ft3_helper.auth_id,
+    original_id: byte_array,
+    attributes: map<dip_core.Attribute.I, gtv>
+) {
+    val account = ft3_helper.do_auth(auth_id, ["T"]);    
+    val instance = originals_core.Id.get_instance(original_id);
     
     for ((attribute_name, value) in attributes) {
-	    Dip.Meta.Engine.execute_access(instance, attribute_name, Dip.Meta.Engine.access(account));
-	    
-		Wrapper.Attribute.set_value(
-			instance,
-			attribute_name,
-			value
-		);
-	}
+        dip_core.Meta.Engine.execute_access(instance, attribute_name, dip_core.Meta.Engine.access(account));
+        
+        originals_core.Wrapper.Attribute.set_value(
+            instance,
+            attribute_name,
+            value,
+            dip_core.Meta.Engine.access(account)
+        );
+    }
 }
 
-operation set_prototype_attribute_op(
-    auth_id,
-	prototype_name: text,
-	attribute_name: Dip.Attribute.I,
-	value: gtv
-) {	
-    val account = do_auth(auth_id, ["T"]);
-    val instance = Dip.Prototype.get(prototype_name);
-    
-    Dip.Meta.Engine.execute_access(instance, attribute_name, Dip.Meta.Engine.access(account));
-    
-	Wrapper.Attribute.set_value(
-		instance,
-		attribute_name,
-		value
-	);
-}
-
-operation remove_original_attribute_op(
-    auth_id,
-	original_id: byte_array,
-	attribute_name: Dip.Attribute.I
-) {	
-    val account = do_auth(auth_id, ["T"]);
-    val instance = Id.get_instance(original_id);
-    
-    Dip.Meta.Engine.execute_access(instance, attribute_name, Dip.Meta.Engine.access(account));
-    
-	Wrapper.Attribute.remove_value(
-		instance,
-		attribute_name
-	);
-}
-
-operation remove_original_attributes_op(
-    auth_id,
-	original_id: byte_array,
-	attribute_names: list<Dip.Attribute.I>
+operation set_prototype_attribute(
+    ft3_helper.auth_id,
+    prototype_name: text,
+    attribute_name: dip_core.Attribute.I,
+    value: gtv
 ) {
-    val account = do_auth(auth_id, ["T"]);
-    val instance = Id.get_instance(original_id);
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
+    val instance = dip_core.Prototype.get(prototype_name);
+    
+    dip_core.Meta.Engine.execute_access(instance, attribute_name, dip_core.Meta.Engine.access(account));
+    
+    originals_core.Wrapper.Attribute.set_value(
+        instance,
+        attribute_name,
+        value,
+        dip_core.Meta.Engine.access(account)
+    );
+}
+
+operation remove_original_attribute(
+    ft3_helper.auth_id,
+    original_id: byte_array,
+    attribute_name: dip_core.Attribute.I
+) {
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
+    val instance = originals_core.Id.get_instance(original_id);
+    
+    dip_core.Meta.Engine.execute_access(instance, attribute_name, dip_core.Meta.Engine.access(account));
+    
+    originals_core.Wrapper.Attribute.remove_value(
+        instance,
+        attribute_name
+    );
+}
+
+operation remove_original_attributes(
+    ft3_helper.auth_id,
+    original_id: byte_array,
+    attribute_names: list<dip_core.Attribute.I>
+) {
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
+    val instance = originals_core.Id.get_instance(original_id);
     
     for (attribute_name in attribute_names) {
-	    Dip.Meta.Engine.execute_access(instance, attribute_name, Dip.Meta.Engine.access(account));
-	    
-		Wrapper.Attribute.remove_value(
-			instance,
-			attribute_name
-		);
-	}
+        dip_core.Meta.Engine.execute_access(instance, attribute_name, dip_core.Meta.Engine.access(account));
+        
+        originals_core.Wrapper.Attribute.remove_value(
+            instance,
+            attribute_name
+        );
+    }
 }
 
-operation add_original_container_element_op(
-    auth_id,
-	original_id: byte_array,
-	attribute_name: Dip.Attribute.I,
-	value: gtv
-) {	
-    val account = do_auth(auth_id, ["T"]);
-    val instance = Id.get_instance(original_id);
+operation add_original_container_element(
+    ft3_helper.auth_id,
+    original_id: byte_array,
+    attribute_name: dip_core.Attribute.I,
+    value: gtv
+) {
+    val account = ft3_helper.do_auth(auth_id, ["T"]);
+    val instance = originals_core.Id.get_instance(original_id);
     
-    Dip.Meta.Engine.execute_access(instance, attribute_name, Dip.Meta.Engine.access(account));
+    dip_core.Meta.Engine.execute_access(instance, attribute_name, dip_core.Meta.Engine.access(account));
     
-	Wrapper.Attribute.add_container_element(
-		instance,
-		attribute_name,
-		value
-	);
+    originals_core.Wrapper.Attribute.add_container_element(
+        instance,
+        attribute_name,
+        value,
+        dip_core.Meta.Engine.access(account)
+    );
 }
- 

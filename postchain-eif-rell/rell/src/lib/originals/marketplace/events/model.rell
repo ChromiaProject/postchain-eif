@@ -1,0 +1,31 @@
+struct event_settlement_descriptor {
+    id: byte_array;
+    taker_descriptor: event_payment_descriptor;
+    maker_descriptor: event_payment_descriptor;
+    expiration: integer;
+    salt: integer;
+    Marketplace.settlement_type;
+}
+
+struct event_offer {
+    nft: originals_core.Id.asset_instance;
+    maker_descriptor: event_payment_descriptor;
+    taker_descriptor: event_payment_descriptor;
+    created_at: timestamp;
+}
+
+struct event_payment_descriptor {
+    asset: event_ft3_asset;
+    Marketplace.asset_type;
+    amount: integer;
+    account: event_ft3_account;
+}
+
+struct event_ft3_asset {
+    id: byte_array;
+    name: text;
+}
+
+struct event_ft3_account {
+    id: byte_array;
+}

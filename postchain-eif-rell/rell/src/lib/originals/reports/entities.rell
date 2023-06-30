@@ -1,0 +1,16 @@
+enum report_object_type {
+    nft,
+    project,
+    collection
+}
+
+struct report_item {
+    type: text;
+    id: gtv;
+}
+
+entity report_nft {
+    key nft: core.Id.asset_instance, account: ft3_account.account;
+    index account: ft3_account.account;
+    created_at: timestamp = originals_util.now_from_context();
+}

@@ -1,0 +1,86 @@
+function test_report_nft_by_single_user() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+  
+    val report_timestamp = originals_util.now_from_blocks();
+    reports_external.report(admin.auth_id, reports_tests.create_mock_report_nft_object(bertha_id))
+        .sign(admin.keypair)
+        .run();
+
+    val last_asset_instance = originals_core.Id.asset_instance @ { .asset.id == bertha_id };
+    assert_equals(last_asset_instance.reports_count, 1);
+
+    assert_equals(reports_tests.find_last_reported_nft(), struct<reports.report_nft>(
+        nft = last_asset_instance,
+        account = ft3_account.account @ { .id == admin.auth_id.account_id },
+        created_at = report_timestamp
+    ));
+}
+
+function test_report_nft_by_multiple_users() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+  
+    reports_external.report(admin.auth_id, reports_tests.create_mock_report_nft_object(bertha_id))
+        .sign(admin.keypair)
+        .run();
+
+    reports_external.report(alice.auth_id, reports_tests.create_mock_report_nft_object(bertha_id))
+        .sign(alice.keypair)
+        .run();
+
+    val last_asset_instance = originals_core.Id.asset_instance @ { .asset.id == bertha_id };
+    
+    assert_equals(last_asset_instance.reports_count, 2);
+}
+
+function test_cannot_report_nft_more_than_once_from_the_same_user() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+  
+    reports_external.report(admin.auth_id, reports_tests.create_mock_report_nft_object(bertha_id))
+        .sign(admin.keypair)
+        .run();
+
+    reports_external.report(admin.auth_id, reports_tests.create_mock_report_nft_object(bertha_id))
+        .sign(admin.keypair)
+        .run_must_fail();
+}
+
+function test_single_user_reports_two_nfts() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val (original_id_one, original_instance_one) = collections_tests_helper.create_cow(admin, mock_collection.name);
+    val (original_id_two, original_instance_two) = collections_tests_helper.create_cow(admin, mock_collection.name);
+  
+    reports_external.report(admin.auth_id, reports_tests.create_mock_report_nft_object(original_id_one))
+        .sign(admin.keypair)
+        .run();
+
+    reports_external.report(admin.auth_id, reports_tests.create_mock_report_nft_object(original_id_two))
+        .sign(admin.keypair)
+        .run();
+}

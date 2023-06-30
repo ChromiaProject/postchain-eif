@@ -1,0 +1,22 @@
+@test module;
+
+import collections_external: ^^.collections.external;
+import projects: ^^.projects;
+import ft3_helper_tests: ^^^.ft3_helper.tests;
+import originals_util: ^^.util;
+import originals_core: ^^.core;
+import dip_attributes: ^^^.dip.attributes;
+import originals_external: ^^^.originals.external;
+import originals_external_dev: ^^^.originals.external.dev;
+import projects_external: ^^.projects.external;
+import mapper: ^^^.dip.util.pagination_mapper;
+import ft3_account: ^^^.ft3.account;
+import originals_marketplace: ^^.marketplace;
+import marketplace_external: ^^.marketplace.external;
+import marketplace_test_utils: ^.marketplace.utils;
+import originals_tests_helper: ^.helper;
+import originals_tests_mocks: ^.mocks;
+import collections_tests_helper: ^.collections.helper;
+import collections_tests_mocks: ^.collections.mocks;
+import ^^^.dip.tests.{NOP};
+import ^^.collections;

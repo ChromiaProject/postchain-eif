@@ -1,0 +1,27 @@
+function require_create_collection_permission(account) {
+    require(
+        has_create_collection_permission(account),
+        "Account '%s' doesn't have permission to create collection".format(account.id)
+    );
+}
+
+function require_add_original_to_collection_permission(account, original: originals_core.Id.asset_instance, collection) {
+    require(
+        has_add_original_to_collection_permission(account, original, collection),
+        "Account '%s' cannot add original '%s' to collection '%s'".format(account.id, original.asset.id, collection.name)
+    );
+}
+
+function require_collection_owner(account, collection) {
+    require(
+        account == collection.owner,
+        "This action is reserved for collection owner. Collection '%s' is owned by '%s'".format(collection.display_name, collection.owner.id)
+    );
+}
+
+function require_collection_owner_or_approved_minter(account, collection) {
+    require(
+        account == collection.owner or exists(approved_minter @? {account, collection}),
+        "This action is reserved for collection owner and approved minters"
+    );
+}

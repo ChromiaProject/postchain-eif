@@ -1,12 +1,5 @@
 
 object transfer_hooks_state {
-    mutable is_before_transfer_called: boolean = false;
-    mutable before_transfer_from_account_id: byte_array = x"";
-    mutable before_transfer_to_account_id: byte_array = x"";
-    mutable before_transfer_original_id: byte_array = x"";
-    mutable before_transfer_quantity: integer = 0;
-    
-    
     mutable is_after_transfer_called: boolean = false;
     mutable after_transfer_from_account_id: byte_array = x"";
     mutable after_transfer_to_account_id: byte_array = x"";
@@ -14,20 +7,11 @@ object transfer_hooks_state {
     mutable after_transfer_quantity: integer = 0;   
 }
 
-@extend(Ownership.Hooks.before_transfer) 
-function (account: ft3.acc.account, original: Dip.instance, to_id: byte_array, quantity: integer) {
-    transfer_hooks_state.is_before_transfer_called = true;
-    transfer_hooks_state.before_transfer_from_account_id = account.id;
-    transfer_hooks_state.before_transfer_to_account_id = to_id;
-    transfer_hooks_state.before_transfer_original_id = Id.get_id(original);
-    transfer_hooks_state.before_transfer_quantity = quantity;
-}
-
-@extend(Ownership.Hooks.after_transfer) 
-function (account: ft3.acc.account, original: Dip.instance, to_id: byte_array, quantity: integer) {
+@extend(originals_core.Ownership.Hooks.after_transfer)
+function (account: ft3_account.account, original: dip_basic.Dip.instance, to_id: byte_array, quantity: integer) {
     transfer_hooks_state.is_after_transfer_called = true;
     transfer_hooks_state.after_transfer_from_account_id = account.id;
     transfer_hooks_state.after_transfer_to_account_id = to_id;
-    transfer_hooks_state.after_transfer_original_id = Id.get_id(original);
-    transfer_hooks_state.after_transfer_quantity = quantity;        
+    transfer_hooks_state.after_transfer_original_id = originals_core.Id.get_id(original);
+    transfer_hooks_state.after_transfer_quantity = quantity;
 }

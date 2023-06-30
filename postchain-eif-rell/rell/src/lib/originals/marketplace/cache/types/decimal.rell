@@ -68,4 +68,25 @@ namespace Cache.Decimal {
             attribute_value.count--;
         }
     }
+
+    function get_value_count(Dip.attribute, value: decimal) {
+        Dip.util.ensure_type(Dip.Attribute.type.decimal, attribute.type);
+        return attribute_value @ { attribute, value } .count;
+    }
+
+    function get_instance_attribute_value(Dip.instance, Dip.attribute) {
+        Dip.util.ensure_type(Dip.Attribute.type.decimal, attribute.type);
+
+        val value = Dip.Decimal._get_value(instance, attribute);
+        if (empty(value)) return null;
+
+        val count = attribute_value @? { attribute, value } .count;
+        if (empty(count)) return null;
+
+        return (
+            name = attribute.name,
+            value = value.to_gtv(),
+            count = count
+        );
+    }
 }

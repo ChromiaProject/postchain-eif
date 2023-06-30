@@ -1,35 +1,112 @@
+@mount("marketplace")
+namespace Operations {
+    
+    operation create_settlement(
+        auth_id,
+        maker_descriptor_asset_id: byte_array,
+        maker_descriptor_asset_type: Marketplace.asset_type,
+        maker_descriptor_amount: integer,
+        taker_descriptor_asset_id: byte_array,
+        taker_descriptor_asset_type: Marketplace.asset_type,
+        taker_descriptor_amount: integer,
+        expiration: integer,
+        salt: integer,
+        Marketplace.settlement_type,
+        maker_evm_signature: byte_array?
+    ) {
+        val maker_account = do_auth(auth_id, ["T"]);
+        Marketplace.create_settlement(
+            maker_account,
+            maker_descriptor_asset_id,
+            maker_descriptor_asset_type,
+            maker_descriptor_amount,
+            taker_descriptor_asset_id,
+            taker_descriptor_asset_type,
+            taker_descriptor_amount,
+            expiration,
+            salt,
+            settlement_type,
+            maker_evm_signature
+        );
+    }
+    
+    operation delete_settlement(
+        auth_id,
+        original_id: byte_array
+    ) {
+        val signer_account = do_auth(auth_id, ["T"]);
+        Marketplace.delete_settlement(signer_account, original_id);
+    }
+    
+    operation settle(
+        auth_id,
+        settlement_id: byte_array
+    ) {
+        val taker_account = do_auth(auth_id, ["T"]);
+        Marketplace.settle(taker_account, settlement_id);
+    }
+    
+    operation bid(
+        auth_id,
+        settlement_id: byte_array,
+        bid_amount: integer
+    ) {
+        val bidder_account = do_auth(auth_id, ["T"]);
+        Marketplace.bid(bidder_account, settlement_id, bid_amount);
+    }
+    
+    operation close_auction(
+        settlement_id: byte_array
+    ) {
+        Marketplace.close_auction(settlement_id);
+    }
+    
+    // Admin operations
+    
+    operation set_domain_separator(domain_separator: byte_array) {
+        admin.require_admin();
+        Marketplace.set_domain_separator(domain_separator);
+    }
+    
+    operation set_evm_expiration_delete_buffer(evm_expiration_delete_buffer: integer) {
+        admin.require_admin();
+        Marketplace.set_evm_expiration_delete_buffer(evm_expiration_delete_buffer);
+    }
+    
+    
+    // Oracle operations
+    
+    operation register_settled_event(msg_sender: text, settlement_id: byte_array) {
+        Marketplace.register_settled_event(msg_sender.lower_case(), settlement_id);
+    }
+    
+    operation register_cancelled_event(settlement_id: byte_array) {
+        Marketplace.register_cancelled_event(settlement_id);
+    }
+    
+    operation register_evm_asset(evm_address: text, Marketplace.evm_type, asset_id: byte_array?, token_id: integer?) {
+        EvmAccounts.require_address(evm_address);
+        Marketplace.register_evm_asset(evm_address, evm_type, asset_id, token_id);
+    }
 
-operation list_original_op(
-    auth_id,
-	original_id: byte_array,
-	asset_id: byte_array,
-	price: integer
-) {
-    val account = do_auth(auth_id, ["T"]);
-	Listing.list_original(account, original_id, asset_id, price);
-}
+    // Not listed item offers
 
-operation change_original_price_op(
-    auth_id,
-	original_id: byte_array, 
-	price: integer
-) {
-    val account = do_auth(auth_id, ["T"]);
-	Listing.change_price(account, original_id, price);
-}
+    operation create_or_update_offer(
+        auth_id,
+        original_id: byte_array,
+        asset_id: byte_array,
+        amount: integer
+    ) {
+        val bidder_account = do_auth(auth_id, ["T"]);
+        Marketplace.create_or_update_offer(bidder_account, original_id, asset_id, amount);
+    }
 
-operation unlist_original_op(
-    auth_id,
-	original_id: byte_array
-) {
-    val account = do_auth(auth_id, ["T"]);
-	Listing.unlist_original(account, original_id);
-}
-
-operation buy_original_op(
-    auth_id,
-	original_id: byte_array
-) {
-    val account = do_auth(auth_id, ["T"]);
-	Listing.buy_original(account, original_id);
+    operation accept_offer(
+        auth_id,
+        original_id: byte_array,
+        bidder_account_id: byte_array
+    ) {
+        val caller_account = do_auth(auth_id, ["T"]);
+        Marketplace.accept_offer(caller_account, original_id, bidder_account_id);
+    }
 }

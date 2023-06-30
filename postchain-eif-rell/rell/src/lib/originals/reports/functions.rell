@@ -1,0 +1,51 @@
+function report(ft3_account.account, report_item) {
+    when (report_object_type_from_name(report_item.type)) {
+        nft -> {
+            val asset_id = byte_array.from_gtv(report_item.id);
+            val asset_instance = require(core.Id.asset_instance @? { .asset.id == asset_id },
+                "Nft not found '%s'".format(asset_id)
+            );
+            create report_nft(asset_instance, account);
+            asset_instance.reports_count += 1;
+        }
+        project -> {
+            val project_name = text.from_gtv(report_item.id);
+            val project = require(projects.project @? { .name == project_name },
+                "Project not found '%s'".format(project_name)
+            );
+            create projects.report_project(project, account);
+            project.reports_count += 1;
+        }
+        collection -> {
+            val id = text.from_gtv(report_item.id);
+            val collection = require(originals_collections.collection @? { .name == id },
+                "Collection not found '%s'".format(id)
+            );
+            create collections.report_collection(collection, account);
+            collection.reports_count += 1;
+        }
+    }
+}
+
+function is_reported_by_user(reporter_id: byte_array, object_id: gtv, object_type: text): boolean {
+    when(report_object_type_from_name(object_type)) {
+        nft -> {
+            val asset_id = byte_array.from_gtv(object_id);
+            return exists(report_nft @? {.account.id == reporter_id, .nft.asset.id == asset_id});
+        }
+        project -> {
+            val project_name = text.from_gtv(object_id);
+            return exists(projects.report_project @? {.account.id == reporter_id, .project.name == project_name});
+        }
+        collection -> {
+            val collection_name = text.from_gtv(object_id);
+            return exists(collections.report_collection @? {.account.id == reporter_id, .collection.name == collection_name});
+        }
+    }
+}
+
+function report_object_type_from_name(name): report_object_type =
+    require(
+        report_object_type.values() @? {.name == name},
+        "Unrecognized report object type %s".format(name)
+    );

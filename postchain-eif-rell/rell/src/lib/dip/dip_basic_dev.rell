@@ -2,9 +2,6 @@
 module;
 
 namespace Dip {
-	import ^.attributes.*;
-	import ^.core.*;
-	import ^.external;
-	
-    import ^.external.dev;
+    import ^.attributes.*;
+    import ^.core.*;
 }

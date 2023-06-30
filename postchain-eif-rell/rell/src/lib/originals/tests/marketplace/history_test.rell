@@ -1,0 +1,38 @@
+function test_history(){
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    utils.register(admin, bob);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    
+    val cow_ids = list<byte_array>();
+    for(i in range(5)) {
+        val (id, _) = utils.create_cow(admin, mock_collection.name);
+        cow_ids.add(id);
+    }
+    
+    val (ranch_id, ranch_instance) = utils.create_ranch(admin, mock_collection.name, cow_ids);
+
+    originals_tests_helper.list_original(admin, ranch_id);
+    
+    val settlement_id = marketplace_external.Queries.derive_settlement_id(admin.auth_id.account_id, ranch_id, 123);
+    
+    marketplace_external.Operations.settle(
+        bob.auth_id,
+        settlement_id
+    ).sign(bob.keypair).run();
+    
+    val trade_events = marketplace_external.Queries.get_trade_logs(ranch_id);
+    
+    assert_equals(trade_events.size(), 1);
+    
+    val trade_event = trade_events[0];
+    
+    assert_equals(trade_event.maker_id, admin.auth_id.account_id);
+    assert_equals(trade_event.taker_id, bob.auth_id.account_id);
+    assert_equals(trade_event.maker_asset_id, ranch_id);
+    assert_equals(trade_event.taker_asset_id, originals_util.Ft3Helper.get_asset(originals_tests_mocks.ASSET_ID).id);
+    assert_equals(trade_event.maker_amount, 1);
+    assert_equals(trade_event.taker_amount, 100);
+    assert_true(trade_event.indirect_ids.contains_all(cow_ids));
+}

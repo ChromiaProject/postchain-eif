@@ -1,0 +1,17 @@
+@test module;
+
+import originals_core: ^^^.core;
+import evm_accounts: ^^^^.evm_accounts;
+import originals_external: ^^^.external;
+import originals_external_dev: ^^^.external.dev.dev_op;
+import originals_tests_helper: ^^.helper;
+import originals_tests_mocks: ^^.mocks;
+import dip_attributes: ^^^^.dip.attributes;
+import originals_marketplace: ^^^.marketplace;
+import marketplace_external: ^^^.marketplace.external;
+import ft3_helper_tests: ^^^^.ft3_helper.tests;
+import originals_marketplace_util_tests_mocks: ^.mocks;
+import dip_core: ^^^^.dip.core;
+import ^^^^.dip.tests.{NOP};
+import ^^^.events;
+import evm_accounts_external: ^^^^.evm_accounts.external.{Queries, Operations};

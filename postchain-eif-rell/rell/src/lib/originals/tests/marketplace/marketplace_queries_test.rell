@@ -1,0 +1,361 @@
+@test module;
+
+import ft3_helper_tests: ^^^^.ft3_helper.tests;
+import marketplace: ^^^.marketplace.external;
+import originals_tests_mocks: ^^.mocks;
+import originals_tests_helper: ^^.helper;
+import dip_external: ^^^^.dip.external;
+import originals_core: ^^^.core;
+import dip_attributes: ^^^^.dip.attributes;
+import originals_external: ^^^.external;
+import originals_external_dev: ^^^.external.dev.dev_op;
+import dip_tests: ^^^^.dip.tests;
+import dip_utils: ^^^^.dip.util;
+import originals_marketplace: ^^^.marketplace;
+import originals_marketplace_external: ^^^.marketplace.external;
+import collections_tests_helper: ^^.collections.helper;
+import ^.utils;
+import originals_utils: ^^^.util;
+function test_find_listed_originals_by_interface() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    originals_external_dev.create_asset(originals_tests_mocks.ASSET_NAME, admin.auth_id.account_id, admin.auth_id.account_id, 1000).run();
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val (character_id, character_instance) = utils.create_mock_instance_with_children(admin, mock_collection.name);
+    
+    dip_external.def_instance(
+        admin.auth_id,
+        originals_core.chromia.IBadge.interface,
+        [
+            originals_core.chromia.IBadge.name: dip_attributes.Text.T("chosen_one"),
+            originals_core.chromia.IBadge.display_name: dip_attributes.Text.T("Chosen one"),
+            originals_core.chromia.IBadge.description: dip_attributes.Text.T("Character is the chosen one"),
+            originals_core.chromia.IBadge.image: dip_attributes.Text.T("")
+        ]
+    ).sign(admin.keypair).run();
+    val badge_instance = dip_tests.get_last_instance();
+    
+    originals_external_dev.add_badge_to_original(
+        originals_core.Id.get_instance(character_id),
+        badge_instance
+    ).run();
+    
+    originals_tests_helper.list_original(admin, character_id);
+
+    val settlement_id = originals_marketplace.Marketplace.settlement_descriptor @ {
+        .maker_descriptor.asset.id == character_id
+    } ( .id );
+    
+    var originals = originals_marketplace_external.Queries.find_listed_originals_by_interface(
+        utils.ICharacter.interface, originals_tests_helper.default_cursor()
+    ).data;
+        
+    val instance = map<text, gtv>.from_gtv(originals[0]);
+    assert_equals(1, originals.size());
+    assert_equals(instance["id"], character_id.to_gtv());
+    
+    val settlement_descriptor = instance["settlement_descriptor"];
+    assert_equals(settlement_descriptor, [
+        "settlement_type": originals_marketplace.Marketplace.settlement_type.fixed_price.to_gtv(),
+        "asset_type": originals_marketplace.Marketplace.asset_type.regular.to_gtv(),
+        "asset_id": originals_utils.Ft3Helper.get_asset(originals_tests_mocks.ASSET_ID).id.to_gtv(),
+        "maker": admin.auth_id.account_id.to_gtv(),
+        "amount": (100).to_gtv(),
+        "id": settlement_id.to_gtv(),
+        "expiration": originals_tests_mocks.VALID_EXPIRATION.to_gtv()
+    ].to_gtv());
+    
+   val children = instance["children"];
+   assert_equals(list<gtv?>.from_gtv(children).size(), 1);
+}
+
+function test_find_listed_originals_by_interface_price_range() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    originals_external_dev.create_asset(originals_tests_mocks.ASSET_NAME, admin.auth_id.account_id, admin.auth_id.account_id, 1000).run();
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val (character_id, character_instance) = utils.create_mock_instance_with_children(admin, mock_collection.name);
+    
+    dip_external.def_instance(
+        admin.auth_id,
+        originals_core.chromia.IBadge.interface,
+        [
+            originals_core.chromia.IBadge.name: dip_attributes.Text.T("chosen_one"),
+            originals_core.chromia.IBadge.display_name: dip_attributes.Text.T("Chosen one"),
+            originals_core.chromia.IBadge.description: dip_attributes.Text.T("Character is the chosen one"),
+            originals_core.chromia.IBadge.image: dip_attributes.Text.T("")
+        ]
+    ).sign(admin.keypair).run();
+    val badge_instance = dip_tests.get_last_instance();
+    
+    originals_external_dev.add_badge_to_original(
+        originals_core.Id.get_instance(character_id),
+        badge_instance
+    ).run();
+    
+    originals_tests_helper.list_original(admin, character_id);
+
+    val settlement_id = originals_marketplace.Marketplace.settlement_descriptor @ {
+        .maker_descriptor.asset.id == character_id
+    } ( .id );
+    
+    var originals = originals_marketplace_external.Queries.find_listed_originals_by_interface_price_range(
+        utils.ICharacter.interface, 
+        0,
+        99,
+        originals_tests_helper.default_cursor()
+    ).data;
+    assert_equals(originals.size(), 0);
+    
+    originals = originals_marketplace_external.Queries.find_listed_originals_by_interface_price_range(
+        utils.ICharacter.interface, 
+        101,
+        200,
+        originals_tests_helper.default_cursor()
+    ).data;
+    assert_equals(originals.size(), 0);
+    
+    // TODO: Check inclusive/exclusive ranges of min max, should be inclusive
+    originals = originals_marketplace_external.Queries.find_listed_originals_by_interface_price_range(
+        utils.ICharacter.interface, 
+        99,
+        101,
+        originals_tests_helper.default_cursor()
+    ).data;
+    assert_equals(originals.size(), 1);
+    
+    val instance = map<text, gtv>.from_gtv(originals[0]);
+    assert_equals(1, originals.size());
+    assert_equals(instance["id"], character_id.to_gtv());
+    
+    val settlement_descriptor = instance["settlement_descriptor"];
+    assert_equals(settlement_descriptor, [
+        "settlement_type": originals_marketplace.Marketplace.settlement_type.fixed_price.to_gtv(),
+        "asset_type": originals_marketplace.Marketplace.asset_type.regular.to_gtv(),
+        "asset_id": originals_utils.Ft3Helper.get_asset(originals_tests_mocks.ASSET_ID).id.to_gtv(),
+        "maker": admin.auth_id.account_id.to_gtv(),
+        "amount": (100).to_gtv(),
+        "id": settlement_id.to_gtv(),
+        "expiration": originals_tests_mocks.VALID_EXPIRATION.to_gtv()
+    ].to_gtv());
+    
+   val children = instance["children"];
+   assert_equals(list<gtv?>.from_gtv(children).size(), 1);
+}
+
+function test_find_instances_by_owner_and_status() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    utils.IFoo.register(admin);
+    
+    val (foo_id1, foo_instance1) = utils.create_mock_instance(admin, mock_collection.name, "Damocles");
+    val (foo_id2, foo_instance2) = utils.create_mock_instance(admin, mock_collection.name, "Gram");
+    
+    originals_external_dev.create_asset(originals_tests_mocks.ASSET_NAME, admin.auth_id.account_id, admin.auth_id.account_id, 1000).run();
+    
+    originals_tests_helper.list_original(admin, foo_id1);
+    
+    val all_instances_page_data = originals_marketplace_external.Queries.find_original_instances_by_owner_id(admin.auth_id.account_id, originals_tests_helper.default_cursor()).data;
+    assert_equals(all_instances_page_data.size(), 2);
+    
+    val listed_instances_page_data = originals_marketplace_external.Queries.find_original_instances_by_owner_id_and_status(admin.auth_id.account_id, true, originals_tests_helper.default_cursor()).data;
+    val listed_instances = map<name, gtv?>.from_gtv(listed_instances_page_data[0]);
+    assert_equals(listed_instances["id"], foo_id1.to_gtv());
+    
+    val not_listed_instances_page_data = originals_marketplace_external.Queries.find_original_instances_by_owner_id_and_status(admin.auth_id.account_id, false, originals_tests_helper.default_cursor()).data;
+    val not_listed_instances = map<name, gtv?>.from_gtv(not_listed_instances_page_data[0]);
+    assert_equals(not_listed_instances["id"], foo_id2.to_gtv());
+}
+
+function test_find_distinct_original_names_by_interface() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+
+    originals_tests_helper.init_originals(admin);
+    utils.IFoo.register(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+    
+    val foo_type = originals_core.Minter.I(
+        interface_name = utils.IFoo.interface,
+        [
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T("Test Original"),
+            originals_core.chromia.IOriginal.creator_id: dip_attributes.ByteArray.T(admin.auth_id.account_id),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Foo"),
+            originals_core.chromia.ITradable.image: dip_attributes.Text.T(originals_tests_mocks.dummy_image),
+            utils.IFoo.foo: dip_attributes.Text.T("Foo")
+        ]
+    );  
+    originals_external.mint_non_fungible_original(
+        admin.auth_id,
+        mock_collection.name,
+        foo_type
+    ).sign(admin.keypair).run();
+    
+    val foo_type2 = originals_core.Minter.I(
+        interface_name = utils.IFoo.interface,
+        [
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T("Test Original2"),
+            originals_core.chromia.IOriginal.creator_id: dip_attributes.ByteArray.T(admin.auth_id.account_id),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Foo"),
+            originals_core.chromia.ITradable.image: dip_attributes.Text.T(originals_tests_mocks.dummy_image),
+            utils.IFoo.foo: dip_attributes.Text.T("Foo")
+        ]
+    );
+    dip_tests.NOP().op(originals_external.mint_non_fungible_original(
+        admin.auth_id,
+        mock_collection.name,
+        foo_type2
+    )).sign(admin.keypair).run();
+    
+    val foo_type3 = originals_core.Minter.I(
+        interface_name = utils.IFoo.interface,
+        [
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T("Test Original3"),
+            originals_core.chromia.IOriginal.creator_id: dip_attributes.ByteArray.T(admin.auth_id.account_id),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Foo2"),
+            originals_core.chromia.ITradable.image: dip_attributes.Text.T(originals_tests_mocks.dummy_image),
+            utils.IFoo.foo: dip_attributes.Text.T("Foo")
+        ]
+    );  
+    originals_external.mint_non_fungible_original(
+        admin.auth_id,
+        mock_collection.name,
+        foo_type3
+    ).sign(admin.keypair).run();
+    
+    assert_equals(originals_marketplace_external.Queries.find_distinct_original_names_by_interface(utils.IFoo.interface).size(), 3);
+}
+
+function test_get_grouped_interfaces() {
+    val admin = ft3_helper_tests.register_admin();
+
+    originals_tests_helper.init_originals(admin);
+        
+    utils.register_planetary_example(admin);
+    
+    print(originals_marketplace_external.Queries.get_grouped_interfaces());
+}
+
+function test_find_original_by_id() {
+    val admin = ft3_helper_tests.register_admin();
+    val bob = ft3_helper_tests.register_bob();
+    originals_tests_helper.init_originals(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, bob, admin);
+        
+    utils.IFoo.register(admin);
+    
+    val (foo_id1, foo_instance1) = utils.create_mock_instance(admin, mock_collection.name, "Damocles");
+    
+    val foo_type = originals_core.Minter.I(
+        interface_name = utils.IFoo.interface,
+        [
+            originals_core.chromia.IOriginal.name: dip_attributes.Text.T("Test Original"),
+            originals_core.chromia.IOriginal.creator_id: dip_attributes.ByteArray.T(admin.auth_id.account_id),
+            originals_core.chromia.IOriginal.creator_name: dip_attributes.Text.T("Foo"),
+            originals_core.chromia.ITradable.image: dip_attributes.Text.T(originals_tests_mocks.dummy_image),
+            utils.IFoo.foo: dip_attributes.Text.T("Foo")
+       ]
+    );  
+    
+    originals_external.mint_non_fungible_original(
+        admin.auth_id,
+        mock_collection.name,
+        foo_type
+    )
+    .sign(admin.keypair)
+    .run();
+    
+    val original = originals_marketplace_external.Queries.find_original_by_id(foo_id1)!!;  
+    
+    assert_equals(original, map<text, gtv?>([
+        "id": foo_id1.to_gtv(),
+        "settlement_descriptor": map<name, gtv?>().to_gtv(),
+        "tx_history":list<map<name, gtv?>>().to_gtv(),
+        "badges": list<map<name, gtv?>>().to_gtv(),
+        "attributes": map<name, gtv>().to_gtv(),
+        "name": "Test Original".to_gtv(),
+        "creator_id": admin.auth_id.account_id.to_gtv(),
+        "creator_name": "Tester".to_gtv(),
+        "description": null,
+        "children": list<map<name, gtv?>>().to_gtv(),
+        "collection_name": mock_collection.name.to_gtv()
+   ]));
+   
+   // Should be null if id doesn't exist
+   assert_null(originals_marketplace_external.Queries.find_original_by_id(x"0373"));
+}
+
+function test_find_listed_originals_by_collection() {
+    val admin = ft3_helper_tests.register_admin();
+    val alice = ft3_helper_tests.register_alice();
+
+    utils.register_test_asset_and_mint_to_account(admin);
+
+    val (mock_collection, mock_project) = originals_tests_helper.create_mock_collection(admin, alice, admin);
+    val (bertha_id, bertha_instance) = collections_tests_helper.create_cow(admin, mock_collection.name);
+        
+    // Should be null if not listed
+    
+    var originals = originals_marketplace_external.Queries.find_listed_originals_by_collection(
+        mock_collection.name,
+        originals_core.chromia.INonFungibleOriginal.interface,
+        originals_tests_helper.default_cursor()
+    );
+
+    var expected_response = dip_utils.paged_result(
+        next_cursor = null,
+        data = []
+    );
+   
+    assert_equals(originals, expected_response);
+    
+    // Should find listed original
+    
+    originals_tests_helper.list_original(admin, bertha_id);
+  
+    originals = originals_marketplace_external.Queries.find_listed_originals_by_collection(
+        mock_collection.name,
+        originals_core.chromia.INonFungibleOriginal.interface,
+        originals_tests_helper.default_cursor()
+    );
+
+    val settlement_descriptor_id = originals_marketplace.Marketplace.settlement_descriptor @ {
+        .maker_descriptor.asset.id == bertha_id
+    }.id;
+
+    expected_response = dip_utils.paged_result(
+        next_cursor = null,
+        data = [[
+            "attributes": [
+                "face": "neutral".to_gtv()
+            ].to_gtv(),
+            "badges": list<map<name, gtv?>>().to_gtv(),
+            "children": list<map<name, gtv?>>().to_gtv(),
+            "creator_id": admin.auth_id.account_id.to_gtv(),
+            "creator_name": "Admin".to_gtv(),
+            "description": null,
+            "name": "Test Original".to_gtv(),
+            "id": bertha_id.to_gtv(),
+            "settlement_descriptor": map<name, gtv>([
+                "settlement_type": originals_marketplace.Marketplace.settlement_type.fixed_price.to_gtv(),
+                "asset_type": originals_marketplace.Marketplace.asset_type.regular.to_gtv(),
+                "asset_id": originals_utils.Ft3Helper.get_asset(originals_tests_mocks.ASSET_ID).id.to_gtv(),
+                "maker": admin.auth_id.account_id.to_gtv(),
+                "amount": integer(100).to_gtv(),
+                "id": settlement_descriptor_id.to_gtv(),
+                "expiration": originals_tests_mocks.VALID_EXPIRATION.to_gtv()
+                ]).to_gtv(),
+            "tx_history": list<map<name, gtv?>>().to_gtv(),
+            "collection_name": mock_collection.name.to_gtv()
+        ].to_gtv()]
+    );
+    
+    assert_equals(originals, expected_response);
+}

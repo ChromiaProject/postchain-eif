@@ -1,8 +1,8 @@
 import ^^^.ft3.account;
 
-function require_minting_permission(account.account, Interface.dclass) {
+function require_minting_permission(account.account, Interface.dclass, collection) {
     require(
-        has_minting_permission(account, dclass),
+        has_minting_permission(account, dclass, collection),
         "Account '%s' does not have access to interface '%s'".format(account.id, dclass.name)
     );
 }

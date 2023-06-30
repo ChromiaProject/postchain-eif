@@ -1,0 +1,33 @@
+function get_last_favorite_by_type_mapped(favorites.favorite_type) = (
+    favorites.favorite @ {} (
+        @omit @sort_desc .rowid,
+        favorites.map_favorite_by_type($, favorite_type.name)
+    ) limit 1
+);
+
+function get_last_favorite() = (
+    favorites.favorite @ {} (
+        @omit @sort_desc .rowid,
+        $
+    ) limit 1
+);
+
+function find_mapped_favorites_by_type(favorites.favorite_type) {
+    when (favorite_type) {
+        nft -> {
+            return (f: favorites.favorite, fn: favorites.favorite_nft) @* {
+                f.favorite_object == fn.favorite_object
+            } (favorites.map_favorite_by_type(f, favorite_type.name));
+        }
+        collection -> {
+            return (f: favorites.favorite, fc: favorites.favorite_collection) @* {
+                f.favorite_object == fc.favorite_object
+            } (favorites.map_favorite_by_type(f, favorite_type.name));
+        }
+        project -> {
+            return (f: favorites.favorite, fp: favorites.favorite_project) @* {
+                f.favorite_object == fp.favorite_object
+            } (favorites.map_favorite_by_type(f, favorite_type.name));
+        }
+    }
+}

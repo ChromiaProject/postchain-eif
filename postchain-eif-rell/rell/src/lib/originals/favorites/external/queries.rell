@@ -1,0 +1,6 @@
+query find_favorites(account_id: byte_array, favorite_type_name: text, page_cursor: text) {
+    val cursor = mapper.decode_cursor(page_cursor);
+    val favorites = favorites.find_favorites_by_type(account_id, favorite_type_name, cursor);
+
+    return mapper.make_page(favorites, cursor);
+}

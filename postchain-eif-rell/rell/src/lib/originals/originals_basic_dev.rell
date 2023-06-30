@@ -2,7 +2,5 @@
 module;
 
 namespace Originals {
-	import ^.external;
-	import ^.external.dev;
-	import ^.core.*;
+    import ^.core.*;
 }

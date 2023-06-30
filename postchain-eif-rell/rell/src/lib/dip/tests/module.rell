@@ -3,23 +3,24 @@
 import ^.external.*;
 import ^.external.dev.*;
 import ^^.ft3_helper.tests.*;
+import ^.external.access.owner_based;
 
 function create_instance_() {
-	rell.test.tx()
-        .op(create_instance_op())
+    rell.test.tx()
+        .op(create_instance())
         .nop()
         .run();
     return instance @ {(instance @* {} (@sort_desc .rowid) limit 1)[0]};
 }
 
 function get_last_instance() {
-	return (instance_dclass @* {.instance.is_prototype == false} (@omit @sort_desc .rowid, .instance) limit 1)[0];
+    return (instance_dclass @* {.instance.is_prototype == false} (@omit @sort_desc .rowid, .instance) limit 1)[0];
 }
 
 function get_last_instances() {
-	return (instance_dclass @* {.instance.is_prototype == false} (@omit @sort .rowid, .instance));
+    return (instance_dclass @* {.instance.is_prototype == false} (@omit @sort .rowid, .instance));
 }
 
 function NOP() {
-	return rell.test.tx().nop();
+    return rell.test.tx().nop();
 }

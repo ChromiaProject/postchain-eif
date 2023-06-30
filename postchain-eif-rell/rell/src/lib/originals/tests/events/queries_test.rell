@@ -1,0 +1,124 @@
+function test_find_nft_activity_pagination() {
+    val accs = originals_tests_helper.register_and_retrieve_accounts();
+    val from = accs[0];
+    val to = accs[1];
+    
+    val create_event_reqs = list<(type: text, asset_id: byte_array, from_id: byte_array, to_id: byte_array, params: byte_array)>();
+    
+    originals_external_dev.create_asset("asset", from.id, to.id, 10000).run();
+    for (i in range(50)) {
+        create_event_reqs.add((
+            type = events.event_type.on_sale.name,
+            asset_id = "asset".hash(),
+            from_id = from.id,
+            to_id = to.id,
+            params = i.to_gtv().to_bytes()
+        ));
+    }
+    originals_external_dev.create_events(create_event_reqs).run();
+    
+    var current_cursor: text? = originals_tests_helper.default_cursor(9, rowid.from_gtv(integer(0).to_gtv()));
+    var actual = 0;
+    val expected = 5;
+    while (true) {
+        val response = events_external.find_nft_activity([events.event_type.on_sale.name], null, null, null, current_cursor!!);
+        current_cursor = response.next_cursor;
+        val response_events = response.data;
+        
+        var i = 0;
+        for (event in response_events) {
+            val expected_params = ((9 * actual) + i).to_gtv();
+            assert_equals(originals_tests_helper.unpack_pretty_gtv(["params"], event), expected_params);
+            i++;
+        }
+        
+        if (empty(current_cursor)) {
+            break;
+        }
+
+        actual++;
+        assert_equals(response_events.size(), 9);
+    }
+    
+    assert_equals(actual, expected);
+}
+
+function test_find_nft_activity_type() {
+    val accs = originals_tests_helper.register_and_retrieve_accounts();
+    val from = accs[0];
+    val to = accs[1];
+    
+    originals_tests_mocks.mock_events(from, to);
+    
+    val response_events = events_external.find_nft_activity([events.event_type.values()[1].name], null, null, null, originals_tests_helper.default_cursor()).data;
+    
+    assert_equals(response_events.size(), 4);
+    for (event in response_events) {
+        assert_equals(originals_tests_helper.unpack_pretty_gtv(["type"], event), events.event_type.values()[1].name.to_gtv());
+    }
+}
+
+function test_find_nft_activity_asset_id() {
+    val accs = originals_tests_helper.register_and_retrieve_accounts();
+    val acc1 = accs[0];
+    val acc2 = accs[1];
+    
+    originals_tests_mocks.mock_events(acc1, acc2);
+    
+    val response_events = events_external.find_nft_activity([events.event_type.values()[3].name], "asset1".hash(), null, null, originals_tests_helper.default_cursor()).data;
+    
+    assert_equals(response_events.size(), 2);
+    for (event in response_events) {
+        assert_equals(originals_tests_helper.unpack_pretty_gtv(["asset", "id"], event), "asset1".hash().to_gtv());
+    }
+}
+
+function test_find_nft_activity_collection() {
+    val bob = ft3_helper_tests.register_bob();
+    val admin = ft3_helper_tests.register_admin();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection1, _) = originals_tests_helper.create_mock_collection(admin, bob, admin);  
+    val (bertha1_id, _) = collections_tests_helper.create_cow(admin, mock_collection1.name);
+    val (mock_collection2, _) = originals_tests_helper.create_mock_collection(admin, bob, admin, name = "collection2", symbol = "c2");  
+    val (bertha2_id, _) = collections_tests_helper.create_cow(admin, mock_collection2.name);
+  
+    originals_tests_mocks.mock_events(ft3_account.account @ {admin.auth_id.account_id}, ft3_account.account @ {bob.auth_id.account_id}, bertha1_id, bertha2_id);
+    
+    val response_events = events_external.find_nft_activity([events.event_type.values()[1].name, events.event_type.values()[3].name], null, mock_collection1.name, null, originals_tests_helper.default_cursor()).data;
+    assert_equals(response_events.size(), 4);
+    for (event in response_events) {
+        assert_equals(originals_tests_helper.unpack_pretty_gtv(["asset", "id"], event), bertha1_id.to_gtv());
+    }
+}
+
+function test_find_nft_activity_project() {
+    val bob = ft3_helper_tests.register_bob();
+    val admin = ft3_helper_tests.register_admin();
+
+    originals_tests_helper.init_originals(admin);
+    originals_tests_helper.initialize_mock_interfaces(admin);
+
+    val (mock_collection1, mock_project1) = originals_tests_helper.create_mock_collection(admin, bob, admin);  
+    val (bertha1_id, _) = collections_tests_helper.create_cow(admin, mock_collection1.name);
+    val mock_project2 = originals_tests_helper.create_mock_project(admin, projects.simple_project_props(
+        name = "Project2",
+        display_name = "Project2",
+        avatar = originals_tests_mocks.mock_image,
+        background_image = originals_tests_mocks.mock_image,
+        website = "website.com",
+        description = "Description of Project1"
+    ));
+    val (mock_collection2, _) = originals_tests_helper.create_mock_collection(admin, bob, admin, name = "collection2", project = mock_project2, symbol = "c2");  
+    val (bertha2_id, _) = collections_tests_helper.create_cow(admin, mock_collection2.name);
+  
+    originals_tests_mocks.mock_events(ft3_account.account @ {admin.auth_id.account_id}, ft3_account.account @ {bob.auth_id.account_id}, bertha1_id, bertha2_id);
+    
+    val response_events = events_external.find_nft_activity([events.event_type.values()[1].name, events.event_type.values()[3].name], null, null, mock_project2.name, originals_tests_helper.default_cursor()).data;
+    assert_equals(response_events.size(), 4);
+    for (event in response_events) {
+        assert_equals(originals_tests_helper.unpack_pretty_gtv(["asset", "id"], event), bertha2_id.to_gtv());
+    }
+}

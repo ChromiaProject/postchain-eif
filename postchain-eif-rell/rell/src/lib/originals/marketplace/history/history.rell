@@ -1,0 +1,92 @@
+namespace History {
+    @log 
+    entity trade_event {
+        maker: ft3.acc.account;
+        taker: ft3.acc.account;
+        maker_asset: ft3.asset;
+        taker_asset: ft3.asset;
+        maker_amount: integer;
+        taker_amount: integer;
+    }
+    
+    @log
+    entity indirect_trade {
+        index ft3.asset, trade_event;
+        amount: integer;
+    }
+    
+    function log_trade(
+        maker: ft3.acc.account,
+        taker: ft3.acc.account,
+        maker_asset: ft3.asset,
+        taker_asset: ft3.asset,
+        maker_amount: integer,
+        taker_amount: integer
+    ) {
+        return create trade_event(
+            maker,
+            taker,
+            maker_asset,
+            taker_asset,
+            maker_amount,
+            taker_amount
+        );
+    }
+    
+    function log_indirect_trade(
+        ft3.asset,
+        trade_event,
+        amount: integer
+    ) {
+        create indirect_trade (
+            asset,
+            trade_event,
+            amount
+        );
+    }
+    
+    function get_trade_logs(asset_id: byte_array) {
+        return trade_event @* { .maker_asset.id == asset_id } (
+            maker_id = .maker.id,
+            taker_id = .taker.id,
+            maker_asset_id = .maker_asset.id,
+            taker_asset_id = .taker_asset.id,
+            maker_amount = .maker_amount,
+            taker_amount = .taker_amount,
+            timestamp = .transaction.block.timestamp,
+            @sort_desc block_height = .transaction.block.block_height,
+            
+            indirect_ids = get_indirect_trade_logs($)
+        );
+    }
+    
+    function get_indirect_trade_logs(trade_event) {
+        return indirect_trade @* {trade_event} .asset.id;
+    }
+    
+    function get_trade_logs_page(
+        asset_id: byte_array,
+        page_cursor
+    ) {
+        return trade_event @* {
+            if (page_cursor.after_rowid??) (.rowid < page_cursor.after_rowid!!) else true,
+            .maker_asset.id == asset_id
+        } (
+            @omit @sort_desc .rowid,
+            pagination_result(
+                data = (
+                    maker_id = .maker.id,
+                    taker_id = .taker.id,
+                    maker_asset_id = .maker_asset.id,
+                    taker_asset_id = .taker_asset.id,
+                    maker_amount = .maker_amount,
+                    taker_amount = .taker_amount,
+                    timestamp = .transaction.block.timestamp,
+                    block_height = .transaction.block.block_height,
+                    indirect = get_indirect_trade_logs($)
+                ).to_gtv_pretty(),
+                rowid = .rowid
+            )
+        ) limit fetch_data_size(page_cursor);
+    }
+}

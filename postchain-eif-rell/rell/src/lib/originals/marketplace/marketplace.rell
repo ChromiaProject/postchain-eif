@@ -1,73 +1,723 @@
+// TODO: maybe settlement evm signature should be validated by an oracle or implement it with Rell's eth_ecrecover
+// TODO: Once the EVM - Chromia indexer is implemented, change EVM asset checks to the implemented mechanisms to determine whether asset is EVM
+namespace Marketplace {
+    import .meta.{Meta};
+    import .history.{History};
+    import .category.{Category};
+    import .filter.{Filter};
+    import .events;
+        
+    object data {
+        null_asset: ft3.asset = generate_null_asset();
+        mutable domain_separator: byte_array = x"";
+        // time after expiration before maker can delete settlement
+        // buffer in case a taker evm tx is getting mined
+        mutable evm_expiration_delete_buffer: integer = 1000 * 60 * 10; // default 10 minutes
+    }
+    
+    enum settlement_type {
+        fixed_price,
+        evm,
+        auction
+    }
+    
+    enum asset_type {
+        regular,
+        original,
+        evm_asset,
+        null_asset
+    }
 
-namespace Listing {
-	entity original_listing {
-		key original: Originals.Id.asset_instance;
-		owner: ft3.acc.account;
-		asset: ft3.asset;
-		mutable price: integer;
-	}
-	
-	function get(original_id: byte_array): original_listing {
-		return require(
-			original_listing @? {.original.asset.id == original_id},
-			"Original with id " + original_id + " not listed."
-		);
-	}
-	
-	function list_original(
-	    account: ft3.acc.account,
-		original_id: byte_array,
-		asset_id: byte_array,
-		price: integer
-	) {
-		require(price > 0, "Price has to be positive");
-		val original_asset_instance = Originals.Id.get_by_id(original_id);
-		require(
-			Originals.chromia.ITradable.has(original_asset_instance.instance),
-			"Original does not implement '" + Originals.chromia.ITradable.interface + "' interface"
-		);
-		
-		Ft3Helper.lock_asset(account.id, original_id, Ft3Helper.LISTED);
-		create original_listing (original_asset_instance, account, Ft3Helper.get_asset(asset_id), price);
-	}
-	
-	function change_price(
-	    account: ft3.acc.account,
-		original_id: byte_array,
-		price: integer
-	) {
-		require(price > 0, "Price has to be positive");
-		val listing = original_listing @ {.original.asset.id == original_id};
-		require(listing.owner == account, "Only owner can change the price.");
-		listing.price = price;		
-	}
-	
-	function unlist_original(
-	    account: ft3.acc.account,
-		original_id: byte_array
-	) {
-		Ft3Helper.unlock_asset(account.id, original_id, Ft3Helper.LISTED);
-		delete original_listing @ {.original.asset.id == original_id};
-	}
-	
-	function buy_original(
-	    account: ft3.acc.account,
-		original_id: byte_array
-	) {
-		val listing = get(original_id);
-		transfer_asset(account, listing.owner, listing.asset, listing.price);
-		Ft3Helper.transfer_listed_asset(listing.owner, account, original_id);
-		
-		val original = Originals.Id.get_instance(original_id);
-		val transferred_ids = Originals.Ownership.transfer_linked_originals(listing.owner, account, original);
-		
-		val log = History.log_buy_event(listing.original, listing.owner, account, listing.asset, listing.price);
-		for (id in transferred_ids) {
-			History.log_indirect_buy(Originals.Id.get_by_id(id), log);
+    entity offer {
+        index originals_core.Id.asset_instance;
+        maker_descriptor: payment_descriptor;
+        taker_descriptor: payment_descriptor;
+        created_at: timestamp = original_utils.now_from_context();
+    }
+    
+    entity payment_descriptor {
+        asset: ft3.asset; // Asset can refer to an Original, an EVM imported original, or an EVM asset (ERC20 or Eth)
+        asset_type;
+        mutable amount: integer; // Only mutated on auction type settlements
+        // Used on the taker side to store the highest bidder, can later be used to reserve a settlement for a particular account
+        mutable ft3.acc.account;
+    }
+    
+    entity settlement_descriptor {
+        key id: byte_array; // The id for evm settlements is the evm signed settlement_descriptor
+        maker_descriptor: payment_descriptor;
+        taker_descriptor: payment_descriptor;
+        expiration: integer;
+        salt: integer;
+        settlement_type;
+        created_at: timestamp = original_utils.now_from_context();
+    }
+    
+    enum evm_type {
+        fungible,
+        erc721,
+        erc1155,
+        null_asset
+    }
+    
+    entity evm_asset {
+        key ft3.asset;
+        address: text;
+        evm_type;
+        token_id: integer = 0;
+    }
+    
+    // check_signature should always be true except for testing so as not to have to get the signature of every evm test settlement
+    function create_settlement(
+        maker_account: ft3.acc.account,
+        maker_descriptor_asset_id: byte_array,
+        maker_descriptor_asset_type: asset_type,
+        maker_descriptor_amount: integer,
+        taker_descriptor_asset_id: byte_array,
+        taker_descriptor_asset_type: asset_type,
+        taker_descriptor_amount: integer,
+        expiration: integer,
+        salt: integer,
+        settlement_type,
+        maker_evm_signature: byte_array?,
+        check_signature: boolean = true
+    ) {
+        val maker_asset = get_and_check_descriptor_asset(maker_descriptor_asset_id, maker_descriptor_asset_type);
+        val taker_asset = get_and_check_descriptor_asset(taker_descriptor_asset_id, taker_descriptor_asset_type);
+        
+        extensions.before_create_settlement(
+            maker_account,
+            maker_asset,
+            maker_descriptor_asset_type,
+            maker_descriptor_amount,
+            taker_asset,
+            taker_descriptor_asset_type,
+            taker_descriptor_amount,
+            expiration,
+            salt,
+            settlement_type,
+            maker_evm_signature
+        );
+        require(expiration > op_context.last_block_time, "Expiration must be in the future");
+        require(maker_descriptor_amount > 0 and maker_descriptor_asset_type != asset_type.null_asset, "Maker descriptor amount must be greater than 0 and not a null asset");
+        require(maker_descriptor_amount >= 0, "Taker descriptor amount must be greater or equal to 0");
+        require(
+            (maker_descriptor_asset_type != asset_type.evm_asset and taker_descriptor_asset_type != asset_type.evm_asset)
+            or
+            settlement_type == Marketplace.settlement_type.evm,
+            "Settlement type must be EVM if there is and EVM asset in the settlement descriptor"
+        );
+        
+        if(settlement_type == Marketplace.settlement_type.evm) { // Either maker and taker have to be evm_assets or only taker
+            require(EvmAccounts.is_evm_account(maker_account), "Maker must be an EVM account");
+            require(
+                (maker_descriptor_asset_type == asset_type.evm_asset and taker_descriptor_asset_type == asset_type.evm_asset)
+                or
+                (maker_descriptor_asset_type != asset_type.evm_asset and taker_descriptor_asset_type == asset_type.evm_asset), 
+                "For evm settlements either taker and maker must offer evm_assets or only taker"
+            );
+        }
+        
+        if(settlement_type != Marketplace.settlement_type.evm) {
+            require(
+                evm_asset @? {maker_asset} == null
+                and
+                evm_asset @? {taker_asset} == null, 
+                "Settlements assets can't be EVM for this type of settlement"
+            );
+        }
+
+        val maker_descriptor = create payment_descriptor(
+            maker_asset,
+            maker_descriptor_asset_type,
+            maker_descriptor_amount,
+            maker_account
+        );
+        lock_descriptor_asset(maker_descriptor);
+        
+        val taker_descriptor = create payment_descriptor(
+            taker_asset,
+            taker_descriptor_asset_type,
+            taker_descriptor_amount,
+            account = ensure_null_account(maker_account)
+        );
+        
+        val id: byte_array;
+        if (settlement_type == Marketplace.settlement_type.evm) {
+            require(maker_evm_signature != null, "An EVM settlement type requires a signature");
+            id = maker_evm_signature!!;
+        } else {
+            id = derive_settlement_id(maker_account.id, maker_descriptor_asset_id, salt);
+        }
+        val settlement_descriptor = create settlement_descriptor(
+            id = id,
+            maker_descriptor = maker_descriptor,
+            taker_descriptor = taker_descriptor,
+            expiration,
+            salt,
+            settlement_type
+        );
+
+        if (settlement_type == Marketplace.settlement_type.evm and check_signature) { require(verify_settlement_signature(settlement_descriptor), "Signature does not match descriptor"); }
+    
+        extensions.after_create_settlement(settlement_descriptor);
+    }
+    
+    function delete_settlement(
+        signer_account: ft3.acc.account,
+        settlement_id: byte_array
+    ) {
+        _delete_settlement(signer_account, settlement_id, op_context.last_block_time);
+    }
+    
+    function _delete_settlement(
+        signer_account: ft3.acc.account,
+        settlement_id: byte_array,
+        last_block_time: timestamp
+    ) {
+        val settlement_descriptor = settlement_descriptor @ {.id == settlement_id};
+        extensions.before_delete_settlement(settlement_descriptor);
+        require(settlement_descriptor.settlement_type == Marketplace.settlement_type.fixed_price
+            or
+            settlement_descriptor.settlement_type == Marketplace.settlement_type.evm,
+            "Only expired EVM and fixed price settlements can be deleted"
+        );
+        require(
+            settlement_descriptor.settlement_type != Marketplace.settlement_type.evm
+            or 
+            (settlement_descriptor.expiration + data.evm_expiration_delete_buffer) < last_block_time,
+            "EVM settlements can only be deleted " + (data.evm_expiration_delete_buffer/1000/60).to_text() + " minutes after expiration"
+        );
+        require(signer_account == settlement_descriptor.maker_descriptor.account, "Only the maker can delete the settlement");
+        unlock_descriptor_asset(settlement_descriptor.maker_descriptor);
+        delete settlement_descriptor;
+        extensions.after_delete_settlement(settlement_id);
+    }
+    
+    function settle(
+        taker_account: ft3.acc.account,
+        settlement_id: byte_array
+    ) {
+        val settlement_descriptor = settlement_descriptor @ {.id == settlement_id};
+        
+        require(taker_account != settlement_descriptor.maker_descriptor.account, "Cannot buy from your own listing");
+        require(settlement_descriptor.settlement_type == Marketplace.settlement_type.fixed_price, "Can only resolve settlements of fixed price type");
+        
+        extensions.before_settle(taker_account, settlement_descriptor);        
+        
+        make_payments(settlement_descriptor, taker_account, true);
+
+        extensions.after_settle(taker_account, settlement_descriptor);
+        
+        delete settlement_descriptor;
+    }
+    
+    function bid(
+        bidder_account: ft3.acc.account,
+        settlement_id: byte_array,
+        bid_amount: integer
+    ) {
+        _bid(bidder_account, settlement_id, bid_amount, op_context.last_block_time);
+    }
+    
+    function _bid(
+        bidder_account: ft3.acc.account,
+        settlement_id: byte_array,
+        bid_amount: integer,
+        last_block_time: timestamp
+    ) {
+        val settlement_descriptor = settlement_descriptor @ {.id == settlement_id};
+        
+        extensions.before_bid(bidder_account, bid_amount, settlement_descriptor);
+        
+        require(settlement_descriptor.settlement_type == settlement_type.auction, "Can only bid on auction type settlements");
+        require(settlement_descriptor.expiration >= last_block_time, "Auction is over");
+        require(
+            bid_amount > settlement_descriptor.taker_descriptor.amount
+            or
+            (
+                settlement_descriptor.taker_descriptor.account.id == original_utils.Ft3Helper.get_null_account_id(settlement_descriptor.maker_descriptor.account.id)
+                and
+                bid_amount >= settlement_descriptor.taker_descriptor.amount
+            ),
+            "Bid is not high enough to be accepted"
+        );
+        require(bidder_account != settlement_descriptor.maker_descriptor.account, "Cannot bid on your own auction");
+        
+        // Unlock bid of last highest bidder
+        if (settlement_descriptor.taker_descriptor.account != ensure_null_account(settlement_descriptor.maker_descriptor.account)) {
+            unlock_descriptor_asset(settlement_descriptor.taker_descriptor);
+        }
+                
+        // Lock new highest bid
+        update settlement_descriptor.taker_descriptor(.account = bidder_account, .amount = bid_amount);
+        
+        lock_descriptor_asset(settlement_descriptor.taker_descriptor);
+        
+        extensions.after_bid(bidder_account, bid_amount, settlement_descriptor);
+    }
+    
+    function close_auction(
+        settlement_id: byte_array
+    ) {
+        _close_auction(settlement_id, op_context.last_block_time);
+    }
+    
+    function _close_auction(
+        settlement_id: byte_array,
+        last_block_time: timestamp
+    ) {
+        val settlement_descriptor = settlement_descriptor @ {.id == settlement_id};
+        val taker_account = settlement_descriptor.taker_descriptor.account;
+        
+        extensions.before_settle(taker_account, settlement_descriptor);
+        
+        require(settlement_descriptor.expiration <= last_block_time, "Auction is not over");
+        
+        // Transfer bid to seller and asset to buyer, if no buyer then return assets to seller
+        if (taker_account == ensure_null_account(settlement_descriptor.maker_descriptor.account)) {
+            unlock_descriptor_asset(settlement_descriptor.maker_descriptor);
+        } else {
+            make_payments(settlement_descriptor, taker_account);
+        }
+        
+        extensions.after_settle(taker_account, settlement_descriptor);
+        
+        delete settlement_descriptor;    
+    }
+    
+    function register_evm_asset(
+        evm_address: text,
+        evm_type,
+        asset_id: byte_array?,
+        token_id: integer?
+    ) {
+        require(op_context.is_signer(chain_context.args.oracle_pubkey), "Only a trusted oracle can register an evm asset");
+
+        val asset_evm_address_low = evm_address.lower_case();
+    
+        val ft3.asset;
+        when(evm_type) {
+            Marketplace.evm_type.erc721, Marketplace.evm_type.erc1155 -> {
+                require(token_id != null, "Token id can't be null for NFT token");
+                asset = originals_core.Id.get_by_id(asset_id!!).asset;
+            }
+            Marketplace.evm_type.fungible -> {
+                val evm_asset = evm_asset @? {asset_evm_address_low};
+                require(empty(evm_asset), "Address is already registered");
+                        
+                val issuing_chain_rid = chain_context.blockchain_rid;
+                val id = derive_fungible_evm_asset_id(asset_evm_address_low);
+                asset = create ft3.asset(id, issuing_chain_rid, id.to_hex());
+            }
+            Marketplace.evm_type.null_asset -> {
+                asset = data.null_asset;
+            }
+        }
+        
+        create evm_asset(
+            asset,
+            asset_evm_address_low,
+            evm_type,
+            token_id ?: 0
+        );
+    }
+    
+    struct evm_payment_descriptor {
+        token: text; // 0x for ETH if TokenType == FUNGIBLE
+        tokenId: integer;
+        tokenType: integer;
+        amount: integer;
+    }
+    
+    struct evm_settlement_descriptor {
+        maker: text;
+        makerDescriptor: evm_payment_descriptor;
+        takerDescriptor: evm_payment_descriptor;
+        expiration: integer;
+        salt: integer;
+    }
+    
+    function get_evm_settlement_descriptor(settlement_id: byte_array): evm_settlement_descriptor {
+        val settlement_descriptor = settlement_descriptor @ {.id == settlement_id};
+        return settlement_descriptor_to_evm(settlement_descriptor);
+    }
+    
+    function settlement_descriptor_to_evm(settlement_descriptor): evm_settlement_descriptor {
+        val maker_evm_asset = evm_asset @? {settlement_descriptor.maker_descriptor.asset};
+        val taker_evm_asset = evm_asset @? {settlement_descriptor.taker_descriptor.asset};
+        val maker_evm_address = EvmAccounts.get_evm_account_address(settlement_descriptor.maker_descriptor.account);
+        
+        val makerDescriptor = evm_payment_descriptor(
+            maker_evm_asset?.address ?: "0x0000000000000000000000000000000000000000",
+            tokenId = maker_evm_asset?.token_id ?: 0,
+            tokenType = maker_evm_asset?.evm_type?.value ?: evm_type.null_asset.value,
+            amount = 
+                if (settlement_descriptor.maker_descriptor.asset_type == asset_type.evm_asset
+                    or
+                    settlement_descriptor.maker_descriptor.asset_type == asset_type.null_asset
+                ) 
+                    settlement_descriptor.maker_descriptor.amount
+                else 0
+        );
+        
+        val takerDescriptor = evm_payment_descriptor(
+            taker_evm_asset?.address ?: "0x0000000000000000000000000000000000000000",
+            tokenId = taker_evm_asset?.token_id ?: 0,
+            tokenType = taker_evm_asset?.evm_type?.value ?: evm_type.null_asset.value,
+            amount = 
+                if (settlement_descriptor.taker_descriptor.asset_type == asset_type.evm_asset
+                    or
+                    settlement_descriptor.taker_descriptor.asset_type == asset_type.null_asset
+                ) 
+                    settlement_descriptor.taker_descriptor.amount
+                else 0
+        );
+        
+        return evm_settlement_descriptor(
+            maker_evm_address,
+            makerDescriptor,
+            takerDescriptor,
+            expiration = settlement_descriptor.expiration,
+            salt = settlement_descriptor.salt
+        );
+    }
+    
+    function register_settled_event(msg_sender: text, settlement_id: byte_array) {
+        require(op_context.is_signer(chain_context.args.oracle_pubkey), "Only a trusted oracle can register a paid event");
+        val settlement_descriptor = settlement_descriptor @? {settlement_id};
+        require(settlement_descriptor != null, "No settlement descriptor found with that id");
+        
+        val taker_account = EvmAccounts.ensure_evm_account(msg_sender);
+        
+        extensions.before_settle(taker_account, settlement_descriptor!!);
+        
+        make_payments(settlement_descriptor, taker_account);
+        
+        extensions.after_settle(taker_account, settlement_descriptor);
+
+        delete settlement_descriptor; 
+    }
+    
+    function register_cancelled_event(settlement_id: byte_array) {
+        val settlement_descriptor = settlement_descriptor @ {settlement_id};
+        
+        extensions.before_delete_settlement(settlement_descriptor);
+        
+        require(op_context.is_signer(chain_context.args.oracle_pubkey), "Only a trusted oracle can register a cancelled event");
+        
+        delete settlement_descriptor @ {settlement_id}; 
+        
+        extensions.after_delete_settlement(settlement_id);
+    }
+    
+    // Helper functions
+    
+    function get_and_check_descriptor_asset(asset_id: byte_array, asset_type) {
+        val asset: ft3.asset;
+        
+        when(asset_type) {
+            original -> {
+                val original = originals_core.Id.get_by_id(asset_id);
+                require(
+                    originals_core.chromia.ITradable.has(original.instance),
+                    "Original does not implement '" + originals_core.chromia.ITradable.interface + "' interface"
+                );
+                asset = original.asset;
+            }
+            evm_asset -> {
+                val evm_asset = evm_asset @? {.asset.id == asset_id};
+                require(evm_asset != null, "Invalid EVM asset");
+                asset = evm_asset!!.asset;
+            }
+            regular -> {
+                asset = ft3.asset @ {.id == asset_id};
+            }
+            null_asset -> {
+                asset = data.null_asset;
+            }
+        }
+        
+        return asset;
+    }
+    
+    function lock_descriptor_asset(payment_descriptor) {
+        when(payment_descriptor.asset_type) {
+            Marketplace.asset_type.original -> {
+                lock_asset(payment_descriptor.account, payment_descriptor.asset, payment_descriptor.amount, original_utils.Ft3Helper.ESCROW, true);
+            }
+            Marketplace.asset_type.regular -> {
+                lock_asset(payment_descriptor.account, payment_descriptor.asset, payment_descriptor.amount, original_utils.Ft3Helper.ESCROW);
+            }
+        }
+    }
+    
+    function unlock_descriptor_asset(payment_descriptor) {
+        when(payment_descriptor.asset_type) {
+            Marketplace.asset_type.original -> {
+                unlock_asset(payment_descriptor.account, payment_descriptor.asset, payment_descriptor.amount, original_utils.Ft3Helper.ESCROW, true);
+            }
+            Marketplace.asset_type.regular -> {
+                unlock_asset(payment_descriptor.account, payment_descriptor.asset, payment_descriptor.amount, original_utils.Ft3Helper.ESCROW);
+            }
+        }
+    }
+    
+    function generate_null_asset(): ft3.asset {
+        val issuing_chain_rid = chain_context.blockchain_rid;
+        return create ft3.asset (name = "NULL", issuing_chain_rid, id = "NULL".to_bytes());
+    }
+    
+    function generate_null_evm_asset(): evm_asset {
+        val issuing_chain_rid = chain_context.blockchain_rid;
+        return create evm_asset(
+            asset = ft3.asset @ {.id == "NULL".to_bytes()},
+            "0x1234567891234567891234567891234567891234",
+            evm_type.null_asset
+        );
+    }
+    
+    function make_payments(settlement_descriptor, taker_account: ft3.acc.account, skip_unlock_taker_asset: boolean = false) {
+        unlock_descriptor_asset(settlement_descriptor.maker_descriptor);
+        if (not skip_unlock_taker_asset) {
+            unlock_descriptor_asset(settlement_descriptor.taker_descriptor);
+        }
+        
+        val indirect_transferred_ids = make_payment(settlement_descriptor.maker_descriptor.account, taker_account, settlement_descriptor.maker_descriptor);
+
+        val trade_log = History.log_trade(
+            settlement_descriptor.maker_descriptor.account,
+            taker_account,
+            settlement_descriptor.maker_descriptor.asset,
+            settlement_descriptor.taker_descriptor.asset,
+            settlement_descriptor.maker_descriptor.amount,
+            settlement_descriptor.taker_descriptor.amount
+        );
+        if(indirect_transferred_ids != null) {
+            for (id in indirect_transferred_ids) {
+                History.log_indirect_trade(
+                    ft3.asset @ {id},
+                    trade_log,
+                    1
+                );
+            }
+        }
+                
+        make_payment(taker_account, settlement_descriptor.maker_descriptor.account, settlement_descriptor.taker_descriptor);
+        extensions.after_make_payment(settlement_descriptor);
+    }
+    
+    function make_payment(from: ft3.acc.account, to: ft3.acc.account, payment_descriptor): (list<byte_array>?) {
+        when(payment_descriptor.asset_type) {
+            asset_type.regular -> {
+                transfer_asset(from, to, payment_descriptor.asset, payment_descriptor.amount);    
+            }
+            asset_type.original -> {
+                // Transfer original
+                original_utils.Ft3Helper.transfer_original_asset(from, payment_descriptor.asset.id, to.id, payment_descriptor.amount);
+                return originals_core.Ownership.transfer_linked_originals(
+                    from,
+                    original_utils.Ft3Helper.get_ft3_account(to.id),
+                    originals_core.Id.get_instance(payment_descriptor.asset.id)
+                );
+            }
+        }
+        return null;
+    }
+    
+    function lock_asset(owner_account: ft3.acc.account, ft3.asset, amount: integer, reason: text, is_original: boolean = false){
+        val owner_account_checked: ft3.acc.account;
+        if (is_original) {
+            owner_account_checked = ensure_locked_account(original_utils.Ft3Helper.ORIGINAL, owner_account);
+        } else {
+            owner_account_checked = owner_account;
+        }
+        
+        transfer_asset(
+            owner_account_checked,
+            ensure_locked_account(reason, owner_account),
+            asset,
+            amount
+        );
+    }
+    
+    function unlock_asset(owner_account: ft3.acc.account, ft3.asset, amount: integer, reason: text, is_original: boolean = false){
+        val owner_account_checked: ft3.acc.account;
+        if (is_original) {
+            owner_account_checked = ensure_locked_account(original_utils.Ft3Helper.ORIGINAL, owner_account);
+        } else {
+            owner_account_checked = owner_account;
+        }
+        
+        transfer_asset(
+            ensure_locked_account(reason, owner_account),
+            owner_account_checked,
+            asset,
+            amount
+        );
+    }
+    
+    function set_evm_expiration_delete_buffer(evm_expiration_delete_buffer: integer) {
+        data.evm_expiration_delete_buffer = evm_expiration_delete_buffer;
+    }
+    
+    function ensure_null_account(ft3.acc.account) {
+        return ensure_locked_account(original_utils.Ft3Helper.NULL, account);
+    }
+    
+    
+    function derive_settlement_id(maker_account_id: byte_array, maker_descriptor_asset_id: byte_array, salt: integer) {
+        return (maker_account_id, maker_descriptor_asset_id, salt).hash();
+    }
+    
+    function derive_fungible_evm_asset_id(evm_address: text) {
+        return evm_address.lower_case().hash();
+    }
+    
+    val payment_descriptor_typehash = keccak256("PaymentDescriptor(address token,uint256 tokenId,uint8 tokenType,uint256 amount)".to_bytes());
+    val settlement_descriptor_typehash = keccak256("SettlementDescriptor(address maker,PaymentDescriptor makerDescriptor,PaymentDescriptor takerDescriptor,uint256 expiration,uint256 salt)PaymentDescriptor(address token,uint256 tokenId,uint8 tokenType,uint256 amount)".to_bytes());
+    
+    function set_domain_separator(domain_separator: byte_array) {
+        data.domain_separator = domain_separator;        
+    }
+    
+    function verify_settlement_signature(settlement_descriptor) {
+        val evm_settlement_descriptor = settlement_descriptor_to_evm(settlement_descriptor);
+
+         val pubkey_64bytes = eth_ecrecover(
+            settlement_descriptor.id.sub(0, 32),
+            settlement_descriptor.id.sub(32, 64),
+            integer.from_hex(settlement_descriptor.id.sub(64).to_hex()) - 27,
+            hash_to_sign(evm_settlement_descriptor)
+        );
+         val _address: byte_array = keccak256(pubkey_64bytes).sub(12);
+         val address = "0x" + _address.to_hex();
+      
+        return evm_settlement_descriptor.maker == address.lower_case();
+    }
+    
+    function hash_to_sign(evm_settlement_descriptor) {
+        return keccak256(
+            x'1901' +
+            pack_and_pad_32_bytes([
+                data.domain_separator,
+                hash_settlement_descriptor(evm_settlement_descriptor)
+            ])
+        );
+    }
+    
+    function hash_settlement_descriptor(evm_settlement_descriptor) {
+        return keccak256(
+            pack_and_pad_32_bytes([
+                settlement_descriptor_typehash,
+                byte_array.from_hex(evm_settlement_descriptor.maker.sub(2)),
+                hash_payment_descriptor(evm_settlement_descriptor.makerDescriptor),
+                hash_payment_descriptor(evm_settlement_descriptor.takerDescriptor),
+                integer_to_bytes(evm_settlement_descriptor.expiration),
+                integer_to_bytes(evm_settlement_descriptor.salt)
+            ])
+        );
+    }
+    
+    function hash_payment_descriptor(evm_payment_descriptor) {
+        return keccak256(
+            pack_and_pad_32_bytes([
+                payment_descriptor_typehash,
+                byte_array.from_hex(evm_payment_descriptor.token.sub(2)),
+                integer_to_bytes(evm_payment_descriptor.tokenId),
+                integer_to_bytes(evm_payment_descriptor.tokenType),
+                integer_to_bytes(evm_payment_descriptor.amount)
+            ])
+        );
+    }
+    
+    function integer_to_bytes(int: integer) {
+        var hex = int.to_hex();
+        if(hex.size() == 0) {
+            hex = "00";
+        } else if (hex.size() % 2 != 0) {
+            hex = "0" + hex;
+        }
+        return byte_array.from_hex(hex);
+    }
+    
+    function pad_32_bytes(bytes: byte_array) {
+        val size = bytes.size();
+        val zeroes_to_add = 32 - size;
+        var padding_bytes = x"";
+        for (i in range(zeroes_to_add)) {
+            padding_bytes += x"00";
+        }
+        return padding_bytes + bytes;
+    }
+    
+    function pack_and_pad_32_bytes(bytes_list: list<byte_array>): byte_array {
+        var packed_bytes = x'';
+        for (bytes in bytes_list) {
+            packed_bytes += pad_32_bytes(bytes);
+        }
+        return packed_bytes;
+    }
+
+    function create_or_update_offer(
+        bidder_account: ft3.acc.account,
+        original_id: byte_array,
+        asset_id: byte_array,
+        amount: integer
+    ) {
+        require(amount > 0, "Cannot place a negative offer or offer with 0 amount");
+        val original_asset_instance = originals_core.Id.asset_instance @? { .asset.id == original_id };
+        require(original_asset_instance, "Original with id '%s' does not exist".format(original_id));
+
+        val bidders_last_offer = find_bidders_offer(bidder_account, original_id);
+        val asset = get_and_check_descriptor_asset(asset_id, Marketplace.asset_type.regular);
+
+        extensions.before_create_or_update_offer(bidder_account, amount, asset);
+
+        if (not empty(bidders_last_offer)) {
+            bidders_last_offer.maker_descriptor.amount = amount;
+            bidders_last_offer.taker_descriptor.amount = amount;
+
+            extensions.after_update_offer(bidders_last_offer);
+        } else {
+            val original_owner_account_id = originals_core.Ownership.get_owner_if_one_by_original_id(original_id);
+            require(original_owner_account_id!! != bidder_account.id, "Cannot create an offer for your own nft");
+
+			val maker_descriptor = create Marketplace.payment_descriptor(asset, Marketplace.asset_type.regular, amount, bidder_account);
+			// Todo, if we decide to support fungible originals, update the amount value
+			val taker_descriptor = create Marketplace.payment_descriptor(original_asset_instance.asset, Marketplace.asset_type.original, amount = 1, ft3.acc.account @ { original_owner_account_id });
+			
+			val offer = create Marketplace.offer(original_asset_instance, maker_descriptor, taker_descriptor);
+			extensions.after_create_offer(offer);
 		}
-		
-		delete listing;
 	}
-} 
 
+    function accept_offer(
+        caller_account: ft3.acc.account,
+        original_id: byte_array,
+        bidder_account_id: byte_array
+    ) {
+        val bidder_account = ft3.acc.account @? { .id == bidder_account_id };
+        require(bidder_account, "Bidder account with id '%s' does not exist!".format(bidder_account_id));
 
+        val found_offer = find_bidders_offer(bidder_account, original_id);
+        require(found_offer, "Offer not found!");
+
+        val owner_account = found_offer.taker_descriptor.account;
+
+        require(owner_account == caller_account, "Cannot accept an offer, if you are not the nft owner");
+
+        extensions.before_accept_offer(bidder_account, found_offer);
+        make_payment(bidder_account, owner_account, found_offer.maker_descriptor);
+        make_payment(owner_account, bidder_account, found_offer.taker_descriptor);
+
+        extensions.after_accept_offer(found_offer);
+    }
+
+    function delete_offer(originals_core.Id.asset_instance) {
+        delete Marketplace.offer @* { asset_instance };
+    }
+
+    function find_bidders_offer(bidder_account: ft3.acc.account, original_id: byte_array) =
+        Marketplace.offer @? { .maker_descriptor.account == bidder_account, .asset_instance.asset.id == original_id };
+}

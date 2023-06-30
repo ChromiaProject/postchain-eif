@@ -1,0 +1,30 @@
+@mount("evm_accounts")
+namespace Queries {
+    query get_login_message(
+        address: text,
+        ft3.acc.auth_descriptor
+    ): text {
+        return EvmAccounts.get_login_message(
+            EvmAccounts.get_evm_account(address.lower_case()),
+            auth_descriptor
+        );
+    }
+    
+    query get_logout_message(
+        address: text,
+        auth_descriptor_ids: list<byte_array>
+    ) {
+        val account = EvmAccounts.get_evm_account(address.lower_case());
+        require(account != null, "No account for that address");
+        return EvmAccounts.get_logout_message(
+            account!!,
+            auth_descriptor_ids
+        );
+    }
+    
+    query derive_evm_account_id(
+        address: text
+    ): byte_array {
+        return EvmAccounts.derive_evm_account_id(address.lower_case());
+    }
+}

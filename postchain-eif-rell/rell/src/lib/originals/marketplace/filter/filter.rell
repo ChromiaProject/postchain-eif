@@ -1,0 +1,287 @@
+namespace Filter {
+    function get_by_interface(name): map<name, gtv> {
+        val filters_definition = map<name, gtv>();
+        val attribute_tag_pairs = marketplace.Marketplace.Meta.find_interface_attributes_by_meta_tag(name, marketplace.Marketplace.Meta.tag.marketplace_filter);
+        
+        for((attribute, tag_value) in attribute_tag_pairs) {
+            when(attribute.type) {
+                originals_basic.Originals.Dip.Attribute.type.text -> filters_definition[tag_value] = _handle_text_filter(attribute).to_gtv();
+                originals_basic.Originals.Dip.Attribute.type.integer -> filters_definition[tag_value] = _handle_integer_filter(attribute).to_gtv();
+            }
+        }
+        
+        return filters_definition;
+    }
+    
+    /*
+     * TODO only on protoypes and fungible originals?
+     * or limit
+     */
+    function _handle_text_filter(marketplace.Dip.attribute): map<name, gtv> {
+        val cache = marketplace.Cache.Text.get_values(attribute);
+        val values = map(cache @* {} (($.value, $.count)));
+
+        return _options_filter(attribute.name, values);
+    }
+    
+    function _options_filter(name, values: map<text, integer>): map<text, gtv> {
+        return [
+            "name": name.to_gtv(),
+            "type": "options".to_gtv(),
+            "values": values.to_gtv()
+        ];
+    }
+    
+    /*
+     * TODO only on protoypes and fungible originals?
+     * or limit
+     */
+    function _handle_integer_filter(marketplace.Dip.attribute): map<name, gtv> {
+        val min = marketplace.Cache.Integer.get_min_value(attribute);
+        val max = marketplace.Cache.Integer.get_max_value(attribute);
+        if (min == null) return _range_filter(attribute.name, 0, 100);
+        if (max == null) return _range_filter(attribute.name, min, min);
+        
+        return _range_filter(attribute.name, min, max);
+    }
+    
+    function _range_filter(name, min: integer, max: integer): map<text, gtv> {
+        return [
+            "name": name.to_gtv(),
+            "type": "range".to_gtv(),
+            "values": [
+                "min": min.to_gtv(),
+                "max": max.to_gtv()
+            ].to_gtv()
+        ];
+    }
+    
+    function find_listed_originals_by_interface(
+        interface_name: name,
+        page_cursor
+    ) {
+        return (
+            sd: marketplace.Marketplace.settlement_descriptor,
+            id: originals_basic.Originals.Dip.instance_dclass,
+            asset_instance: originals_basic.Originals.Id.asset_instance
+        ) @* {
+            if(page_cursor.after_rowid??)(id.instance.rowid > page_cursor.after_rowid!!) else true,
+            id.dclass.name == interface_name,
+            asset_instance.instance == id.instance,
+            sd.maker_descriptor.asset.id == asset_instance.asset.id
+        } (
+            @omit @sort asset_instance.instance,
+            pagination_result(
+                data = map_original_instance(asset_instance.instance).to_gtv(),
+                rowid = asset_instance.instance.rowid
+            )
+        ) limit fetch_data_size(page_cursor);
+    }
+    
+    function find_original_instances_by_owner_id_and_status(
+        owner_id: byte_array,
+        listed_state: boolean,
+        page_cursor
+    ) {
+        val original_account_id = ft3_helper.Ft3Helper.get_original_account_id(owner_id);
+        val marketplace_account_id = ft3_helper.Ft3Helper.get_escrow_account_id(owner_id);
+        
+        return (ia: originals_basic.Originals.Id.asset_instance, b: ft3_core.balance) @* {
+            if (page_cursor.after_rowid??) (ia.instance.rowid > page_cursor.after_rowid!!) else true,
+            b.amount > 0,
+            ia.asset == b.asset,
+            when (listed_state) {
+                true -> b.account.id == marketplace_account_id;
+                else -> b.account.id == original_account_id;
+            }
+        } (
+            @omit @sort ia.instance,
+            pagination_result(
+                data = map_original_instance(ia.instance).to_gtv(),
+                rowid = ia.instance.rowid
+            )
+        ) limit fetch_data_size(page_cursor);
+    }
+    
+    
+    function find_listed_originals_by_interface_price_range(
+        interface_name: name,
+        min: integer,
+        max: integer,
+        page_cursor
+    ) {
+        return (
+            sd: marketplace.Marketplace.settlement_descriptor,
+            id: originals_basic.Originals.Dip.instance_dclass,
+            asset_instance: originals_basic.Originals.Id.asset_instance
+        ) @* {
+            if (page_cursor.after_rowid??) (id.instance.rowid > page_cursor.after_rowid!!) else true,
+            id.dclass.name == interface_name,
+            asset_instance.instance == id.instance,
+            sd.maker_descriptor.asset.id == asset_instance.asset.id,
+            sd.taker_descriptor.amount > min, sd.taker_descriptor.amount < max
+        } (
+            @omit @sort asset_instance.instance,
+            pagination_result(
+                data = map_original_instance(asset_instance.instance).to_gtv(),
+                rowid = asset_instance.instance.rowid
+            )
+        ) limit fetch_data_size(page_cursor);
+    }
+    
+    // TODO: These functions are not marketplace specific, they are general purpose functions for Originals
+    
+    function map_original_instance(originals_basic.Originals.Dip.instance): map<name, gtv?> {
+        val mapping_rules = [
+            originals_basic.Originals.OMapper.map_original_meta([originals_basic.Originals.OMapper.type.id]),
+            originals_basic.Originals.OMapper.map_marketplace_settlement_descriptor(originals_basic.Originals.Dip.Mapper.to_map("settlement_descriptor")),
+            originals_basic.Originals.OMapper.map_tx_history(originals_basic.Originals.Dip.Mapper.to_list("tx_history")),
+            originals_basic.Originals.OMapper.map_badges(),
+            originals_basic.Originals.Dip.Mapper.map_attributes_by_meta_tag(marketplace.Marketplace.Meta.tag.marketplace_filter.name, originals_basic.Originals.Dip.Mapper.to_map("attributes")),        
+            originals_basic.Originals.Dip.Mapper.map_attributes_of_interfaces([originals_basic.Originals.chromia.IOriginal.get()])
+        ];
+        
+        val children_rule = originals_basic.Originals.OMapper.map_linked(mapping_rules, originals_basic.Originals.Dip.Mapper.to_list("children"));
+        mapping_rules.add(children_rule);
+        
+        return originals_basic.Originals.Dip.Mapper.map_instance(instance, mapping_rules, [marketplace.Dip.Mapper.option.remove_interface]);
+    }
+
+    function find_original_by_id(id: byte_array): map<name, gtv?>? {
+        val instance = originals_basic.Originals.Id.asset_instance @? {.asset.id == id} .instance;
+        return if(instance??) map_original_instance(instance) else null;
+    }
+
+    function find_originals_by_creator_id(
+        creator_id: byte_array,
+        page_cursor_instance_id
+    ) {
+        return marketplace.Dip.Attribute.find_instances(
+            originals_basic.Originals.chromia.IOriginal.creator_id,
+            creator_id.to_gtv(),
+            page_cursor_instance_id
+        );
+    }
+    
+    function find_distinct_original_names_by_interface(interface_name: name): list<(display_name: text)> {
+        var original_name = originals_basic.Originals.chromia.IOriginal.name;
+        
+        return (id: originals_basic.Originals.Dip.instance_dclass, t: originals_basic.Originals.Dip.Text.text_attribute) @* {
+            id.dclass.name == interface_name,
+            t.attribute.name == original_name.name,
+            id.instance == t.instance
+        } (@group display_name = t.value);
+    }
+    
+    function find_originals_by_name(name: text) {
+        var original_name = originals_basic.Originals.chromia.IOriginal.name;
+        
+        val instances = (id: originals_basic.Originals.Dip.instance_dclass, t: originals_basic.Originals.Dip.Text.text_attribute) @* {
+            t.attribute.name == original_name.name,
+            t.value == name,
+            id.instance == t.instance
+        } (@group @sort id.instance);
+        
+        return instances @* {} (map_original_instance($));
+    }
+    
+    function get_grouped_interfaces(): map<name, list<map<name, gtv>>> {
+        val category_interfaces = marketplace.Marketplace.Meta.get_category_values();
+        
+        val grouped_interfaces = map<name, list<map<name, gtv>>>();
+        for ((category_name, interface_name) in category_interfaces) {
+            val interface = originals_basic.Originals.Dip.Interface.get(interface_name);
+            val dclasses = originals_basic.Originals.Dip.Interface.get_with_dependencies(interface);
+            val attributes = originals_basic.Originals.Dip.Attribute.get_all_in_dclasses(dclasses);
+            val mapped_attributes = map<name, gtv>();
+            for (attribute in attributes) {
+                mapped_attributes.put(
+                    originals_basic.Originals.Dip.Attribute.get_name_from_attribute(attribute),
+                    (meta = list<integer>().to_gtv(), type = attribute.type.name).to_gtv()
+                );
+            }
+            
+            val meta = map<name, gtv>();
+            val description_tag = marketplace.Marketplace.Meta.tag.marketplace_description.name;
+            val description = originals_basic.Originals.Dip.InterfaceMeta.get(interface, description_tag);
+            if (description??) {
+                meta.put(description_tag, description.to_gtv());    
+            }
+            
+            val name_tag = marketplace.Marketplace.Meta.tag.marketplace_name.name;
+            val name = originals_basic.Originals.Dip.InterfaceMeta.get(interface, name_tag);
+            if (name??) {
+                meta.put(name_tag, name.to_gtv());    
+            }
+            
+            grouped_interfaces.put(category_name, [mapped_attributes, meta]);
+        }
+        
+        return grouped_interfaces;
+    }
+    
+    function find_original_instances_by_owner_id(
+        owner_id: byte_array, 
+        page_cursor
+    ) {
+        val original_account_id = ft3_helper.Ft3Helper.get_original_account_id(owner_id);
+        val marketplace_account_id = ft3_helper.Ft3Helper.get_escrow_account_id(owner_id);
+        
+        return (a: originals_basic.Originals.Id.asset_instance, b: ft3_core.balance) @* {
+            if (page_cursor.after_rowid??) (a.instance.rowid > page_cursor.after_rowid!!) else true,
+            (b.account.id == original_account_id or b.account.id == marketplace_account_id),
+            a.asset == b.asset,
+            b.amount > 0
+        } (
+            @omit @sort a.instance,
+            pagination_result(
+                data = map_original_instance(a.instance).to_gtv(),
+                rowid = a.rowid
+            )
+        ) limit fetch_data_size(page_cursor);
+    }
+
+    function find_paginated_listed_originals_by_collection(collections.collection, interface_name: name, page_cursor) {
+        return (
+            sd: marketplace.Marketplace.settlement_descriptor, 
+            ai: originals_basic.Originals.Id.asset_instance, 
+            id: marketplace.Dip.instance_dclass, 
+            co: collections.collection_original
+        ) @* {
+            if (page_cursor.after_rowid??) (id.instance.rowid > page_cursor.after_rowid!!) else true,
+            id.dclass.name == interface_name,
+            ai.instance == id.instance,
+            sd.maker_descriptor.asset.id == ai.asset.id,
+            co.collection == collection,
+            co.asset_instance == ai
+        } (
+            @omit @sort ai.instance,
+            pagination_result(
+                data = map_original_instance(ai.instance).to_gtv(),
+                rowid = ai.instance.rowid
+            )
+        ) limit fetch_data_size(page_cursor);
+    }
+
+    function search(
+        text
+    ): (type: text, hit: gtv)? {
+        if (text.size() != 64) return null;
+        val id = byte_array(text);
+        
+        if (ft3_helper.Ft3Helper.does_account_exist(id)) {
+            val cursor = page_cursor(page_size = 10 ,after_rowid = null);
+            return (
+                type = "account",
+                hit = find_original_instances_by_owner_id(id, cursor).to_gtv()
+            );
+        } else if (originals_basic.Originals.Id.does_original_exist(id)) {
+            return (
+                type = "original",
+                hit = find_original_by_id(id)!!.to_gtv()
+            );
+        }
+        
+        return null;
+    }
+}

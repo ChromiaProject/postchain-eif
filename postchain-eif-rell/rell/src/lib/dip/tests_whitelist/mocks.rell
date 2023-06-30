@@ -6,7 +6,7 @@ import ^^^.ft3_helper.tests.*;
 
 function define_empty_interface(name = "TestInterface", auth_data) {
     external
-        .def_interface_op(
+        .def_interface(
             auth_data.auth_id,
             name,
             [:]
@@ -24,7 +24,7 @@ function define_empty_prototype(
     auth_data
 ) {
     external
-        .def_prototype_op(
+        .def_prototype(
             auth_data.auth_id,
             interface_name,
             [:],

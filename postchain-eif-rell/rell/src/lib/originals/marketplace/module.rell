@@ -1,9 +1,18 @@
-@mount('marketplace')
 module;
 
-import .external.*;
-import .cache.types.*;
-import ^.originals_basic.*;
-import ^.util.*;
-import ^^.dip.dip_basic.*;
 import ^^.ft3_helper.*;
+import ^^.evm_accounts.{EvmAccounts};
+import ^^.access.admin;
+import ^^.dip.dip_basic.*;
+import .cache.types.*;
+import .extensions;
+import ^.collections;
+//TODO: Find better place to import extensions. They should be optional, but if we import
+// them here, they automatically get imported with originals library.
+import .extensions.settlement;
+import originals_core: ^.core;
+import original_utils: ^.util;
+
+struct module_args {
+    oracle_pubkey: pubkey;
+}

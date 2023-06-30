@@ -1,2 +1,11 @@
-@test
-module;
+@test module;
+
+import wl_helper: ^^.access.whitelist.tests.helper;
+import originals_external: ^^.originals.external;
+import originals_core: ^.core;
+import collections_external: ^.collections.external;
+import dip_attributes: ^^.dip.attributes;
+import originals_tests_helper: ^.tests.helper;
+import originals_tests_mocks: ^.tests.mocks;
+import ft3_helper_tests: ^^.ft3_helper.tests;
+import ^^.access.whitelist;

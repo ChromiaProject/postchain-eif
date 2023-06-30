@@ -3,10 +3,7 @@ import ^.admin;
 operation whitelist_account(account_id: byte_array) {
     admin.require_admin("Only admin can whitelist an account");
     
-    val account = require(
-        account @? { account_id },
-        "Account does not exist: " + account_id
-    );
+    val account = util.Ft3Helper.Account(account_id);
     
     require(
         empty(whitelist @? { account }),

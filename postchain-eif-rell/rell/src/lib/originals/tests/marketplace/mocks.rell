@@ -1,0 +1,267 @@
+@test module;
+
+import originals_external: ^^^.external;
+import originals_core: ^^^.core;
+import originals_marketplace: ^^^.marketplace;
+import dip_core: ^^^^.dip.core;
+import dip_attributes: ^^^^.dip.attributes;
+import originals_tests_helper: ^^.helper;
+import originals_tests_mocks: ^^.mocks;
+import ft3_helper_tests: ^^^^.ft3_helper.tests;
+
+namespace ITradableBertha {
+    val interface = "ITradableBertha";
+    
+    function dependencies() = [
+        originals_core.chromia.INonFungibleOriginal.interface,
+        originals_core.chromia.ITradable.interface
+    ];
+
+    val face = dip_core.Attribute.I(interface, name="face");
+    
+    function register(ft3_helper_tests.auth_data) {
+        originals_external.def_original_interface(
+            auth_data.auth_id,
+            interface,
+            [
+                face: dip_core.Type(dip_attributes.Text.T("neutral"), meta_list = [ originals_marketplace.Marketplace.Meta.Filter("marketplace_filter") ])
+            ],
+            dependencies(),
+            [
+                originals_marketplace.Marketplace.Meta.Category("marketplace")
+            ]
+        )
+        .sign(auth_data.keypair)
+        .run();
+    }
+
+    function get() = dip_core.Interface.get(interface);
+}
+
+namespace IBertha {
+    val interface = "IBertha";
+    
+    function dependencies() = [
+        originals_core.chromia.INonFungibleOriginal.interface
+    ];
+
+    val face = dip_core.Attribute.I(interface, name="face");
+    
+    function register(ft3_helper_tests.auth_data) {
+        originals_external.def_original_interface(
+            auth_data.auth_id,
+            interface,
+           [
+               face: dip_core.Type(dip_attributes.Text.T("happy"), meta_list = [ originals_marketplace.Marketplace.Meta.Filter("marketplace_filter") ])
+           ],
+           dependencies(),
+           [
+               originals_marketplace.Marketplace.Meta.Category("marketplace")
+           ]
+        )
+        .sign(auth_data.keypair)
+        .run();
+    }
+
+    function get() = dip_core.Interface.get(interface);
+}
+
+namespace IRanch {
+    val interface = "IRanch";
+    
+    function dependencies(): list<text> {return [
+        originals_core.chromia.INonFungibleOriginal.interface,
+        originals_core.chromia.ITradable.interface
+    ];}
+    
+    val cows = dip_core.Attribute.I(interface, name = "cows");
+    
+    function register(ft3_helper_tests.auth_data) {
+        originals_external.def_original_interface(
+            auth_data.auth_id,
+            interface,
+            [
+                cows: dip_core.Type(
+                    dip_attributes.Set.T(dip_core.Attribute.type.instance, set<dip_core.instance>().to_gtv()),
+                    [originals_core.OwnerMutable(), dip_core.ImplementsInterface(ITradableBertha.interface)]
+                )
+            ],
+            dependencies(),
+            [
+                originals_marketplace.Marketplace.Meta.Category("Ranch")
+            ]
+        ).sign(auth_data.keypair).run();
+    }
+    
+    function get() = dip_core.Interface.get(interface);    
+}
+
+namespace IMockOriginalWithBooleanAttribute {
+    val interface = "IMockOriginalWithBooleanAttribute";
+    
+    function dependencies() = [
+        originals_core.chromia.INonFungibleOriginal.interface,
+        originals_core.chromia.ITradable.interface
+    ];
+
+    val is_boolean = dip_core.Attribute.I(interface, name="is_boolean");
+    
+    function register(ft3_helper_tests.auth_data) {
+        originals_external.def_original_interface(
+            auth_data.auth_id,
+            interface,
+           [
+               is_boolean: dip_core.Type(dip_attributes.Boolean.T(true), meta_list = [ originals_marketplace.Marketplace.Meta.Filter("marketplace_filter") ])
+           ],
+           dependencies(),
+           [
+               originals_marketplace.Marketplace.Meta.Category("marketplace")
+           ]
+        )
+        .sign(auth_data.keypair)
+        .run();
+    }
+
+    function get() = dip_core.Interface.get(interface);
+}
+
+namespace IMockOriginalWithByteArrayAttribute {
+    val interface = "IMockOriginalWithByteArrayAttribute";
+    
+    function dependencies() = [
+        originals_core.chromia.INonFungibleOriginal.interface,
+        originals_core.chromia.ITradable.interface
+    ];
+
+    val byte_array = dip_core.Attribute.I(interface, name="byte_array");
+    
+    function register(ft3_helper_tests.auth_data) {
+        originals_external.def_original_interface(
+            auth_data.auth_id,
+            interface,
+           [
+               byte_array: dip_core.Type(dip_attributes.ByteArray.T(x"abcd"), meta_list = [ originals_marketplace.Marketplace.Meta.Filter("marketplace_filter") ])
+           ],
+           dependencies(),
+           [
+               originals_marketplace.Marketplace.Meta.Category("marketplace")
+           ]
+        )
+        .sign(auth_data.keypair)
+        .run();
+    }
+
+    function get() = dip_core.Interface.get(interface);
+}
+
+namespace IMockOriginalWithDecimalAttribute {
+    val interface = "IMockOriginalWithDecimalAttribute";
+    
+    function dependencies() = [
+        originals_core.chromia.INonFungibleOriginal.interface,
+        originals_core.chromia.ITradable.interface
+    ];
+
+    val decimal = dip_core.Attribute.I(interface, name="decimal");
+    
+    function register(ft3_helper_tests.auth_data) {
+        originals_external.def_original_interface(
+            auth_data.auth_id,
+            interface,
+           [
+               decimal: dip_core.Type(dip_attributes.Decimal.T(0.12), meta_list = [ originals_marketplace.Marketplace.Meta.Filter("marketplace_filter") ])
+           ],
+           dependencies(),
+           [
+               originals_marketplace.Marketplace.Meta.Category("marketplace")
+           ]
+        )
+        .sign(auth_data.keypair)
+        .run();
+    }
+
+    function get() = dip_core.Interface.get(interface);
+}
+
+namespace IMockOriginalWithIntegerAttribute {
+    val interface = "IMockOriginalWithIntegerAttribute";
+    
+    function dependencies() = [
+        originals_core.chromia.INonFungibleOriginal.interface,
+        originals_core.chromia.ITradable.interface
+    ];
+
+    val integer = dip_core.Attribute.I(interface, name="integer");
+    
+    function register(ft3_helper_tests.auth_data) {
+        originals_external.def_original_interface(
+            auth_data.auth_id,
+            interface,
+           [
+               integer: dip_core.Type(dip_attributes.Integer.T(12), meta_list = [ originals_marketplace.Marketplace.Meta.Filter("marketplace_filter") ])
+           ],
+           dependencies(),
+           [
+               originals_marketplace.Marketplace.Meta.Category("marketplace")
+           ]
+        )
+        .sign(auth_data.keypair)
+        .run();
+    }
+
+    function get() = dip_core.Interface.get(interface);
+}
+
+namespace IMockOriginalWithFileAttribute {
+    val interface = "IMockOriginalWithFileAttribute";
+    
+    function dependencies() = [
+        originals_core.chromia.INonFungibleOriginal.interface,
+        originals_core.chromia.ITradable.interface
+    ];
+
+    val file = dip_core.Attribute.I(interface, name="file");
+    
+    function register(ft3_helper_tests.auth_data) {
+        originals_external.def_original_interface(
+            auth_data.auth_id,
+            interface,
+           [
+               file: dip_core.Type(dip_attributes.File.T(originals_tests_mocks.dummy_file), meta_list = [ originals_marketplace.Marketplace.Meta.Filter("marketplace_filter") ])
+           ],
+           dependencies(),
+           [
+               originals_marketplace.Marketplace.Meta.Category("marketplace")
+           ]
+        )
+        .sign(auth_data.keypair)
+        .run();
+    }
+
+    function get() = dip_core.Interface.get(interface);
+}
+
+namespace IMockOriginalWithNoAttributes {
+    val interface = "IMockOriginalWithNoAttributes";
+    
+    function dependencies() = [
+        originals_core.chromia.INonFungibleOriginal.interface,
+        originals_core.chromia.ITradable.interface
+    ];
+
+    function register(ft3_helper_tests.auth_data) {
+        originals_external.def_original_interface(
+            auth_data.auth_id,
+            interface,
+           [:],
+           dependencies(),
+           [
+               originals_marketplace.Marketplace.Meta.Category("marketplace")
+           ]
+        )
+        .sign(auth_data.keypair)
+        .run();
+    }
+
+    function get() = dip_core.Interface.get(interface);
+}

@@ -1,0 +1,239 @@
+function Collection(name) = require(
+    collection @? { .name == name },
+    "Collection '%s' not found".format(name)
+);
+
+function Collection_by_original_id(original_id: byte_array) = require(
+    collection_original @? { .asset_instance.asset.id == original_id }.collection,
+    "Collection for original with id '%s' not found".format(original_id)
+);
+
+function Collection_by_asset_instance(originals_core.Id.asset_instance) {
+    return Collection_by_original_id(asset_instance.asset.id);
+}
+
+function Collection_by_instance(dip_core.instance) {
+    val original_id = originals_core.Id.get_id(instance);
+    return Collection_by_original_id(original_id);
+}
+
+function add_original_to_collection(account: ft3_account.account, original: originals_core.Id.asset_instance, collection) {
+    access.require_add_original_to_collection_permission(account, original, collection);
+    create collection_original(collection, original);
+    collection.nfts_count += 1;
+
+    val original_owner_account = validate_original_owner(original.asset.id, account);
+    val collection_nft_owner = ensure_collection_nft_owner(collection, original_owner_account);
+
+    if (collection_nft_owner.nfts_count == 0) update collection(owners_count += 1);
+    collection_nft_owner.nfts_count += 1;
+}
+
+function ensure_collection_nft_owner(collection, account: ft3_account.account)
+    = collection_nft_owner @? { collection , account }
+    ?: create collection_nft_owner(collection, account);
+
+function validate_original_owner(original_id: byte_array, caller_account: ft3_account.account) {
+    val original_owner_account_id = originals_core.Ownership.get_owner_if_one_by_original_id(original_id);
+
+    if (not empty(original_owner_account_id) and original_owner_account_id != caller_account.id) {
+        return ft3_account.account @ { original_owner_account_id };
+    }
+
+    return caller_account;
+}
+
+function find_paginated_originals_by_collection_for_account(account: ft3_account.account, collection, dip_util.page_cursor) {
+    return (ia: originals_core.Id.asset_instance, b: ft3_core.balance, co: collection_original) @* {
+        if (page_cursor.after_rowid??) (co.rowid > page_cursor.after_rowid!!) else true,
+        b.amount > 0,
+        ia.asset == b.asset,
+        co.collection == collection,
+        co.asset_instance == ia,
+        b.account.id == originals_utils.Ft3Helper.get_original_account_id(account.id)
+    } (
+          @omit @sort co.rowid,
+          dip_util.pagination_result(
+              data = co.asset_instance.asset.id.to_gtv(),
+              rowid = co.rowid
+        )
+    ) limit dip_util.fetch_data_size(page_cursor);
+}
+
+function find_paginated_originals_by_collection(collection, dip_util.page_cursor) {
+    return (ia: originals_core.Id.asset_instance, co: collection_original) @* {
+        if (page_cursor.after_rowid??) (co.rowid > page_cursor.after_rowid!!) else true,
+        co.collection == collection,
+        co.asset_instance == ia
+    } (
+        @omit @sort ia.rowid,
+        dip_util.pagination_result(
+            data = ia.asset.id.to_gtv(),
+            rowid = ia.rowid
+        )
+    ) limit dip_util.fetch_data_size(page_cursor); 
+}
+
+function find_collection_by_original_id(id: byte_array) {
+    return collection_original @? { .asset_instance.asset.id == id } (map_collection_details(.collection));
+}
+
+function find_collection_name_by_original_id(id: byte_array) {
+    return collection_original @ { .asset_instance.asset.id == id } (.collection.name);
+}
+
+function validate_collection_params(
+    name: text,
+    display_name: text,
+    description: text
+) {
+    require(
+        name.size() <= 50 and name.size() > 0,
+        "Collection name '%s' has invalid length".format(name)
+    );
+    
+    require(
+        display_name.size() <= 50 and display_name.size() > 0, 
+        "Collection display name '%s' has invalid length".format(display_name)
+    );
+
+    validate_collection_description_length(description);
+}
+
+function validate_collection_description_length(description: text) =
+    require(
+        description.size() <= 200 and description.size() > 0, 
+        "Collection description '%s' has invalid length".format(description)
+    );
+
+function add_social_url_to_collection(account: ft3_account.account, collection, social_name: text, social_url: text) {
+    create collection_social_url(collection, url = social_url, name =  social_name);
+}
+
+function calculate_collection_floor_price(collection) {
+    val floor_price = (co: collection_original, sd: originals_marketplace.Marketplace.settlement_descriptor) @? {
+        co.collection == collection,
+        sd.maker_descriptor.asset.id == co.asset_instance.asset.id,
+        sd.settlement_type != originals_marketplace.Marketplace.settlement_type.auction,
+        sd.expiration > block @ {} ( @sort_desc .timestamp ) limit 1,
+        sd.taker_descriptor.amount > 0
+    } (@min sd.taker_descriptor.amount);
+
+    if (empty(floor_price)) return 0;
+
+    return floor_price;
+}
+
+function create_collection(
+    name,
+    symbol: text,
+    display_name: text,
+    description: text,
+    owner_account: ft3_account.account,
+    author_account: ft3_account.account,
+    background_image: text,
+    collection_avatar: text,
+    project_name: text
+) {
+
+    validate_collection_params(name, display_name, description);
+
+    create collection(
+        name,
+        symbol,
+        projects.Project(project_name),
+        author = author_account,
+        display_name,
+        description,
+        owner = owner_account,
+        background_image = background_image,
+        collection_avatar = collection_avatar
+    );
+}
+
+function map_collection_details(collection, socials: list<(name:text, url:text)> = list()) {
+    return (
+        name = collection.name,
+        project = (
+            id = collection.project.rowid,
+            name = collection.project.name,
+            avatar = collection.project.avatar
+        ),
+        author = collection.author.id,
+        display_name = collection.display_name,
+        description = collection.description,
+        owner = collection.owner.id,
+        background_image = collection.background_image,
+        collection_avatar = collection.collection_avatar,
+        socials = socials,
+        nfts_count = collection.nfts_count,
+        owners_count = collection.owners_count,
+        floor_price = calculate_collection_floor_price(collection),
+        volume = collection.trading_volume,
+        last_four_nfts = collection_original @* { collection } (@omit @sort_desc .rowid, $.asset_instance) limit 4
+    );
+}
+
+function find_collection_nft_owner(collection, account: ft3_account.account) =
+    collection_nft_owner @? { collection , account };
+
+// update_floor_price sets floor_price of a collection to the smallest price is it listed for.
+// params:
+//     collection: collection to update
+//     ignore_settlement_descriptor: this settlement_descriptor will be excluded from the query
+function update_floor_price(collection, ignore_settlement_descriptor: originals_marketplace.Marketplace.settlement_descriptor?) {
+    val floor_settlement_descriptor = (
+        sd: originals_marketplace.Marketplace.settlement_descriptor,
+        co: collection_original
+    ) @? {
+        sd.maker_descriptor.asset == co.asset_instance.asset,
+        co.collection == collection,
+        if (ignore_settlement_descriptor != null) sd not in [ignore_settlement_descriptor] else true
+    } (
+        @omit @sort sd.taker_descriptor.amount,
+        sd
+    ) limit 1;
+
+    collection.floor_price = floor_settlement_descriptor?.taker_descriptor?.amount ?: 0;
+}
+
+function update_collection_nft_owner_after_transfer(collection, from: ft3_account.account, to: ft3_account.account, quantity: integer = 1) {
+    val from_collection_nft_owner = find_collection_nft_owner(collection, from)!!;
+    val to_collection_nft_owner = ensure_collection_nft_owner(collection, to);
+
+    if (to_collection_nft_owner.nfts_count == 0) collection.owners_count += 1;
+
+    from_collection_nft_owner.nfts_count -= quantity;
+    to_collection_nft_owner.nfts_count += quantity;
+
+    if (from_collection_nft_owner.nfts_count == 0) collection.owners_count -= 1;
+}
+
+function add_approved_minter(ft3_account.account, collection) {
+    require(empty(approved_minter @? {account, collection}), "Account is already an approved minter");
+    create approved_minter (
+        account,
+        collection
+    );
+}
+
+function update_collection_details(collection, display_name: text, description: text) {
+    validate_collection_description_length(description);
+
+    update collection(display_name, description);
+}
+
+function update_collection_social_url(collection, social_name: text, url: text) {
+    val collection_social = collection_social_url @? { .name == social_name };
+
+    require(collection_social, "Collection social not found '%s'".format(social_name));
+    require(collection_social.url != url,
+        "Failed to update social url '%s' that is the same as the existing one".format(url)
+    );
+
+    update collection_social(url);
+}
+
+function update_collection_avatar(collection, avatar: text) {
+    collection.collection_avatar = avatar;
+}

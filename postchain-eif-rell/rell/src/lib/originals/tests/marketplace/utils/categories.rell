@@ -1,0 +1,91 @@
+namespace CategoryInterface1 {
+    val interface = "category_interface1";
+    
+    function register(ft3_helper_tests.auth_data) {
+        originals_external.def_original_interface(
+            auth_data.auth_id,
+            interface,
+            [:],
+            [originals_core.chromia.ITradable.interface],
+            [
+                originals_marketplace.Marketplace.Meta.Category("Category 1")
+            ]
+        ).sign(auth_data.keypair).run();
+    }
+}
+
+namespace CategoryInterface2 {
+    val interface = "category_interface2";
+    
+    function register(ft3_helper_tests.auth_data) {
+        originals_external.def_original_interface(
+            auth_data.auth_id,
+            interface,
+            [:],
+            [originals_core.chromia.ITradable.interface],
+            [
+                originals_marketplace.Marketplace.Meta.Category("Category 2")
+            ]
+        ).sign(auth_data.keypair).run();
+    }
+}
+
+namespace CategoryInterface3 {
+    val interface = "category_interface3";
+    
+    function register(ft3_helper_tests.auth_data) {
+        originals_external.def_original_interface(
+            auth_data.auth_id,
+            interface,
+            [:],
+            [originals_core.chromia.ITradable.interface],
+            [
+                originals_marketplace.Marketplace.Meta.Category("Category 3")
+            ]
+        ).sign(auth_data.keypair).run();
+    }
+}
+
+namespace CategoryInterface4 {
+    val interface = "category_interface4";
+    
+    function register(ft3_helper_tests.auth_data) {
+        originals_external.def_original_interface(
+            auth_data.auth_id,
+            interface,
+            [:],
+            [],
+            [
+                originals_marketplace.Marketplace.Meta.Category("Category 4")
+            ]
+        ).sign(auth_data.keypair).run();
+    }
+}
+
+namespace CategoryInterface5 {
+    val interface = "category_interface5";
+    
+    function dependencies(): list<text> {return [CategoryInterface3.interface];}
+    
+    function register(ft3_helper_tests.auth_data) {
+        originals_external.def_original_interface(
+            auth_data.auth_id,
+            interface,
+            [:],
+            dependencies(),
+            [
+                originals_marketplace.Marketplace.Meta.Category("Category 5")
+            ]
+        ).sign(auth_data.keypair).run();
+    }
+}
+
+function register_categories(ft3_helper_tests.auth_data) {
+    originals_tests_helper.init_originals(auth_data);
+    
+    CategoryInterface1.register(auth_data);
+    CategoryInterface2.register(auth_data);
+    CategoryInterface3.register(auth_data);
+    CategoryInterface4.register(auth_data);
+    CategoryInterface5.register(auth_data);
+}
