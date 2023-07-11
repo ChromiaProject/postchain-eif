@@ -98,11 +98,6 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>net.postchain.client</groupId>
-            <artifactId>postchain-client</artifactId>
-            <version>3.11.2</version>
-        </dependency>
-        <dependency>
             <groupId>net.postchain</groupId>
             <artifactId>postchain-devtools</artifactId>
             <scope>test</scope>
@@ -119,67 +114,8 @@
         </dependency>
     </dependencies>
 
-    <pluginRepositories>
-        <pluginRepository>
-            <id>rell-maven</id>
-            <url>https://gitlab.com/api/v4/projects/37668820/packages/maven</url>
-        </pluginRepository>
-    </pluginRepositories>
-
     <build>
         <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-scm-plugin</artifactId>
-                <version>2.0.0-M2</version>
-                <configuration>
-                    <providerImplementations>
-                        <git>jgit</git>
-                    </providerImplementations>
-                </configuration>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.apache.maven.scm</groupId>
-                        <artifactId>maven-scm-provider-jgit</artifactId>
-                        <version>2.0.0-M2</version>
-                    </dependency>
-                </dependencies>
-                <executions>
-                    <execution>
-                        <id>clone-ft3</id>
-                        <goals>
-                            <goal>checkout</goal>
-                        </goals>
-                        <phase>generate-sources</phase>
-                        <configuration>
-                            <skipCheckoutIfExists>true</skipCheckoutIfExists>
-                            <checkoutDirectory>${project.build.directory}/ft3</checkoutDirectory>
-                            <connectionUrl>scm:git:https://bitbucket.org/chromawallet/ft3-lib.git</connectionUrl>
-                            <scmVersion>ft3.5</scmVersion>
-                            <scmVersionType>branch</scmVersionType>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>net.postchain.rell</groupId>
-                <artifactId>rell-maven-plugin</artifactId>
-                <version>0.11.0</version>
-                <configuration>
-                    <source>${project.build.directory}/ft3/rell/src</source>
-                    <packageName>com.chromia</packageName>
-                    <mainModule>main</mainModule>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>rell-client-gen</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>rell-generate-client</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
             <plugin>
                 <artifactId>kotlin-maven-plugin</artifactId>
                 <groupId>org.jetbrains.kotlin</groupId>
@@ -204,7 +140,6 @@
                             <sourceDirs>
                                 <sourceDir>src/test/kotlin</sourceDir>
                                 <sourceDir>target/generated-test-sources</sourceDir>
-                                <sourceDir>target/generated-sources</sourceDir>
                             </sourceDirs>
                         </configuration>
                     </execution>
@@ -357,12 +292,5 @@
             </build>
         </profile>
     </profiles>
-
-    <repositories>
-        <repository>
-            <id>gitlab-maven</id>
-            <url>https://gitlab.com/api/v4/projects/46288950/packages/maven</url>
-        </repository>
-    </repositories>
 
 </project>

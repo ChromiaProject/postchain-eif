@@ -1,11 +1,8 @@
 package net.postchain.eif
 
-import com.chromia.lib.ft3.account.AuthDescriptor
-import com.chromia.lib.ft3.evm.Signature
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import net.postchain.common.hexStringToByteArray
-import net.postchain.common.hexStringToWrappedByteArray
 import net.postchain.concurrent.util.get
 import net.postchain.core.Transaction
 import net.postchain.crypto.KeyPair
@@ -14,12 +11,9 @@ import net.postchain.devtools.IntegrationTestSetup
 import net.postchain.devtools.testinfra.BaseTestInfrastructureFactory
 import net.postchain.eif.contracts.TestToken
 import net.postchain.eif.contracts.TokenBridge
-import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvNull
-import net.postchain.gtv.GtvString
-import net.postchain.gtv.mapper.GtvObjectMapper
 import net.postchain.gtx.GtxBuilder
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -178,22 +172,21 @@ class EifIntegrationTest : IntegrationTestSetup() {
         val userEVMAddress = "e105ba42b66d08ac7ca7fc48c583599044a6dab3"
         fun registerAccount(): ByteArray {
             val userPubkey = "038f888dec563b5bc253e87abc90afd26c3287021d10236ea19d248043dc39e0b8"
-            val auth = AuthDescriptor(
-                    "S",
-                    listOf(userPubkey.hexStringToWrappedByteArray()),
-                    listOf(GtvArray(arrayOf(gtv("T"))) , gtv(userPubkey)),
-                    GtvString("") // TODO: Why cannot use GtvNull like in rell code as `null.to_gtv()`
+            val auth = gtv(
+                    gtv("S"),
+                    GtvArray(arrayOf(gtv(userPubkey.hexStringToByteArray()))),
+                    gtv(GtvArray(arrayOf(gtv("T"))), gtv(userPubkey.hexStringToByteArray())),
+                    GtvNull
             )
 
-            val sig = Signature(
-                    "39b0c8c44a10d0fd70c0ed0e833cf6d93818ae1b10777857eb868516932796dc".hexStringToWrappedByteArray(),
-                    "44de8f297cce55c3da8401dd77269d0baf978f60e97ebc5717d4c8eeaed3bea9".hexStringToWrappedByteArray(),
-                    28L)
+            val sig = gtv(
+                    gtv("39b0c8c44a10d0fd70c0ed0e833cf6d93818ae1b10777857eb868516932796dc".hexStringToByteArray()),
+                    gtv("44de8f297cce55c3da8401dd77269d0baf978f60e97ebc5717d4c8eeaed3bea9".hexStringToByteArray()),
+                    gtv(28L))
 
             val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
-            b.addOperation("ft3.evm.register_account", gtv(userEVMAddress.hexStringToByteArray()),
-                    GtvObjectMapper.toGtvArray(auth),
-                    GtvObjectMapper.toGtvArray(sig))
+            b.addOperation("ft3.evm.register_account",
+                    gtv(userEVMAddress.hexStringToByteArray()), auth, sig)
 
             return b.finish().sign(sigMaker).buildGtx().encode()
         }
