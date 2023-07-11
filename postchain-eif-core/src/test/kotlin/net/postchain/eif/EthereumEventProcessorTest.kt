@@ -53,7 +53,7 @@ class EthereumEventProcessorTest {
     // This could be any private key but value must match in /geth-compose/geth/key.txt
     // and the address created must be added to /geth-compose/geth/test.json
     private val credentials = Credentials
-        .create("0x0000000000000000000000000000000001000000000000000000000000000000")
+        .create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
     private val accountId = Bytes32("fc91c4abaff09f4c67a0ab84d4e9afd37c929978bea3fa1790403ab6ee85bf33"
         .hexStringToByteArray())
     private val validatorContract = Address("0x0000000000000000000000000000000000000000")
