@@ -1,8 +1,0 @@
-@test module;
-
-import ft3_helper_tests: ^^^.ft3_helper.tests;
-import ^^^.evm_accounts.{EvmAccounts};
-import ft3_core: ^^^.ft3.core;
-import evm_accounts_external: ^^^.evm_accounts.external.{Queries, Operations, OperationsDev};
-import originals_tests_helper: ^.helper;
-import originals_tests_mocks: ^.mocks;

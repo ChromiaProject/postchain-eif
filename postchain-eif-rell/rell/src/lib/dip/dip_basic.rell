@@ -1,7 +1,0 @@
-@mount('dip')
-module;
-
-namespace Dip {
-    import ^.attributes.*;
-    import ^.core.*;
-}

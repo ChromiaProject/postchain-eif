@@ -1,8 +1,0 @@
-import ft3_account: ^^.ft3.account;
-import dip_attributes: ^^.dip.attributes;
-import originals_core: ^^.originals.core;
-import originals_collections: ^^.originals.collections;
-import ^.projects;
-import ^.favorites;
-import originals_util: ^.util;
-import mapper: ^^.dip.util.pagination_mapper;

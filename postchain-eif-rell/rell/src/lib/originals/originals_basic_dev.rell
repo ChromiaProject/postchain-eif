@@ -1,6 +1,0 @@
-@mount('originals')
-module;
-
-namespace Originals {
-    import ^.core.*;
-}

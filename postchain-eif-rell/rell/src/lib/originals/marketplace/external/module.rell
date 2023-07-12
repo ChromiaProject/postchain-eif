@@ -1,7 +1,0 @@
-@mount("marketplace")
-module;
-
-import ^.*;
-import ^^.collections;
-import mapper: ^^^.dip.util.pagination_mapper;
-import dip_core: ^^^.dip.core;

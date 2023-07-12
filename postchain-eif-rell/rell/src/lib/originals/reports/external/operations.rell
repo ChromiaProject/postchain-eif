@@ -1,5 +1,0 @@
-operation report(ft3_helper.auth_id, reports.report_item) {
-    val account = ft3_helper.do_auth(auth_id, []);
-
-    reports.report(account, report_item);
-}

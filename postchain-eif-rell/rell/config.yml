@@ -46,3 +46,30 @@ blockchains:
 compile:
   source: src
   rellVersion: 0.10.11
+libs:
+  ft3:
+    registry: https://bitbucket.org/chromawallet/ft3-lib/src/v2.1.0/
+    path: rell/src/lib/ft3
+    tagOrBranch: ft3.5
+    rid: x"4F31FF92307C464BBCF8970A293BF6A5B91600921EA727825F401801649BDE72"
+  access:
+    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
+    path: rell/src/access
+    tagOrBranch: eif
+    rid: x"67FCAF1E65709EEB03B11820FC62D99C784D0B45A52F0C06CE54FA4389033F5D"
+  dip:
+    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
+    path: rell/src/dip
+    tagOrBranch: eif
+    rid: x"0410477041210AACC96A1E6B5495E9004B8FEE6F6CA12A858776A3C19C61BD8D"
+  evm_accounts:
+    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
+    path: rell/src/evm_accounts
+    tagOrBranch: eif
+    rid: x"D67D442DBB2E6CBB1FD0656D8B30C6FFC063403E5DE76F751ACD7D3F0F731369"
+  originals:
+    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
+    path: rell/src/originals
+    tagOrBranch: eif
+    rid: x"1A5F24EDFEBB46B89F41E4AD7CDD4EC538372EE0FF953BD8BE1490FBFB9ED7F1"
+

@@ -1,7 +1,0 @@
-function now_from_blocks() {
-    return block @ {} ( @sort_desc .timestamp ) limit 1;
-}
-
-function now_from_context() {
-    return op_context.last_block_time;
-}
