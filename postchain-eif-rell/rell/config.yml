@@ -73,4 +73,9 @@ libs:
     path: rell/src/originals
     tagOrBranch: eif
     rid: x"09922670A770522E82375D3970B9AE6AAD2E519AF8016CB90A16D7D71A3FE490"
+  ft3_helper:
+    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
+    path: rell/src/ft3_helper
+    tagOrBranch: eif
+    rid: x"5EC6B65E53749EBF86C283D1F05F4259A1159BDBC1D2C204849422949AC5D35C"
 
