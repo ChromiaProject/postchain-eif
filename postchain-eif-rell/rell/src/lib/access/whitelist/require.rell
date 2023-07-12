@@ -1,7 +1,0 @@
-
-function require_active(ft3_account.account) {
-    require(
-        whitelist @? { account, .locked == false },
-        "Account not active: %s".format(account.id)
-    );
-}

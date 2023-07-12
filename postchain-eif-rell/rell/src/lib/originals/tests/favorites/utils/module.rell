@@ -1,4 +1,0 @@
-@test module;
-
-import ^^^.favorites;
-import ^^^.projects;

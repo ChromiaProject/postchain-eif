@@ -1,6 +1,0 @@
-import ^^^.dip.util.pagination_mapper.*;
-import ^^.marketplace;
-import ^^.collections;
-import originals_basic: ^^^.originals.originals_basic;
-import ft3_helper: ^^^.originals.util;
-import ft3_core: ^^^.ft3.core;

@@ -1,5 +1,0 @@
-namespace OperationsDev {
-    operation auth_and_log(account_id: byte_array, auth_descriptor_id: byte_array) {
-        ft3.acc.auth_and_log(account_id, auth_descriptor_id, ["T"]);
-    }
-}

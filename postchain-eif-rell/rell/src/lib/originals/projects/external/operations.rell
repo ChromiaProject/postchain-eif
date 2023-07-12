@@ -1,5 +1,0 @@
-operation create_project(utils.ft3_helper.auth_id, projects.simple_project_props) {
-    val account = utils.ft3_helper.do_auth(auth_id, []);
-    admin.require_admin("Only admin can create project");
-    projects.create_project(account, simple_project_props);
-}

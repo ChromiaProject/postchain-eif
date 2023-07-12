@@ -1,5 +1,0 @@
-
-entity whitelist {
-    key ft3_account.account;
-    mutable locked: boolean = false;
-}

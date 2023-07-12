@@ -1,4 +1,0 @@
-@mount("marketplace")
-module;
-
-import ^.*;
