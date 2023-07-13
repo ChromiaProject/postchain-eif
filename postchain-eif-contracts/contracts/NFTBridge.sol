@@ -27,6 +27,8 @@ contract NFTBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reentr
     using Postchain for bytes32;
     using MerkleProof for bytes32[];
 
+    uint constant WITHDRAW_OFFSET = 2; // need to update when deploy contract on production
+
     mapping (IERC721 => bool) public _allowedNFT;
     mapping (IERC721 => mapping(uint256 => address)) public _owners;
     mapping (bytes32 => WithdrawNFT) public _withdrawNFT;
@@ -150,7 +152,7 @@ contract NFTBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reentr
             wd.nft = nft;
             wd.beneficiary = beneficiary;
             wd.tokenId = tokenId;
-            wd.block_number = block.number + 50;
+            wd.block_number = block.number + WITHDRAW_OFFSET;
             wd.status = Status.Withdrawable;
             _withdrawNFT[hash] = wd;
             emit WithdrawRequestNFT(beneficiary, nft, tokenId);

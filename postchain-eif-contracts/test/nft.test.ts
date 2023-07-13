@@ -8,10 +8,10 @@ import { BytesLike, hexZeroPad, keccak256 } from "ethers/lib/utils";
 import { DecodeHexStringToByteArray, hashGtvBytes32Leaf, hashGtvBytes64Leaf, hashGtvIntegerLeaf, postchainMerkleNodeHash } from "./utils"
 import { intToHex } from "ethjs-util";
 
-
 chai.use(solidity);
 const { expect } = chai;
 const ft3_account_id = "0x95471c57f0bc16284cb1016eba3b2736fa5fb2a640e2f20984079f4349f867ff"
+const WITHDRAW_OFFSET = "0x2";
 
 describe("Non Fungible Token", () => {
     let nftAddress: string;
@@ -278,11 +278,7 @@ describe("Non Fungible Token", () => {
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
                     user.address)).to.revertedWith("NFTBridge: not mature enough to withdraw the nft")
 
-                // force mining 100 blocks
-                for (let i = 0; i < 100; i++) {
-                    await ethers.provider.send('evm_mine', [])
-                }
-
+                await ethers.provider.send('hardhat_mine', [WITHDRAW_OFFSET])
                 expect(await tokenInstance.balanceOf(bridgeAddress)).to.eq(1)
                 expect(await tokenInstance.ownerOf(tokenId)).to.eq(bridgeAddress)
 

@@ -11,7 +11,7 @@ import { DecodeHexStringToByteArray, hashGtvBytes32Leaf, hashGtvBytes64Leaf, has
 chai.use(solidity);
 const { expect } = chai;
 const ft3_account_id = "0x95471c57f0bc16284cb1016eba3b2736fa5fb2a640e2f20984079f4349f867ff"
-const WITHDRAW_OFFSET = "0x14C08"; //85000 
+const WITHDRAW_OFFSET = "0x2";
 describe("Token Bridge Test", () => {
     let tokenAddress: string;
     let bridgeAddress: string;
@@ -418,7 +418,6 @@ describe("Token Bridge Test", () => {
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
                     user.address)).to.revertedWith("TokenBridge: not mature enough to withdraw the fund")
 
-                // force mining 98 blocks
                 await ethers.provider.send('hardhat_mine', [WITHDRAW_OFFSET])
                 let hashEvent = DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length))
 
@@ -686,7 +685,6 @@ describe("Token Bridge Test", () => {
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
                     bridgeDelegatorAddress)).to.revertedWith("TokenBridge: not mature enough to withdraw the fund")
 
-                // force mining 98 blocks
                 await ethers.provider.send('hardhat_mine', [WITHDRAW_OFFSET])
 
                 let hashEvent = DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length))
