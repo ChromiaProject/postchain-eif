@@ -147,7 +147,7 @@ class EifIntegrationTest : IntegrationTestSetup() {
         sealBlock()
 
         val value = node.getBlockchainInstance().blockchainEngine.getBlockQueries()
-                .query("ft3.get_asset_by_name", gtv(mapOf("name" to gtv("Chromia")))).get()
+                .query("ft3.get_asset_by_name", gtv("name" to gtv("Chromia"))).get()
         val assetId = value[0]["id"]!!
         fun addNewEvmErc20(): ByteArray {
             val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
@@ -168,7 +168,8 @@ class EifIntegrationTest : IntegrationTestSetup() {
         }
 
         // Register evm account
-        val userEVMAddress = "e105ba42b66d08ac7ca7fc48c583599044a6dab3".hexStringToByteArray()
+        val evmAddress = "e105ba42b66d08ac7ca7fc48c583599044a6dab3"
+        val userEVMAddress = evmAddress.hexStringToByteArray()
         fun registerAccount(): ByteArray {
             val userPubkey = "038f888dec563b5bc253e87abc90afd26c3287021d10236ea19d248043dc39e0b8".hexStringToByteArray()
             val userPriKey = "71b5b7f8de0661af934a5e4612f3d0ba183e639bdf4e7452fb6457ed3cfbc825".hexStringToByteArray()
@@ -201,18 +202,37 @@ class EifIntegrationTest : IntegrationTestSetup() {
 
         // query ft3 account by evm address
         val blockQuery = node.getBlockchainInstance().blockchainEngine.getBlockQueries()
-        val accountId = blockQuery.query("ft3.evm.get_account_by_evm_address", gtv(mapOf("acc" to gtv(userEVMAddress)))).get()
+        val accountId = blockQuery.query("ft3.evm.get_account_by_evm_address", gtv("acc" to gtv(userEVMAddress))).get()
 
         // Deposit to postchain
         for (i in 1..5) {
             bridge.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), Bytes32(accountId.asByteArray())).send()
         }
 
-        repeat(10) { sealBlock() }
+        repeat(20) { sealBlock() } // keep postchain mine new blocks to ensure that all evm deposits are recorded
 
         // Check the ft3 balance
-        val balance = blockQuery.query("ft3.get_asset_balance", gtv(mapOf("account_id" to accountId, "asset_id" to assetId))).get()
-        assertEquals(50L, balance["amount"]!!.asInteger())
+        val expectedBalance = 50L
+        val balance = blockQuery.query("ft3.get_asset_balance", gtv("account_id" to accountId, "asset_id" to assetId)).get()
+        assertEquals(expectedBalance, balance["amount"]!!.asInteger())
+
+        // Check eif state for account as well
+        val expectedState = SimpleGtvEncoder.encodeGtv(gtv(
+                gtv(to32Bytes(evmAddress)), // encode gtv array with assumption that the data contains only byte32 and uint256
+                gtv(1*2*32), // 2 * 32 bytes per entry
+                gtv(to32Bytes(testToken.contractAddress.substring(2))), // encode gtv array with assumption that the data contains only byte32 and uint256
+                gtv(expectedBalance)
+        ))
+        val accounts = blockQuery.query("get_network_accounts", gtv("network_id" to gtv(1))).get()
+        val accountNumber = accounts[0].asDict()["state_n"]!!
+        val args = gtv(
+                "blockHeight" to gtv(currentBlockHeight),
+                "accountNumber" to gtv(accountNumber.asInteger())
+        )
+        val accountState = blockQuery.query("get_account_state_merkle_proof", args).get().asDict()
+
+        val stateData = accountState["stateData"]!!
+        assertEquals(stateData.asByteArray().contentEquals(expectedState), true)
     }
 
     private fun getBinaryFromArtifactResource(resourcePath: String): String {
@@ -220,4 +240,10 @@ class EifIntegrationTest : IntegrationTestSetup() {
         val artifactJson = GsonBuilder().create().fromJson(artifactFile, JsonObject::class.java)
         return artifactJson.get("bytecode").asString
     }
+
+    /**
+     * convert evm address to 32 bytes to compliance with EIF simple gtv encoder
+     * @see SimpleGtvEncoder.encodeGtv
+     */
+    private fun to32Bytes(address: String) = "000000000000000000000000$address".hexStringToByteArray()
 }
