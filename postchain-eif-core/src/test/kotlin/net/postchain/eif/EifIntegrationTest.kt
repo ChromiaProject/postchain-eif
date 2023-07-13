@@ -11,6 +11,7 @@ import net.postchain.devtools.IntegrationTestSetup
 import net.postchain.devtools.testinfra.BaseTestInfrastructureFactory
 import net.postchain.eif.contracts.TestToken
 import net.postchain.eif.contracts.TokenBridge
+import net.postchain.eif.contracts.Validator
 import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvNull
@@ -21,7 +22,9 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.Address
+import org.web3j.abi.datatypes.DynamicArray
 import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto.Credentials
@@ -48,12 +51,12 @@ class EifIntegrationTest : IntegrationTestSetup() {
     // and the address created must be added to /geth-compose/geth/test.json
     private val credentials = Credentials
             .create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
-    private val validatorContract = Address("0x0000000000000000000000000000000000000000")
     private lateinit var web3j: Web3j
     private lateinit var transactionManager: TransactionManager
 
     private val tokenBridgeBinary = getBinaryFromArtifactResource("/artifacts/contracts/TokenBridge.sol/TokenBridge.json")
     private val testTokenBinary = getBinaryFromArtifactResource("/artifacts/contracts/token/TestToken.sol/TestToken.json")
+    private val validatorBinary = getBinaryFromArtifactResource("/artifacts/contracts/Validator.sol/Validator.json")
 
     @BeforeEach
     fun setup() {
@@ -95,9 +98,15 @@ class EifIntegrationTest : IntegrationTestSetup() {
     @Test
     fun deposit() {
         val initialMint = 100L
+
+        // Deploy validator contract
+        val postchainValidator = "659e4a3726275edFD125F52338ECe0d54d15BD99"
+        val encodedConstructor = FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(postchainValidator))))
+        val validator = Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedConstructor).send()
+
         // Deploy token bridge contract
         val bridge = Contract.deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
-            initialize(validatorContract).send()
+            initialize(Address(validator.contractAddress)).send()
         }
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contract
