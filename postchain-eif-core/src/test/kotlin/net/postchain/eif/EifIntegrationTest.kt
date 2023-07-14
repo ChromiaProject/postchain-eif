@@ -21,6 +21,7 @@ import net.postchain.gtv.GtvNull
 import net.postchain.gtx.GtxBuilder
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.testcontainers.containers.wait.strategy.Wait
@@ -353,6 +354,62 @@ class EifIntegrationTest : IntegrationTestSetup() {
         bridge.withdraw(Bytes32(eventHash), Address(evmAddress)).send()
         userBalance = testToken.balanceOf(Address(evmAddress)).send()
         assertEquals(userBalance.value, BigInteger.valueOf(initialMint - depositedAmount + withdrawAmount))
+
+        // Get the last snapshot block height as mass-exit block
+        var lastBlockHeight = currentBlockHeight
+        var lastBlockRID: ByteArray? = null
+        while (lastBlockHeight >= 0) {
+            val block = blockQuery.getBlockAtHeight(lastBlockHeight, false).get()
+            val header = block!!.header.rawData.toHex()
+            if (header.takeLast(64) != "0000000000000000000000000000000000000000000000000000000000000000") {
+                lastBlockRID = block.header.blockRID
+                break
+            }
+            lastBlockHeight--
+        }
+
+        assertNotNull(lastBlockRID, "There should be valid block for mass-exit")
+        if (lastBlockRID != null) {
+            bridge.triggerMassExit(Uint256(lastBlockHeight), Bytes32(lastBlockRID)).send()
+
+            // Withdraw remaining token of the account by using snapshot state with mass-exit
+            val state = blockQuery.query("get_account_state_merkle_proof",
+                    gtv(
+                            "blockHeight" to gtv(lastBlockHeight),
+                            "accountNumber" to gtv(accountNumber.asInteger())
+                    )).get().asDict()
+
+            val stateData = state["stateData"]!!.asByteArray()
+            val proof = state["stateProof"]!!.asDict()
+            val leaf = Bytes32(proof["leaf"]!!.asByteArray())
+            val position = Uint256(proof["position"]!!.asInteger())
+            val merkleProofs = proof["merkleProofs"]!!.asArray().map { Bytes32(it.asByteArray()) }
+            val stateProof = TokenBridge.Proof(leaf, position, DynamicArray(Bytes32::class.java, merkleProofs))
+            val blockHeader = state["blockHeader"]!!.asByteArray()
+            val blockWitness = state["blockWitness"]!!.asArray()
+            val signatures = blockWitness.map { DynamicBytes(it.asDict()["sig"]!!.asByteArray()) }
+            val signers = blockWitness.map { Address(it.asDict()["pubkey"]!!.asByteArray().toHex()) }
+            val extraMerkleProof = state["extraMerkleProof"]!!.asDict()
+            val extraProofs = extraMerkleProof["extraMerkleProofs"]!!.asArray().map { Bytes32(it.asByteArray()) }
+            val extraProofData = TokenBridge.ExtraProofData(
+                    DynamicBytes(extraMerkleProof["leaf"]!!.asByteArray()),
+                    Bytes32(extraMerkleProof["hashedLeaf"]!!.asByteArray()),
+                    Uint256(extraMerkleProof["position"]!!.asInteger()),
+                    Bytes32(extraMerkleProof["extraRoot"]!!.asByteArray()),
+                    DynamicArray(Bytes32::class.java, extraProofs)
+            )
+            bridge.withdrawBySnapshot(
+                    DynamicBytes(stateData),
+                    stateProof,
+                    DynamicBytes(blockHeader),
+                    DynamicArray(DynamicBytes::class.java, signatures),
+                    DynamicArray(Address::class.java, signers),
+                    extraProofData
+            ).send()
+
+            userBalance = testToken.balanceOf(Address(evmAddress)).send()
+            assertEquals(userBalance.value, BigInteger.valueOf(initialMint))
+        }
     }
 
     private fun getBinaryFromArtifactResource(resourcePath: String): String {
