@@ -185,21 +185,31 @@ class EifIntegrationTest : IntegrationTestSetup() {
 
         // Register evm account
         val evmAddress = "e105ba42b66d08ac7ca7fc48c583599044a6dab3"
-        val userEVMAddress = evmAddress.hexStringToByteArray()
+        val userEvmAddress = evmAddress.hexStringToByteArray()
         val userPubkey = "038f888dec563b5bc253e87abc90afd26c3287021d10236ea19d248043dc39e0b8".hexStringToByteArray()
         val userPriKey = "71b5b7f8de0661af934a5e4612f3d0ba183e639bdf4e7452fb6457ed3cfbc825".hexStringToByteArray()
-        fun registerAccount(): ByteArray {
+
+        val otherEvmAddressString = "661683e5d36E83B38B1a20247ba6F5c410dC165d"
+        val otherEvmAddess = otherEvmAddressString.hexStringToByteArray()
+        val otherPubkey = "02E0A8A3C79C9F18B7CEAD2493435AC926B4A527EF670B873F5F1410084EFF9C80".hexStringToByteArray()
+        val otherPrikey = "B31AB878C62B0E940B345C659A456D3573CF25960823C34C7BEEB5D1F813BEFD".hexStringToByteArray()
+        val sig = gtv(
+                gtv("39b0c8c44a10d0fd70c0ed0e833cf6d93818ae1b10777857eb868516932796dc".hexStringToByteArray()),
+                gtv("44de8f297cce55c3da8401dd77269d0baf978f60e97ebc5717d4c8eeaed3bea9".hexStringToByteArray()),
+                gtv(28L))
+
+        val otherSig = gtv(
+                gtv("8fa4216cd5979efdeb109e10f87225ea9579fd21289fac7f1410278554e79aff".hexStringToByteArray()),
+                gtv("442017757e4e627a98d40c89cdbdde4612251cc86acabba27cf1683cd1d7cb4c".hexStringToByteArray()),
+                gtv(28L))
+
+        fun registerAccount(userPubkey: ByteArray, userPriKey: ByteArray, userEVMAddress: ByteArray, sig: GtvArray): ByteArray {
             val auth = gtv(
                     gtv("S"),
                     GtvArray(arrayOf(gtv(userPubkey))),
                     gtv(GtvArray(arrayOf(gtv("T"))), gtv(userPubkey)),
                     GtvNull
             )
-
-            val sig = gtv(
-                    gtv("39b0c8c44a10d0fd70c0ed0e833cf6d93818ae1b10777857eb868516932796dc".hexStringToByteArray()),
-                    gtv("44de8f297cce55c3da8401dd77269d0baf978f60e97ebc5717d4c8eeaed3bea9".hexStringToByteArray()),
-                    gtv(28L))
 
             val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
             b.addOperation("ft3.evm.register_account", gtv(userEVMAddress), auth, sig)
@@ -213,12 +223,14 @@ class EifIntegrationTest : IntegrationTestSetup() {
 
         enqueueTx(addNewEvmErc20())
         enqueueTx(addTokenMapping())
-        enqueueTx(registerAccount())
+        enqueueTx(registerAccount(userPubkey, userPriKey, userEvmAddress, sig))
+        enqueueTx(registerAccount(otherPubkey, otherPrikey, otherEvmAddess, otherSig))
         sealBlock()
 
         // query ft3 account by evm address
         val blockQuery = node.getBlockchainInstance().blockchainEngine.getBlockQueries()
-        val accountId = blockQuery.query("ft3.evm.get_account_by_evm_address", gtv("acc" to gtv(userEVMAddress))).get()
+        val accountId = blockQuery.query("ft3.evm.get_account_by_evm_address", gtv("acc" to gtv(userEvmAddress))).get()
+        val otherAccountId = blockQuery.query("ft3.evm.get_account_by_evm_address", gtv("acc" to gtv(otherEvmAddess))).get()
 
         // Deposit to postchain
         for (i in 1..5) {
@@ -244,6 +256,7 @@ class EifIntegrationTest : IntegrationTestSetup() {
         ))
         val accounts = blockQuery.query("get_network_accounts", gtv("network_id" to gtv(networkId))).get()
         val accountNumber = accounts[0].asDict()["state_n"]!!
+
         val args = gtv(
                 "blockHeight" to gtv(currentBlockHeight),
                 "accountNumber" to gtv(accountNumber.asInteger())
@@ -254,13 +267,16 @@ class EifIntegrationTest : IntegrationTestSetup() {
         assertEquals(stateData.asByteArray().contentEquals(expectedState), true)
 
         // Bridge some ft3 token to evm
-        val auths = blockQuery.query("ft3.get_account_auth_descriptors", gtv("id" to accountId)).get()
-        val authId = gtv(accountId, auths[0].asDict()["id"]!!)
+        val auth = blockQuery.query(
+                "ft3.get_account_auth_descriptors",
+                gtv("id" to accountId)
+        ).get()[0].asDict()["id"]!!
+        val authId = gtv(accountId, auth)
 
         val withdrawAmount = 10L
         fun withdrawOnPostchain(): ByteArray {
             val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
-            b.addOperation("bridge_ft3_token_to_evm", authId, gtv(networkId), gtv(testTokenAddress), gtv(userEVMAddress), gtv(withdrawAmount))
+            b.addOperation("bridge_ft3_token_to_evm", authId, gtv(networkId), gtv(testTokenAddress), gtv(userEvmAddress), gtv(withdrawAmount))
             val signer = cryptoSystem.buildSigMaker(KeyPair(userPubkey, userPriKey))
             return b.finish()
                     .sign(signer)
@@ -295,7 +311,7 @@ class EifIntegrationTest : IntegrationTestSetup() {
         val withdrawInfo = blockQuery.query("get_erc20_withdrawal", gtv(
                 "network_id" to gtv(networkId),
                 "token_address" to gtv(testTokenAddress),
-                "beneficiary" to gtv(userEVMAddress)
+                "beneficiary" to gtv(userEvmAddress)
         )).get()[0].asDict()
         assertEquals(withdrawInfo["amount"]!!.asInteger(), withdrawAmount)
         val serial = withdrawInfo["serial"]!!.asInteger()
@@ -355,6 +371,37 @@ class EifIntegrationTest : IntegrationTestSetup() {
         userBalance = testToken.balanceOf(Address(evmAddress)).send()
         assertEquals(userBalance.value, BigInteger.valueOf(initialMint - depositedAmount + withdrawAmount))
 
+        // Transfer ft3 token to another account
+        val transferAmount = 20L
+        val inputs = GtvArray(arrayOf(gtv(
+                accountId,
+                assetId,
+                auth,
+                gtv(transferAmount),
+                gtv(mapOf())
+        )))
+
+        val outputs = GtvArray(arrayOf(gtv(
+                otherAccountId,
+                assetId,
+                gtv(transferAmount),
+                gtv(mapOf())
+        )))
+
+        fun transfer(): ByteArray {
+            val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
+            b.addOperation("ft3.transfer", inputs, outputs)
+
+            val signer = cryptoSystem.buildSigMaker(KeyPair(userPubkey, userPriKey))
+            return b.finish()
+                    .sign(signer)
+                    .buildGtx()
+                    .encode()
+        }
+
+        enqueueTx(transfer())
+        sealBlock()
+
         // Get the last snapshot block height as mass-exit block
         var lastBlockHeight = currentBlockHeight
         var lastBlockRID: ByteArray? = null
@@ -376,7 +423,7 @@ class EifIntegrationTest : IntegrationTestSetup() {
             val state = blockQuery.query("get_account_state_merkle_proof",
                     gtv(
                             "blockHeight" to gtv(lastBlockHeight),
-                            "accountNumber" to gtv(accountNumber.asInteger())
+                            "accountNumber" to accountNumber
                     )).get().asDict()
 
             val stateData = state["stateData"]!!.asByteArray()
@@ -407,8 +454,42 @@ class EifIntegrationTest : IntegrationTestSetup() {
                     extraProofData
             ).send()
 
+            // Withdraw the remaining token balance of other account as well
+            val otherAccountNumber = accountNumber.asInteger()+1
+            val otherState = blockQuery.query("get_account_state_merkle_proof",
+                    gtv(
+                            "blockHeight" to gtv(lastBlockHeight),
+                            "accountNumber" to gtv(otherAccountNumber)
+                    )).get().asDict()
+
+            val otherStateData = otherState["stateData"]!!.asByteArray()
+            val otherProof = otherState["stateProof"]!!.asDict()
+            val otherLeaf = Bytes32(otherProof["leaf"]!!.asByteArray())
+            val otherPosition = Uint256(otherProof["position"]!!.asInteger())
+            val otherMerkleProofs = otherProof["merkleProofs"]!!.asArray().map { Bytes32(it.asByteArray()) }
+            val otherStateProof = TokenBridge.Proof(otherLeaf, otherPosition, DynamicArray(Bytes32::class.java, otherMerkleProofs))
+            val otherExtraMerkleProof = otherState["extraMerkleProof"]!!.asDict()
+            val otherExtraProofs = otherExtraMerkleProof["extraMerkleProofs"]!!.asArray().map { Bytes32(it.asByteArray()) }
+            val otherExtraProofData = TokenBridge.ExtraProofData(
+                    DynamicBytes(otherExtraMerkleProof["leaf"]!!.asByteArray()),
+                    Bytes32(otherExtraMerkleProof["hashedLeaf"]!!.asByteArray()),
+                    Uint256(otherExtraMerkleProof["position"]!!.asInteger()),
+                    Bytes32(otherExtraMerkleProof["extraRoot"]!!.asByteArray()),
+                    DynamicArray(Bytes32::class.java, otherExtraProofs)
+            )
+            bridge.withdrawBySnapshot(
+                    DynamicBytes(otherStateData),
+                    otherStateProof,
+                    DynamicBytes(blockHeader),
+                    DynamicArray(DynamicBytes::class.java, signatures),
+                    DynamicArray(Address::class.java, signers),
+                    otherExtraProofData
+            ).send()
+
             userBalance = testToken.balanceOf(Address(evmAddress)).send()
-            assertEquals(userBalance.value, BigInteger.valueOf(initialMint))
+            assertEquals(userBalance.value, BigInteger.valueOf(initialMint-transferAmount))
+            userBalance = testToken.balanceOf(Address(otherEvmAddressString)).send()
+            assertEquals(userBalance.value, BigInteger.valueOf(transferAmount))
         }
     }
 
