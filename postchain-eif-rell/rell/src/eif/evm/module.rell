@@ -1,0 +1,72 @@
+@mount('eif.evm')
+module;
+
+import acc: ^^.lib.ft4.accounts;
+import auth: ^^.lib.ft4.auth;
+
+entity evm_account {
+  key acc.account;
+  key address: byte_array;
+  mutable nonce: integer;
+}
+
+query get_login_message() = "Add key:\n{1}\n\nTo account:\n{2}\n\nWith permission:\nTransfer\n\nNonce: {3}";
+query get_register_message() = "Create account for EVM wallet:\n{1}\n\nDisposable key:\n{2}";
+query get_evm_signature_nonce(acc: byte_array) = require(evm_account @? { .address == acc }( .nonce ), "No account found for the provided pubkey");
+query get_account_by_evm_address(acc: byte_array) = evm_account @? { .address == acc }( .account );
+
+operation register_account(evm_addr: byte_array, acc.auth_descriptor, auth.signature) {
+  require(op_context.get_signers().size() > 0, "Transaction needs to be signed with disposable key");
+  require(auth_descriptor.auth_type == acc.auth_type.S, "Only single sig is supported");
+  require(_extract_single_sig_args(auth_descriptor).flags == set(["T"]), "Only Transfer permission is allowed");
+
+  val pubkey = op_context.get_signers()[0];
+  val account = acc.account @ { .id == acc.create_account_with_auth(auth_descriptor) };
+  val register_msg = _create_register_message(pubkey, evm_addr);
+  val recovered_address = _recover_address_from_evm_signature(register_msg, signature);
+  require(recovered_address == evm_addr, "Signature not valid for the provided key");
+
+  create evm_account(account, evm_addr, 0);
+}
+
+operation add_auth_descriptor(accountId: byte_array, acc.auth_descriptor, auth.signature) {
+  require(op_context.get_signers().size() > 0, "Transaction needs to be signed with disposable key");
+  val participants = acc.get_participants(auth_descriptor.auth_type, auth_descriptor.args.to_gtv().to_bytes());
+  require(op_context.get_signers().contains_all(participants), "Transaction not signed by auth descriptor key");
+  require(_extract_single_sig_args(auth_descriptor).flags == set(["T"]), "Only Transfer permission is allowed");
+  
+  val account = acc.account @ { .id == accountId };
+  val login_msg = _create_login_message(participants[0], account.id);
+  val recovered_address = _recover_address_from_evm_signature(login_msg, signature);
+  val evm_account = evm_account @? { .address == recovered_address };
+  require(evm_account, "Signature not valid for the selected account");
+  
+  acc.Unsafe._add_auth_descriptor(account, auth_descriptor);
+  evm_account.nonce += 1;
+}
+
+function _extract_single_sig_args(acc.auth_descriptor): acc.single_sig_args {
+  return acc.single_sig_args.from_bytes(auth_descriptor.args.to_gtv().to_bytes());
+}
+
+function _create_register_message(pubkey, evm_addr: byte_array): text {
+  return get_register_message()
+                .replace("{1}", evm_addr.to_hex().lower_case())
+                .replace("{2}", pubkey.to_hex().lower_case());
+}
+
+function _create_login_message(pubkey, accountId: byte_array): text {
+  return get_login_message()
+                .replace("{1}", pubkey.to_hex().lower_case())
+                .replace("{2}", accountId.to_hex().lower_case())
+                .replace("{3}", evm_account @ { .account.id == accountId}( .nonce ).to_text());
+}
+
+
+function _recover_address_from_evm_signature(message: text, auth.signature): byte_array {
+    require(message != "", "Empty messages are not allowed");
+    val msg_hash = keccak256(("\u0019Ethereum Signed Message:\n" + message.size().to_text() + message).to_bytes());
+    val eth_pubkey = eth_ecrecover(signature.r, signature.s, signature.v - 27, msg_hash);
+    return keccak256(eth_pubkey).sub(12);
+}
+

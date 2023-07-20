@@ -3,14 +3,8 @@
     "dependencies": {
       "ft3": {
         "repository": "git@bitbucket.org:chromawallet/ft3-lib.git",
-        "branch": "ft3.5",
+        "branch": "development",
         "subdirectory": "rell/src/lib",
-        "createDirectory": false
-      },
-      "originals": {
-        "repository": "git@bitbucket.org:chromawallet/originals-dip.git",
-        "branch": "eif",
-        "subdirectory": "rell/src/",
         "createDirectory": false
       }
     }
