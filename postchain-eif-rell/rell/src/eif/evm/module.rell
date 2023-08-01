@@ -14,6 +14,7 @@ query get_login_message() = "Add key:\n{1}\n\nTo account:\n{2}\n\nWith permissio
 query get_register_message() = "Create account for EVM wallet:\n{1}\n\nDisposable key:\n{2}";
 query get_evm_signature_nonce(acc: byte_array) = require(evm_account @? { .address == acc }( .nonce ), "No account found for the provided pubkey");
 query get_account_by_evm_address(acc: byte_array) = evm_account @? { .address == acc }( .account );
+query get_account_id_by_evm_address(acc: byte_array) = evm_account @? { .address == acc }( .account.id );
 
 operation register_account(evm_addr: byte_array, acc.auth_descriptor, auth.signature) {
   require(op_context.get_signers().size() > 0, "Transaction needs to be signed with disposable key");

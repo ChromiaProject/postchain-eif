@@ -48,5 +48,5 @@ libs:
     registry: https://bitbucket.org/chromawallet/ft3-lib
     path: rell/src/lib/ft4
     tagOrBranch: development
-    rid: x"4F4C6B2A52D571CA697E80811FCCC099029B8BEE185982EF4E5990F5AD6A5FB9"
+    rid: x"37DE200177CD28986F87F6DD490C14C23754B876831B88F90AE23EB2F43347A4"
     insecure: false
