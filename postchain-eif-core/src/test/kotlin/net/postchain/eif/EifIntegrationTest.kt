@@ -236,11 +236,11 @@ class EifIntegrationTest : IntegrationTestSetup() {
         enqueueTx(registerAccount(otherPubkey, otherPrikey, otherEvmAddess, otherSig))
         sealBlock()
 
-        // query ft account by evm address
+        // query ft account id by evm address
         val blockQuery = node.getBlockchainInstance().blockchainEngine.getBlockQueries()
-        val accountId = blockQuery.query("eif.evm.get_account_by_evm_address",
+        val accountId = blockQuery.query("eif.evm.get_account_id_by_evm_address",
                 gtv("acc" to gtv(userEvmAddress))).get()
-        val otherAccountId = blockQuery.query("eif.evm.get_account_by_evm_address",
+        val otherAccountId = blockQuery.query("eif.evm.get_account_id_by_evm_address",
                 gtv("acc" to gtv(otherEvmAddess))).get()
 
         // Deposit to postchain
@@ -281,13 +281,20 @@ class EifIntegrationTest : IntegrationTestSetup() {
         assertEquals(stateData.asByteArray().contentEquals(expectedState), true)
 
         // Bridge some ft token to evm
+        val gtvAuthDescriptorId = blockQuery.query(
+                "ft4.get_account_auth_descriptors",
+                gtv("id" to accountId, "page_size" to gtv(1L), "page_cursor" to GtvNull)
+        ).get()["data"]!![0]["id"]!!
+
         val auth = gtv(
                 gtv(AuthType.S.ordinal.toLong()),
                 gtv(GtvArray(arrayOf(gtv("T"))), gtv(userPubkey)),
                 GtvNull
         )
+
         val authDescriptorId = auth.merkleHash(GtvMerkleHashCalculator(myCS))
-        val authId = gtv(accountId, gtv(authDescriptorId))
+        assertEquals(gtv(authDescriptorId), gtvAuthDescriptorId)
+        val authId = gtv(accountId, gtvAuthDescriptorId)
 
         val withdrawAmount = BigInteger("1234567890", 16)
         fun withdrawOnPostchain(): ByteArray {
