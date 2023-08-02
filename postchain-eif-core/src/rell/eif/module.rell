@@ -1,10 +1,10 @@
-import admin: ^.lib.access.admin;
-import acc: ^.lib.ft3.account;
-import ft3: ^.lib.ft3.core;
-import evm: ^.lib.ft3.evm;
-import dip: ^.lib.dip.core;
-import og: ^.lib.originals.core;
-import ^.lib.ft3_helper.*;
+import admin: ^.access.admin;
+import acc: ^.ft3.account;
+import ft3: ^.ft3.core;
+import evm: ^.ft3.evm;
+import dip: ^.dip.core;
+import og: ^.originals.core;
+import ^.ft3_helper.*;
 
 struct module_args {
     sync_transfers_inside_dapp: boolean;
