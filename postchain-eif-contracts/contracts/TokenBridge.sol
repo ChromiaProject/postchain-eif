@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 // Upgradeable implementations
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 // Interfaces
@@ -20,7 +21,7 @@ interface IValidator {
 // This contract is upgradeable. This imposes restrictions on how storage layout can be modified once it is deployed
 // Some instructions are also not allowed. Read more at: https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable
 // Note: To enhance the security & decentralization, we should call transferOwnership() to external multi-sig owner after deploy the smart contract
-contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
     uint8 constant ERC20_ACCOUNT_STATE_BYTE_SIZE = 64;
     uint constant EMERGENCY_DURATION = 90 days;
@@ -109,6 +110,14 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
     }
 
+    function pause() onlyOwner public {
+        _pause();
+    }
+
+    function unpause() onlyOwner public {
+        _unpause();
+    }
+
     function allowToken(IERC20 token) onlyOwner public {
         _allowedToken[token] = true;
     }
@@ -162,7 +171,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         return true;
     }
 
-    function deposit(IERC20 token, uint256 amount, bytes32 ft3_account_id) isAllowToken(token) public returns (bool) {
+    function deposit(IERC20 token, uint256 amount, bytes32 ft3_account_id) isAllowToken(token) whenNotPaused public returns (bool) {
         (string memory name, string memory symbol, uint8 decimals) = _getTokenInfo(token);
         token.transferFrom(msg.sender, address(this), amount);
         _balances[token] += amount;
@@ -181,7 +190,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         bytes[] memory sigs,
         address[] memory signers,
         Data.ExtraProofData memory extraProof
-    ) external nonReentrant {
+    ) external whenNotPaused nonReentrant {
         _withdrawRequest(eventProof, blockHeader, sigs, signers, extraProof);
         _events[eventProof.leaf] = _updateWithdraw(eventProof.leaf, _event); // mark the event hash was already used.
     }
@@ -225,7 +234,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         return true;
     }
 
-    function withdraw(bytes32 _hash, address payable beneficiary) external nonReentrant {
+    function withdraw(bytes32 _hash, address payable beneficiary) external whenNotPaused nonReentrant {
         Withdraw storage wd = _withdraw[_hash];
         require(wd.beneficiary == beneficiary, "TokenBridge: no fund for the beneficiary");
         require(wd.block_number <= block.number, "TokenBridge: not mature enough to withdraw the fund");
@@ -245,7 +254,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
     /**
      * @dev user can withdraw token back to postchain if they cannot withdraw on EVM chain
      */
-    function withdrawToPostchain(bytes32 _hash, bytes32 ft3_account_id) external nonReentrant {
+    function withdrawToPostchain(bytes32 _hash, bytes32 ft3_account_id) external whenNotPaused nonReentrant {
         Withdraw storage wd = _withdraw[_hash];
         require(wd.beneficiary == msg.sender, "TokenBridge: no fund for the beneficiary");
         require(wd.block_number <= block.number, "TokenBridge: not mature enough to withdraw the fund");
@@ -269,7 +278,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         bytes[] memory sigs,
         address[] memory signers,
         Data.ExtraProofData memory extraProof
-    ) whenMassExit nonReentrant public  {
+    ) whenMassExit whenNotPaused nonReentrant public  {
         require(_snapshots[stateProof.leaf] == false, "TokenBridge: snapshot already used");
         require(stateProof.leaf == keccak256(snapshot), "TokenBridge: snapshot data is not correct");
         (uint height, bytes32 blockRid, , bytes32 stateRoot) = Postchain.verifyBlockHeader(blockHeader, extraProof);
