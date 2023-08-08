@@ -155,7 +155,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
      * @dev admin need to fund enough token for bridge; otherwise, user cannot claim
      * and they might need to withdraw back to postchain.
      */
-    function fund(IERC20 token, uint256 amount) isAllowToken(token) public returns (bool) {
+    function fund(IERC20 token, uint256 amount) isAllowToken(token) onlyOwner public returns (bool) {
         token.transferFrom(msg.sender, address(this), amount);
         _balances[token] += amount;
         emit FundedERC20(msg.sender, token, amount);
