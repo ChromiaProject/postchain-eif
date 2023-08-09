@@ -17,6 +17,7 @@ import net.postchain.eif.contracts.TokenBridge
 import net.postchain.eif.contracts.Validator
 import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvFactory.gtv
+import net.postchain.gtv.GtvInteger
 import net.postchain.gtv.GtvNull
 import net.postchain.gtx.GtxBuilder
 import org.junit.jupiter.api.AfterEach
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.FunctionEncoder
@@ -34,6 +36,7 @@ import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto.Credentials
 import org.web3j.protocol.Web3j
+import org.web3j.protocol.exceptions.TransactionException
 import org.web3j.protocol.http.HttpService
 import org.web3j.tx.Contract
 import org.web3j.tx.FastRawTransactionManager
@@ -273,10 +276,11 @@ class EifIntegrationTest : IntegrationTestSetup() {
         ).get()[0].asDict()["id"]!!
         val authId = gtv(accountId, auth)
 
-        val withdrawAmount = 10L
+        val withdrawAmount = 5L
         fun withdrawOnPostchain(): ByteArray {
             val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
             b.addOperation("bridge_ft3_token_to_evm", authId, gtv(networkId), gtv(testTokenAddress), gtv(userEvmAddress), gtv(withdrawAmount))
+            b.addOperation("nop", GtvInteger(System.currentTimeMillis()))
             val signer = cryptoSystem.buildSigMaker(KeyPair(userPubkey, userPriKey))
             return b.finish()
                     .sign(signer)
@@ -402,13 +406,16 @@ class EifIntegrationTest : IntegrationTestSetup() {
         enqueueTx(transfer())
         sealBlock()
 
+        enqueueTx(withdrawOnPostchain())
+        sealBlock()
+
         // Get the last snapshot block height as mass-exit block
         var lastBlockHeight = currentBlockHeight
         var lastBlockRID: ByteArray? = null
         while (lastBlockHeight >= 0) {
             val block = blockQuery.getBlockAtHeight(lastBlockHeight, false).get()
             val header = block!!.header.rawData.toHex()
-            if (header.takeLast(64) != "0000000000000000000000000000000000000000000000000000000000000000") {
+            if (header.takeLast(64) != "0".repeat(64)) {
                 lastBlockRID = block.header.blockRID
                 break
             }
@@ -418,6 +425,70 @@ class EifIntegrationTest : IntegrationTestSetup() {
         assertNotNull(lastBlockRID, "There should be valid block for mass-exit")
         if (lastBlockRID != null) {
             bridge.triggerMassExit(Uint256(lastBlockHeight), Bytes32(lastBlockRID)).send()
+
+            // Withdraw request on evm for the last postchain withdraw
+            val withdrawInfo2 = blockQuery.query("get_erc20_withdrawal", gtv(
+                    "network_id" to gtv(networkId),
+                    "token_address" to gtv(testTokenAddress),
+                    "beneficiary" to gtv(userEvmAddress)
+            )).get()[0].asDict()
+            assertEquals(withdrawInfo2["amount"]!!.asInteger(), withdrawAmount)
+            val serial2 = withdrawInfo2["serial"]!!.asInteger()
+
+            // Query to get the event proof to withdraw fund on evm
+            val eventData2 = gtv(
+                    gtv(serial2),
+                    gtv(networkId),
+                    gtv(to32Bytes(testToken.contractAddress.substring(2))),
+                    gtv(to32Bytes(evmAddress)),
+                    gtv(withdrawAmount)
+            )
+            val eventHash2 = ds.digest(SimpleGtvEncoder.encodeGtv(eventData2))
+            val eventProof2 = blockQuery.query("get_event_merkle_proof",
+                    gtv("eventHash" to gtv(eventHash2.toHex()))).get().asDict()
+
+            val actualEventData2 = eventProof2["eventData"]!!.asByteArray()
+            assertEquals(
+                    SimpleGtvEncoder.encodeGtv(eventData2).contentEquals(actualEventData2),
+                    true
+            )
+
+            val blockHeader2 = eventProof2["blockHeader"]!!.asByteArray()
+
+            val p2 = eventProof2["eventProof"]!!.asDict()
+            val leaf2 = Bytes32(p2["leaf"]!!.asByteArray())
+            val position2 = Uint256(p2["position"]!!.asInteger())
+            val merkleProofs2 = p2["merkleProofs"]!!.asArray().map { Bytes32(it.asByteArray()) }
+            val proof2 = TokenBridge.Proof(leaf2, position2, DynamicArray(Bytes32::class.java, merkleProofs2))
+
+            val blockWitness2 = eventProof2["blockWitness"]!!.asArray()
+            val signatures2 = blockWitness2.map { DynamicBytes(it.asDict()["sig"]!!.asByteArray()) }
+            val signers2 = blockWitness2.map { Address(it.asDict()["pubkey"]!!.asByteArray().toHex()) }
+
+            val extraMerkleProof2 = eventProof2["extraMerkleProof"]!!.asDict()
+            val extraProofs2 = extraMerkleProof2["extraMerkleProofs"]!!.asArray().map { Bytes32(it.asByteArray()) }
+            val extraProofData2 = TokenBridge.ExtraProofData(
+                    DynamicBytes(extraMerkleProof2["leaf"]!!.asByteArray()),
+                    Bytes32(extraMerkleProof2["hashedLeaf"]!!.asByteArray()),
+                    Uint256(extraMerkleProof2["position"]!!.asInteger()),
+                    Bytes32(extraMerkleProof2["extraRoot"]!!.asByteArray()),
+                    DynamicArray(Bytes32::class.java, extraProofs2)
+            )
+
+            bridge.withdrawRequest(
+                    DynamicBytes(actualEventData2),
+                    proof2,
+                    DynamicBytes(blockHeader2),
+                    DynamicArray(DynamicBytes::class.java, signatures2),
+                    DynamicArray(Address::class.java, signers2),
+                    extraProofData2
+            ).send()
+
+            // wait some seconds to allow evm node to mine some new blocks
+            Thread.sleep(5000)
+            bridge.withdraw(Bytes32(eventHash2), Address(evmAddress)).send()
+            userBalance = testToken.balanceOf(Address(evmAddress)).send()
+            assertEquals(userBalance.value, BigInteger.valueOf(initialMint - depositedAmount + 2*withdrawAmount))
 
             // Withdraw remaining token of the account by using snapshot state with mass-exit
             val state = blockQuery.query("get_account_state_merkle_proof",
@@ -485,6 +556,70 @@ class EifIntegrationTest : IntegrationTestSetup() {
                     DynamicArray(Address::class.java, signers),
                     otherExtraProofData
             ).send()
+
+            enqueueTx(withdrawOnPostchain())
+            sealBlock()
+
+            val withdrawInfo3 = blockQuery.query("get_erc20_withdrawal", gtv(
+                    "network_id" to gtv(networkId),
+                    "token_address" to gtv(testTokenAddress),
+                    "beneficiary" to gtv(userEvmAddress)
+            )).get()[0].asDict()
+            assertEquals(withdrawInfo3["amount"]!!.asInteger(), withdrawAmount)
+            val serial3 = withdrawInfo3["serial"]!!.asInteger()
+
+            // Query to get the event proof to withdraw fund on evm
+            val eventData3 = gtv(
+                    gtv(serial3),
+                    gtv(networkId),
+                    gtv(to32Bytes(testToken.contractAddress.substring(2))),
+                    gtv(to32Bytes(evmAddress)),
+                    gtv(withdrawAmount)
+            )
+            val eventHash3 = ds.digest(SimpleGtvEncoder.encodeGtv(eventData3))
+            val eventProof3 = blockQuery.query("get_event_merkle_proof",
+                    gtv("eventHash" to gtv(eventHash3.toHex()))).get().asDict()
+
+            val actualEventData3 = eventProof3["eventData"]!!.asByteArray()
+            assertEquals(
+                    SimpleGtvEncoder.encodeGtv(eventData3).contentEquals(actualEventData3),
+                    true
+            )
+
+            val blockHeader3 = eventProof3["blockHeader"]!!.asByteArray()
+
+            val p3 = eventProof3["eventProof"]!!.asDict()
+            val leaf3 = Bytes32(p3["leaf"]!!.asByteArray())
+            val position3 = Uint256(p3["position"]!!.asInteger())
+            val merkleProofs3 = p3["merkleProofs"]!!.asArray().map { Bytes32(it.asByteArray()) }
+            val proof3 = TokenBridge.Proof(leaf3, position3, DynamicArray(Bytes32::class.java, merkleProofs3))
+
+            val blockWitness3 = eventProof3["blockWitness"]!!.asArray()
+            val signatures3 = blockWitness2.map { DynamicBytes(it.asDict()["sig"]!!.asByteArray()) }
+            val signers3 = blockWitness3.map { Address(it.asDict()["pubkey"]!!.asByteArray().toHex()) }
+
+            val extraMerkleProof3 = eventProof3["extraMerkleProof"]!!.asDict()
+            val extraProofs3 = extraMerkleProof3["extraMerkleProofs"]!!.asArray().map { Bytes32(it.asByteArray()) }
+            val extraProofData3 = TokenBridge.ExtraProofData(
+                    DynamicBytes(extraMerkleProof3["leaf"]!!.asByteArray()),
+                    Bytes32(extraMerkleProof3["hashedLeaf"]!!.asByteArray()),
+                    Uint256(extraMerkleProof3["position"]!!.asInteger()),
+                    Bytes32(extraMerkleProof3["extraRoot"]!!.asByteArray()),
+                    DynamicArray(Bytes32::class.java, extraProofs3)
+            )
+
+            // User cannot send withdraw request after the mass-exit block height
+            val exception = assertThrows<TransactionException> {
+                bridge.withdrawRequest(
+                        DynamicBytes(actualEventData3),
+                        proof3,
+                        DynamicBytes(blockHeader3),
+                        DynamicArray(DynamicBytes::class.java, signatures3),
+                        DynamicArray(Address::class.java, signers3),
+                        extraProofData3
+                ).send()
+            }
+            assertEquals(exception.message!!.contains("TokenBridge: cannot withdraw request after the mass exit block height"), true)
 
             userBalance = testToken.balanceOf(Address(evmAddress)).send()
             assertEquals(userBalance.value, BigInteger.valueOf(initialMint-transferAmount))

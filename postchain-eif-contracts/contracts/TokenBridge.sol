@@ -197,7 +197,7 @@ contract TokenBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrad
         {
             (uint height, bytes32 blockRid, bytes32 eventRoot, ) = Postchain.verifyBlockHeader(blockHeader, extraProof);
             if (isMassExit) {
-                require(height < massExitBlock.height, "TokenBridge: only can withdraw request before the mass exit block height");
+                require(height <= massExitBlock.height, "TokenBridge: cannot withdraw request after the mass exit block height");
             }
             if (!validator.isValidSignatures(validator.getValidatorHeight(height), blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
             if (!MerkleProof.verify(eventProof.merkleProofs, eventProof.leaf, eventProof.position, eventRoot)) revert("TokenBridge: invalid merkle proof");
