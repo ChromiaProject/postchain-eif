@@ -81,6 +81,7 @@ class EifSynchronizationInfrastructureExtension(
                     evmConfig.maxReadAhead,
                     evmConfig.maxQueueSize,
                     BigInteger.valueOf(evmBlockchainConfig.skipToHeight),
+                    BigInteger.valueOf(evmConfig.lastEvmBlockHeight),
                     engine
             ).apply { start() }
         }
