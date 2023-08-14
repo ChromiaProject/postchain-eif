@@ -35,7 +35,7 @@ class EifSynchronizationInfrastructureExtension(
 
                 eventProcessors[cfg.blockchainRid.toHex()] = mutableMapOf()
                 for ((evmBlockchainName, evmBlockchainConfig) in eifBlockchainConfig.chains) {
-                    if (evmBlockchainConfig.skipToHeight == BigInteger.ZERO) {
+                    if (evmBlockchainConfig.skipToHeight == 0L) {
                         logger.warn("Skip to height config is set to 0. Consider changing it to avoid redundant queries.")
                     }
 
@@ -80,7 +80,7 @@ class EifSynchronizationInfrastructureExtension(
                     BigInteger.valueOf(evmBlockchainConfig.readOffset),
                     evmConfig.maxReadAhead,
                     evmConfig.maxQueueSize,
-                    evmBlockchainConfig.skipToHeight,
+                    BigInteger.valueOf(evmBlockchainConfig.skipToHeight),
                     BigInteger.valueOf(evmConfig.lastEvmBlockHeight),
                     engine
             ).apply { start() }
