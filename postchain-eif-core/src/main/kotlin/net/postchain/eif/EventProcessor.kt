@@ -112,18 +112,24 @@ class EvmEventProcessor(
         private val maxReadAhead: Long,
         private val maxQueueSize: Long,
         skipToHeight: BigInteger,
+        lastEvmBlockHeight: BigInteger,
         blockchainEngine: BlockchainEngine
 ) : EventProcessor, AbstractBlockchainProcess("$networkId-event-processor", blockchainEngine) {
 
     data class EvmBlock(val number: BigInteger, val hash: String)
 
+    private val eventBlocks: Queue<Array<Gtv>> = LinkedList()
+    private val eventMap = events.associateBy(EventEncoder::encode)
+    private val eventSignatures = eventMap.keys.toTypedArray()
+
     var lastReadLogBlockHeight = getLastCommittedEvmBlockHeight(networkId) ?: skipToHeight
         private set
 
-    private val eventBlocks: Queue<Array<Gtv>> = LinkedList()
-
-    private val eventMap = events.associateBy(EventEncoder::encode)
-    private val eventSignatures = eventMap.keys.toTypedArray()
+    init {
+        if (lastEvmBlockHeight > lastReadLogBlockHeight) {
+            lastReadLogBlockHeight = lastEvmBlockHeight
+        }
+    }
 
     /**
      * Producer thread will read events from ethereum ond add to queue in this action. Main thread will consume them.
