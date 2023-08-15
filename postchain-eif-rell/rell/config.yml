@@ -1,0 +1,81 @@
+definitions:
+  - &eif_test
+    chains:
+      goerli:
+        network_id: 5
+        contracts:
+          - '0xb7eb5d60dd5610a82a4844beb3f7d750316d3d32'
+        skip_to_height: 9149852
+  - &common_args
+    lib.ft3.core:
+      my_blockchain_name: My Neighbor Alice
+      my_blockchain_website: https://myneighboralice.com
+      my_blockchain_description: My Neighbor Alice is a multiplayer builder game, introducing blockchain to millions of players. Anyone can buy and own virtual islands, collect and build exciting items and meet new friends.
+      rate_limit_active: 0
+      rate_limit_max_points: 20
+      rate_limit_recovery_time: 5000
+      rate_limit_points_at_account_creation: 20
+  - &rell_test_args
+    lib.originals.marketplace:
+      oracle_pubkey: 02a829e1d7fffbd856a04b53ec7d478d8896803b571c7700ec464d6a9d4f0e3bbd
+    lib.access.admin:
+      admin_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
+    eif:
+      sync_transfers_inside_dapp: true
+
+test:
+  modules:
+    - tests.eif
+  moduleArgs:
+    <<: *common_args
+    <<: *rell_test_args
+
+blockchains:
+  eif:
+    module: main
+    config:
+      gtx:
+        modules: ['net.postchain.eif.EifGTXModule']
+      eif:
+        <<: *eif_test
+      sync_ext: ['net.postchain.eif.EifSynchronizationInfrastructureExtension']
+    moduleArgs:
+      <<: *common_args
+      <<: *rell_test_args
+
+compile:
+  source: src
+  target: target
+  rellVersion: 0.10.11
+libs:
+  ft3:
+    registry: https://bitbucket.org/chromawallet/ft3-lib/src/v2.1.0/
+    path: rell/src/lib/ft3
+    tagOrBranch: ft3.5
+    rid: x"79AA5CE8E30EBD8483EB1CA06A9FCE19401AB3A676C34D5C3E3EACF6C408583E"
+  access:
+    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
+    path: rell/src/access
+    tagOrBranch: eif
+    rid: x"67FCAF1E65709EEB03B11820FC62D99C784D0B45A52F0C06CE54FA4389033F5D"
+  dip:
+    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
+    path: rell/src/dip
+    tagOrBranch: eif
+    rid: x"AF7A1040D7E0F0D1C8A2969FA556A038F6659781DEF483F771DE28C45C6DA135"
+  evm_accounts:
+    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
+    path: rell/src/evm_accounts
+    tagOrBranch: eif
+    rid: x"6ED7E0C1998F24C677FB57A5F11EE0F7DB8857608B739FE922F7FD27727A0362"
+  originals:
+    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
+    path: rell/src/originals
+    tagOrBranch: eif
+    rid: x"09922670A770522E82375D3970B9AE6AAD2E519AF8016CB90A16D7D71A3FE490"
+  ft3_helper:
+    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
+    path: rell/src/ft3_helper
+    tagOrBranch: eif
+    rid: x"5EC6B65E53749EBF86C283D1F05F4259A1159BDBC1D2C204849422949AC5D35C"
+

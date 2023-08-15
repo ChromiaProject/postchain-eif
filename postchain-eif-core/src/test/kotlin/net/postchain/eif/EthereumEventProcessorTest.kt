@@ -113,7 +113,9 @@ class EthereumEventProcessorTest {
             .send().result.blockNumber
         val eventsToRead = listOf(TokenBridge.DEPOSITEDERC20_EVENT)
         val evmEventProcessor =
-            EvmEventProcessor(1L, web3j, listOf(bridge.contractAddress), eventsToRead, BigInteger.ZERO, BigInteger.ONE, 200L, 100L, contractDeployBlockNumber, engineMock).apply {
+            EvmEventProcessor(1L, web3j, listOf(bridge.contractAddress), eventsToRead,
+                    BigInteger.ZERO, BigInteger.ONE, 200L, 100L,
+                    contractDeployBlockNumber, BigInteger.ZERO, engineMock).apply {
                 start()
             }
 
@@ -224,7 +226,9 @@ class EthereumEventProcessorTest {
         val contractAddresses = listOf(bridgeFirst.contractAddress, bridgeSecond.contractAddress)
         val eventsToRead = listOf(TokenBridge.DEPOSITEDERC20_EVENT)
         val evmEventProcessor =
-                EvmEventProcessor(1L, web3j, contractAddresses, eventsToRead, BigInteger.ZERO, BigInteger.ONE, 200L, 100L, contractDeployBlockNumber, engineMock).apply {
+                EvmEventProcessor(1L, web3j, contractAddresses, eventsToRead,
+                        BigInteger.ZERO, BigInteger.ONE, 200L, 100L,
+                        contractDeployBlockNumber, BigInteger.ZERO, engineMock).apply {
                     start()
                 }
 

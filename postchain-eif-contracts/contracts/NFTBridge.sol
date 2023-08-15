@@ -96,7 +96,7 @@ contract NFTBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reentr
      * @dev admin need to fund nft for bridge; otherwise, user cannot claim
      * and they might need to withdraw back to postchain.
      */
-    function fundNFT(IERC721 nft, uint256 tokenId) isAllowNFT(nft) public returns (bool) {
+    function fundNFT(IERC721 nft, uint256 tokenId) isAllowNFT(nft) onlyOwner public returns (bool) {
         nft.safeTransferFrom(msg.sender, address(this), tokenId);
         _owners[nft][tokenId] = msg.sender;
         emit FundedERC721(msg.sender, nft, tokenId);
