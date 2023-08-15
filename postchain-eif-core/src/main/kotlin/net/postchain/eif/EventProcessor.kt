@@ -4,6 +4,7 @@ import mu.KLogging
 import net.postchain.core.BlockchainEngine
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.hexStringToByteArray
+import net.postchain.concurrent.util.get
 import net.postchain.core.framework.AbstractBlockchainProcess
 import net.postchain.gtv.*
 import net.postchain.gtv.GtvFactory.gtv
@@ -21,7 +22,7 @@ import org.web3j.tx.Contract
 import java.lang.Thread.sleep
 import java.math.BigInteger
 import java.util.*
-import kotlin.streams.toList
+import java.util.stream.Collectors
 
 enum class EncodedBlock(val index: Int) {
     NETWORK_ID(0),
@@ -109,58 +110,71 @@ class EvmEventProcessor(
         private val maxReadAhead: Long,
         private val maxQueueSize: Long,
         skipToHeight: BigInteger,
+        lastEvmBlockHeight: BigInteger,
         blockchainEngine: BlockchainEngine
 ) : EventProcessor, AbstractBlockchainProcess("$networkId-event-processor", blockchainEngine) {
 
     data class EvmBlock(val number: BigInteger, val hash: String)
 
+    private val eventBlocks: Queue<Array<Gtv>> = LinkedList()
+    private val eventMap = events.associateBy(EventEncoder::encode)
+    private val eventSignatures = eventMap.keys.toTypedArray()
+
     var lastReadLogBlockHeight = getLastCommittedEvmBlockHeight(networkId) ?: skipToHeight
         private set
 
-    private val eventBlocks: Queue<Array<Gtv>> = LinkedList()
-
-    private val eventMap = events.associateBy(EventEncoder::encode)
-    private val eventSignatures = eventMap.keys.toTypedArray()
+    init {
+        if (lastEvmBlockHeight > lastReadLogBlockHeight) {
+            lastReadLogBlockHeight = lastEvmBlockHeight
+        }
+    }
 
     /**
      * Producer thread will read events from ethereum ond add to queue in this action. Main thread will consume them.
      */
     override fun action() {
-        val from = lastReadLogBlockHeight + BigInteger.ONE
-        // it's safe to query the event from the finalized block on Ethereum PoS
-        val finalizedBlock = DefaultBlockParameter.valueOf("finalized")
-        val finalizedBlockHeight = sendWeb3jRequestWithRetry(web3j.ethGetBlockByNumber(finalizedBlock, false)).block.number
-        // Pacing the reading of logs
-        val to = minOf(finalizedBlockHeight, from + BigInteger.valueOf(maxReadAhead))
+        try {
+            val from = lastReadLogBlockHeight + BigInteger.ONE
+            // it's safe to query the event from the finalized block on Ethereum PoS
+            val finalizedBlock = DefaultBlockParameter.valueOf("finalized")
+            val finalizedBlockHeight = sendWeb3jRequestWithRetry(web3j.ethGetBlockByNumber(finalizedBlock, false)).block.number
+            // Pacing the reading of logs
+            val to = minOf(finalizedBlockHeight, from + BigInteger.valueOf(maxReadAhead))
 
-        if (to < from) {
-            logger.debug { "No new blocks to read. We are at height: $to" }
-            // Sleep a bit until next attempt
-            sleep(500)
-            return
-        }
+            if (to < from) {
+                logger.debug { "No new blocks to read. We are at height: $to" }
+                // Sleep a bit until next attempt
+                sleep(500)
+                return
+            }
 
-        val filter = EthFilter(
-            DefaultBlockParameter.valueOf(from),
-            DefaultBlockParameter.valueOf(to),
-            contractAddresses
-        )
-        filter.addOptionalTopics(*eventSignatures)
+            val filter = EthFilter(
+                    DefaultBlockParameter.valueOf(from),
+                    DefaultBlockParameter.valueOf(to),
+                    contractAddresses
+            )
+            filter.addOptionalTopics(*eventSignatures)
 
-        val logResponse = sendWeb3jRequestWithRetry(web3j.ethGetLogs(filter))
+            val logResponse = sendWeb3jRequestWithRetry(web3j.ethGetLogs(filter))
 
-        // Ensure events are sorted on txIndex + logIndex, blocks sorted on block number
-        val sortedEncodedLogs = logResponse.logs
-                .map { (it as EthLog.LogObject).get() }
-                .groupBy { EvmBlock(it.blockNumber, it.blockHash) }
-                .mapValues { it.value.sortedWith(compareBy({ event -> event.transactionIndex }, { event -> event.logIndex })) }
-                .toList()
-                .sortedBy { it.first.number }
-                .map(::eventBlockToGtv)
-        processLogEventsAndUpdateOffsets(sortedEncodedLogs, to)
+            // Ensure events are sorted on txIndex + logIndex, blocks sorted on block number
+            val sortedEncodedLogs = logResponse.logs
+                    .map { (it as EthLog.LogObject).get() }
+                    .groupBy { EvmBlock(it.blockNumber, it.blockHash) }
+                    .mapValues { it.value.sortedWith(compareBy({ event -> event.transactionIndex }, { event -> event.logIndex })) }
+                    .toList()
+                    .sortedBy { it.first.number }
+                    .map(::eventBlockToGtv)
+            processLogEventsAndUpdateOffsets(sortedEncodedLogs, to)
 
-        while (isQueueFull()) {
-            logger.debug("Wait for events to be consumed until we read more")
+            while (isQueueFull()) {
+                logger.debug("Wait for events to be consumed until we read more")
+                sleep(500)
+            }
+        } catch (e: Exception) {
+            // We catch all errors in order to keep retrying
+            logger.error("Parsing of EVM logs unexpectedly failed: $e", e)
+            // Sleep a bit and hope that we can recover
             sleep(500)
         }
     }
@@ -221,7 +235,7 @@ class EvmEventProcessor(
     override fun getEventData(): List<Array<Gtv>> {
         return eventBlocks.stream()
             .takeWhile { it[EncodedBlock.NUMBER.index].asBigInteger() <= lastReadLogBlockHeight - readOffset }
-            .toList()
+            .collect(Collectors.toList())
     }
 
     private fun eventBlockToGtv(eventBlock: Pair<EvmBlock, List<Log>>): Array<Gtv> {

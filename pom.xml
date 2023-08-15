@@ -5,7 +5,7 @@
 
     <groupId>net.postchain</groupId>
     <artifactId>postchain-eif</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>${revision}</version>
     <packaging>pom</packaging>
     <modules>
         <module>postchain-eif-contracts</module>
@@ -17,12 +17,12 @@
     <description>Postchain EIF. Ethereum Integration Framework</description>
 
     <properties>
-        <postchain.version>3.7.0-SNAPSHOT</postchain.version>
+        <revision>dev</revision>
+        <postchain.version>3.9.1</postchain.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
-        <kotlin.compiler.jvmTarget>11</kotlin.compiler.jvmTarget>
-        <gitflow.maven.plugin.version>1.18.0</gitflow.maven.plugin.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <kotlin.compiler.jvmTarget>17</kotlin.compiler.jvmTarget>
         <testcontainers.version>1.16.2</testcontainers.version>
     </properties>
 
@@ -39,7 +39,7 @@
             <dependency>
                 <groupId>org.web3j</groupId>
                 <artifactId>core</artifactId>
-                <version>4.9.2</version>
+                <version>4.9.7</version>
             </dependency>
             <dependency>
                 <groupId>com.squareup.okhttp3</groupId>
@@ -71,7 +71,7 @@
                 <plugin>
                     <groupId>org.jetbrains.kotlin</groupId>
                     <artifactId>kotlin-maven-plugin</artifactId>
-                    <version>1.6.21</version>
+                    <version>1.8.21</version>
                 </plugin>
 
                 <plugin>
@@ -133,15 +133,47 @@
 
         <plugins>
             <plugin>
-                <groupId>com.amashchenko.maven.plugin</groupId>
-                <artifactId>gitflow-maven-plugin</artifactId>
-                <version>${gitflow.maven.plugin.version}</version>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>1.4.1</version>
                 <configuration>
-                    <gitFlowConfig>
-                        <developmentBranch>dev</developmentBranch>
-                        <versionTagPrefix>ver-</versionTagPrefix>
-                    </gitFlowConfig>
+                    <updatePomFile>true</updatePomFile>
+                    <flattenMode>resolveCiFriendliesOnly</flattenMode>
                 </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <id>copy-deps</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <includeScope>runtime</includeScope>
+                            <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

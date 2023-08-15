@@ -10,7 +10,8 @@ import { DecodeHexStringToByteArray, hashGtvBytes32Leaf, hashGtvBytes64Leaf, has
 
 chai.use(solidity);
 const { expect } = chai;
-
+const ft3_account_id = "0x95471c57f0bc16284cb1016eba3b2736fa5fb2a640e2f20984079f4349f867ff"
+const WITHDRAW_OFFSET = "0x14C08"; //85000 
 describe("Token Bridge Test", () => {
     let tokenAddress: string;
     let bridgeAddress: string;
@@ -44,6 +45,8 @@ describe("Token Bridge Test", () => {
         const bridgeDelegatorFactory = new TokenBridgeDelegator__factory(deployer)
         const bridgeDelegator = await bridgeDelegatorFactory.deploy(bridgeAddress)
         bridgeDelegatorAddress = bridgeDelegator.address
+
+        await bridge.allowToken(tokenAddress)
     });
 
     describe("Validators", async () => {
@@ -80,11 +83,12 @@ describe("Token Bridge Test", () => {
             const name = await tokenApproveInstance.name()
             const symbol = await tokenApproveInstance.symbol()
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
-            await expect(bridge.deposit(tokenAddress, toDeposit))
+            await expect(bridge.deposit(tokenAddress, toDeposit, ft3_account_id))
                     .to.emit(bridge, "DepositedERC20")
                     .withArgs(
                         user.address,
                         tokenAddress,
+                        ft3_account_id,
                         network.config.chainId,
                         toDeposit,
                         name,
@@ -94,6 +98,43 @@ describe("Token Bridge Test", () => {
 
             expect(await bridge._balances(tokenAddress)).to.eq(toDeposit)
             expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint.sub(toDeposit))
+        })
+    })
+
+    describe("Emergency Withdraw", async () => {
+        it("Emergency Withdraw", async () => {
+            const [deployer, user, beneficiary] = await ethers.getSigners()
+            const tokenInstance = new TestToken__factory(deployer).attach(tokenAddress)
+            const toMint = ethers.utils.parseEther("10000")
+
+            await tokenInstance.mint(user.address, toMint)
+            expect(await tokenInstance.totalSupply()).to.eq(toMint)
+            expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint)
+
+            const bridge = new TokenBridge__factory(user).attach(bridgeAddress)
+            const toDeposit = ethers.utils.parseEther("100")
+            const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
+            await tokenApproveInstance.approve(bridgeAddress, toDeposit)
+            await bridge.deposit(tokenAddress, toDeposit, ft3_account_id)
+
+            // normal user cannot call emergencyWithdraw
+            await expect(bridge.emergencyWithdraw(tokenAddress, beneficiary.address)).to.be.revertedWith("Ownable: caller is not the owner")
+
+            const adminBridge = new TokenBridge__factory(deployer).attach(bridgeAddress)
+            // admin or owner cannot call emergencyWithdraw before setting time
+            await expect(adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address)).to.be.revertedWith("TokenBridge: cannot do emergency withdrawl before setting timestamp")
+
+            // admin can call emergencyWithdraw after setting time
+            expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(0)
+            expect(await adminBridge._balances(tokenAddress)).to.eq(toDeposit)
+            const nighttyDays = 90 * 24 * 60 * 60
+            const blockNum= await ethers.provider.getBlockNumber()
+            const block = await ethers.provider.getBlock(blockNum)
+            const timestamp = block.timestamp + nighttyDays
+            await ethers.provider.send('evm_setNextBlockTimestamp', [timestamp])
+            await adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address)
+            expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(toDeposit)
+            expect(await adminBridge._balances(tokenAddress)).to.eq(toDeposit)
         })
     })
 
@@ -112,7 +153,8 @@ describe("Token Bridge Test", () => {
             const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
 
-            let tx: ContractTransaction = await bridge.deposit(tokenAddress, toDeposit)
+            await expect(bridge.deposit(bridgeAddress, toDeposit, ft3_account_id)).to.be.revertedWith('TokenBridge: not allow token')
+            let tx: ContractTransaction = await bridge.deposit(tokenAddress, toDeposit, ft3_account_id)
             let receipt: ContractReceipt = await tx.wait()
             let logs = receipt.events?.filter((x) =>  {return x.event == 'DepositedERC20'})
             if (logs !== undefined) {
@@ -377,10 +419,7 @@ describe("Token Bridge Test", () => {
                     user.address)).to.revertedWith("TokenBridge: not mature enough to withdraw the fund")
 
                 // force mining 98 blocks
-                for (let i = 0; i < 98; i++) {
-                    await ethers.provider.send('evm_mine', [])
-                }
-
+                await ethers.provider.send('hardhat_mine', [WITHDRAW_OFFSET])
                 let hashEvent = DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length))
 
                 // directoryNode can update withdraw request status to pending (emergency case)
@@ -431,7 +470,8 @@ describe("Token Bridge Test", () => {
             const toDeposit = ethers.utils.parseEther("100")
             await bridgeDelegator.approve(tokenAddress, bridgeAddress, toDeposit)
 
-            let tx: ContractTransaction = await bridgeDelegator.deposit(tokenAddress, toDeposit)
+            await expect(bridge.deposit(bridgeAddress, toDeposit, ft3_account_id)).to.be.revertedWith('TokenBridge: not allow token')
+            let tx: ContractTransaction = await bridgeDelegator.deposit(tokenAddress, toDeposit, ft3_account_id)
             let receipt: ContractReceipt = await tx.wait()
             let logs = receipt.logs
             if (logs !== undefined) {
@@ -647,9 +687,7 @@ describe("Token Bridge Test", () => {
                     bridgeDelegatorAddress)).to.revertedWith("TokenBridge: not mature enough to withdraw the fund")
 
                 // force mining 98 blocks
-                for (let i = 0; i < 98; i++) {
-                    await ethers.provider.send('evm_mine', [])
-                }
+                await ethers.provider.send('hardhat_mine', [WITHDRAW_OFFSET])
 
                 let hashEvent = DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length))
 
@@ -684,5 +722,36 @@ describe("Token Bridge Test", () => {
                     bridgeDelegatorAddress)).to.be.revertedWith('TokenBridge: fund is pending or was already claimed')
             }
         })        
+    })
+
+    describe("Mass Exit", async () => {
+        it("only admin can manage mass exit",async () => {
+            const [admin, other] = await ethers.getSigners()
+            let otherTokenBridge = new TokenBridge__factory(other).attach(bridgeAddress)
+            let adminTokenBridge = new TokenBridge__factory(admin).attach(bridgeAddress)
+            expect(await adminTokenBridge.isMassExit()).to.be.false
+            let node1 = hashGtvBytes32Leaf(DecodeHexStringToByteArray("977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795"))
+            let node2 = hashGtvBytes32Leaf(DecodeHexStringToByteArray("49e46bf022de1515cbb2bf0f69c62c071825a9b940e8f3892acb5d2021832ba0"))
+            let blockRid = postchainMerkleNodeHash([0x7, node1, node2])
+
+            // non admin cannot trigger mass exit
+            await expect(otherTokenBridge.triggerMassExit(100, blockRid)).to.be.revertedWith("Ownable: caller is not the owner")
+
+            // admin can trigger mass exit
+            await adminTokenBridge.triggerMassExit(100, blockRid)
+            expect(await adminTokenBridge.isMassExit()).to.be.true
+            expect((await adminTokenBridge.massExitBlock()).blockRid).to.be.equal(blockRid)
+            expect((await adminTokenBridge.massExitBlock()).height).to.be.equal(100)
+
+            // update mass exit block
+            await adminTokenBridge.updateMassExitBlock(200, blockRid)
+            expect((await adminTokenBridge.massExitBlock()).blockRid).to.be.equal(blockRid)
+            expect((await adminTokenBridge.massExitBlock()).height).to.be.equal(200)
+
+            // postpone mass exit
+            await expect(otherTokenBridge.postponeMassExit()).to.be.revertedWith("Ownable: caller is not the owner")
+            await adminTokenBridge.postponeMassExit()
+            expect(await adminTokenBridge.isMassExit()).to.be.false
+        })
     })
 })

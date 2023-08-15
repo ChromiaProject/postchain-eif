@@ -1,8 +1,8 @@
 package net.postchain.eif
 
 import net.postchain.common.hexStringToByteArray
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.junit.jupiter.api.Test
-import org.spongycastle.jce.provider.BouncyCastleProvider
 import java.security.Security
 import kotlin.test.assertTrue
 

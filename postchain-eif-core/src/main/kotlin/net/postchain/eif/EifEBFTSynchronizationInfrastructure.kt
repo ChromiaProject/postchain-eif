@@ -10,7 +10,7 @@ import net.postchain.eif.config.EvmBlockchainConfig
 import net.postchain.eif.config.EvmConfig
 import net.postchain.eif.metrics.EifMetricsRegistry
 import net.postchain.gtv.mapper.toObject
-import net.postchain.gtx.GTXModuleAwareness
+import net.postchain.gtx.GTXModuleAware
 import org.web3j.protocol.Web3j
 import java.math.BigInteger
 
@@ -26,7 +26,7 @@ class EifSynchronizationInfrastructureExtension(
     override fun connectProcess(process: BlockchainProcess) {
         val engine = process.blockchainEngine
         val cfg = engine.getConfiguration()
-        if (cfg is GTXModuleAwareness) {
+        if (cfg is GTXModuleAware) {
             val exs = cfg.module.getSpecialTxExtensions()
             val ext = exs.find { it is EifSpecialTxExtension }
             if (ext is EifSpecialTxExtension) {
@@ -35,7 +35,7 @@ class EifSynchronizationInfrastructureExtension(
 
                 eventProcessors[cfg.blockchainRid.toHex()] = mutableMapOf()
                 for ((evmBlockchainName, evmBlockchainConfig) in eifBlockchainConfig.chains) {
-                    if (evmBlockchainConfig.skipToHeight == BigInteger.ZERO) {
+                    if (evmBlockchainConfig.skipToHeight == 0L) {
                         logger.warn("Skip to height config is set to 0. Consider changing it to avoid redundant queries.")
                     }
 
@@ -79,7 +79,8 @@ class EifSynchronizationInfrastructureExtension(
                     BigInteger.valueOf(evmBlockchainConfig.readOffset),
                     evmConfig.maxReadAhead,
                     evmConfig.maxQueueSize,
-                    evmBlockchainConfig.skipToHeight,
+                    BigInteger.valueOf(evmBlockchainConfig.skipToHeight),
+                    BigInteger.valueOf(evmConfig.lastEvmBlockHeight),
                     engine
             ).apply { start() }
         }
