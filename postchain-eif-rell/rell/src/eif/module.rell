@@ -341,7 +341,7 @@ function evm_block_fn(network_id: integer, evm_block_height: integer, evm_block_
                             og.chromia.IOriginal.creator_name: dip.Text.T("User")
                         ]
                     );
-                    og.Minter.mint_non_fungible_original(ft3_account, original_type);
+                    og.Minter.mint_non_fungible_original(ft3_account, "eif", original_type, dip.Meta.Engine.access(ft3_account));
                 }
             }
         }
@@ -479,7 +479,7 @@ operation bridge_ft3_token_to_evm(auth_id, network_id: integer, token_address: b
 
 operation deposit_non_fungible_original(auth_id, asset_id: byte_array, network_id: integer, token_address: byte_array, beneficiary: byte_array) {
     val account = do_auth(auth_id, ["T"]);
-    val ft3_burn_account = og.ensure_locked_account("BURN", account);
+    val ft3_burn_account = ensure_locked_account("BURN", account);
 
     val instance = og.Id.get_instance(asset_id);
     val dclass = dip.instance_dclass @ { instance, .direct == true} .dclass;
@@ -496,7 +496,7 @@ operation deposit_non_fungible_original(auth_id, asset_id: byte_array, network_i
 
 operation bridge_non_fungible_original_to_evm(auth_id, asset_id: byte_array, network_id: integer, token_address: byte_array, beneficiary: byte_array) {
     val account = do_auth(auth_id, ["T"]);
-    val ft3_burn_account = og.ensure_locked_account("BURN", account);
+    val ft3_burn_account = ensure_locked_account("BURN", account);
 
     val instance = og.Id.get_instance(asset_id);
     val dclass = dip.instance_dclass @ { instance, .direct == true} .dclass;
@@ -658,7 +658,7 @@ operation claim_ERC721(network_id: integer, token_address: byte_array, beneficia
         ]
     );
     val account = require(acc.account @? { account_id }, "account does not exist: " + account_id);
-    og.Minter.mint_non_fungible_original(account, original_type);
+    og.Minter.mint_non_fungible_original(account, "eif", original_type, dip.Meta.Engine.access(account));
 
     emit_withdraw(network_id, beneficiary, account, withdraw_info);
 }
