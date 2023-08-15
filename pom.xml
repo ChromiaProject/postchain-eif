@@ -10,6 +10,7 @@
     <modules>
         <module>postchain-eif-contracts</module>
         <module>postchain-eif-core</module>
+        <module>postchain-eif-rell</module>
         <module>postchain-eif-ui</module>
     </modules>
 
