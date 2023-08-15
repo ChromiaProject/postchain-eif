@@ -283,7 +283,7 @@
                                 <int>1</int>
                             </entry>
                             <entry key="skip_to_height">
-                                <bigint>0</bigint>
+                                <int>0</int>
                             </entry>
                             <entry key="evm_read_offset">
                                 <int>0</int>
