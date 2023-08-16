@@ -107,11 +107,6 @@
             <artifactId>rell-gtx</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>com.willowtreeapps.assertk</groupId>
-            <artifactId>assertk-jvm</artifactId>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
     <build>

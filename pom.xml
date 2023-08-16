@@ -26,7 +26,6 @@
         <maven.compiler.target>17</maven.compiler.target>
         <kotlin.compiler.jvmTarget>17</kotlin.compiler.jvmTarget>
         <testcontainers.version>1.16.2</testcontainers.version>
-        <assertk.version>0.26</assertk.version>
     </properties>
 
     <dependencyManagement>
@@ -68,11 +67,6 @@
                 <artifactId>rell-gtx</artifactId>
                 <version>${rell.version}</version>
                 <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>com.willowtreeapps.assertk</groupId>
-                <artifactId>assertk-jvm</artifactId>
-                <version>${assertk.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

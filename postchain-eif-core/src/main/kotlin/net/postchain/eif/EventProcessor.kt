@@ -187,11 +187,11 @@ class EvmEventProcessor(
     }
 
     override fun getBlockchainState(): BlockchainState {
-        TODO("Not yet implemented")
+        return BlockchainState.RUNNING
     }
 
     override fun isSigner(): Boolean {
-        TODO("Not yet implemented")
+        return false
     }
 
     @Synchronized
