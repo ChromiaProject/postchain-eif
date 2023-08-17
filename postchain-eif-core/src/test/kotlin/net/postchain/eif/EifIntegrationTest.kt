@@ -3,18 +3,21 @@ package net.postchain.eif
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import net.postchain.base.snapshot.SimpleDigestSystem
+import net.postchain.common.BlockchainRid
 import net.postchain.common.data.KECCAK256
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
 import net.postchain.concurrent.util.get
 import net.postchain.core.Transaction
 import net.postchain.crypto.KeyPair
+import net.postchain.crypto.SigMaker
 import net.postchain.crypto.devtools.KeyPairHelper
 import net.postchain.devtools.IntegrationTestSetup
 import net.postchain.devtools.testinfra.BaseTestInfrastructureFactory
 import net.postchain.eif.contracts.TestToken
 import net.postchain.eif.contracts.TokenBridge
 import net.postchain.eif.contracts.Validator
+import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvInteger
@@ -158,37 +161,12 @@ class EifIntegrationTest : IntegrationTestSetup() {
 
         val sigMaker = cryptoSystem.buildSigMaker(KeyPair(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
 
-        fun registerAsset(): ByteArray {
-            val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
-            b.addOperation("ft3.dev_register_asset", gtv("Chromia"), gtv(bcRid.data))
-            return b.finish()
-                    .sign(sigMaker)
-                    .buildGtx()
-                    .encode()
-        }
-        enqueueTx(registerAsset())
+        enqueueTx(registerAsset("Chromia", bcRid, sigMaker))
         sealBlock()
 
         val value = node.getBlockchainInstance().blockchainEngine.getBlockQueries()
                 .query("ft3.get_asset_by_name", gtv("name" to gtv("Chromia"))).get()
         val assetId = value[0]["id"]!!
-        fun addNewEvmErc20(): ByteArray {
-            val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
-            b.addOperation("add_new_evm_erc20", gtv(networkId), gtv(testTokenAddress), gtv("Chromia"), gtv("CHR"), gtv(6))
-            return b.finish()
-                    .sign(sigMaker)
-                    .buildGtx()
-                    .encode()
-        }
-
-        fun addTokenMapping(): ByteArray {
-            val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
-            b.addOperation("add_new_token_mapping", gtv(networkId), gtv(testTokenAddress), assetId)
-            return b.finish()
-                    .sign(sigMaker)
-                    .buildGtx()
-                    .encode()
-        }
 
         // Register evm account
         val evmAddress = "e105ba42b66d08ac7ca7fc48c583599044a6dab3"
@@ -210,28 +188,10 @@ class EifIntegrationTest : IntegrationTestSetup() {
                 gtv("442017757e4e627a98d40c89cdbdde4612251cc86acabba27cf1683cd1d7cb4c".hexStringToByteArray()),
                 gtv(28L))
 
-        fun registerAccount(userPubkey: ByteArray, userPriKey: ByteArray, userEVMAddress: ByteArray, sig: GtvArray): ByteArray {
-            val auth = gtv(
-                    gtv("S"),
-                    GtvArray(arrayOf(gtv(userPubkey))),
-                    gtv(GtvArray(arrayOf(gtv("T"))), gtv(userPubkey)),
-                    GtvNull
-            )
-
-            val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
-            b.addOperation("ft3.evm.register_account", gtv(userEVMAddress), auth, sig)
-
-            val signer = cryptoSystem.buildSigMaker(KeyPair(userPubkey, userPriKey))
-            return b.finish()
-                    .sign(signer)
-                    .buildGtx()
-                    .encode()
-        }
-
-        enqueueTx(addNewEvmErc20())
-        enqueueTx(addTokenMapping())
-        enqueueTx(registerAccount(userPubkey, userPriKey, userEvmAddress, sig))
-        enqueueTx(registerAccount(otherPubkey, otherPrikey, otherEvmAddess, otherSig))
+        enqueueTx(addNewEvmErc20(testTokenAddress, "Chromia", "CHR", 6, bcRid, sigMaker))
+        enqueueTx(addTokenMapping(testTokenAddress, assetId, bcRid, sigMaker))
+        enqueueTx(registerAccount(userPubkey, userPriKey, userEvmAddress, sig, bcRid, sigMaker))
+        enqueueTx(registerAccount(otherPubkey, otherPrikey, otherEvmAddess, otherSig, bcRid, sigMaker))
         sealBlock()
 
         // query ft3 account by evm address
@@ -281,18 +241,7 @@ class EifIntegrationTest : IntegrationTestSetup() {
         val authId = gtv(accountId, auth)
 
         val withdrawAmount = 5L
-        fun withdrawOnPostchain(): ByteArray {
-            val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
-            b.addOperation("bridge_ft3_token_to_evm", authId, gtv(networkId), gtv(testTokenAddress), gtv(userEvmAddress), gtv(withdrawAmount))
-            b.addOperation("nop", GtvInteger(System.currentTimeMillis()))
-            val signer = cryptoSystem.buildSigMaker(KeyPair(userPubkey, userPriKey))
-            return b.finish()
-                    .sign(signer)
-                    .buildGtx()
-                    .encode()
-        }
-
-        enqueueTx(withdrawOnPostchain())
+        enqueueTx(withdrawOnPostchain(userPubkey, userPriKey, authId, testTokenAddress, userEvmAddress, withdrawAmount, bcRid))
         sealBlock()
 
         // Check eif state for account after withdraw as well
@@ -398,21 +347,10 @@ class EifIntegrationTest : IntegrationTestSetup() {
                 gtv(mapOf())
         )))
 
-        fun transfer(): ByteArray {
-            val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
-            b.addOperation("ft3.transfer", inputs, outputs)
-
-            val signer = cryptoSystem.buildSigMaker(KeyPair(userPubkey, userPriKey))
-            return b.finish()
-                    .sign(signer)
-                    .buildGtx()
-                    .encode()
-        }
-
-        enqueueTx(transfer())
+        enqueueTx(transfer(userPubkey, userPriKey, inputs, outputs, bcRid))
         sealBlock()
 
-        enqueueTx(withdrawOnPostchain())
+        enqueueTx(withdrawOnPostchain(userPubkey, userPriKey, authId, testTokenAddress, userEvmAddress, withdrawAmount, bcRid))
         sealBlock()
 
         // Get the last snapshot block height as mass-exit block
@@ -567,7 +505,7 @@ class EifIntegrationTest : IntegrationTestSetup() {
                     otherExtraProofData
             ).send()
 
-            enqueueTx(withdrawOnPostchain())
+            enqueueTx(withdrawOnPostchain(userPubkey, userPriKey, authId, testTokenAddress, userEvmAddress, withdrawAmount, bcRid))
             sealBlock()
 
             val withdrawInfo3 = blockQuery.query("get_erc20_withdrawal", gtv(
@@ -638,6 +576,7 @@ class EifIntegrationTest : IntegrationTestSetup() {
         }
     }
 
+    // get smart contract binary from resource
     private fun getBinaryFromArtifactResource(resourcePath: String): String {
         val artifactFile = javaClass.getResource(resourcePath)?.readText()
         val artifactJson = GsonBuilder().create().fromJson(artifactFile, JsonObject::class.java)
@@ -649,4 +588,79 @@ class EifIntegrationTest : IntegrationTestSetup() {
      * @see SimpleGtvEncoder.encodeGtv
      */
     private fun to32Bytes(address: String) = "000000000000000000000000$address".hexStringToByteArray()
+
+    // Register asset on postchain
+    private fun registerAsset(name: String, bcRid: BlockchainRid, sigMaker: SigMaker): ByteArray {
+        val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
+        b.addOperation("ft3.dev_register_asset", gtv(name), gtv(bcRid.data))
+        return b.finish()
+                .sign(sigMaker)
+                .buildGtx()
+                .encode()
+    }
+
+    // Add new evm erc20 token
+    private fun addNewEvmErc20(tokenAddress: ByteArray, name: String, symbol: String, decimal: Long, bcRid: BlockchainRid, sigMaker: SigMaker): ByteArray {
+        val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
+        b.addOperation("add_new_evm_erc20", gtv(networkId), gtv(tokenAddress), gtv(name), gtv(symbol), gtv(decimal))
+        return b.finish()
+                .sign(sigMaker)
+                .buildGtx()
+                .encode()
+    }
+
+    // Add new token mapping
+    private fun addTokenMapping(tokenAddress: ByteArray, assetId: Gtv, bcRid: BlockchainRid, sigMaker: SigMaker): ByteArray {
+        val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
+        b.addOperation("add_new_token_mapping", gtv(networkId), gtv(tokenAddress), assetId)
+        return b.finish()
+                .sign(sigMaker)
+                .buildGtx()
+                .encode()
+    }
+
+    // Register account on postchain
+    private fun registerAccount(userPubkey: ByteArray, userPriKey: ByteArray, userEVMAddress: ByteArray, sig: GtvArray, bcRid: BlockchainRid, sigMaker: SigMaker): ByteArray {
+        val auth = gtv(
+                gtv("S"),
+                GtvArray(arrayOf(gtv(userPubkey))),
+                gtv(GtvArray(arrayOf(gtv("T"))), gtv(userPubkey)),
+                GtvNull
+        )
+
+        val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
+        b.addOperation("ft3.evm.register_account", gtv(userEVMAddress), auth, sig)
+
+        val signer = cryptoSystem.buildSigMaker(KeyPair(userPubkey, userPriKey))
+        return b.finish()
+                .sign(signer)
+                .buildGtx()
+                .encode()
+    }
+
+    // Withdraw ft3 token on postchain
+    private fun withdrawOnPostchain(userPubkey: ByteArray, userPriKey: ByteArray,
+                                    authId: Gtv, tokenAddress: ByteArray,
+                                    userEvmAddress: ByteArray, withdrawAmount: Long, bcRid: BlockchainRid): ByteArray {
+        val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
+        b.addOperation("bridge_ft3_token_to_evm", authId, gtv(networkId), gtv(tokenAddress), gtv(userEvmAddress), gtv(withdrawAmount))
+        b.addOperation("nop", GtvInteger(System.currentTimeMillis()))
+        val signer = cryptoSystem.buildSigMaker(KeyPair(userPubkey, userPriKey))
+        return b.finish()
+                .sign(signer)
+                .buildGtx()
+                .encode()
+    }
+
+    // Transfer ft3 token to another account
+    private fun transfer(userPubkey: ByteArray, userPriKey: ByteArray, inputs: Gtv, outputs: Gtv, bcRid: BlockchainRid): ByteArray {
+        val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
+        b.addOperation("ft3.transfer", inputs, outputs)
+
+        val signer = cryptoSystem.buildSigMaker(KeyPair(userPubkey, userPriKey))
+        return b.finish()
+                .sign(signer)
+                .buildGtx()
+                .encode()
+    }
 }
