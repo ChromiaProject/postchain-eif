@@ -1,7 +1,6 @@
 package net.postchain.eif.cli
 
-import assertk.assert
-import assertk.assertions.isEqualTo
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
@@ -24,6 +23,7 @@ class AbiJsonToGtvXmlCommandTest {
         )
 
         val expectedGtvXml = javaClass.getResource("/net/postchain/eif/cli/erc20_abi_to_gtv.xml").readText()
-        assert(outputFile.readText()).isEqualTo(expectedGtvXml)
+
+        assertEquals(outputFile.readText(), expectedGtvXml)
     }
 }

@@ -1,11 +1,10 @@
 package net.postchain.eif
 
-import assertk.assert
-import assertk.assertions.isEqualTo
 import net.postchain.common.exception.UserMistake
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.gtvml.GtvMLParser
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.web3j.abi.EventEncoder
@@ -22,16 +21,16 @@ class GtvToEventMapperTest {
         val events = abiGtv.asArray().map(GtvToEventMapper::map)
 
         val approvalEvent = events[0]
-        assert(approvalEvent.name).isEqualTo("Approval")
-        assert(approvalEvent.indexedParameters[0].type).isEqualTo(Address::class.java)
-        assert(approvalEvent.indexedParameters[1].type).isEqualTo(Address::class.java)
-        assert(approvalEvent.nonIndexedParameters[0].type).isEqualTo(Uint256::class.java)
+        assertEquals(approvalEvent.name, "Approval")
+        assertEquals(Address::class.java, approvalEvent.indexedParameters[0].classType)
+        assertEquals(Address::class.java, approvalEvent.indexedParameters[1].classType)
+        assertEquals(Uint256::class.java, approvalEvent.nonIndexedParameters[0].classType)
 
         val transferEvent = events[1]
-        assert(transferEvent.name).isEqualTo("Transfer")
-        assert(transferEvent.indexedParameters[0].type).isEqualTo(Address::class.java)
-        assert(transferEvent.indexedParameters[1].type).isEqualTo(Address::class.java)
-        assert(transferEvent.nonIndexedParameters[0].type).isEqualTo(Uint256::class.java)
+        assertEquals(transferEvent.name, "Transfer")
+        assertEquals(Address::class.java, transferEvent.indexedParameters[0].classType)
+        assertEquals(Address::class.java, transferEvent.indexedParameters[1].classType)
+        assertEquals(Uint256::class.java, transferEvent.nonIndexedParameters[0].classType)
     }
 
     @Test
@@ -102,7 +101,7 @@ class GtvToEventMapperTest {
         val event = eventWithInputType(typeName)
         val mappedEvent = GtvToEventMapper.map(event)
         EventEncoder.encode(mappedEvent) // Ensure that we can encode event without exceptions
-        assert(mappedEvent.indexedParameters[0].classType).isEqualTo(expectedClass)
+        assertEquals(expectedClass, mappedEvent.indexedParameters[0].classType)
     }
 
     private fun eventWithInputType(typeName: String, anonymous: Boolean = false): Gtv {

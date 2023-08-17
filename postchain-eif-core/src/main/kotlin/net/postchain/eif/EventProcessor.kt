@@ -5,6 +5,7 @@ import net.postchain.core.BlockchainEngine
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.hexStringToByteArray
 import net.postchain.concurrent.util.get
+import net.postchain.core.BlockchainState
 import net.postchain.core.framework.AbstractBlockchainProcess
 import net.postchain.gtv.*
 import net.postchain.gtv.GtvFactory.gtv
@@ -137,7 +138,8 @@ class EvmEventProcessor(
             val from = lastReadLogBlockHeight + BigInteger.ONE
             // it's safe to query the event from the finalized block on Ethereum PoS
             val finalizedBlock = DefaultBlockParameter.valueOf("finalized")
-            val finalizedBlockHeight = sendWeb3jRequestWithRetry(web3j.ethGetBlockByNumber(finalizedBlock, false)).block.number
+            val blockNumberReply = sendWeb3jRequestWithRetry(web3j.ethGetBlockByNumber(finalizedBlock, false)) ?: return
+            val finalizedBlockHeight = blockNumberReply.block.number
             // Pacing the reading of logs
             val to = minOf(finalizedBlockHeight, from + BigInteger.valueOf(maxReadAhead))
 
@@ -155,7 +157,7 @@ class EvmEventProcessor(
             )
             filter.addOptionalTopics(*eventSignatures)
 
-            val logResponse = sendWeb3jRequestWithRetry(web3j.ethGetLogs(filter))
+            val logResponse = sendWeb3jRequestWithRetry(web3j.ethGetLogs(filter)) ?: return
 
             // Ensure events are sorted on txIndex + logIndex, blocks sorted on block number
             val sortedEncodedLogs = logResponse.logs
@@ -181,6 +183,14 @@ class EvmEventProcessor(
 
     override fun cleanup() {
         web3j.shutdown()
+    }
+
+    override fun getBlockchainState(): BlockchainState {
+        return BlockchainState.RUNNING
+    }
+
+    override fun isSigner(): Boolean {
+        return false
     }
 
     @Synchronized
@@ -301,7 +311,7 @@ class EvmEventProcessor(
     private fun <T : Response<*>> sendWeb3jRequestWithRetry(
         request: Request<*, T>,
         retryTimeout: Long = 500
-    ): T {
+    ): T? {
         val response = try {
             val response = request.send()
             if (response.hasError()) {
@@ -313,7 +323,7 @@ class EvmEventProcessor(
             null
         }
 
-        if (response == null || response.hasError()) {
+        if (isProcessRunning() && (response == null || response.hasError())) {
             if (retryTimeout > 0) {
                 sleep(retryTimeout)
             }

@@ -102,6 +102,11 @@
             <artifactId>postchain-devtools</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>net.postchain.rell</groupId>
+            <artifactId>rell-gtx</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -202,6 +207,7 @@
                         <includes>
                             <include>TokenBridge</include>
                             <include>TestToken</include>
+                            <include>Validator</include>
                         </includes>
                     </contract>
                     <pathPrefixes>
@@ -212,6 +218,7 @@
                         <includes>
                             <include>**/TokenBridge.json</include>
                             <include>**/TestToken.json</include>
+                            <include>**/Validator.json</include>
                         </includes>
                     </abiSourceFiles>
                     <outputDirectory>
