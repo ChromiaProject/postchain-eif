@@ -20,6 +20,8 @@ import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvInteger
 import net.postchain.gtv.GtvNull
 import net.postchain.gtx.GtxBuilder
+import org.awaitility.Awaitility
+import org.awaitility.Duration
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -36,6 +38,7 @@ import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto.Credentials
 import org.web3j.protocol.Web3j
+import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.exceptions.TransactionException
 import org.web3j.protocol.http.HttpService
 import org.web3j.tx.Contract
@@ -45,6 +48,7 @@ import org.web3j.tx.gas.DefaultGasProvider
 import org.web3j.tx.response.PollingTransactionReceiptProcessor
 import java.math.BigInteger
 import java.security.MessageDigest
+import java.util.concurrent.TimeUnit
 
 @Testcontainers(disabledWithoutDocker = true)
 class EifIntegrationTest : IntegrationTestSetup() {
@@ -359,7 +363,7 @@ class EifIntegrationTest : IntegrationTestSetup() {
                 DynamicArray(Bytes32::class.java, extraProofs)
         )
 
-        bridge.withdrawRequest(
+        var receipt = bridge.withdrawRequest(
                 DynamicBytes(actualEventData),
                 proof,
                 DynamicBytes(blockHeader),
@@ -367,10 +371,12 @@ class EifIntegrationTest : IntegrationTestSetup() {
                 DynamicArray(Address::class.java, signers),
                 extraProofData
         ).send()
-
         // wait some seconds to allow evm node to mine some new blocks
         // that mature enough to withdraw requesting fund
-        Thread.sleep(5000)
+        Awaitility.await().atMost(Duration.TEN_SECONDS).until {
+            val block = web3j.ethGetBlockByNumber(DefaultBlockParameter.valueOf(receipt.blockNumber.add(BigInteger.TWO)), false).send()
+            block.block != null
+        }
         bridge.withdraw(Bytes32(eventHash), Address(evmAddress)).send()
         userBalance = testToken.balanceOf(Address(evmAddress)).send()
         assertEquals(userBalance.value, BigInteger.valueOf(initialMint - depositedAmount + withdrawAmount))
@@ -475,7 +481,7 @@ class EifIntegrationTest : IntegrationTestSetup() {
                     DynamicArray(Bytes32::class.java, extraProofs2)
             )
 
-            bridge.withdrawRequest(
+            receipt = bridge.withdrawRequest(
                     DynamicBytes(actualEventData2),
                     proof2,
                     DynamicBytes(blockHeader2),
@@ -485,7 +491,11 @@ class EifIntegrationTest : IntegrationTestSetup() {
             ).send()
 
             // wait some seconds to allow evm node to mine some new blocks
-            Thread.sleep(5000)
+            // that mature enough to withdraw requesting fund
+            Awaitility.await().atMost(Duration.TEN_SECONDS).until {
+                val block = web3j.ethGetBlockByNumber(DefaultBlockParameter.valueOf(receipt.blockNumber.add(BigInteger.TWO)), false).send()
+                block.block != null
+            }
             bridge.withdraw(Bytes32(eventHash2), Address(evmAddress)).send()
             userBalance = testToken.balanceOf(Address(evmAddress)).send()
             assertEquals(userBalance.value, BigInteger.valueOf(initialMint - depositedAmount + 2*withdrawAmount))
