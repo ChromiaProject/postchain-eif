@@ -1,12 +1,11 @@
 package net.postchain.eif
 
-import assertk.assert
-import assertk.assertions.isEqualTo
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
+import net.postchain.crypto.Secp256k1SigMaker
 import net.postchain.crypto.secp256k1_decodeSignature
-import net.postchain.crypto.secp256k1_sign
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import java.security.MessageDigest
 
@@ -29,7 +28,7 @@ class EcrecoverTest {
         val recoveredPubKey = ecrecover(recId, messageHash, components[0], components[1])
 
         // Skipping the first byte of pubkey
-        assert(recoveredPubKey!!.toHex()).isEqualTo((expectedPubKey.substring(2)), true)
+        assertEquals(recoveredPubKey!!.toHex().lowercase(), expectedPubKey.substring(2))
     }
 
     @Test
@@ -39,9 +38,10 @@ class EcrecoverTest {
 
         val sha256 = MessageDigest.getInstance("SHA-256")
         val digest = sha256.digest("Test".toByteArray())
-        val signature = secp256k1_sign(digest, privKey)
+        val signer = Secp256k1SigMaker(pubKey, privKey, ::digest)
+        val signature = signer.signDigest(digest)
 
-        val signatureWithV = encodeSignatureWithV(digest, pubKey, signature)
+        val signatureWithV = encodeSignatureWithV(digest, signature)
         val recId = when (signatureWithV[64]) {
             27.toByte() -> 0
             28.toByte() -> 1

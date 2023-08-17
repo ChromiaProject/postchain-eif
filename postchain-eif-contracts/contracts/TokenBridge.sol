@@ -24,7 +24,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
 
     uint8 constant ERC20_ACCOUNT_STATE_BYTE_SIZE = 64;
     uint constant EMERGENCY_DURATION = 90 days;
-    uint constant WITHDRAW_OFFSET = 85000;
+    uint constant WITHDRAW_OFFSET = 2; // need to update when deploy contract on production
     using Postchain for bytes32;
     using MerkleProof for bytes32[];
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -206,7 +206,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
         {
             (uint height, bytes32 blockRid, bytes32 eventRoot, ) = Postchain.verifyBlockHeader(blockHeader, extraProof);
             if (isMassExit) {
-                require(height < massExitBlock.height, "TokenBridge: only can withdraw request before the mass exit block height");
+                require(height <= massExitBlock.height, "TokenBridge: cannot withdraw request after the mass exit block height");
             }
             if (!validator.isValidSignatures(validator.getValidatorHeight(height), blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
             if (!MerkleProof.verify(eventProof.merkleProofs, eventProof.leaf, eventProof.position, eventRoot)) revert("TokenBridge: invalid merkle proof");
