@@ -9,6 +9,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.slf4j.MDCContext
 import mu.KLogging
 import net.postchain.core.BlockchainEngine
 import net.postchain.common.exception.ProgrammerMistake
@@ -143,7 +144,7 @@ class EvmEventProcessor(
             lastReadLogBlockHeight = lastEvmBlockHeight
         }
 
-        job = CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-event-processor")) {
+        job = CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-event-processor") + MDCContext()) {
             while (isActive) {
                 try {
                     fetchEvents()

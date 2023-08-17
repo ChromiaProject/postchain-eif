@@ -16,8 +16,7 @@ Configuration:
       name: ConsoleAppender
       target: SYSTEM_OUT
       PatternLayout:
-        # pattern: "[%X{node-id}] %-5level %d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %c{1} - %msg%n"
-        pattern: "%-5level %d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %c{1} - %msg%n"
+        pattern: "%-5level %d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %c{1} -%replace{%notEmpty{ [%notEmpty{bc-rid=%.-2X{blockchainRID}:%.4X{blockchainRID}}%notEmpty{, chain-id=%X{chainIID}}]:}}{\\[, }{[} %msg%n"
     RollingFile:
       name: FileAppender
       fileName: "${logs}/${filename}.${fileExt}"
@@ -42,8 +41,7 @@ Configuration:
               IfAccumulatedFileSize:
                 exceeds: 1 GB
       PatternLayout:
-        # pattern: "[%X{node-id}] %-5level %d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %c{1} - %msg%n"
-        pattern: "%-5level %d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %c{1} - %msg%n"
+        pattern: "%-5level %d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %c{1} -%replace{%notEmpty{ [%notEmpty{bc-rid=%.-2X{blockchainRID}:%.4X{blockchainRID}}%notEmpty{, chain-id=%X{chainIID}}]:}}{\\[, }{[} %msg%n"
 
   Loggers:
 
