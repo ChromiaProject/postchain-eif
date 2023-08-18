@@ -116,7 +116,6 @@ class EthereumEventProcessorTest {
             EvmEventProcessor(1L, web3j, listOf(bridge.contractAddress), eventsToRead,
                     BigInteger.ZERO, 200L, 100L,
                     contractDeployBlockNumber, BigInteger.ZERO, engineMock).apply {
-                start()
             }
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contract
@@ -229,7 +228,6 @@ class EthereumEventProcessorTest {
                 EvmEventProcessor(1L, web3j, contractAddresses, eventsToRead,
                         BigInteger.ZERO, 200L, 100L,
                         contractDeployBlockNumber, BigInteger.ZERO, engineMock).apply {
-                    start()
                 }
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contracts
