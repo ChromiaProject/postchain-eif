@@ -1,12 +1,21 @@
 package net.postchain.eif
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.slf4j.MDCContext
 import mu.KLogging
 import net.postchain.core.BlockchainEngine
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.hexStringToByteArray
 import net.postchain.concurrent.util.get
-import net.postchain.core.BlockchainState
-import net.postchain.core.framework.AbstractBlockchainProcess
+import net.postchain.core.Shutdownable
 import net.postchain.gtv.*
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtx.data.OpData
@@ -21,10 +30,10 @@ import org.web3j.protocol.core.methods.request.EthFilter
 import org.web3j.protocol.core.methods.response.EthLog
 import org.web3j.protocol.core.methods.response.Log
 import org.web3j.tx.Contract
-import java.lang.Thread.sleep
 import java.math.BigInteger
 import java.util.*
 import java.util.stream.Collectors
+import kotlin.coroutines.coroutineContext
 
 enum class EncodedBlock(val index: Int) {
     NETWORK_ID(0),
@@ -113,8 +122,12 @@ class EvmEventProcessor(
         private val maxQueueSize: Long,
         skipToHeight: BigInteger,
         lastEvmBlockHeight: BigInteger,
-        blockchainEngine: BlockchainEngine
-) : EventProcessor, AbstractBlockchainProcess("$networkId-event-processor", blockchainEngine) {
+        private val blockchainEngine: BlockchainEngine
+) : EventProcessor, Shutdownable {
+
+    private val job: Job
+
+    companion object : KLogging()
 
     data class EvmBlock(val number: BigInteger, val hash: String)
 
@@ -129,73 +142,73 @@ class EvmEventProcessor(
         if (lastEvmBlockHeight > lastReadLogBlockHeight) {
             lastReadLogBlockHeight = lastEvmBlockHeight
         }
+
+        job = CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-event-processor") + MDCContext()) {
+            while (isActive) {
+                try {
+                    fetchEvents()
+                } catch (e: CancellationException) {
+                    break
+                } catch (e: Exception) {
+                    logger.error("Parsing of EVM logs unexpectedly failed: $e", e)
+                    delay(500) // Delay a bit and hope that we can recover
+                }
+            }
+        }
     }
 
     /**
      * Producer thread will read events from ethereum ond add to queue in this action. Main thread will consume them.
      */
-    override fun action() {
-        try {
-            val from = lastReadLogBlockHeight + BigInteger.ONE
-            // it's safe to query the event from the finalized block on Ethereum PoS
-            // because the finalized block is guaranteed to be the same on all nodes
-            // But binance smart chain's finalized block is not stable, so we need to query the latest block
-            // They added a new RPC method to query the finalized block at https://github.com/bnb-chain/bsc/pull/1789,
-            // but it's not available on the current version of web3j.
-            // Actually, this is kind of incompatible with the ethereum API.
-            val blockNumberReply = sendWeb3jRequestWithRetry(web3j.ethGetBlockByNumber(DefaultBlockParameterName.LATEST, false)) ?: return
-            val finalizedBlockHeight = blockNumberReply.block.number
-            // Pacing the reading of logs
-            val to = minOf(finalizedBlockHeight, from + BigInteger.valueOf(maxReadAhead))
+    private suspend fun fetchEvents() {
+        val from = lastReadLogBlockHeight + BigInteger.ONE
+        // it's safe to query the event from the finalized block on Ethereum PoS
+        // because the finalized block is guaranteed to be the same on all nodes
+        // But binance smart chain's finalized block is not stable, so we need to query the latest block
+        // They added a new RPC method to query the finalized block at https://github.com/bnb-chain/bsc/pull/1789,
+        // but it's not available on the current version of web3j.
+        // Actually, this is kind of incompatible with the ethereum API.
+        val blockNumberReply = sendWeb3jRequestWithRetry(web3j.ethGetBlockByNumber(DefaultBlockParameterName.LATEST, false)) ?: return
+        val finalizedBlockHeight = blockNumberReply.block.number
 
-            if (to < from) {
-                logger.debug { "No new blocks to read. We are at height: $to" }
-                // Sleep a bit until next attempt
-                sleep(500)
-                return
-            }
+        // Pacing the reading of logs
+        val to = minOf(finalizedBlockHeight, from + BigInteger.valueOf(maxReadAhead))
 
-            val filter = EthFilter(
-                    DefaultBlockParameter.valueOf(from),
-                    DefaultBlockParameter.valueOf(to),
-                    contractAddresses
-            )
-            filter.addOptionalTopics(*eventSignatures)
+        if (to < from) {
+            logger.debug { "No new blocks to read. We are at height: $to" }
+            // Sleep a bit until next attempt
+            delay(500)
+            return
+        }
 
-            val logResponse = sendWeb3jRequestWithRetry(web3j.ethGetLogs(filter)) ?: return
+        val filter = EthFilter(
+                DefaultBlockParameter.valueOf(from),
+                DefaultBlockParameter.valueOf(to),
+                contractAddresses
+        )
+        filter.addOptionalTopics(*eventSignatures)
 
-            // Ensure events are sorted on txIndex + logIndex, blocks sorted on block number
-            val sortedEncodedLogs = logResponse.logs
-                    .map { (it as EthLog.LogObject).get() }
-                    .groupBy { EvmBlock(it.blockNumber, it.blockHash) }
-                    .mapValues { it.value.sortedWith(compareBy({ event -> event.transactionIndex }, { event -> event.logIndex })) }
-                    .toList()
-                    .sortedBy { it.first.number }
-                    .map(::eventBlockToGtv)
-            processLogEventsAndUpdateOffsets(sortedEncodedLogs, to)
+        val logResponse = sendWeb3jRequestWithRetry(web3j.ethGetLogs(filter)) ?: return
 
-            while (isQueueFull()) {
-                logger.debug("Wait for events to be consumed until we read more")
-                sleep(500)
-            }
-        } catch (e: Exception) {
-            // We catch all errors in order to keep retrying
-            logger.error("Parsing of EVM logs unexpectedly failed: $e", e)
-            // Sleep a bit and hope that we can recover
-            sleep(500)
+        // Ensure events are sorted on txIndex + logIndex, blocks sorted on block number
+        val sortedEncodedLogs = logResponse.logs
+                .map { (it as EthLog.LogObject).get() }
+                .groupBy { EvmBlock(it.blockNumber, it.blockHash) }
+                .mapValues { it.value.sortedWith(compareBy({ event -> event.transactionIndex }, { event -> event.logIndex })) }
+                .toList()
+                .sortedBy { it.first.number }
+                .map(::eventBlockToGtv)
+        processLogEventsAndUpdateOffsets(sortedEncodedLogs, to)
+
+        while (isQueueFull()) {
+            logger.debug("Wait for events to be consumed until we read more")
+            delay(500)
         }
     }
 
-    override fun cleanup() {
+    override fun shutdown() {
+        job.cancel()
         web3j.shutdown()
-    }
-
-    override fun getBlockchainState(): BlockchainState {
-        return BlockchainState.RUNNING
-    }
-
-    override fun isSigner(): Boolean {
-        return false
     }
 
     @Synchronized
@@ -313,7 +326,7 @@ class EvmEventProcessor(
         }
     }
 
-    private fun <T : Response<*>> sendWeb3jRequestWithRetry(
+    private suspend fun <T : Response<*>> sendWeb3jRequestWithRetry(
         request: Request<*, T>,
         retryTimeout: Long = 500
     ): T? {
@@ -328,9 +341,15 @@ class EvmEventProcessor(
             null
         }
 
-        if (isProcessRunning() && (response == null || response.hasError())) {
+        if (response == null || response.hasError()) {
+            try {
+                coroutineContext.ensureActive()
+            } catch (e: CancellationException) {
+                return null
+            }
+
             if (retryTimeout > 0) {
-                sleep(retryTimeout)
+                delay(retryTimeout)
             }
             return sendWeb3jRequestWithRetry(request, retryTimeout)
         }
