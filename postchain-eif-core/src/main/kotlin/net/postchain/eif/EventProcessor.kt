@@ -14,6 +14,7 @@ import org.web3j.abi.EventEncoder
 import org.web3j.abi.datatypes.Event
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameter
+import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.Response
 import org.web3j.protocol.core.methods.request.EthFilter
@@ -137,8 +138,12 @@ class EvmEventProcessor(
         try {
             val from = lastReadLogBlockHeight + BigInteger.ONE
             // it's safe to query the event from the finalized block on Ethereum PoS
-            val finalizedBlock = DefaultBlockParameter.valueOf("finalized")
-            val blockNumberReply = sendWeb3jRequestWithRetry(web3j.ethGetBlockByNumber(finalizedBlock, false)) ?: return
+            // because the finalized block is guaranteed to be the same on all nodes
+            // But binance smart chain's finalized block is not stable, so we need to query the latest block
+            // They added a new RPC method to query the finalized block at https://github.com/bnb-chain/bsc/pull/1789,
+            // but it's not available on the current version of web3j.
+            // Actually, this is kind of incompatible with the ethereum API.
+            val blockNumberReply = sendWeb3jRequestWithRetry(web3j.ethGetBlockByNumber(DefaultBlockParameterName.LATEST, false)) ?: return
             val finalizedBlockHeight = blockNumberReply.block.number
             // Pacing the reading of logs
             val to = minOf(finalizedBlockHeight, from + BigInteger.valueOf(maxReadAhead))
