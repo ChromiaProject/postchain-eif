@@ -280,7 +280,7 @@
                                 </array>
                             </entry>
                             <entry key="network_id">
-                                <int>1</int>
+                                <int>1337</int>
                             </entry>
                             <entry key="skip_to_height">
                                 <int>0</int>
@@ -342,7 +342,7 @@
                                         <int>10</int>
                                     </entry>
                                     <entry key="rate_limit_points_at_account_creation">
-                                        <int>1</int>
+                                        <int>100</int>
                                     </entry>
                                     <entry key="rate_limit_recovery_time">
                                         <int>5000</int>

@@ -51,13 +51,12 @@ import org.web3j.tx.gas.DefaultGasProvider
 import org.web3j.tx.response.PollingTransactionReceiptProcessor
 import java.math.BigInteger
 import java.security.MessageDigest
-import java.util.concurrent.TimeUnit
 
 @Testcontainers(disabledWithoutDocker = true)
-class EifIntegrationTest : IntegrationTestSetup() {
+class BscEifIntegrationTest : IntegrationTestSetup() {
 
     private val networkId = 1337L
-    private val gethContainer = GethContainer()
+    private val gethContainer = BscContainer()
             .withExposedService(
                     "geth", 8545,
                     Wait.forLogMessage(".*HTTP server started.*\\s", 1)
@@ -115,6 +114,12 @@ class EifIntegrationTest : IntegrationTestSetup() {
     @Test
     fun deposit() {
         val initialMint = 100L
+
+        // Binance smart chain need to run some blocks to upgrade the consensus smart contract
+        Awaitility.await().atMost(Duration.ONE_MINUTE).until {
+            val block = web3j.ethGetBlockByNumber(DefaultBlockParameter.valueOf(BigInteger.TEN), false).send()
+            block.block != null
+        }
 
         // Deploy validator contract
         val postchainValidator = "659e4a3726275edFD125F52338ECe0d54d15BD99"
