@@ -280,10 +280,10 @@
                                 </array>
                             </entry>
                             <entry key="network_id">
-                                <int>1</int>
+                                <int>1337</int>
                             </entry>
                             <entry key="skip_to_height">
-                                <bigint>0</bigint>
+                                <int>0</int>
                             </entry>
                             <entry key="evm_read_offset">
                                 <int>0</int>

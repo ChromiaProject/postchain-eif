@@ -1,0 +1,73 @@
+---
+- anonymous: false
+  inputs:
+  - indexed: true
+    internalType: address
+    name: sender
+    type: address
+  - indexed: true
+    internalType: contract IERC20
+    name: token
+    type: address
+  - indexed: true
+    internalType: bytes32
+    name: ft3_account_id
+    type: bytes32
+  - indexed: false
+    internalType: uint256
+    name: networkId
+    type: uint256
+  - indexed: false
+    internalType: uint256
+    name: amount
+    type: uint256
+  - indexed: false
+    internalType: string
+    name: name
+    type: string
+  - indexed: false
+    internalType: string
+    name: symbol
+    type: string
+  - indexed: false
+    internalType: uint8
+    name: decimals
+    type: uint8
+  name: DepositedERC20
+  type: event
+- anonymous: false
+  inputs:
+  - indexed: true
+    internalType: address
+    name: sender
+    type: address
+  - indexed: true
+    internalType: contract IERC721
+    name: nft
+    type: address
+  - indexed: true
+    internalType: bytes32
+    name: ft3_account_id
+    type: bytes32
+  - indexed: false
+    internalType: uint256
+    name: networkId
+    type: uint256
+  - indexed: false
+    internalType: uint256
+    name: tokenId
+    type: uint256
+  - indexed: false
+    internalType: string
+    name: name
+    type: string
+  - indexed: false
+    internalType: string
+    name: symbol
+    type: string
+  - indexed: false
+    internalType: string
+    name: tokenURI
+    type: string
+  name: DepositedERC721
+  type: event

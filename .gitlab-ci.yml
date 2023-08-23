@@ -49,6 +49,8 @@ variables:
   POSTGRES_PASSWORD: postchain
   POSTGRES_INITDB_ARGS: "--lc-collate=C.UTF-8 --lc-ctype=C.UTF-8 --encoding=UTF-8"
   POSTCHAIN_DB_URL: jdbc:postgresql://postgres/postchain
+  CHR_DB_URL: jdbc:postgresql://postgres/postchain
+  ORIGINALS_REPO: https://x-token-auth:$ORIGINALS_ACCESS_TOKEN@bitbucket.org/chromawallet/originals-dip.git
   # Instruct Testcontainers to use the daemon of DinD.
   DOCKER_HOST: tcp://docker:2375
   # Instruct Docker not to start over TLS.

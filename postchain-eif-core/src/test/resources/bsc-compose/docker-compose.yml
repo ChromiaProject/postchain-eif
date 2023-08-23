@@ -1,7 +1,7 @@
 version: '3'
 services:
   geth:
-    image: hadv/eth-client-go:v1.12.3
+    image: hadv/bsc-client-go:v1.2.10
     ports:
       - 8545:8545
     volumes:

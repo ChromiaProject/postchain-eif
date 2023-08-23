@@ -19,6 +19,15 @@
     <dependencies>
         <!-- Kotlin -->
         <dependency>
+            <groupId>org.jetbrains.kotlinx</groupId>
+            <artifactId>kotlinx-coroutines-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlinx</groupId>
+            <artifactId>kotlinx-coroutines-slf4j</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>net.postchain</groupId>
             <artifactId>postchain-gtv</artifactId>
         </dependency>
@@ -105,11 +114,6 @@
         <dependency>
             <groupId>net.postchain.rell</groupId>
             <artifactId>rell-gtx</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.willowtreeapps.assertk</groupId>
-            <artifactId>assertk-jvm</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
