@@ -6,8 +6,8 @@ import io.micrometer.core.instrument.Metrics
 import net.postchain.common.BlockchainRid
 import net.postchain.eif.EvmEventProcessor
 import net.postchain.eif.EventProcessor
-import net.postchain.metrics.BLOCKCHAIN_RID_TAG
-import net.postchain.metrics.CHAIN_IID_TAG
+import net.postchain.logging.BLOCKCHAIN_RID_TAG
+import net.postchain.logging.CHAIN_IID_TAG
 
 private const val NETWORK_ID_TAG = "network_id"
 

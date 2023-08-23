@@ -16,16 +16,17 @@ import net.postchain.crypto.Secp256K1CryptoSystem
 import net.postchain.crypto.devtools.KeyPairHelper
 import net.postchain.devtools.IntegrationTestSetup
 import net.postchain.devtools.PostchainTestNode
+import net.postchain.devtools.testinfra.BaseTestInfrastructureFactory
 import net.postchain.eif.merkle.MerkleTestUtil.getMerkleProof
 import net.postchain.gtv.*
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.merkle.GtvMerkleHashCalculator
 import net.postchain.gtx.GtxBuilder
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
 import java.math.BigInteger
 import java.security.MessageDigest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 val myCS = Secp256K1CryptoSystem()
 
@@ -95,7 +96,7 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
 
     @Test
     fun testEifBuildBlock() {
-        configOverrides.setProperty("infrastructure", "base/test")
+        configOverrides.setProperty("infrastructure", BaseTestInfrastructureFactory::class.qualifiedName)
         val nodes = createNodes(1, "/net/postchain/eif/blockchain_config.xml")
         val node = nodes[0]
         val bcRid = systemSetup.blockchainMap[1]!!.rid // Just assume we have chain 1
@@ -119,7 +120,7 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
         fun makeSureBlockIsBuiltCorrectly() {
             currentBlockHeight += 1
             buildBlockAndCommit(node.getBlockchainInstance().blockchainEngine)
-            assertEquals(currentBlockHeight, getBestHeight(node))
+            assertEquals(currentBlockHeight, getLastHeight(node))
             val ridsAtHeight = getTxRidsAtHeight(node, currentBlockHeight)
             for (vtx in validTxs) {
                 val vtxRID = vtx.getRID()
@@ -196,7 +197,7 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
 
     @Test
     fun testEifUpdateSnapshot() {
-        configOverrides.setProperty("infrastructure", "base/test")
+        configOverrides.setProperty("infrastructure", BaseTestInfrastructureFactory::class.qualifiedName)
         val nodes = createNodes(1, "/net/postchain/eif/blockchain_config_1.xml")
         val node = nodes[0]
         val bcRid = systemSetup.blockchainMap[1]!!.rid // Just assume we have chain 1
@@ -219,7 +220,7 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
         fun sealBlock() {
             currentBlockHeight += 1
             buildBlockAndCommit(node.getBlockchainInstance().blockchainEngine)
-            assertEquals(currentBlockHeight, getBestHeight(node))
+            assertEquals(currentBlockHeight, getLastHeight(node))
         }
 
         // enqueue txs that emit accounts' state
@@ -342,7 +343,7 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
 
     @Test
     fun testEifEventAndUpdateSnapshot() {
-        configOverrides.setProperty("infrastructure", "base/test")
+        configOverrides.setProperty("infrastructure", BaseTestInfrastructureFactory::class.qualifiedName)
         val nodes = createNodes(1, "/net/postchain/eif/blockchain_config_1.xml")
         val node = nodes[0]
         val bcRid = systemSetup.blockchainMap[1]!!.rid // Just assume we have chain 1
@@ -365,7 +366,7 @@ class EifBlockBuilderTest : IntegrationTestSetup() {
         fun sealBlock() {
             currentBlockHeight += 1
             buildBlockAndCommit(node.getBlockchainInstance().blockchainEngine)
-            assertEquals(currentBlockHeight, getBestHeight(node))
+            assertEquals(currentBlockHeight, getLastHeight(node))
         }
 
         // enqueue txs that emit event

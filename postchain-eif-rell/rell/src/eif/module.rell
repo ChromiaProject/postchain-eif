@@ -552,7 +552,7 @@ operation bridge_ft_token_to_evm(auth_id, network_id: integer, token_address: by
 // }
 
 // user can claim ft asset back to specific account id on postchain after deposit it into EIF
-operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer, 
+operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer,
                         r: byte_array, s: byte_array, v: integer, pk: text, account_id: byte_array) {
     require(amount > 0, "Must withdraw an amount larger than 0");
     val recovered_pubkey = crypto.eth_ecrecover(r, s, v, hash_eth_message(pk));
@@ -669,7 +669,7 @@ operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiar
 //     emit_withdraw(network_id, beneficiary, account, withdraw_info);
 // }
 
-operation withdraw_ERC20(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer, 
+operation withdraw_ERC20(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer,
                                                     r: byte_array, s: byte_array, v: integer, pk: text) {
     require(amount > 0, "Must withdraw an amount larger than 0");
 

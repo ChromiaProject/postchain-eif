@@ -19,6 +19,15 @@
     <dependencies>
         <!-- Kotlin -->
         <dependency>
+            <groupId>org.jetbrains.kotlinx</groupId>
+            <artifactId>kotlinx-coroutines-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlinx</groupId>
+            <artifactId>kotlinx-coroutines-slf4j</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>net.postchain</groupId>
             <artifactId>postchain-gtv</artifactId>
         </dependency>
@@ -100,6 +109,11 @@
         <dependency>
             <groupId>net.postchain</groupId>
             <artifactId>postchain-devtools</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>net.postchain.rell</groupId>
+            <artifactId>rell-gtx</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -202,6 +216,7 @@
                         <includes>
                             <include>TokenBridge</include>
                             <include>TestToken</include>
+                            <include>Validator</include>
                         </includes>
                     </contract>
                     <pathPrefixes>
@@ -212,6 +227,7 @@
                         <includes>
                             <include>**/TokenBridge.json</include>
                             <include>**/TestToken.json</include>
+                            <include>**/Validator.json</include>
                         </includes>
                     </abiSourceFiles>
                     <outputDirectory>

@@ -2,6 +2,7 @@ package net.postchain.eif
 
 import net.postchain.common.hexStringToByteArray
 import net.postchain.gtv.*
+import java.lang.IllegalArgumentException
 
 object SimpleGtvEncoder {
 

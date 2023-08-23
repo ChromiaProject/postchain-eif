@@ -3,13 +3,7 @@
 ## Install rell module dependencies
 
 ```shell
-yarn install
-```
-
-## Update rell module dependencies
-
-```shell
-yarn postinstall
+chr install --settings rell/config.yml
 ```
 
 ## Test

@@ -11,7 +11,7 @@ import { DecodeHexStringToByteArray, hashGtvBytes32Leaf, hashGtvBytes64Leaf, has
 chai.use(solidity);
 const { expect } = chai;
 const ft3_account_id = "0x95471c57f0bc16284cb1016eba3b2736fa5fb2a640e2f20984079f4349f867ff"
-const WITHDRAW_OFFSET = "0x14C08"; //85000 
+const WITHDRAW_OFFSET = "0x2";
 describe("Token Bridge Test", () => {
     let tokenAddress: string;
     let bridgeAddress: string;
@@ -147,13 +147,18 @@ describe("Token Bridge Test", () => {
             await tokenInstance.mint(user.address, toMint);
             expect(await tokenInstance.totalSupply()).to.eq(toMint)
 
+            const bridgeOnwer = new TokenBridge__factory(deployer).attach(bridgeAddress)
             const bridge = new TokenBridge__factory(user).attach(bridgeAddress)
             const validatorAdmin = new Validator__factory(admin).attach(validatorAddress)
             const toDeposit = ethers.utils.parseEther("100")
             const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
 
+            await expect(bridge.pause()).to.be.revertedWith("Ownable: caller is not the owner")
             await expect(bridge.deposit(bridgeAddress, toDeposit, ft3_account_id)).to.be.revertedWith('TokenBridge: not allow token')
+            await bridgeOnwer.pause()
+            await expect(bridge.deposit(tokenAddress, toDeposit, ft3_account_id)).to.be.revertedWith('Pausable: paused')
+            await bridgeOnwer.unpause()
             let tx: ContractTransaction = await bridge.deposit(tokenAddress, toDeposit, ft3_account_id)
             let receipt: ContractReceipt = await tx.wait()
             let logs = receipt.events?.filter((x) =>  {return x.event == 'DepositedERC20'})
@@ -399,6 +404,13 @@ describe("Token Bridge Test", () => {
                     [admin.address, validator1.address],
                     extraProof)
                 ).to.be.revertedWith('Validator: signer is not validator')
+
+                await bridgeOnwer.pause()
+                await expect(bridge.withdrawRequest(data, eventProof,
+                    DecodeHexStringToByteArray(blockHeader), sigs, validators,
+                    extraProof)
+                ).to.be.revertedWith('Pausable: paused')
+                await bridgeOnwer.unpause()
                 await expect(bridge.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     extraProof)
@@ -418,7 +430,6 @@ describe("Token Bridge Test", () => {
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
                     user.address)).to.revertedWith("TokenBridge: not mature enough to withdraw the fund")
 
-                // force mining 98 blocks
                 await ethers.provider.send('hardhat_mine', [WITHDRAW_OFFSET])
                 let hashEvent = DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length))
 
@@ -440,6 +451,11 @@ describe("Token Bridge Test", () => {
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
                     deployer.address)).to.be.revertedWith('TokenBridge: no fund for the beneficiary')
 
+                await bridgeOnwer.pause()
+                await expect(bridge.withdraw(
+                    DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
+                    user.address)).to.be.revertedWith('Pausable: paused')
+                await bridgeOnwer.unpause()
                 // now user can withdraw the fund
                 await expect(bridge.withdraw(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
@@ -686,7 +702,6 @@ describe("Token Bridge Test", () => {
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
                     bridgeDelegatorAddress)).to.revertedWith("TokenBridge: not mature enough to withdraw the fund")
 
-                // force mining 98 blocks
                 await ethers.provider.send('hardhat_mine', [WITHDRAW_OFFSET])
 
                 let hashEvent = DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length))

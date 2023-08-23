@@ -2,10 +2,7 @@ package net.postchain.eif
 
 import net.postchain.common.data.Hash
 import net.postchain.common.data.KECCAK256
-import net.postchain.crypto.CURVE
-import net.postchain.crypto.CURVE_PARAMS
-import net.postchain.crypto.bigIntegerToBytes
-import net.postchain.crypto.secp256k1_decodeSignature
+import net.postchain.crypto.*
 import org.bouncycastle.asn1.x9.X9IntegerConverter
 import org.bouncycastle.math.ec.ECAlgorithms
 import org.bouncycastle.math.ec.ECPoint
@@ -48,9 +45,9 @@ fun encodeSignature(r: BigInteger, s: BigInteger, v: Int): ByteArray {
  * @param signature signature without v
  * @return signature with v to run ecrecover
  */
-fun encodeSignatureWithV(hash: ByteArray, pubKey: ByteArray, signature: ByteArray): ByteArray {
-    val pub = decompressKey(pubKey)
-    val sig = secp256k1_decodeSignature(signature)
+fun encodeSignatureWithV(hash: ByteArray, signature: Signature): ByteArray {
+    val pub = decompressKey(signature.subjectID)
+    val sig = secp256k1_decodeSignature(signature.data)
     val pub0 = ecrecover(0, hash, sig[0], sig[1])
     if (Arrays.areEqual(pub0, pub)) {
         return encodeSignature(sig[0], sig[1], 27)

@@ -1,7 +1,7 @@
 package net.postchain.eif
 
-import assertk.assert
-import assertk.assertions.*
+import assertk.assertThat
+import assertk.assertions.containsExactly
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import net.postchain.common.hexStringToByteArray
@@ -10,15 +10,19 @@ import net.postchain.core.BlockchainEngine
 import net.postchain.core.block.BlockQueries
 import net.postchain.eif.contracts.TestToken
 import net.postchain.eif.contracts.TokenBridge
-import net.postchain.gtv.*
 import net.postchain.gtv.GtvFactory.gtv
+import net.postchain.gtv.GtvNull
 import net.postchain.gtx.data.OpData
 import org.awaitility.Awaitility
 import org.awaitility.Duration
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.mockito.kotlin.*
+import org.mockito.kotlin.any
+import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.mock
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.datatypes.Address
@@ -49,7 +53,7 @@ class EthereumEventProcessorTest {
     // This could be any private key but value must match in /geth-compose/geth/key.txt
     // and the address created must be added to /geth-compose/geth/test.json
     private val credentials = Credentials
-        .create("0x0000000000000000000000000000000001000000000000000000000000000000")
+        .create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
     private val accountId = Bytes32("fc91c4abaff09f4c67a0ab84d4e9afd37c929978bea3fa1790403ab6ee85bf33"
         .hexStringToByteArray())
     private val validatorContract = Address("0x0000000000000000000000000000000000000000")
@@ -109,8 +113,9 @@ class EthereumEventProcessorTest {
             .send().result.blockNumber
         val eventsToRead = listOf(TokenBridge.DEPOSITEDERC20_EVENT)
         val evmEventProcessor =
-            EvmEventProcessor(1L, web3j, listOf(bridge.contractAddress), eventsToRead, BigInteger.ZERO, BigInteger.ONE, 200L, 100L, contractDeployBlockNumber, engineMock).apply {
-                start()
+            EvmEventProcessor(1L, web3j, listOf(bridge.contractAddress), eventsToRead,
+                    BigInteger.ZERO, BigInteger.ONE, 200L, 100L,
+                    contractDeployBlockNumber, BigInteger.ZERO, engineMock).apply {
             }
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contract
@@ -131,19 +136,19 @@ class EthereumEventProcessorTest {
             .untilAsserted {
                 val eventBlocks = evmEventProcessor.getEventData()
                 val events = eventBlocks.flatMap { it[EncodedBlock.EVENTS.index].asArray().asList() }
-                assert(events.size == 5).isTrue()
+                assertEquals(events.size, 5)
             }
 
         // validate events
         val eventData = evmEventProcessor.getEventData()
         val eventBlocksToValidate = eventData
             .map { OpData(OP_EVM_BLOCK, it) }
-        assert(evmEventProcessor.isValidEventData(eventBlocksToValidate)).isTrue()
+        assertTrue(evmEventProcessor.isValidEventData(eventBlocksToValidate))
         // Test if NoOp version can also validate
-        assert(NoOpEventProcessor().isValidEventData(eventBlocksToValidate)).isTrue()
+        assertTrue(NoOpEventProcessor().isValidEventData(eventBlocksToValidate))
 
         // Verify that we can't skip any events by removing a block
-        assert(evmEventProcessor.isValidEventData(eventBlocksToValidate.subList(1, eventBlocksToValidate.size))).isFalse()
+        assertFalse(evmEventProcessor.isValidEventData(eventBlocksToValidate.subList(1, eventBlocksToValidate.size)))
 
         // Verify that we can't skip any events by removing them from the first block in the list
         val eventBlocksWithoutEvents = eventBlocksToValidate.mapIndexed { i, eventBlock ->
@@ -157,13 +162,13 @@ class EthereumEventProcessorTest {
                 eventBlock
             }
         }
-        assert(evmEventProcessor.isValidEventData(eventBlocksWithoutEvents)).isFalse()
+        assertFalse(evmEventProcessor.isValidEventData(eventBlocksWithoutEvents))
 
         // Mock that the block was validated and committed to DB
         evmEventProcessor.markAsProcessed(eventBlocksToValidate)
 
         // Assert events before last committed block are not included now
-        assert(evmEventProcessor.getEventData().isEmpty()).isTrue()
+        assertTrue(evmEventProcessor.getEventData().isEmpty())
 
         // One more final transaction
         // Maxing out this transaction
@@ -179,7 +184,7 @@ class EthereumEventProcessorTest {
             .untilAsserted {
                 val eventBlocks = evmEventProcessor.getEventData()
                 val events = eventBlocks.flatMap { it[EncodedBlock.EVENTS.index].asArray().asList() }
-                assert(events.size == 1).isTrue()
+                assertEquals(events.size, 1)
             }
 
         val lastEventBlock = evmEventProcessor.getEventData().first()
@@ -188,9 +193,9 @@ class EthereumEventProcessorTest {
         val nonIndexedValues = lastEvent[EncodedEvent.NON_INDEXED_VALUES.index].asArray()
 
         // Check that data in the event matches what we sent
-        assert("0x${indexedValues[0].asByteArray().toHex()}").isEqualTo(transactionManager.fromAddress, true) // owner
-        assert("0x${indexedValues[1].asByteArray().toHex()}").isEqualTo(testToken.contractAddress, true) // token
-        assert(nonIndexedValues[1].asBigInteger()).isEqualTo(max) // value
+        assertEquals("0x${indexedValues[0].asByteArray().toHex().lowercase()}", transactionManager.fromAddress) // owner
+        assertEquals("0x${indexedValues[1].asByteArray().toHex().lowercase()}", testToken.contractAddress) // token
+        assertEquals(nonIndexedValues[1].asBigInteger(), max) // value
 
         evmEventProcessor.shutdown()
     }
@@ -220,8 +225,9 @@ class EthereumEventProcessorTest {
         val contractAddresses = listOf(bridgeFirst.contractAddress, bridgeSecond.contractAddress)
         val eventsToRead = listOf(TokenBridge.DEPOSITEDERC20_EVENT)
         val evmEventProcessor =
-                EvmEventProcessor(1L, web3j, contractAddresses, eventsToRead, BigInteger.ZERO, BigInteger.ONE, 200L, 100L, contractDeployBlockNumber, engineMock).apply {
-                    start()
+                EvmEventProcessor(1L, web3j, contractAddresses, eventsToRead,
+                        BigInteger.ZERO, BigInteger.ONE, 200L, 100L,
+                        contractDeployBlockNumber, BigInteger.ZERO, engineMock).apply {
                 }
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contracts
@@ -245,9 +251,9 @@ class EthereumEventProcessorTest {
                 .untilAsserted {
                     val eventBlocks = evmEventProcessor.getEventData()
                     val events = eventBlocks.flatMap { it[EncodedBlock.EVENTS.index].asArray().asList() }
-                    assert(events.size == 2).isTrue()
+                    assertEquals(events.size, 2)
                     val eventContractAddresses = events.map { "0x${it[EncodedEvent.CONTRACT.index].asByteArray().toHex()}".lowercase() }
-                    assert(eventContractAddresses).containsExactly(*contractAddresses.map(String::lowercase).toTypedArray())
+                    assertThat(eventContractAddresses).containsExactly(*contractAddresses.map(String::lowercase).toTypedArray())
                 }
 
         evmEventProcessor.shutdown()
