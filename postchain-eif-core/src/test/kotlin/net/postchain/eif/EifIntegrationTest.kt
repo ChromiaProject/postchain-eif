@@ -32,7 +32,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.testcontainers.containers.wait.strategy.Wait
-import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.DynamicArray
@@ -51,39 +50,46 @@ import org.web3j.tx.gas.DefaultGasProvider
 import org.web3j.tx.response.PollingTransactionReceiptProcessor
 import java.math.BigInteger
 import java.security.MessageDigest
-import java.util.concurrent.TimeUnit
 
-@Testcontainers(disabledWithoutDocker = true)
-class EifIntegrationTest : IntegrationTestSetup() {
+enum class EvmType {
+    GETH, BSC
+}
 
-    private val networkId = 1L
-    private val gethContainer = GethContainer()
-            .withExposedService(
-                    "geth", 8545,
-                    Wait.forLogMessage(".*HTTP server started.*\\s", 1)
-            )
+abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
+
+    private val networkId = 1337L
     private val gasProvider = DefaultGasProvider()
-
-    // This could be any private key but value must match in /geth-compose/geth/key.txt
-    // and the address created must be added to /geth-compose/geth/test.json
+    private val evmContainer = when (evmType) {
+        EvmType.GETH -> {
+            GethContainer().withExposedService(
+                    "geth", 8545,
+                    Wait.forLogMessage(".*HTTP server started.*\\s", 1))
+        }
+        EvmType.BSC -> {
+            BscContainer().withExposedService(
+                    "geth", 8545,
+                    Wait.forLogMessage(".*HTTP server started.*\\s", 1))
+        }
+    }
     private val credentials = Credentials
             .create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
-    private lateinit var web3j: Web3j
-    private lateinit var transactionManager: TransactionManager
 
     private val tokenBridgeBinary = getBinaryFromArtifactResource("/artifacts/contracts/TokenBridge.sol/TokenBridge.json")
     private val testTokenBinary = getBinaryFromArtifactResource("/artifacts/contracts/token/TestToken.sol/TestToken.json")
     private val validatorBinary = getBinaryFromArtifactResource("/artifacts/contracts/Validator.sol/Validator.json")
 
+    private lateinit var web3j: Web3j
+    private lateinit var transactionManager: TransactionManager
+
     @BeforeEach
     fun setup() {
-        gethContainer.start()
+        evmContainer.start()
 
-        val gethHost = gethContainer.getServiceHost("geth", 8545)
-        val gethPort = gethContainer.getServicePort("geth", 8545)
+        val evmHost = evmContainer.getServiceHost("geth", 8545)
+        val evmPort = evmContainer.getServicePort("geth", 8545)
         web3j = Web3j.build(
                 HttpService(
-                        "http://$gethHost:$gethPort"
+                        "http://$evmHost:$evmPort"
                 )
         )
 
@@ -99,7 +105,7 @@ class EifIntegrationTest : IntegrationTestSetup() {
 
         with(configOverrides) {
             setProperty("infrastructure", BaseTestInfrastructureFactory::class.qualifiedName)
-            setProperty("ethereum.url", "http://$gethHost:$gethPort")
+            setProperty("ethereum.url", "http://$evmHost:$evmPort")
             setProperty("ethereum.maxReadAhead", 200)
             setProperty("ethereum.maxQueueSize", 100)
         }
@@ -109,7 +115,7 @@ class EifIntegrationTest : IntegrationTestSetup() {
     override fun tearDown() {
         super.tearDown()
         web3j.shutdown()
-        gethContainer.stop()
+        evmContainer.stop()
     }
 
     @Test
