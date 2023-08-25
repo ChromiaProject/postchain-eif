@@ -14,6 +14,7 @@
     <properties>
         <executable-classifier>jar-with-dependencies</executable-classifier>
         <dist-classifier>dist</dist-classifier>
+        <main.class>com.chromia.MainKt</main.class>
     </properties>
 
     <dependencies>
@@ -120,6 +121,47 @@
 
     <build>
         <plugins>
+
+            <plugin>
+                <groupId>com.google.cloud.tools</groupId>
+                <artifactId>jib-maven-plugin</artifactId>
+                <version>3.3.2</version>
+                <configuration>
+                    <allowInsecureRegistries>false</allowInsecureRegistries>
+                    <from>
+                        <image>
+                            registry.gitlab.com/chromaway/core-tools/chromia-cli/chr:0.9.3
+                        </image>
+                    </from>
+                    <container>
+                        <entrypoint>
+                            <args>/usr/bin/chr-entrypoint.sh</args>
+                        </entrypoint>
+                        <args>
+                            <arg>chr</arg>
+                        </args>
+                        <extraClasspath>/usr/share/chr/libs/*</extraClasspath>
+                        <appRoot>/usr/share/chr</appRoot>
+                        <workingDirectory>/usr/app</workingDirectory>
+                        <mainClass>${main.class}</mainClass>
+                    </container>
+                    <containerizingMode>packaged</containerizingMode>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>docker-build</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>dockerBuild</goal>
+                        </goals>
+                        <configuration>
+                            <to>
+                                <image>eif</image>
+                            </to>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <artifactId>kotlin-maven-plugin</artifactId>
                 <groupId>org.jetbrains.kotlin</groupId>
@@ -297,6 +339,84 @@
                 </plugins>
             </build>
         </profile>
+
+            <profile>
+                <id>docker-arm</id>
+                <activation>
+                    <os>
+                        <family>mac</family>
+                        <arch>aarch64</arch>
+                    </os>
+                </activation>
+                <build>
+                    <pluginManagement>
+                        <plugins>
+                            <plugin>
+                                <groupId>com.google.cloud.tools</groupId>
+                                <artifactId>jib-maven-plugin</artifactId>
+                                <executions>
+                                    <execution>
+                                        <id>docker-build</id>
+                                        <configuration>
+                                            <from>
+                                                <platforms>
+                                                    <platform>
+                                                        <os>linux</os>
+                                                        <architecture>arm64</architecture>
+                                                    </platform>
+                                                </platforms>
+                                            </from>
+                                        </configuration>
+                                    </execution>
+                                </executions>
+                            </plugin>
+                        </plugins>
+                    </pluginManagement>
+                </build>
+            </profile>
+            <profile>
+                <id>docker-push</id>
+                <build>
+                    <pluginManagement>
+                        <plugins>
+                            <plugin>
+                                <groupId>com.google.cloud.tools</groupId>
+                                <artifactId>jib-maven-plugin</artifactId>
+                                <executions>
+                                    <execution>
+                                        <id>docker-push</id>
+                                        <phase>deploy</phase>
+                                        <goals>
+                                            <goal>build</goal>
+                                        </goals>
+                                        <configuration>
+                                            <from>
+                                                <platforms>
+                                                    <platform>
+                                                        <architecture>amd64</architecture>
+                                                        <os>linux</os>
+                                                    </platform>
+                                                    <platform>
+                                                        <architecture>arm64</architecture>
+                                                        <os>linux</os>
+                                                    </platform>
+                                                </platforms>
+                                            </from>
+                                            <to>
+                                                <image>${gitlab.registry}/${image.name}:${project.version}</image>
+                                                <auth>
+                                                    <username>${env.CI_REGISTRY_USER}</username>
+                                                    <password>${env.CI_REGISTRY_PASSWORD}</password>
+                                                </auth>
+                                            </to>
+                                        </configuration>
+                                    </execution>
+                                </executions>
+                            </plugin>
+                        </plugins>
+                    </pluginManagement>
+                </build>
+            </profile>
     </profiles>
 
 </project>
