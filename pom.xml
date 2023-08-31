@@ -19,7 +19,7 @@
 
     <properties>
         <revision>dev</revision>
-        <postchain.version>3.11.1</postchain.version>
+        <postchain.version>dev</postchain.version>
         <rell.version>0.13.1</rell.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>17</maven.compiler.source>

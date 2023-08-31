@@ -31,6 +31,7 @@ import java.security.Security
 const val PREFIX: String = "sys.x.eif"
 const val EIF: String = "eif"
 const val LEVELS_PER_PAGE = 2
+const val SNAPSHOT_TO_KEEP = 2
 
 class EifGTXModule : SimpleGTXModule<Unit>(
         Unit, mapOf(), mapOf(
@@ -58,7 +59,7 @@ class EifGTXModule : SimpleGTXModule<Unit>(
 
     override fun makeBlockBuilderExtensions(): List<BaseBlockBuilderExtension> {
         return listOf(EifImplementation(SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)),
-                LEVELS_PER_PAGE
+                LEVELS_PER_PAGE, SNAPSHOT_TO_KEEP
         ))
     }
 
@@ -126,7 +127,7 @@ private fun eventProof(ctx: EContext, blockHeight: Long, event: DatabaseAccess.E
 private fun stateProof(ctx: EContext, blockHeight: Long, state: DatabaseAccess.AccountState?): Gtv {
     if (state == null) return GtvNull
     val ds = SimpleDigestSystem(MessageDigest.getInstance(KECCAK256))
-    val ss = SnapshotPageStore(ctx, LEVELS_PER_PAGE, ds, PREFIX)
+    val ss = SnapshotPageStore(ctx, LEVELS_PER_PAGE, SNAPSHOT_TO_KEEP, ds, PREFIX)
     val proofs = ss.getMerkleProof(blockHeight, state.stateN)
     val gtvProofs = proofs.map(::gtv)
     return gtv(
