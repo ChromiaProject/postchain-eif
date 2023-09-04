@@ -115,7 +115,7 @@ class EthereumEventProcessorTest {
         val evmEventProcessor =
             EvmEventProcessor(1L, web3j, listOf(bridge.contractAddress), eventsToRead,
                     BigInteger.ZERO, BigInteger.ONE, 200L, 100L,
-                    contractDeployBlockNumber, BigInteger.ZERO, engineMock).apply {
+                    contractDeployBlockNumber, BigInteger.ZERO, engineMock, Web3jRequestHandler(500, 60_000), 500).apply {
             }
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contract
@@ -227,7 +227,7 @@ class EthereumEventProcessorTest {
         val evmEventProcessor =
                 EvmEventProcessor(1L, web3j, contractAddresses, eventsToRead,
                         BigInteger.ZERO, BigInteger.ONE, 200L, 100L,
-                        contractDeployBlockNumber, BigInteger.ZERO, engineMock).apply {
+                        contractDeployBlockNumber, BigInteger.ZERO, engineMock, Web3jRequestHandler(500, 60_000), 500).apply {
                 }
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contracts

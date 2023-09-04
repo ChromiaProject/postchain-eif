@@ -10,7 +10,10 @@ data class EvmConfig(
         val readTimeout: Long,
         val writeTimeout: Long,
         val maxReadAhead: Long,
-        val maxQueueSize: Long
+        val maxQueueSize: Long,
+        val minRetryDelay: Long,
+        val maxRetryDelay: Long,
+        val delayWhenNoNewBlocks: Long
 ) {
     companion object {
         @JvmStatic
@@ -22,7 +25,10 @@ data class EvmConfig(
                     config.getLong("evm.readTimeout", 300),
                     config.getLong("evm.writeTimeout", 300),
                     config.getLong("$chain.maxReadAhead", 2_000L),
-                    config.getLong("$chain.maxQueueSize", 1_000L),
+                    config.getLong("$chain.maxQueueSize", 2_000L),
+                    config.getLong("evm.minRetryDelay", 500L),
+                    config.getLong("evm.maxRetryDelay", 60_000L),
+                    config.getLong("evm.delayWhenNoNewBlocks", 500L)
             )
         }
     }
