@@ -82,7 +82,9 @@ class EifSynchronizationInfrastructureExtension(
                     evmConfig.maxQueueSize,
                     BigInteger.valueOf(evmBlockchainConfig.skipToHeight),
                     BigInteger.valueOf(evmConfig.lastEvmBlockHeight),
-                    engine
+                    engine,
+                    Web3jRequestHandler(evmConfig.minRetryDelay, evmConfig.maxRetryDelay),
+                    evmConfig.delayWhenNoNewBlocks
             )
         }
     }
