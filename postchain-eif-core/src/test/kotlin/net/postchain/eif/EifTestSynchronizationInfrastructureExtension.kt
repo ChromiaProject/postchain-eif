@@ -5,6 +5,7 @@ import net.postchain.PostchainContext
 import net.postchain.core.*
 import net.postchain.gtx.GTXBlockchainConfiguration
 
+@Suppress("UNUSED_PARAMETER")
 class EifTestSynchronizationInfrastructureExtension(
     postchainContext: PostchainContext
 ) : SynchronizationInfrastructureExtension {
