@@ -40,7 +40,7 @@ import java.math.BigInteger
 import java.util.concurrent.CompletableFuture
 
 @Testcontainers(disabledWithoutDocker = true)
-class EthereumEventProcessorTest {
+class EthereumEventProcessorIT {
 
     private val gethContainer = GethContainer()
         .withExposedService(
