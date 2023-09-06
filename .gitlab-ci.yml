@@ -37,6 +37,11 @@ build:
     when: always
     paths:
       - $JACOCO_REPORT_DIR/*
+    reports:
+      junit:
+        - "*/target/surefire-reports/TEST-*.xml"
+        - "*/target/failsafe-reports/TEST-*.xml"
+    expire_in: 1 week
 
 test-coverage-report:
   stage: code-coverage
