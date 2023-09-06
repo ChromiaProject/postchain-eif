@@ -196,8 +196,8 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
 
         enqueueTx(addNewEvmErc20(testTokenAddress, "Chromia", "CHR", 6, bcRid, sigMaker))
         enqueueTx(addTokenMapping(testTokenAddress, assetId, bcRid, sigMaker))
-        enqueueTx(registerAccount(userPubkey, userPriKey, userEvmAddress, sig, bcRid, sigMaker))
-        enqueueTx(registerAccount(otherPubkey, otherPrikey, otherEvmAddess, otherSig, bcRid, sigMaker))
+        enqueueTx(registerAccount(userPubkey, userPriKey, userEvmAddress, sig, bcRid))
+        enqueueTx(registerAccount(otherPubkey, otherPrikey, otherEvmAddess, otherSig, bcRid))
         sealBlock()
 
         // query ft3 account by evm address
@@ -451,32 +451,32 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
                             "accountNumber" to accountNumber
                     )).get().asDict()
 
-            val stateData = state["stateData"]!!.asByteArray()
-            val proof = state["stateProof"]!!.asDict()
-            val leaf = Bytes32(proof["leaf"]!!.asByteArray())
-            val position = Uint256(proof["position"]!!.asInteger())
-            val merkleProofs = proof["merkleProofs"]!!.asArray().map { Bytes32(it.asByteArray()) }
-            val stateProof = TokenBridge.Proof(leaf, position, DynamicArray(Bytes32::class.java, merkleProofs))
-            val blockHeader = state["blockHeader"]!!.asByteArray()
-            val blockWitness = state["blockWitness"]!!.asArray()
-            val signatures = blockWitness.map { DynamicBytes(it.asDict()["sig"]!!.asByteArray()) }
-            val signers = blockWitness.map { Address(it.asDict()["pubkey"]!!.asByteArray().toHex()) }
-            val extraMerkleProof = state["extraMerkleProof"]!!.asDict()
-            val extraProofs = extraMerkleProof["extraMerkleProofs"]!!.asArray().map { Bytes32(it.asByteArray()) }
-            val extraProofData = TokenBridge.ExtraProofData(
-                    DynamicBytes(extraMerkleProof["leaf"]!!.asByteArray()),
-                    Bytes32(extraMerkleProof["hashedLeaf"]!!.asByteArray()),
-                    Uint256(extraMerkleProof["position"]!!.asInteger()),
-                    Bytes32(extraMerkleProof["extraRoot"]!!.asByteArray()),
-                    DynamicArray(Bytes32::class.java, extraProofs)
+            val stateStateData = state["stateData"]!!.asByteArray()
+            val stateProof = state["stateProof"]!!.asDict()
+            val stateLeaf = Bytes32(stateProof["leaf"]!!.asByteArray())
+            val statePosition = Uint256(stateProof["position"]!!.asInteger())
+            val stateMerkleProofs = stateProof["merkleProofs"]!!.asArray().map { Bytes32(it.asByteArray()) }
+            val stateProof2 = TokenBridge.Proof(stateLeaf, statePosition, DynamicArray(Bytes32::class.java, stateMerkleProofs))
+            val stateBlockHeader = state["blockHeader"]!!.asByteArray()
+            val stateBlockWitness = state["blockWitness"]!!.asArray()
+            val stateSignatures = stateBlockWitness.map { DynamicBytes(it.asDict()["sig"]!!.asByteArray()) }
+            val stateSigners = stateBlockWitness.map { Address(it.asDict()["pubkey"]!!.asByteArray().toHex()) }
+            val stateExtraMerkleProof = state["extraMerkleProof"]!!.asDict()
+            val stateExtraProofs = extraMerkleProof["extraMerkleProofs"]!!.asArray().map { Bytes32(it.asByteArray()) }
+            val stateExtraProofData = TokenBridge.ExtraProofData(
+                    DynamicBytes(stateExtraMerkleProof["leaf"]!!.asByteArray()),
+                    Bytes32(stateExtraMerkleProof["hashedLeaf"]!!.asByteArray()),
+                    Uint256(stateExtraMerkleProof["position"]!!.asInteger()),
+                    Bytes32(stateExtraMerkleProof["extraRoot"]!!.asByteArray()),
+                    DynamicArray(Bytes32::class.java, stateExtraProofs)
             )
             bridge.withdrawBySnapshot(
-                    DynamicBytes(stateData),
-                    stateProof,
+                    DynamicBytes(stateStateData),
+                    stateProof2,
                     DynamicBytes(blockHeader),
                     DynamicArray(DynamicBytes::class.java, signatures),
                     DynamicArray(Address::class.java, signers),
-                    extraProofData
+                    stateExtraProofData
             ).send()
 
             // Withdraw the remaining token balance of other account as well
@@ -505,9 +505,9 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
             bridge.withdrawBySnapshot(
                     DynamicBytes(otherStateData),
                     otherStateProof,
-                    DynamicBytes(blockHeader),
-                    DynamicArray(DynamicBytes::class.java, signatures),
-                    DynamicArray(Address::class.java, signers),
+                    DynamicBytes(stateBlockHeader),
+                    DynamicArray(DynamicBytes::class.java, stateSignatures),
+                    DynamicArray(Address::class.java, stateSigners),
                     otherExtraProofData
             ).send()
 
@@ -626,7 +626,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
     }
 
     // Register account on postchain
-    private fun registerAccount(userPubkey: ByteArray, userPriKey: ByteArray, userEVMAddress: ByteArray, sig: GtvArray, bcRid: BlockchainRid, sigMaker: SigMaker): ByteArray {
+    private fun registerAccount(userPubkey: ByteArray, userPriKey: ByteArray, userEVMAddress: ByteArray, sig: GtvArray, bcRid: BlockchainRid): ByteArray {
         val auth = gtv(
                 gtv("S"),
                 GtvArray(arrayOf(gtv(userPubkey))),

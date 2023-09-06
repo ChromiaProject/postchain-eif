@@ -68,6 +68,7 @@ class EifGTXModule : SimpleGTXModule<Unit>(
 
 }
 
+@Suppress("UNUSED_PARAMETER")
 fun eventMerkleProofQuery(config: Unit, ctx: EContext, args: Gtv): Gtv {
     val argsDict = args.asDict()
     val eventHash = argsDict["eventHash"]!!.asString().hexStringToByteArray()
@@ -92,6 +93,7 @@ fun eventMerkleProofQuery(config: Unit, ctx: EContext, args: Gtv): Gtv {
  * blockHeight should be the latest block height that the global snapshot was updated.
  * That mean the block header's extra data should contain the state root hash as well.
  */
+@Suppress("UNUSED_PARAMETER")
 fun accountStateMerkleProofQuery(config: Unit, ctx: EContext, args: Gtv): Gtv {
     val argsDict = args.asDict()
     val blockHeight = argsDict["blockHeight"]!!.asInteger()

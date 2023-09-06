@@ -127,6 +127,11 @@
             <plugin>
                 <artifactId>kotlin-maven-plugin</artifactId>
                 <groupId>org.jetbrains.kotlin</groupId>
+                <configuration>
+                    <args>
+                        <arg>-Werror</arg>
+                    </args>
+                 </configuration>
                 <executions>
                     <execution>
                         <id>compile</id>
