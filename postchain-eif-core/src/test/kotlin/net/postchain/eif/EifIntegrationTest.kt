@@ -462,7 +462,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
             val stateSignatures = stateBlockWitness.map { DynamicBytes(it.asDict()["sig"]!!.asByteArray()) }
             val stateSigners = stateBlockWitness.map { Address(it.asDict()["pubkey"]!!.asByteArray().toHex()) }
             val stateExtraMerkleProof = state["extraMerkleProof"]!!.asDict()
-            val stateExtraProofs = extraMerkleProof["extraMerkleProofs"]!!.asArray().map { Bytes32(it.asByteArray()) }
+            val stateExtraProofs = stateExtraMerkleProof["extraMerkleProofs"]!!.asArray().map { Bytes32(it.asByteArray()) }
             val stateExtraProofData = TokenBridge.ExtraProofData(
                     DynamicBytes(stateExtraMerkleProof["leaf"]!!.asByteArray()),
                     Bytes32(stateExtraMerkleProof["hashedLeaf"]!!.asByteArray()),
@@ -473,9 +473,9 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
             bridge.withdrawBySnapshot(
                     DynamicBytes(stateStateData),
                     stateProof2,
-                    DynamicBytes(blockHeader),
-                    DynamicArray(DynamicBytes::class.java, signatures),
-                    DynamicArray(Address::class.java, signers),
+                    DynamicBytes(stateBlockHeader),
+                    DynamicArray(DynamicBytes::class.java, stateSignatures),
+                    DynamicArray(Address::class.java, stateSigners),
                     stateExtraProofData
             ).send()
 
