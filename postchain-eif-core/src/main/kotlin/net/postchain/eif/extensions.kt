@@ -20,7 +20,8 @@ const val EIF_STATE = "eif_state"
 
 class EifImplementation(
         private val ds: DigestSystem,
-        private val levelsPerPage: Int): BaseBlockBuilderExtension, TxEventSink {
+        private val levelsPerPage: Int,
+        private val snapshotsToKeep: Int): BaseBlockBuilderExtension, TxEventSink {
 
     private lateinit var bctx: BlockEContext
     lateinit var store: LeafStore
@@ -43,7 +44,7 @@ class EifImplementation(
         baseBB.installEventProcessor(EIF_STATE, this)
         bctx = blockEContext
         store = LeafStore()
-        snapshot = SnapshotPageStore(blockEContext, levelsPerPage, ds, PREFIX)
+        snapshot = SnapshotPageStore(blockEContext, levelsPerPage, snapshotsToKeep, ds, PREFIX)
         event = EventPageStore(blockEContext, levelsPerPage, ds, PREFIX)
     }
 
@@ -53,6 +54,9 @@ class EifImplementation(
     override fun finalize(): Map<String, Gtv> {
         val extra = mutableMapOf<String, Gtv>()
         val stateRootHash = snapshot.updateSnapshot(bctx.height, states)
+        if (states.size > 0) {
+            snapshot.pruneSnapshot(bctx.height)
+        }
         val eventRootHash = event.writeEventTree(bctx.height, events)
         extra[EIF] = GtvByteArray(eventRootHash + stateRootHash)
         return extra
