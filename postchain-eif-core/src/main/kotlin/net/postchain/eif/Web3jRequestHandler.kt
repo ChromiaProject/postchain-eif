@@ -5,6 +5,7 @@ import kotlinx.coroutines.ensureActive
 import mu.KLogging
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.Response
+import org.web3j.protocol.exceptions.ClientConnectionException
 import kotlin.coroutines.coroutineContext
 import kotlin.math.min
 
@@ -27,8 +28,11 @@ class Web3jRequestHandler(
                     logger.error("Web3j request failed with error code: ${response.error.code} and message: ${response.error.message}")
                 }
                 response
+            } catch (e: ClientConnectionException) {
+                logger.error("Web3j request failed: ${e.message}")
+                null
             } catch (e: Exception) {
-                logger.error("Web3j request failed", e)
+                logger.error("Web3j request failed unexpectedly", e)
                 null
             }
 
