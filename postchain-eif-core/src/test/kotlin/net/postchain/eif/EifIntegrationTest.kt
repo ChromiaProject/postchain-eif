@@ -210,15 +210,16 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
             bridge.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), Bytes32(accountId.asByteArray())).send()
         }
 
-        repeat(20) { sealBlock() } // keep postchain mine new blocks to ensure that all evm deposits are recorded
-
         val depositedAmount = 50L
         var userBalance = testToken.balanceOf(Address(evmAddress)).send()
         assertEquals(userBalance.value, BigInteger.valueOf(initialMint - depositedAmount))
 
         // Check the ft3 balance
-        var balance = blockQuery.query("ft3.get_asset_balance", gtv("account_id" to accountId, "asset_id" to assetId)).get()["amount"]!!.asInteger()
-        assertEquals(depositedAmount, balance)
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            sealBlock() // keep postchain mine new blocks to ensure that all evm deposits are recorded
+            val balance = blockQuery.query("ft3.get_asset_balance", gtv("account_id" to accountId, "asset_id" to assetId)).get()["amount"]!!.asInteger()
+            assertEquals(depositedAmount, balance)
+        }
 
         // Check eif state for account as well
         val expectedState = SimpleGtvEncoder.encodeGtv(gtv(
@@ -266,7 +267,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
         val stateData1 = accountState1["stateData"]!!
         assertEquals(stateData1.asByteArray().contentEquals(expectedState1), true)
 
-        balance = blockQuery.query("ft3.get_asset_balance",
+        val balance = blockQuery.query("ft3.get_asset_balance",
                 gtv("account_id" to accountId, "asset_id" to assetId)).get()["amount"]!!.asInteger()
         assertEquals(depositedAmount - withdrawAmount, balance)
 
