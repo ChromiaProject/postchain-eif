@@ -11,19 +11,22 @@ import kotlin.math.min
 
 class Web3jRequestHandler(
         private val baseTimeout: Long,
-        private val maxTimeout: Long
+        private val maxTimeout: Long,
+        private val maxTryErrors: Long
 ) {
     companion object : KLogging() {
         const val DELAY_POWER_BASE = 1.2
     }
 
     suspend fun <T : Response<*>> sendWeb3jRequestWithRetry(
-            request: Request<*, T>
+            requests: List<Request<*, T>>
     ): T {
         var retryTimeout = baseTimeout
+        var tryErrors = 0L
+        var index = 0
         while (true) {
             val response = try {
-                val response = request.send()
+                val response = requests[index].send()
                 if (response.hasError()) {
                     logger.error("Web3j request failed with error code: ${response.error.code} and message: ${response.error.message}")
                 }
@@ -37,8 +40,14 @@ class Web3jRequestHandler(
             }
 
             if (response == null || response.hasError()) {
+                tryErrors++
+                if (tryErrors >= maxTryErrors) {
+                    tryErrors = 0L
+                    retryTimeout = baseTimeout
+                    index = (index + 1) % requests.size
+                    logger.error { "Web3j request failed after $tryErrors tries. Trying next request $index." }
+                }
                 coroutineContext.ensureActive()
-
                 delay(retryTimeout)
                 retryTimeout = min((retryTimeout.toDouble() * DELAY_POWER_BASE).toLong(), maxTimeout)
             } else {

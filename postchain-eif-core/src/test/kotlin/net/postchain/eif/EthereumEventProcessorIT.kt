@@ -43,21 +43,21 @@ import java.util.concurrent.CompletableFuture
 class EthereumEventProcessorIT {
 
     private val gethContainer = GethContainer()
-        .withExposedService(
-            "geth", 8545,
-            Wait.forLogMessage(".*HTTP server started.*\\s", 1)
-        )
+            .withExposedService(
+                    "geth", 8545,
+                    Wait.forLogMessage(".*HTTP server started.*\\s", 1)
+            )
 
     private val gasProvider = DefaultGasProvider()
 
     // This could be any private key but value must match in /geth-compose/geth/key.txt
     // and the address created must be added to /geth-compose/geth/test.json
     private val credentials = Credentials
-        .create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
+            .create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
     private val accountId = Bytes32("fc91c4abaff09f4c67a0ab84d4e9afd37c929978bea3fa1790403ab6ee85bf33"
-        .hexStringToByteArray())
+            .hexStringToByteArray())
     private val validatorContract = Address("0x0000000000000000000000000000000000000000")
-    private lateinit var web3j: Web3j
+    private var web3jServices = mutableListOf<Web3j>()
     private lateinit var transactionManager: TransactionManager
 
     private val tokenBridgeBinary = getBinaryFromArtifactResource("/artifacts/contracts/TokenBridge.sol/TokenBridge.json")
@@ -69,26 +69,26 @@ class EthereumEventProcessorIT {
 
         val gethHost = gethContainer.getServiceHost("geth", 8545)
         val gethPort = gethContainer.getServicePort("geth", 8545)
-        web3j = Web3j.build(
-            HttpService(
-                "http://$gethHost:$gethPort"
-            )
-        )
+        web3jServices.add(Web3j.build(
+                HttpService(
+                        "http://$gethHost:$gethPort"
+                )
+        ))
 
         transactionManager = FastRawTransactionManager(
-            web3j,
-            credentials,
-            PollingTransactionReceiptProcessor(
-                web3j,
-                1000,
-                30
-            )
+                web3jServices[0],
+                credentials,
+                PollingTransactionReceiptProcessor(
+                        web3jServices[0],
+                        1000,
+                        30
+                )
         )
     }
 
     @AfterEach
     fun tearDown() {
-        web3j.shutdown()
+        web3jServices.forEach { it.shutdown() }
         gethContainer.stop()
     }
 
@@ -96,7 +96,7 @@ class EthereumEventProcessorIT {
     fun `Deposit events on ethereum should be parsed and private validated`() {
         val initialMint = 50L
         // Deploy token bridge contract
-        val bridge = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
+        val bridge = deployRemoteCall(TokenBridge::class.java, web3jServices[0], transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
             initialize(validatorContract).send()
         }
 
@@ -109,17 +109,17 @@ class EthereumEventProcessorIT {
         }
 
         val contractDeployTransactionHash = bridge.transactionReceipt.get().transactionHash
-        val contractDeployBlockNumber = web3j.ethGetTransactionByHash(contractDeployTransactionHash)
-            .send().result.blockNumber
+        val contractDeployBlockNumber = web3jServices[0].ethGetTransactionByHash(contractDeployTransactionHash)
+                .send().result.blockNumber
         val eventsToRead = listOf(TokenBridge.DEPOSITEDERC20_EVENT)
         val evmEventProcessor =
-            EvmEventProcessor(1L, web3j, listOf(bridge.contractAddress), eventsToRead,
-                    BigInteger.ZERO, BigInteger.ONE, 200L, 100L,
-                    contractDeployBlockNumber, BigInteger.ZERO, engineMock, Web3jRequestHandler(500, 60_000), 500).apply {
-            }
+                EvmEventProcessor(1L, web3jServices, listOf(bridge.contractAddress), eventsToRead,
+                        BigInteger.ZERO, BigInteger.ONE, 200L, 100L,
+                        contractDeployBlockNumber, BigInteger.ZERO, engineMock, Web3jRequestHandler(500, 60_000, 2), 500).apply {
+                }
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contract
-        val testToken = deployRemoteCall(TestToken::class.java, web3j, transactionManager, gasProvider, testTokenBinary, "").send().apply {
+        val testToken = deployRemoteCall(TestToken::class.java, web3jServices[0], transactionManager, gasProvider, testTokenBinary, "").send().apply {
             mint(Address(transactionManager.fromAddress), Uint256(BigInteger.valueOf(initialMint))).send()
             approve(Address(bridge.contractAddress), Uint256(BigInteger.valueOf(initialMint))).send()
         }
@@ -132,17 +132,17 @@ class EthereumEventProcessorIT {
         }
 
         Awaitility.await()
-            .atMost(Duration.ONE_MINUTE)
-            .untilAsserted {
-                val eventBlocks = evmEventProcessor.getEventData()
-                val events = eventBlocks.flatMap { it[EncodedBlock.EVENTS.index].asArray().asList() }
-                assertEquals(events.size, 5)
-            }
+                .atMost(Duration.ONE_MINUTE)
+                .untilAsserted {
+                    val eventBlocks = evmEventProcessor.getEventData()
+                    val events = eventBlocks.flatMap { it[EncodedBlock.EVENTS.index].asArray().asList() }
+                    assertEquals(events.size, 5)
+                }
 
         // validate events
         val eventData = evmEventProcessor.getEventData()
         val eventBlocksToValidate = eventData
-            .map { OpData(OP_EVM_BLOCK, it) }
+                .map { OpData(OP_EVM_BLOCK, it) }
         assertTrue(evmEventProcessor.isValidEventData(eventBlocksToValidate))
         // Test if NoOp version can also validate
         assertTrue(NoOpEventProcessor().isValidEventData(eventBlocksToValidate))
@@ -154,9 +154,9 @@ class EthereumEventProcessorIT {
         val eventBlocksWithoutEvents = eventBlocksToValidate.mapIndexed { i, eventBlock ->
             if (i == 0) {
                 OpData(OP_EVM_BLOCK, arrayOf(
-                    eventBlock.args[EncodedBlock.NUMBER.index],
-                    eventBlock.args[EncodedBlock.HASH.index],
-                    gtv(emptyList())
+                        eventBlock.args[EncodedBlock.NUMBER.index],
+                        eventBlock.args[EncodedBlock.HASH.index],
+                        gtv(emptyList())
                 ))
             } else {
                 eventBlock
@@ -173,19 +173,19 @@ class EthereumEventProcessorIT {
         // One more final transaction
         // Maxing out this transaction
         val max = BigInteger.TWO.pow(256) - BigInteger.valueOf(initialMint + 1)
-        with (testToken) {
+        with(testToken) {
             mint(Address(transactionManager.fromAddress), Uint256(max)).send()
             approve(Address(bridge.contractAddress), Uint256(max)).send()
         }
         bridge.deposit(Address(testToken.contractAddress), Uint256(max), accountId).send()
 
         Awaitility.await()
-            .atMost(Duration.ONE_MINUTE)
-            .untilAsserted {
-                val eventBlocks = evmEventProcessor.getEventData()
-                val events = eventBlocks.flatMap { it[EncodedBlock.EVENTS.index].asArray().asList() }
-                assertEquals(events.size, 1)
-            }
+                .atMost(Duration.ONE_MINUTE)
+                .untilAsserted {
+                    val eventBlocks = evmEventProcessor.getEventData()
+                    val events = eventBlocks.flatMap { it[EncodedBlock.EVENTS.index].asArray().asList() }
+                    assertEquals(events.size, 1)
+                }
 
         val lastEventBlock = evmEventProcessor.getEventData().first()
         val lastEvent = lastEventBlock[EncodedBlock.EVENTS.index].asArray().first()
@@ -204,10 +204,10 @@ class EthereumEventProcessorIT {
     fun `Events can be received from multiple contracts`() {
         val initialMint = 20L
         // Deploy two token bridge contracts
-        val bridgeFirst = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
+        val bridgeFirst = deployRemoteCall(TokenBridge::class.java, web3jServices[0], transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
             initialize(validatorContract).send()
         }
-        val bridgeSecond = deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
+        val bridgeSecond = deployRemoteCall(TokenBridge::class.java, web3jServices[0], transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
             initialize(validatorContract).send()
         }
 
@@ -220,18 +220,18 @@ class EthereumEventProcessorIT {
         }
 
         val contractDeployTransactionHash = bridgeFirst.transactionReceipt.get().transactionHash
-        val contractDeployBlockNumber = web3j.ethGetTransactionByHash(contractDeployTransactionHash)
+        val contractDeployBlockNumber = web3jServices[0].ethGetTransactionByHash(contractDeployTransactionHash)
                 .send().result.blockNumber
         val contractAddresses = listOf(bridgeFirst.contractAddress, bridgeSecond.contractAddress)
         val eventsToRead = listOf(TokenBridge.DEPOSITEDERC20_EVENT)
         val evmEventProcessor =
-                EvmEventProcessor(1L, web3j, contractAddresses, eventsToRead,
+                EvmEventProcessor(1L, web3jServices, contractAddresses, eventsToRead,
                         BigInteger.ZERO, BigInteger.ONE, 200L, 100L,
-                        contractDeployBlockNumber, BigInteger.ZERO, engineMock, Web3jRequestHandler(500, 60_000), 500).apply {
+                        contractDeployBlockNumber, BigInteger.ZERO, engineMock, Web3jRequestHandler(500, 60_000, 2), 500).apply {
                 }
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contracts
-        val testToken = deployRemoteCall(TestToken::class.java, web3j, transactionManager, gasProvider, testTokenBinary, "").send().apply {
+        val testToken = deployRemoteCall(TestToken::class.java, web3jServices[0], transactionManager, gasProvider, testTokenBinary, "").send().apply {
             mint(Address(transactionManager.fromAddress), Uint256(BigInteger.valueOf(initialMint))).send()
             approve(Address(bridgeFirst.contractAddress), Uint256(BigInteger.TEN)).send()
             approve(Address(bridgeSecond.contractAddress), Uint256(BigInteger.TEN)).send()
