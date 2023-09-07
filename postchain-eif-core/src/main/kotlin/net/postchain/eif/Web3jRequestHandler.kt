@@ -12,7 +12,8 @@ import kotlin.math.min
 class Web3jRequestHandler(
         private val baseTimeout: Long,
         private val maxTimeout: Long,
-        private val maxTryErrors: Long
+        private val maxTryErrors: Long,
+        private val urls: List<String>
 ) {
     companion object : KLogging() {
         const val DELAY_POWER_BASE = 1.2
@@ -42,10 +43,11 @@ class Web3jRequestHandler(
             if (response == null || response.hasError()) {
                 tryErrors++
                 if (tryErrors >= maxTryErrors) {
-                    tryErrors = 0L
                     retryTimeout = baseTimeout
+                    logger.error { "Web3j request failed after $tryErrors tries on ${requests[index].method}/${urls[index]}" }
                     index = (index + 1) % requests.size
-                    logger.error { "Web3j request failed after $tryErrors tries. Trying next request $index." }
+                    tryErrors = 0L
+                    logger.info { "Switching to another rpc endpoint at ${urls[index]}" }
                 }
                 coroutineContext.ensureActive()
                 delay(retryTimeout)

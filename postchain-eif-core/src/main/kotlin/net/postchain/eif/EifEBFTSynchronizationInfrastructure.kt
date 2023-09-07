@@ -67,6 +67,7 @@ class EifSynchronizationInfrastructureExtension(
             logger.warn("EIF is running in disconnected mode. No events will be validated against ethereum.")
             NoOpEventProcessor()
         } else {
+            val urls = evmConfig.urls.split(",").map { it.trim() }
             val web3jServices = Web3jServiceFactory.buildServices(evmConfig)
             val events = evmBlockchainConfig.events.asArray().map(GtvToEventMapper::map)
             EvmEventProcessor(
@@ -81,7 +82,7 @@ class EifSynchronizationInfrastructureExtension(
                     BigInteger.valueOf(evmBlockchainConfig.skipToHeight),
                     BigInteger.valueOf(evmConfig.lastEvmBlockHeight),
                     engine,
-                    Web3jRequestHandler(evmConfig.minRetryDelay, evmConfig.maxRetryDelay, evmConfig.maxTryErrors),
+                    Web3jRequestHandler(evmConfig.minRetryDelay, evmConfig.maxRetryDelay, evmConfig.maxTryErrors, urls),
                     evmConfig.delayWhenNoNewBlocks
             )
         }

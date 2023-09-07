@@ -57,6 +57,7 @@ class EthereumEventProcessorIT {
     private val accountId = Bytes32("fc91c4abaff09f4c67a0ab84d4e9afd37c929978bea3fa1790403ab6ee85bf33"
             .hexStringToByteArray())
     private val validatorContract = Address("0x0000000000000000000000000000000000000000")
+    private var url = "http://localhost:8545"
     private var web3jServices = mutableListOf<Web3j>()
     private lateinit var transactionManager: TransactionManager
 
@@ -69,11 +70,8 @@ class EthereumEventProcessorIT {
 
         val gethHost = gethContainer.getServiceHost("geth", 8545)
         val gethPort = gethContainer.getServicePort("geth", 8545)
-        web3jServices.add(Web3j.build(
-                HttpService(
-                        "http://$gethHost:$gethPort"
-                )
-        ))
+        url = "http://$gethHost:$gethPort"
+        web3jServices.add(Web3j.build(HttpService(url)))
 
         transactionManager = FastRawTransactionManager(
                 web3jServices[0],
@@ -115,7 +113,7 @@ class EthereumEventProcessorIT {
         val evmEventProcessor =
                 EvmEventProcessor(1L, web3jServices, listOf(bridge.contractAddress), eventsToRead,
                         BigInteger.ZERO, BigInteger.ONE, 200L, 100L,
-                        contractDeployBlockNumber, BigInteger.ZERO, engineMock, Web3jRequestHandler(500, 60_000, 2), 500).apply {
+                        contractDeployBlockNumber, BigInteger.ZERO, engineMock, Web3jRequestHandler(500, 60_000, 2, mutableListOf(url)), 500).apply {
                 }
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contract
@@ -227,7 +225,7 @@ class EthereumEventProcessorIT {
         val evmEventProcessor =
                 EvmEventProcessor(1L, web3jServices, contractAddresses, eventsToRead,
                         BigInteger.ZERO, BigInteger.ONE, 200L, 100L,
-                        contractDeployBlockNumber, BigInteger.ZERO, engineMock, Web3jRequestHandler(500, 60_000, 2), 500).apply {
+                        contractDeployBlockNumber, BigInteger.ZERO, engineMock, Web3jRequestHandler(500, 60_000, 2, mutableListOf(url)), 500).apply {
                 }
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contracts
