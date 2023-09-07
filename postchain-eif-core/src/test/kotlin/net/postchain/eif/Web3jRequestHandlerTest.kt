@@ -17,13 +17,13 @@ class Web3jRequestHandlerTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `Assert that web3j requests are sent with exponential back off`() = runTest(StandardTestDispatcher()) {
-        val web3jRequestHandler = Web3jRequestHandler(500, 60_000L)
+        val web3jRequestHandler = Web3jRequestHandler(500, 60_000L, 10, mutableListOf())
 
         val requestMock: Request<*, Response<*>> = mock {
             on { send() } doThrow RuntimeException("You want me to fail")
         }
         backgroundScope.launch {
-            web3jRequestHandler.sendWeb3jRequestWithRetry(requestMock)
+            web3jRequestHandler.sendWeb3jRequestWithRetry(mutableListOf(requestMock))
         }
 
         testScheduler.advanceTimeBy(1)

@@ -110,7 +110,7 @@ class NoOpEventProcessor : EventProcessor {
  */
 class EvmEventProcessor(
         private val networkId: Long,
-        private val web3j: Web3j,
+        private val web3jServices: List<Web3j>,
         private val contractAddresses: List<String>,
         events: List<Event>,
         private val evmReadOffset: BigInteger,
@@ -162,7 +162,7 @@ class EvmEventProcessor(
     private suspend fun fetchEvents() {
         val from = lastReadLogBlockHeight + BigInteger.ONE
 
-        val blockNumberReply = web3jRequestHandler.sendWeb3jRequestWithRetry(web3j.ethBlockNumber())
+        val blockNumberReply = web3jRequestHandler.sendWeb3jRequestWithRetry(web3jServices.map { it.ethBlockNumber()})
         val currentBlockHeight = blockNumberReply.blockNumber - evmReadOffset
         // Pacing the reading of logs
         val to = minOf(currentBlockHeight, from + BigInteger.valueOf(maxReadAhead))
@@ -181,7 +181,8 @@ class EvmEventProcessor(
         )
         filter.addOptionalTopics(*eventSignatures)
 
-        val logResponse = web3jRequestHandler.sendWeb3jRequestWithRetry(web3j.ethGetLogs(filter))
+
+        val logResponse = web3jRequestHandler.sendWeb3jRequestWithRetry(web3jServices.map { it.ethGetLogs(filter) })
 
         // Ensure events are sorted on txIndex + logIndex, blocks sorted on block number
         val sortedEncodedLogs = logResponse.logs
@@ -201,7 +202,7 @@ class EvmEventProcessor(
 
     override fun shutdown() {
         job.cancel()
-        web3j.shutdown()
+        web3jServices.forEach { it.shutdown() }
     }
 
     @Synchronized
