@@ -14,7 +14,7 @@
     "cross-env": "^7.0.3",
     "dotenv": "^10.0.0",
     "ethereum-waffle": "^3.3.0",
-    "ethers": "^5.3.1",
+    "ethers": "^5.7",
     "fs-extra": "^10.0.0",
     "react-hot-toast": "^2.1.1",
     "react-query": "^3.21.1",
@@ -32,13 +32,12 @@
     "@web3-react/walletconnect-connector": "^6.2.4",
     "autoprefixer": "^9",
     "daisyui": "^1.14.0",
-    "postchain-client": "^0.10.5",
+    "postchain-client": "^1.5.9",
     "postcss": "^7",
-    "react": "^17.0.2",
-    "react-dom": "^17.0.2",
+    "react": "^16.8.0",
+    "react-dom": "^16.8.0",
     "react-scripts": "^4.0.3",
-    "tailwindcss": "npm:@tailwindcss/postcss7-compat",
-    "web3-react": "^5.0.5"
+    "tailwindcss": "npm:@tailwindcss/postcss7-compat"
   },
   "browserslist": {
     "production": [
