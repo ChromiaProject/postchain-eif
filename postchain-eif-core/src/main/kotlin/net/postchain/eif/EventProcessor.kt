@@ -291,7 +291,16 @@ class EvmEventProcessor(
         val blockHeight = block.asDict()["evm_block_height"]
             ?: throw ProgrammerMistake("Last evm block has no height stored")
 
-        return blockHeight.asBigInteger()
+        // Trying to be flexible here, don't care what the query gives us as long as it's a number
+        return when (blockHeight) {
+            is GtvBigInteger -> {
+                blockHeight.asBigInteger()
+            }
+            is GtvInteger -> {
+                BigInteger.valueOf(blockHeight.asInteger())
+            }
+            else -> throw ProgrammerMistake("Unexpected block height type: ${blockHeight.type}")
+        }
     }
 
     @Synchronized
