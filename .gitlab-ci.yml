@@ -29,7 +29,7 @@ deploy:
     - main
     - /^support\/.*$/
   script:
-    - mvn $MAVEN_CLI_OPTS deploy --activate-profiles ci,gitlab-registry -Drevision=0-SNAPSHOT
+    - mvn $MAVEN_CLI_OPTS source:jar deploy --activate-profiles ci,gitlab-registry -Drevision=0-SNAPSHOT
 
 build:
   extends:
@@ -64,7 +64,7 @@ deploy-release:
   rules:
     - if: $CI_COMMIT_TAG
   script:
-    - mvn $MAVEN_CLI_OPTS deploy --activate-profiles ci -Drevision=$CI_COMMIT_TAG
+    - mvn $MAVEN_CLI_OPTS source:jar deploy --activate-profiles ci -Drevision=$CI_COMMIT_TAG
 
 variables:
   # This will suppress any download for dependencies and plugins or upload messages which would clutter the console log.
