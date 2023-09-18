@@ -42,7 +42,7 @@ class Web3jRequestHandler(
 
             if (response == null || response.hasError()) {
                 tryErrors++
-                if (tryErrors >= maxTryErrors) {
+                if (tryErrors >= maxTryErrors && requests.size > 1) {
                     retryTimeout = baseTimeout
                     logger.error { "Web3j request failed after $tryErrors tries on ${requests[index].method}/${urls[index]}" }
                     index = (index + 1) % requests.size
