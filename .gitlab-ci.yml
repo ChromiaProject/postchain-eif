@@ -21,15 +21,34 @@ stages:
   - deploy
   - release
 
+# Triggered by that something was merged into or pushed onto main
+deploy-snapshot:
+  extends: .setup
+  stage: deploy
+  rules:
+    - if: $CI_COMMIT_BRANCH == "dev"
+  script:
+    - CURRENT_VERSION=$(git describe --tags --abbrev=0)
+    - IFS=. read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+    - SNAPSHOT_VERSION=$MAJOR.$((MINOR + 1)).0-SNAPSHOT
+    - mvn
+      $MAVEN_CLI_OPTS
+      --activate-profiles ci
+      -Drevision=$SNAPSHOT_VERSION
+      clean source:jar deploy
+
+# Triggered by that a semver tag was pushed
 deploy:
   extends: .setup
   stage: deploy
-  only:
-    - dev
-    - main
-    - /^support\/.*$/
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^[0-9]+\.[0-9]+\.[0-9]+$/
   script:
-    - mvn $MAVEN_CLI_OPTS source:jar deploy --activate-profiles ci,gitlab-registry -Drevision=0-SNAPSHOT
+    - mvn
+      $MAVEN_CLI_OPTS
+      --activate-profiles ci
+      -Drevision=$CI_COMMIT_TAG
+      clean source:jar deploy
 
 build:
   extends:
