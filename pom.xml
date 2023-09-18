@@ -196,7 +196,7 @@
                 <configuration>
                     <excludes>
                         <exclude>**/*IT.java</exclude>
-                        <exclude>**/*Nightly.java</exclude>
+                        <exclude>**/*SlowIntegrationTest.java</exclude>
                     </excludes>
                 </configuration>
             </plugin>
