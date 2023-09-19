@@ -54,7 +54,7 @@ class EifImplementation(
     override fun finalize(): Map<String, Gtv> {
         val extra = mutableMapOf<String, Gtv>()
         val stateRootHash = snapshot.updateSnapshot(bctx.height, states)
-        if (states.size > 0) {
+        if (states.size > 0 && snapshotsToKeep > 0) {
             snapshot.pruneSnapshot(bctx.height)
         }
         val eventRootHash = event.writeEventTree(bctx.height, events)

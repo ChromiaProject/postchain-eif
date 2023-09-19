@@ -2,6 +2,7 @@
 
 package net.postchain.eif
 
+import net.postchain.PostchainContext
 import net.postchain.base.BaseBlockBuilderExtension
 import net.postchain.base.BaseBlockHeader
 import net.postchain.base.BaseBlockWitness
@@ -11,17 +12,21 @@ import net.postchain.base.snapshot.SimpleDigestSystem
 import net.postchain.base.snapshot.SnapshotPageStore
 import net.postchain.common.data.KECCAK256
 import net.postchain.common.hexStringToByteArray
+import net.postchain.core.BlockchainConfiguration
 import net.postchain.core.EContext
 import net.postchain.crypto.Secp256K1CryptoSystem
+import net.postchain.eif.config.EifBlockchainConfig
 import net.postchain.eif.merkle.ProofTreeParser.getProofListAndPosition
 import net.postchain.gtv.*
 import net.postchain.gtv.GtvEncoder.encodeGtv
 import net.postchain.gtv.GtvFactory.gtv
+import net.postchain.gtv.mapper.toObject
 import net.postchain.gtv.merkle.GtvMerkleHashCalculator
 import net.postchain.gtv.merkle.MerkleBasics
 import net.postchain.gtv.merkle.path.GtvPath
 import net.postchain.gtv.merkle.path.GtvPathFactory
 import net.postchain.gtv.merkle.path.GtvPathSet
+import net.postchain.gtx.PostchainContextAware
 import net.postchain.gtx.SimpleGTXModule
 import net.postchain.gtx.special.GTXSpecialTxExtension
 import org.bouncycastle.jce.provider.BouncyCastleProvider
@@ -30,20 +35,30 @@ import java.security.Security
 
 const val PREFIX: String = "sys.x.eif"
 const val EIF: String = "eif"
-const val LEVELS_PER_PAGE = 2
-const val SNAPSHOTS_TO_KEEP = 2
 
-class EifGTXModule : SimpleGTXModule<Unit>(
-        Unit, mapOf(), mapOf(
+class Config(var levelsPerPage: Int = 2,
+             var snapshotsToKeep: Int = 0
+)
+
+class EifGTXModule : SimpleGTXModule<Config>(
+        Config(), mapOf(), mapOf(
         "get_event_merkle_proof" to ::eventMerkleProofQuery,
         "get_account_state_merkle_proof" to ::accountStateMerkleProofQuery
 )
-) {
+), PostchainContextAware {
 
     init {
         // We add this provider so that we can get keccak-256 message digest instances
         if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
             Security.addProvider(BouncyCastleProvider())
+        }
+    }
+
+    override fun initializeContext(configuration: BlockchainConfiguration, postchainContext: PostchainContext) {
+        val snapshotConfig = configuration.rawConfig["eif"]?.toObject<EifBlockchainConfig>()?.snapshot
+        if (snapshotConfig != null) {
+            conf.levelsPerPage = snapshotConfig.levelsPerPage.toInt()
+            conf.snapshotsToKeep = snapshotConfig.snapshotsToKeep.toInt()
         }
     }
 
@@ -59,7 +74,7 @@ class EifGTXModule : SimpleGTXModule<Unit>(
 
     override fun makeBlockBuilderExtensions(): List<BaseBlockBuilderExtension> {
         return listOf(EifImplementation(SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)),
-                LEVELS_PER_PAGE, SNAPSHOTS_TO_KEEP
+                conf.levelsPerPage, conf.snapshotsToKeep
         ))
     }
 
@@ -69,8 +84,7 @@ class EifGTXModule : SimpleGTXModule<Unit>(
 
 }
 
-@Suppress("UNUSED_PARAMETER")
-fun eventMerkleProofQuery(config: Unit, ctx: EContext, args: Gtv): Gtv {
+fun eventMerkleProofQuery(config: Config, ctx: EContext, args: Gtv): Gtv {
     val argsDict = args.asDict()
     val eventHash = argsDict["eventHash"]!!.asString().hexStringToByteArray()
     val db = DatabaseAccess.of(ctx)
@@ -79,7 +93,7 @@ fun eventMerkleProofQuery(config: Unit, ctx: EContext, args: Gtv): Gtv {
     val bh = blockHeaderData(db, ctx, blockHeight)
     val blockHeader = SimpleGtvEncoder.encodeGtv(bh)
     val blockWitness = blockWitnessData(db, ctx, blockHeight)
-    val eventProof = eventProof(ctx, blockHeight, eventInfo)
+    val eventProof = eventProof(ctx, config, blockHeight, eventInfo)
     val extraMerkleProof = extraMerkleProof(db, ctx, blockHeight)
     return gtv(
             "eventData" to gtv(eventInfo.data),
@@ -94,8 +108,7 @@ fun eventMerkleProofQuery(config: Unit, ctx: EContext, args: Gtv): Gtv {
  * blockHeight should be the latest block height that the global snapshot was updated.
  * That mean the block header's extra data should contain the state root hash as well.
  */
-@Suppress("UNUSED_PARAMETER")
-fun accountStateMerkleProofQuery(config: Unit, ctx: EContext, args: Gtv): Gtv {
+fun accountStateMerkleProofQuery(config: Config, ctx: EContext, args: Gtv): Gtv {
     val argsDict = args.asDict()
     val blockHeight = argsDict["blockHeight"]!!.asInteger()
     val accountNumber = argsDict["accountNumber"]!!.asInteger()
@@ -103,7 +116,7 @@ fun accountStateMerkleProofQuery(config: Unit, ctx: EContext, args: Gtv): Gtv {
     val accountState = db.getAccountState(ctx, PREFIX, blockHeight, accountNumber) ?: return GtvNull
     val blockHeader = SimpleGtvEncoder.encodeGtv(blockHeaderData(db, ctx, blockHeight))
     val blockWitness = blockWitnessData(db, ctx, blockHeight)
-    val stateProof = stateProof(ctx, blockHeight, accountState)
+    val stateProof = stateProof(ctx, config, blockHeight, accountState)
     val extraMerkleProof = extraMerkleProof(db, ctx, blockHeight)
     return gtv(
             "stateData" to gtv(accountState.data),
@@ -114,9 +127,9 @@ fun accountStateMerkleProofQuery(config: Unit, ctx: EContext, args: Gtv): Gtv {
     )
 }
 
-private fun eventProof(ctx: EContext, blockHeight: Long, event: DatabaseAccess.EventInfo?): Gtv {
+private fun eventProof(ctx: EContext, config: Config, blockHeight: Long, event: DatabaseAccess.EventInfo?): Gtv {
     if (event == null) return GtvNull
-    val es = EventPageStore(ctx, LEVELS_PER_PAGE, SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)), PREFIX)
+    val es = EventPageStore(ctx, config.levelsPerPage, SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)), PREFIX)
     val proofs = es.getMerkleProof(blockHeight, event.pos)
     val gtvProofs = proofs.map(::gtv)
     return gtv(
@@ -126,10 +139,10 @@ private fun eventProof(ctx: EContext, blockHeight: Long, event: DatabaseAccess.E
     )
 }
 
-private fun stateProof(ctx: EContext, blockHeight: Long, state: DatabaseAccess.AccountState?): Gtv {
+private fun stateProof(ctx: EContext, config: Config, blockHeight: Long, state: DatabaseAccess.AccountState?): Gtv {
     if (state == null) return GtvNull
     val ds = SimpleDigestSystem(MessageDigest.getInstance(KECCAK256))
-    val ss = SnapshotPageStore(ctx, LEVELS_PER_PAGE, SNAPSHOTS_TO_KEEP, ds, PREFIX)
+    val ss = SnapshotPageStore(ctx, config.levelsPerPage, config.snapshotsToKeep, ds, PREFIX)
     val proofs = ss.getMerkleProof(blockHeight, state.stateN)
     val gtvProofs = proofs.map(::gtv)
     return gtv(
