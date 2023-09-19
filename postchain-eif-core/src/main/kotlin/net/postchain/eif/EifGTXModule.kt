@@ -37,7 +37,7 @@ const val PREFIX: String = "sys.x.eif"
 const val EIF: String = "eif"
 
 class Config(var levelsPerPage: Int = 2,
-             var snapshotsToKeep: Int = 10
+             var snapshotsToKeep: Int = 0
 )
 
 class EifGTXModule : SimpleGTXModule<Config>(

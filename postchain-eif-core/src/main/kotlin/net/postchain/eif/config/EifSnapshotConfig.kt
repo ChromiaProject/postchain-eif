@@ -8,6 +8,6 @@ data class EifSnapshotConfig(
         @DefaultValue(defaultLong = 2)
         val levelsPerPage: Long,
         @Name("snapshots_to_keep")
-        @DefaultValue(defaultLong = 10)
+        @DefaultValue(defaultLong = 0)
         val snapshotsToKeep: Long
 )
