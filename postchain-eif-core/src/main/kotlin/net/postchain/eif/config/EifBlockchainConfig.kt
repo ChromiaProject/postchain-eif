@@ -8,5 +8,7 @@ data class EifBlockchainConfig(
         @RawGtv
         val rawGtv: Gtv,
         @Name("chains")
-        val chains: Map<String, EvmBlockchainConfig>
+        val chains: Map<String, EvmBlockchainConfig>,
+        @Name("snapshot")
+        val snapshot: EifSnapshotConfig,
 )

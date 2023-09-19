@@ -2,6 +2,7 @@
 
 package net.postchain.eif
 
+import net.postchain.PostchainContext
 import net.postchain.base.BaseBlockBuilderExtension
 import net.postchain.base.BaseBlockHeader
 import net.postchain.base.BaseBlockWitness
@@ -11,17 +12,21 @@ import net.postchain.base.snapshot.SimpleDigestSystem
 import net.postchain.base.snapshot.SnapshotPageStore
 import net.postchain.common.data.KECCAK256
 import net.postchain.common.hexStringToByteArray
+import net.postchain.core.BlockchainConfiguration
 import net.postchain.core.EContext
 import net.postchain.crypto.Secp256K1CryptoSystem
+import net.postchain.eif.config.EifBlockchainConfig
 import net.postchain.eif.merkle.ProofTreeParser.getProofListAndPosition
 import net.postchain.gtv.*
 import net.postchain.gtv.GtvEncoder.encodeGtv
 import net.postchain.gtv.GtvFactory.gtv
+import net.postchain.gtv.mapper.toObject
 import net.postchain.gtv.merkle.GtvMerkleHashCalculator
 import net.postchain.gtv.merkle.MerkleBasics
 import net.postchain.gtv.merkle.path.GtvPath
 import net.postchain.gtv.merkle.path.GtvPathFactory
 import net.postchain.gtv.merkle.path.GtvPathSet
+import net.postchain.gtx.PostchainContextAware
 import net.postchain.gtx.SimpleGTXModule
 import net.postchain.gtx.special.GTXSpecialTxExtension
 import org.bouncycastle.jce.provider.BouncyCastleProvider
@@ -30,20 +35,28 @@ import java.security.Security
 
 const val PREFIX: String = "sys.x.eif"
 const val EIF: String = "eif"
-const val LEVELS_PER_PAGE = 2
-const val SNAPSHOTS_TO_KEEP = 2
+var levelsPerPage: Int = 2
+var snapshotsToKeep: Int = 10
 
 class EifGTXModule : SimpleGTXModule<Unit>(
         Unit, mapOf(), mapOf(
         "get_event_merkle_proof" to ::eventMerkleProofQuery,
         "get_account_state_merkle_proof" to ::accountStateMerkleProofQuery
 )
-) {
+), PostchainContextAware {
 
     init {
         // We add this provider so that we can get keccak-256 message digest instances
         if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
             Security.addProvider(BouncyCastleProvider())
+        }
+    }
+
+    override fun initializeContext(configuration: BlockchainConfiguration, postchainContext: PostchainContext) {
+        val snapshotConfig = configuration.rawConfig["eif"]?.toObject<EifBlockchainConfig>()?.snapshot
+        if (snapshotConfig != null) {
+            levelsPerPage = snapshotConfig.levelsPerPage.toInt()
+            snapshotsToKeep = snapshotConfig.snapshotsToKeep.toInt()
         }
     }
 
@@ -59,7 +72,7 @@ class EifGTXModule : SimpleGTXModule<Unit>(
 
     override fun makeBlockBuilderExtensions(): List<BaseBlockBuilderExtension> {
         return listOf(EifImplementation(SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)),
-                LEVELS_PER_PAGE, SNAPSHOTS_TO_KEEP
+                levelsPerPage, snapshotsToKeep
         ))
     }
 
@@ -116,7 +129,7 @@ fun accountStateMerkleProofQuery(config: Unit, ctx: EContext, args: Gtv): Gtv {
 
 private fun eventProof(ctx: EContext, blockHeight: Long, event: DatabaseAccess.EventInfo?): Gtv {
     if (event == null) return GtvNull
-    val es = EventPageStore(ctx, LEVELS_PER_PAGE, SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)), PREFIX)
+    val es = EventPageStore(ctx, levelsPerPage, SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)), PREFIX)
     val proofs = es.getMerkleProof(blockHeight, event.pos)
     val gtvProofs = proofs.map(::gtv)
     return gtv(
@@ -129,7 +142,7 @@ private fun eventProof(ctx: EContext, blockHeight: Long, event: DatabaseAccess.E
 private fun stateProof(ctx: EContext, blockHeight: Long, state: DatabaseAccess.AccountState?): Gtv {
     if (state == null) return GtvNull
     val ds = SimpleDigestSystem(MessageDigest.getInstance(KECCAK256))
-    val ss = SnapshotPageStore(ctx, LEVELS_PER_PAGE, SNAPSHOTS_TO_KEEP, ds, PREFIX)
+    val ss = SnapshotPageStore(ctx, levelsPerPage, snapshotsToKeep, ds, PREFIX)
     val proofs = ss.getMerkleProof(blockHeight, state.stateN)
     val gtvProofs = proofs.map(::gtv)
     return gtv(
