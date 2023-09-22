@@ -2,6 +2,7 @@ package net.postchain.eif.config
 
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.mapper.Name
+import net.postchain.gtv.mapper.Nullable
 import net.postchain.gtv.mapper.RawGtv
 
 data class EifBlockchainConfig(
@@ -10,5 +11,6 @@ data class EifBlockchainConfig(
         @Name("chains")
         val chains: Map<String, EvmBlockchainConfig>,
         @Name("snapshot")
-        val snapshot: EifSnapshotConfig,
+        @Nullable
+        val snapshot: EifSnapshotConfig?,
 )
