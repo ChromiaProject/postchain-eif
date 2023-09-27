@@ -8,6 +8,7 @@ import org.web3j.protocol.core.Response
 import org.web3j.protocol.exceptions.ClientConnectionException
 import kotlin.coroutines.coroutineContext
 import kotlin.math.min
+import kotlin.random.Random
 
 class Web3jRequestHandler(
         private val baseTimeout: Long,
@@ -24,7 +25,7 @@ class Web3jRequestHandler(
     ): T {
         var retryTimeout = baseTimeout
         var tryErrors = 0L
-        var index = 0
+        var index = if (requests.size > 1) Random.nextInt(0, requests.size-1) else 0
         while (true) {
             val response = try {
                 val response = requests[index].send()
