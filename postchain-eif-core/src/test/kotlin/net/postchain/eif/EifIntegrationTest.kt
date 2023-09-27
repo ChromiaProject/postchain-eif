@@ -180,11 +180,12 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
 
         val sigMaker = cryptoSystem.buildSigMaker(KeyPair(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
 
-        enqueueTx(registerAsset("Chromia", bcRid, sigMaker))
+        val tokenName = "Chromia"
+        enqueueTx(registerAsset(tokenName, bcRid, sigMaker))
         sealBlock()
 
         val value = node.getBlockchainInstance().blockchainEngine.getBlockQueries()
-                .query("ft3.get_asset_by_name", gtv("name" to gtv("Chromia"))).get()
+                .query("ft3.get_asset_by_name", gtv("name" to gtv(tokenName))).get()
         val assetId = value[0]["id"]!!
 
         // Register evm account
@@ -207,7 +208,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
                 gtv("442017757e4e627a98d40c89cdbdde4612251cc86acabba27cf1683cd1d7cb4c".hexStringToByteArray()),
                 gtv(28L))
 
-        enqueueTx(addNewEvmErc20(testTokenAddress, "Chromia", "CHR", 6, bcRid, sigMaker))
+        enqueueTx(addNewEvmErc20(testTokenAddress, tokenName, "CHR", 6, bcRid, sigMaker))
         enqueueTx(addTokenMapping(testTokenAddress, assetId, bcRid, sigMaker))
 
         // Register accounts
@@ -365,6 +366,19 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
                 DynamicArray(Bytes32::class.java, extraProofs)
         )
 
+        var exception = assertThrows<TransactionException> {
+            bridge.withdrawRequest(
+                    DynamicBytes(actualEventData),
+                    proof,
+                    DynamicBytes(blockHeader),
+                    DynamicArray(DynamicBytes::class.java, signatures),
+                    DynamicArray(Address::class.java, signers),
+                    extraProofData
+            ).send()
+        }
+        assertEquals(exception.message!!.contains("Postchain: invalid blockchain rid"), true)
+
+        bridge.setBlockchainRid(Bytes32(bcRid.data)).send()
         var receipt = bridge.withdrawRequest(
                 DynamicBytes(actualEventData),
                 proof,
@@ -634,7 +648,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
             )
 
             // User cannot send withdraw request after the mass-exit block height
-            val exception = assertThrows<TransactionException> {
+            exception = assertThrows<TransactionException> {
                 bridge.withdrawRequest(
                         DynamicBytes(actualEventData3),
                         proof3,

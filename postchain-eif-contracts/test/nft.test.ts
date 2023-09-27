@@ -17,8 +17,8 @@ describe("Non Fungible Token", () => {
     let nftAddress: string;
     let bridgeAddress: string;
     let validatorAddress: string;
-    let directoryNodes: SignerWithAddress;
-    let appNodes: SignerWithAddress;
+    let ownerAddress: SignerWithAddress;
+    let validators: SignerWithAddress;
     const name = "CRYPTOPUNKS";
     const symbol = "Ͼ";
     const baseURI = "https://gateway.pinata.cloud/ipfs/QmR5NAV7vCi5oobK2wKNKcM5QAyCCzCg2wysZXwhCYbBLs/";
@@ -29,16 +29,16 @@ describe("Non Fungible Token", () => {
             params: [],
         });
         const [deployer] = await ethers.getSigners()
-        ;[directoryNodes, appNodes] = await ethers.getSigners()
+        ;[ownerAddress, validators] = await ethers.getSigners()
         const tokenFactory = new ERC721Mock__factory(deployer)
         const tokenContract = await tokenFactory.deploy(name, symbol)
         nftAddress = tokenContract.address
 
-        const validatorFactory = new Validator__factory(directoryNodes)
-        const validatorContract = await validatorFactory.deploy([appNodes.address])
+        const validatorFactory = new Validator__factory(ownerAddress)
+        const validatorContract = await validatorFactory.deploy([validators.address])
         validatorAddress = validatorContract.address
 
-        const factory = new NFTBridge__factory(directoryNodes)
+        const factory = new NFTBridge__factory(ownerAddress)
         const bridge = await upgrades.deployProxy(factory, [validatorAddress])
         await bridge.allowNFT(nftAddress)
         bridgeAddress = bridge.address
@@ -88,6 +88,7 @@ describe("Non Fungible Token", () => {
             expect(await tokenInstance.ownerOf(tokenId)).to.eq(user.address)
 
             const bridge = new NFTBridge__factory(user).attach(bridgeAddress)
+            const bridgeOwner = new NFTBridge__factory(ownerAddress).attach(bridgeAddress)
             const tokenApproveInstance = new ERC721Mock__factory(user).attach(nftAddress)
             await tokenApproveInstance.setApprovalForAll(bridgeAddress, true)
             await expect(bridge.depositNFT(bridgeAddress, tokenId, ft3_account_id)).to.be.revertedWith('NFTBridge: not allow nft')
@@ -119,6 +120,7 @@ describe("Non Fungible Token", () => {
                 let eifLeaf = hashRootEvent.substring(2, hashRootEvent.length).concat(hashRootState.substring(2, hashRootState.length))
  
                 let blockchainRid = "977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795"
+                let maliciousBlockchainRid = "efe4a2423cc6d39eb91bc9baac4ec325825ff7c12093d45a554dab732129eefc"
                 let previousBlockRid = "49e46bf022de1515cbb2bf0f69c62c071825a9b940e8f3892acb5d2021832ba0"
                 let merkleRootHash = "96defe74f43fcf2d12a1844bcd7a3a7bcb0d4fa191776953dae3f1efb508d866"
                 let merkleRootHashHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(merkleRootHash))
@@ -153,7 +155,7 @@ describe("Non Fungible Token", () => {
                                     extraDataMerkleRoot
                 )
 
-                let sig = await appNodes.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
+                let sig = await validators.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
 
                 let merkleProof = [
                     DecodeHexStringToByteArray("0000000000000000000000000000000000000000000000000000000000000000"), 
@@ -185,9 +187,10 @@ describe("Non Fungible Token", () => {
                 maliciousEvent = maliciousEvent.concat(tokenIdHex.substring(2, tokenIdHex.length))                
                 let maliciousData = DecodeHexStringToByteArray(maliciousEvent)
 
+                await bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid))
                 await expect(bridge.withdrawRequestNFT(maliciousData, eventProof,
                     DecodeHexStringToByteArray(blockHeader),
-                    [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [appNodes.address], el2Proof)
+                    [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [validators.address], el2Proof)
                 ).to.be.revertedWith('Postchain: invalid event')
 
                 // hash two times to make malicious data
@@ -201,7 +204,7 @@ describe("Non Fungible Token", () => {
                 }                
                 await expect(bridge.withdrawRequestNFT(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader),
-                    [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [appNodes.address], invalidExtraLeaf)
+                    [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [validators.address], invalidExtraLeaf)
                 ).to.be.revertedWith('Postchain: invalid EIF extra data')
 
                 let invalidExtraDataRoot = {
@@ -213,7 +216,7 @@ describe("Non Fungible Token", () => {
                 }                
                 await expect(bridge.withdrawRequestNFT(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader),
-                    [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [appNodes.address], invalidExtraDataRoot)
+                    [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [validators.address], invalidExtraDataRoot)
                 ).to.be.revertedWith('Postchain: invalid extra data root')
 
                 let maliciousBlockRid = postchainMerkleNodeHash([0x7, node1234, node1234])
@@ -226,7 +229,7 @@ describe("Non Fungible Token", () => {
                 )
                 await expect(bridge.withdrawRequestNFT(data, eventProof,
                     DecodeHexStringToByteArray(maliciousBlockHeader),
-                    [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [appNodes.address], el2Proof)
+                    [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [validators.address], el2Proof)
                 ).to.be.revertedWith('Postchain: invalid block header')
 
                 let maliciousEl2Proof = {
@@ -241,7 +244,7 @@ describe("Non Fungible Token", () => {
                 }
                 await expect(bridge.withdrawRequestNFT(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader),
-                    [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [appNodes.address], maliciousEl2Proof)
+                    [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [validators.address], maliciousEl2Proof)
                 ).to.be.revertedWith('Postchain: invalid EIF extra merkle proof')
 
                 let maliciousEventProof = {
@@ -251,7 +254,7 @@ describe("Non Fungible Token", () => {
                 }
                 await expect(bridge.withdrawRequestNFT(data, maliciousEventProof,
                     DecodeHexStringToByteArray(blockHeader),
-                    [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [appNodes.address], el2Proof)
+                    [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [validators.address], el2Proof)
                 ).to.be.revertedWith('NFTBridge: invalid merkle proof')
 
                 await expect(bridge.withdrawRequestNFT(data, eventProof,
@@ -259,15 +262,22 @@ describe("Non Fungible Token", () => {
                     [], [], el2Proof)
                 ).to.be.revertedWith('NFTBridge: block signature is invalid')
 
+                await bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(maliciousBlockchainRid))
                 await expect(bridge.withdrawRequestNFT(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader),
-                    [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [appNodes.address], el2Proof)
+                    [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [validators.address], el2Proof)
+                ).to.be.revertedWith('Postchain: invalid blockchain rid')
+
+                await bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid))                
+                await expect(bridge.withdrawRequestNFT(data, eventProof,
+                    DecodeHexStringToByteArray(blockHeader),
+                    [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [validators.address], el2Proof)
                 ).to.emit(bridge, "WithdrawRequestNFT")
                 .withArgs(user.address, nftAddress, tokenId)
 
                 await expect(bridge.withdrawRequestNFT(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader),
-                    [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [appNodes.address], el2Proof)
+                    [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [validators.address], el2Proof)
                 ).to.be.revertedWith('NFTBridge: event hash was already used')
 
                 await expect(bridge.withdrawNFT(
