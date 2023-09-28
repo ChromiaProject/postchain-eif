@@ -25,10 +25,7 @@ const chainIds = {
   ganache: 1337,
   goerli: 5,
   hardhat: 31337,
-  kovan: 42,
   mainnet: 1,
-  rinkeby: 4,
-  ropsten: 3,
   bsc: 97,
   mumbai: 80001,
 };
@@ -69,9 +66,6 @@ const config: HardhatUserConfig = {
     },
     mainnet: createTestnetConfig("mainnet"),
     goerli: createTestnetConfig("goerli"),
-    kovan: createTestnetConfig("kovan"),
-    rinkeby: createTestnetConfig("rinkeby"),
-    ropsten: createTestnetConfig("ropsten"),
     bsc: {
       accounts: {
         count: 10,
