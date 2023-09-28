@@ -56,6 +56,16 @@ $ yarn coverage
 
 ### Deploy token bridge contract to a network (requires Mnemonic, infura API and Etherscan API key)
 
+Create `.env` file by running `cp .env.example .env` and fill in the required environment variables with your own values.
+
+```properties
+MNEMONIC="..."
+INFURA_API_KEY="..."
+ETHERSCAN_API_KEY="..."
+```
+
+Then, run the deploy task:
+
 ```sh
 $ yarn deploy --network goerli --verify --app 0x659E4A3726275EDFD125F52338ECE0D54D15BD99,0x1A642F0E3C3AF545E7ACBD38B07251B3990914F1,0x75E20828B343D1FE37FAE469AB698E19C17F20B5
 ```
