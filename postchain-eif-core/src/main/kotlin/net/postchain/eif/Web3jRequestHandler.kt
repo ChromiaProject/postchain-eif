@@ -23,10 +23,11 @@ class Web3jRequestHandler(
     suspend fun <T : Response<*>> sendWeb3jRequestWithRetry(
             requests: List<Request<*, T>>
     ): T {
-        var retryTimeout = baseTimeout
+        val retryTimeouts = Array(requests.size) { baseTimeout }
         var tryErrors = 0L
         var index = if (requests.size > 1) Random.nextInt(0, requests.size-1) else 0
         while (true) {
+            val currentIndex = index
             val response = try {
                 val response = requests[index].send()
                 if (response.hasError()) {
@@ -44,15 +45,14 @@ class Web3jRequestHandler(
             if (response == null || response.hasError()) {
                 tryErrors++
                 if (tryErrors >= maxTryErrors && requests.size > 1) {
-                    retryTimeout = baseTimeout
                     logger.error { "Web3j request failed after $tryErrors tries on ${requests[index].method}/${urls[index]}" }
                     index = (index + 1) % requests.size
                     tryErrors = 0L
-                    logger.info { "Switching to another rpc endpoint at ${urls[index]}" }
+                    logger.info { "Switching to another rpc endpoint at ${urls[index]} in ${retryTimeouts[index]} ms" }
                 }
                 coroutineContext.ensureActive()
-                delay(retryTimeout)
-                retryTimeout = min((retryTimeout.toDouble() * DELAY_POWER_BASE).toLong(), maxTimeout)
+                delay(retryTimeouts[index])
+                retryTimeouts[currentIndex] = min((retryTimeouts[currentIndex].toDouble() * DELAY_POWER_BASE).toLong(), maxTimeout)
             } else {
                 return response
             }
