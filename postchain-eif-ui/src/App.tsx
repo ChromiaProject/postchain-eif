@@ -10,6 +10,7 @@ import "./App.css";
 const goerliBridgeAddress = process.env.REACT_APP_GOERLI_TOKEN_BRIDGE_ADDRESS
 const bscBridgeAddress = process.env.REACT_APP_BSC_TOKEN_BRIDGE_ADDRESS
 const mumbaiBridgeAddress = process.env.REACT_APP_MUMBAI_TOKEN_BRIDGE_ADDRESS
+const sepoliaBridgeAddress = process.env.REACT_APP_SEPOLIA_TOKEN_BRIDGE_ADDRESS
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ function App() {
                         <option value="5">5 - Goerli test network</option>
                         <option value="97">97 - BNB Smart Chain Testnet</option>
                         <option value="80001">80001 - Polygon Mumbai</option>
+                        <option value="11155111">11155111 - Sepolia test network</option>
                     </select>
                     <label class="label">
                         <span class="label-text">Pick the token</span>
@@ -58,6 +60,7 @@ function App() {
                 {chainId == 5 && !!tokenAddress && !!goerliBridgeAddress && (<Bridge bridgeAddress={goerliBridgeAddress} tokenAddress={tokenAddress} />)}
                 {chainId == 97 && !!tokenAddress && !!bscBridgeAddress && (<Bridge bridgeAddress={bscBridgeAddress} tokenAddress={tokenAddress} />)}
                 {chainId == 80001 && !!tokenAddress && !!mumbaiBridgeAddress && (<Bridge bridgeAddress={mumbaiBridgeAddress} tokenAddress={tokenAddress} />)}
+                {chainId == 11155111 && !!tokenAddress && !!sepoliaBridgeAddress && (<Bridge bridgeAddress={sepoliaBridgeAddress} tokenAddress={tokenAddress} />)}
             </div>
             <ReactQueryDevtools initialIsOpen={false} />
             <Toaster position="top-right" />            
