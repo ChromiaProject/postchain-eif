@@ -1,9 +1,10 @@
 image: registry.gitlab.com/chromaway/core-tools/chromia-images/maven-docker:1.1.3
 include:
   - project: "chromaway/core-infra/gitlab-automation"
-    ref: 1.1.4
+    ref: 1.1.6
     file:
       - templates/release.yml
+      - templates/maven-dependency-scanning.yml
       - templates/report-code-coverage.yml
 
 .setup:
@@ -19,6 +20,7 @@ stages:
   - build
   - code-coverage
   - deploy
+  - dependency-check
   - release
 
 # Triggered by that something was merged into or pushed onto main
@@ -66,6 +68,13 @@ build:
     when: always
     paths:
       - $JACOCO_REPORT_DIR/*
+
+dependency-check:
+  extends: .maven-dependency-check
+  stage: dependency-check
+  interruptible: true
+  rules:
+    - if: $RUN_DEPENDENCY_CHECK == "true"
 
 test-coverage-report:
   stage: code-coverage
