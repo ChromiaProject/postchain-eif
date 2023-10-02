@@ -42,12 +42,17 @@
             <dependency>
                 <groupId>org.web3j</groupId>
                 <artifactId>core</artifactId>
-                <version>4.10.2</version>
+                <version>4.10.3</version>
             </dependency>
             <dependency>
                 <groupId>com.squareup.okhttp3</groupId>
                 <artifactId>okhttp</artifactId>
-                <version>4.9.1</version>
+                <version>4.9.3</version>
+            </dependency>
+            <dependency>
+                <groupId>com.squareup.okio</groupId>
+                <artifactId>okio</artifactId>
+                <version>3.4.0</version>
             </dependency>
 
             <!-- Tests -->
@@ -142,6 +147,21 @@
                             </configuration>
                         </execution>
                     </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.owasp</groupId>
+                    <artifactId>dependency-check-maven</artifactId>
+                    <version>8.3.1</version>
+                    <configuration>
+                        <prettyPrint>true</prettyPrint>
+                        <failBuildOnAnyVulnerability>true</failBuildOnAnyVulnerability>
+                        <assemblyAnalyzerEnabled>false</assemblyAnalyzerEnabled>
+                        <yarnAuditAnalyzerEnabled>false</yarnAuditAnalyzerEnabled>
+                        <suppressionFiles>
+                            <suppressionFile>dependencies-suppression.xml</suppressionFile>
+                            <suppressionFile>https://gitlab.com/chromaway/postchain/-/raw/dev/common-dependencies-suppression.xml?ref_type=heads</suppressionFile>
+                        </suppressionFiles>
+                    </configuration>
                 </plugin>
             </plugins>
         </pluginManagement>
