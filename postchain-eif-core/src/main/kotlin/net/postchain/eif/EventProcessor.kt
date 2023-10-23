@@ -6,7 +6,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.slf4j.MDCContext
@@ -23,8 +22,6 @@ import org.web3j.abi.EventEncoder
 import org.web3j.abi.datatypes.Event
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameter
-import org.web3j.protocol.core.Request
-import org.web3j.protocol.core.Response
 import org.web3j.protocol.core.methods.request.EthFilter
 import org.web3j.protocol.core.methods.response.EthLog
 import org.web3j.protocol.core.methods.response.Log
@@ -32,7 +29,6 @@ import org.web3j.tx.Contract
 import java.math.BigInteger
 import java.util.*
 import java.util.stream.Collectors
-import kotlin.coroutines.coroutineContext
 
 enum class EncodedBlock(val index: Int) {
     NETWORK_ID(0),
@@ -114,7 +110,7 @@ class NoOpEventProcessor : EventProcessor {
  */
 class EvmEventProcessor(
         private val networkId: Long,
-        private val web3j: Web3j,
+        private val web3jServices: List<Web3j>,
         private val contractAddresses: List<String>,
         events: List<Event>,
         private val evmReadOffset: BigInteger,
@@ -123,7 +119,9 @@ class EvmEventProcessor(
         private val maxQueueSize: Long,
         skipToHeight: BigInteger,
         lastEvmBlockHeight: BigInteger,
-        private val blockchainEngine: BlockchainEngine
+        private val blockchainEngine: BlockchainEngine,
+        private val web3jRequestHandler: Web3jRequestHandler,
+        private val delayWhenNoNewBlocks: Long
 ) : EventProcessor, Shutdownable {
 
     private val job: Job
@@ -164,7 +162,7 @@ class EvmEventProcessor(
     private suspend fun fetchEvents() {
         val from = lastReadLogBlockHeight + BigInteger.ONE
 
-        val blockNumberReply = sendWeb3jRequestWithRetry(web3j.ethBlockNumber()) ?: return
+        val blockNumberReply = web3jRequestHandler.sendWeb3jRequestWithRetry(web3jServices.map { it.ethBlockNumber()})
         val currentBlockHeight = blockNumberReply.blockNumber - evmReadOffset
         // Pacing the reading of logs
         val to = minOf(currentBlockHeight, from + BigInteger.valueOf(maxReadAhead))
@@ -172,7 +170,7 @@ class EvmEventProcessor(
         if (to < from) {
             logger.debug { "No new blocks to read. We are at height: $to" }
             // Sleep a bit until next attempt
-            delay(500)
+            delay(delayWhenNoNewBlocks)
             return
         }
 
@@ -183,7 +181,8 @@ class EvmEventProcessor(
         )
         filter.addOptionalTopics(*eventSignatures)
 
-        val logResponse = sendWeb3jRequestWithRetry(web3j.ethGetLogs(filter)) ?: return
+
+        val logResponse = web3jRequestHandler.sendWeb3jRequestWithRetry(web3jServices.map { it.ethGetLogs(filter) })
 
         // Ensure events are sorted on txIndex + logIndex, blocks sorted on block number
         val sortedEncodedLogs = logResponse.logs
@@ -203,7 +202,7 @@ class EvmEventProcessor(
 
     override fun shutdown() {
         job.cancel()
-        web3j.shutdown()
+        web3jServices.forEach { it.shutdown() }
     }
 
     @Synchronized
@@ -292,7 +291,16 @@ class EvmEventProcessor(
         val blockHeight = block.asDict()["evm_block_height"]
             ?: throw ProgrammerMistake("Last evm block has no height stored")
 
-        return blockHeight.asBigInteger()
+        // Trying to be flexible here, don't care what the query gives us as long as it's a number
+        return when (blockHeight) {
+            is GtvBigInteger -> {
+                blockHeight.asBigInteger()
+            }
+            is GtvInteger -> {
+                BigInteger.valueOf(blockHeight.asInteger())
+            }
+            else -> throw ProgrammerMistake("Unexpected block height type: ${blockHeight.type}")
+        }
     }
 
     @Synchronized
@@ -319,35 +327,5 @@ class EvmEventProcessor(
             eventBlocks.poll()
             nextLogEvent = eventBlocks.peek()
         }
-    }
-
-    private suspend fun <T : Response<*>> sendWeb3jRequestWithRetry(
-        request: Request<*, T>,
-        retryTimeout: Long = 500
-    ): T? {
-        val response = try {
-            val response = request.send()
-            if (response.hasError()) {
-                logger.error("Web3j request failed with error code: ${response.error.code} and message: ${response.error.message}")
-            }
-            response
-        } catch (e: Exception) {
-            logger.error("Web3j request failed", e)
-            null
-        }
-
-        if (response == null || response.hasError()) {
-            try {
-                coroutineContext.ensureActive()
-            } catch (e: CancellationException) {
-                return null
-            }
-
-            if (retryTimeout > 0) {
-                delay(retryTimeout)
-            }
-            return sendWeb3jRequestWithRetry(request, retryTimeout)
-        }
-        return response
     }
 }

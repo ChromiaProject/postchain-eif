@@ -59,21 +59,23 @@ library Postchain {
     }    
 
     function verifyBlockHeader(
+        bytes32 blockchainRid,
         bytes memory blockHeader,
         Data.ExtraProofData memory proof
     ) internal pure returns (uint, bytes32, bytes32, bytes32) {
         require(Hash.hashGtvBytes64Leaf(proof.leaf) == proof.hashedLeaf, "Postchain: invalid EIF extra data");
-        (uint height, bytes32 blockRid, bytes32 extraDataHashedLeaf) = _decodeBlockHeader(blockHeader);
-        require(proof.extraRoot == extraDataHashedLeaf, "Postchain: invalid extra data root");
+        BlockHeaderData memory header = _decodeBlockHeader(blockHeader);
+        if (blockchainRid != header.blockchainRid) revert("Postchain: invalid blockchain rid");
+        require(proof.extraRoot == header.extraDataHashedLeaf, "Postchain: invalid extra data root");
         if (!proof.extraMerkleProofs.verifySHA256(proof.hashedLeaf, proof.position, proof.extraRoot)) {
             revert("Postchain: invalid EIF extra merkle proof");
         }
-        return (height, blockRid, _bytesToBytes32(proof.leaf, 0), _bytesToBytes32(proof.leaf, 32));
+        return (header.height, header.blockRid, _bytesToBytes32(proof.leaf, 0), _bytesToBytes32(proof.leaf, 32));
     }
 
     function _decodeBlockHeader(
         bytes memory blockHeader
-    ) internal pure returns (uint, bytes32, bytes32) {
+    ) internal pure returns (BlockHeaderData memory) {
         BlockHeaderData memory header = abi.decode(blockHeader, (BlockHeaderData));
 
         bytes32 node12 = sha256(abi.encodePacked(
@@ -113,7 +115,7 @@ library Postchain {
             ));
 
         if (blockRid != header.blockRid) revert("Postchain: invalid block header");
-        return (header.height, blockRid, header.extraDataHashedLeaf);
+        return header;
     }
 
     function _bytesToBytes32(bytes memory b, uint offset) internal pure returns (bytes32) {

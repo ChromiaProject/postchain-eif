@@ -24,11 +24,9 @@ import "./tasks/deployers";
 const chainIds = {
   ganache: 1337,
   goerli: 5,
+  sepolia: 11155111,
   hardhat: 31337,
-  kovan: 42,
   mainnet: 1,
-  rinkeby: 4,
-  ropsten: 3,
   bsc: 97,
   mumbai: 80001,
 };
@@ -69,9 +67,7 @@ const config: HardhatUserConfig = {
     },
     mainnet: createTestnetConfig("mainnet"),
     goerli: createTestnetConfig("goerli"),
-    kovan: createTestnetConfig("kovan"),
-    rinkeby: createTestnetConfig("rinkeby"),
-    ropsten: createTestnetConfig("ropsten"),
+    sepolia: createTestnetConfig("sepolia"),
     bsc: {
       accounts: {
         count: 10,

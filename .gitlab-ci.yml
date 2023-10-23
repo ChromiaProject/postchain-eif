@@ -1,24 +1,61 @@
-image: registry.gitlab.com/chromaway/core-tools/chromia-images/maven-docker:1.1.2
+image: registry.gitlab.com/chromaway/core-tools/chromia-images/maven-docker:1.1.3
 include:
   - project: "chromaway/core-infra/gitlab-automation"
-    ref: 1.1.0
-    file: templates/release.yml
+    ref: 1.1.6
+    file:
+      - templates/release.yml
+      - templates/maven-dependency-scanning.yml
+      - templates/report-code-coverage.yml
+
+.setup:
+  artifacts:
+    when: always
+    reports:
+      junit:
+        - "*/target/surefire-reports/TEST-*.xml"
+        - "*/target/failsafe-reports/TEST-*.xml"
+    expire_in: 1 week
 
 stages:
   - build
+  - code-coverage
   - deploy
+  - dependency-check
   - release
 
-deploy:
+# Triggered by that something was merged into or pushed onto main
+deploy-snapshot:
+  extends: .setup
   stage: deploy
-  only:
-    - dev
-    - main
-    - /^support\/.*$/
+  rules:
+    - if: $CI_COMMIT_BRANCH == "dev"
   script:
-    - mvn $MAVEN_CLI_OPTS deploy -Pgitlab-registry -Drevision=0-SNAPSHOT
+    - CURRENT_VERSION=$(git describe --tags --abbrev=0)
+    - IFS=. read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+    - SNAPSHOT_VERSION=$MAJOR.$((MINOR + 1)).0-SNAPSHOT
+    - mvn
+      $MAVEN_CLI_OPTS
+      --activate-profiles ci
+      -Drevision=$SNAPSHOT_VERSION
+      clean source:jar deploy
+
+# Triggered by that a semver tag was pushed
+deploy:
+  extends: .setup
+  stage: deploy
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^[0-9]+\.[0-9]+\.[0-9]+$/
+  script:
+    - mvn
+      $MAVEN_CLI_OPTS
+      --activate-profiles ci
+      -Drevision=$CI_COMMIT_TAG
+      clean source:jar deploy
 
 build:
+  extends:
+    - .setup
+    - .visualise-test-coverage
   stage: build
   except:
     - dev
@@ -26,14 +63,28 @@ build:
     - tags
     - /^support\/.*$/
   script:
-    - mvn $MAVEN_CLI_OPTS verify
+    - mvn $MAVEN_CLI_OPTS verify --activate-profiles ci,coverage
+  artifacts:
+    when: always
+    paths:
+      - $JACOCO_REPORT_DIR/*
 
-deploy-release:
-  stage: deploy
+dependency-check:
+  extends: .maven-dependency-check
+  stage: dependency-check
+  interruptible: true
   rules:
-    - if: $CI_COMMIT_TAG
-  script:
-    - mvn $MAVEN_CLI_OPTS deploy -Drevision=$CI_COMMIT_TAG
+    - if: $RUN_DEPENDENCY_CHECK == "true"
+
+test-coverage-report:
+  stage: code-coverage
+  except:
+    - dev
+    - main
+    - tags
+    - /^support\/.*$/
+  dependencies:
+    - build
 
 variables:
   # This will suppress any download for dependencies and plugins or upload messages which would clutter the console log.
@@ -57,6 +108,7 @@ variables:
   DOCKER_TLS_CERTDIR: ""
   # Improve performance with overlayfs.
   DOCKER_DRIVER: overlay2
+  JACOCO_REPORT_DIR: postchain-eif-core/target/site/jacoco
 
 services:
   - postgres
