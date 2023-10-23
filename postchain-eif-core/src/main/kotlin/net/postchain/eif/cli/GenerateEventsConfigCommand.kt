@@ -2,10 +2,11 @@ package net.postchain.eif.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.*
+import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.file
 import java.io.File
 
-class AbiJsonToGtvXmlCommand : CliktCommand(name = "generate-gtv-xml") {
+class GenerateEventsConfigCommand : CliktCommand(name = "generate-events-config") {
 
     private val abiSource by option("-s", "--source", help = "Path to a JSON ABI file or a directory of JSON ABI files")
         .file(true)
@@ -19,6 +20,10 @@ class AbiJsonToGtvXmlCommand : CliktCommand(name = "generate-gtv-xml") {
         .file()
         .default(File("events.xml"))
 
+    private val fileFormat by option("-f", "--format", help = "Output file format")
+        .choice("xml", "yaml")
+        .default("xml")
+
     override fun run() {
         val abiJson = if (abiSource.isDirectory) {
             abiSource.listFiles().joinToString(",", "[", "]") {
@@ -28,12 +33,12 @@ class AbiJsonToGtvXmlCommand : CliktCommand(name = "generate-gtv-xml") {
             abiSource.readText()
         }
 
-        val gtvXml = AbiJsonToGtvXml.abiJsonToXml(abiJson, eventNames)
+        val eventsConfig = AbiJsonToEventsConfig.generate(abiJson, eventNames, FileFormat.valueOf(fileFormat.uppercase()))
 
-        println("Insert generated XML under key 'eif/events' in blockchain config")
+        println("Insert generated events config file under key 'eif/events' in blockchain config")
         if (!outputFile.exists()) {
             outputFile.createNewFile()
         }
-        outputFile.writeText(gtvXml)
+        outputFile.writeText(eventsConfig)
     }
 }
