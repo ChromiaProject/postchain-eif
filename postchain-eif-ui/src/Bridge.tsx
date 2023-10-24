@@ -932,7 +932,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
 
   return (
     <div className="relative py-3 sm:max-w-5xl sm:mx-auto">
-      {chainId !== 5 && chainId !== 97 && chainId !== 80001 && (
+      {chainId !== 5 && chainId !== 97 && chainId !== 80001 && chainId !== 11155111 && chainId !== 17000 && (
         <>
           <div className="alert">
             <div className="flex-1">
@@ -950,7 +950,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
                   d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
                 />
               </svg>
-              <label>Please connect to the Polygon Mumbai/Görli/BSC testnet for testing.</label>
+              <label>Please connect to the Görli/Sepolia/Holesky/BSC/Polygon Mumbai testnet for testing.</label>
             </div>
           </div>
           <div className="divider"></div>

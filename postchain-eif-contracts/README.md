@@ -70,6 +70,12 @@ Then, run the deploy task:
 $ yarn deploy --network goerli --verify --app 0x659E4A3726275EDFD125F52338ECE0D54D15BD99,0x1A642F0E3C3AF545E7ACBD38B07251B3990914F1,0x75E20828B343D1FE37FAE469AB698E19C17F20B5
 ```
 
+You also can deploy ALICE token for test
+
+```sh
+$ yarn deploy:alice --network sepolia --verify
+```
+
 ### Added plugins
 
 - Gas reporter [hardhat-gas-reporter](https://hardhat.org/plugins/hardhat-gas-reporter.html)
