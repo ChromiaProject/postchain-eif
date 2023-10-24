@@ -257,7 +257,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
         val otherAccountId = blockQuery.query("eif.evm.get_account_id_by_evm_address",
                 gtv("acc" to gtv(otherEvmAddess))).get()
         registerAccounts.forEach {
-            it.accountId = blockQuery.query("eif.evm.get_account_by_evm_address", gtv("acc" to gtv(it.evmAddress))).get().asByteArray()
+            it.accountId = blockQuery.query("eif.evm.get_account_id_by_evm_address", gtv("acc" to gtv(it.evmAddress))).get().asByteArray()
         }
 
         // Deposit token on EVM smart contract to bridge it to postchain
@@ -425,7 +425,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
         val toOtherAccounts = accountNum.toBigInteger() * accountBalance.toBigInteger()
         val toRemainingAccount = totalTransferAmount - toOtherAccounts
 
-        enqueueTx(transfer(userPubkey, userPriKey, accountId, authDescriptorId, otherAccountId, assetId, toOtherAccounts, bcRid))
+        enqueueTx(transfer(userPubkey, userPriKey, accountId, authDescriptorId, otherAccountId, assetId, toRemainingAccount, bcRid))
         sealBlock()
         snapshotHeights.add(currentBlockHeight)
         registerAccounts.forEach {
