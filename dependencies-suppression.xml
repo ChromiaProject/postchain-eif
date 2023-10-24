@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+    <suppress>
+        <notes><![CDATA[
+        Vulnerability in OpenZeppelin Contracts. We are not using the problematic code so suppressing this until we
+        upgrade to a higher version.
+        file name: contracts:4.6.0
+        ]]></notes>
+        <cve>CVE-2023-40014</cve>
+    </suppress>
+</suppressions>

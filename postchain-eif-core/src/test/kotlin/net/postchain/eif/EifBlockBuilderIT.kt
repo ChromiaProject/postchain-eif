@@ -30,7 +30,7 @@ import java.security.MessageDigest
 
 val myCS = Secp256K1CryptoSystem()
 
-class EifBlockBuilderTest : IntegrationTestSetup() {
+class EifBlockBuilderIT : IntegrationTestSetup() {
 
     private lateinit var ds: SimpleDigestSystem
     private val sigMaker = myCS.buildSigMaker(KeyPair(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))

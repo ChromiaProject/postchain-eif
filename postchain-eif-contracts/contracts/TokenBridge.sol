@@ -38,6 +38,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
     PostchainBlock public massExitBlock;
     uint256 public emergencyTimestamp;
 
+    // Postchain/Chromia blockchain rid
+    bytes32 private blockchainRid;
+
     // Each postchain event will be used to claim only one time.
     mapping (bytes32 => bool) private _events;
 
@@ -108,6 +111,10 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
         networkId = id;
         validator = _validator;
         emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
+    }
+
+    function setBlockchainRid(bytes32 rid) onlyOwner public {
+        blockchainRid = rid;
     }
 
     function pause() onlyOwner public {
@@ -204,7 +211,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
     ) internal view {
         require(_events[eventProof.leaf] == false, "TokenBridge: event hash was already used");
         {
-            (uint height, bytes32 blockRid, bytes32 eventRoot, ) = Postchain.verifyBlockHeader(blockHeader, extraProof);
+            (uint height, bytes32 blockRid, bytes32 eventRoot, ) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
             if (isMassExit) {
                 require(height <= massExitBlock.height, "TokenBridge: cannot withdraw request after the mass exit block height");
             }
@@ -281,7 +288,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
     ) whenMassExit whenNotPaused nonReentrant public  {
         require(_snapshots[stateProof.leaf] == false, "TokenBridge: snapshot already used");
         require(stateProof.leaf == keccak256(snapshot), "TokenBridge: snapshot data is not correct");
-        (uint height, bytes32 blockRid, , bytes32 stateRoot) = Postchain.verifyBlockHeader(blockHeader, extraProof);
+        (uint height, bytes32 blockRid, , bytes32 stateRoot) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
         require(blockRid == massExitBlock.blockRid && height == massExitBlock.height, "TokenBridge: snapshot block should be the same with mass exit block");
         if (!validator.isValidSignatures(validator.getValidatorHeight(height), blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
         if (!MerkleProof.verify(stateProof.merkleProofs, stateProof.leaf, stateProof.position, stateRoot)) revert("TokenBridge: invalid merkle proof");

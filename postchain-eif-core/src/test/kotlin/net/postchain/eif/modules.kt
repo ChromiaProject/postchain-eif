@@ -1,6 +1,7 @@
 package net.postchain.eif
 
 import net.postchain.base.data.DatabaseAccess
+import net.postchain.common.exception.UserMistake
 import net.postchain.core.EContext
 import net.postchain.core.TxEContext
 import net.postchain.gtv.GtvByteArray
@@ -24,11 +25,11 @@ private fun table_eth_event(ctx: EContext): String {
     return db.tableName(ctx, "eth_events")
 }
 
+@Suppress("UNUSED_PARAMETER")
 class EifEventOp(u: Unit, opdata: ExtOpData) : GTXOperation(opdata) {
 
-    override fun isCorrect(): Boolean {
-        if (data.args.size != 2) return false
-        return true
+    override fun checkCorrectness() {
+        if (data.args.size != 2) throw UserMistake("data.args.size != 2")
     }
 
     override fun apply(ctx: TxEContext): Boolean {
@@ -44,11 +45,11 @@ class EifEventOp(u: Unit, opdata: ExtOpData) : GTXOperation(opdata) {
     }
 }
 
+@Suppress("UNUSED_PARAMETER")
 class EifStateOp(u: Unit, opdata: ExtOpData) : GTXOperation(opdata) {
 
-    override fun isCorrect(): Boolean {
-        if (data.args.size != 3) return false
-        return true
+    override fun checkCorrectness() {
+        if (data.args.size != 3) throw UserMistake("data.args.size != 3")
     }
 
     override fun apply(ctx: TxEContext): Boolean {
@@ -67,11 +68,11 @@ class EifStateOp(u: Unit, opdata: ExtOpData) : GTXOperation(opdata) {
     }
 }
 
+@Suppress("UNUSED_PARAMETER")
 class EifTransferOp(u: Unit, opdata: ExtOpData) : GTXOperation(opdata) {
 
-    override fun isCorrect(): Boolean {
-        if (data.args.size != 9) return false
-        return true
+    override fun checkCorrectness() {
+        if (data.args.size != 9) throw UserMistake("data.args.size != 9")
     }
 
     override fun apply(ctx: TxEContext): Boolean {

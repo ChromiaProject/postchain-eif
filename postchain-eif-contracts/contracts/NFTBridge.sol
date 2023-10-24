@@ -35,6 +35,9 @@ contract NFTBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reentr
     IValidator public validator;
     uint256 public networkId;
 
+    // Postchain/Chromia blockchain rid
+    bytes32 private blockchainRid;
+
     // Each postchain event will be used to claim only one time.
     mapping (bytes32 => bool) private _events;
 
@@ -72,6 +75,10 @@ contract NFTBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reentr
         }
         networkId = id;
         validator = _validator;
+    }
+
+    function setBlockchainRid(bytes32 rid) onlyOwner public {
+        blockchainRid = rid;
     }
 
     /**
@@ -137,7 +144,7 @@ contract NFTBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reentr
     ) internal view {
         require(_events[eventProof.leaf] == false, "NFTBridge: event hash was already used");
         {
-            (uint height, bytes32 blockRid, bytes32 eventRoot, ) = Postchain.verifyBlockHeader(blockHeader, extraProof);
+            (uint height, bytes32 blockRid, bytes32 eventRoot, ) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
             if (!validator.isValidSignatures(validator.getValidatorHeight(height), blockRid, sigs, signers)) revert("NFTBridge: block signature is invalid");
             if (!MerkleProof.verify(eventProof.merkleProofs, eventProof.leaf, eventProof.position, eventRoot)) revert("NFTBridge: invalid merkle proof");
         }

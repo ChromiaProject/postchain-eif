@@ -3,7 +3,7 @@
     <entry key="blockstrategy">
         <dict>
             <entry key="name">
-                <string>net.postchain.base.BaseBlockBuildingStrategy</string>
+                <string>net.postchain.devtools.OnDemandBlockBuildingStrategy</string>
             </entry>
         </dict>
     </entry>
@@ -12,6 +12,16 @@
     </entry>
     <entry key="eif">
         <dict>
+            <entry key="snapshot">
+                <dict>
+                    <entry key="levels_per_page">
+                        <int>2</int>
+                    </entry>
+                    <entry key="snapshots_to_keep">
+                        <int>2</int>
+                    </entry>
+                </dict>
+            </entry>
             <entry key="chains">
                 <dict>
                     <entry key="ethereum">
