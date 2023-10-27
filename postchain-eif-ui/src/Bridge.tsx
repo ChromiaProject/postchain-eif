@@ -119,6 +119,21 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
     return eventHash.substring(2, eventHash.length)
   }
 
+  const setBlockchainRID = async () => {
+    const signer = library.getSigner()
+    try {
+      const bridge = new ethers.Contract(
+        bridgeAddress,
+        BridgeArtifacts.abi,
+        library
+      )
+      let  calldata = bridge.interface.encodeFunctionData("setBlockchainRid", [Buffer.from(blockchainRID, 'hex')])
+      await sendTnx(signer, bridgeAddress, calldata)
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
   const withdrawRequest = async (eventHash: string) => {
     const signer = library.getSigner()
     try {
@@ -305,6 +320,9 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
   return (
     
     <div className="flex flex-col">
+      <button type="button" className="btn btn-outline btn-accent" onClick={() => {setBlockchainRID()}}>
+        Set Blockchain RID
+      </button>
       <input 
         type="text" 
         placeholder="Account Id" 
