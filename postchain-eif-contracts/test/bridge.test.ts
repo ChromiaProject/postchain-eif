@@ -54,7 +54,9 @@ describe("Token Bridge Test", () => {
             const [node1, node2, node3, other] = await ethers.getSigners()
             const validator = new Validator__factory(admin).attach(validatorAddress)
             const otherValidator = new Validator__factory(other).attach(validatorAddress)
-            await expect(otherValidator.addValidator(0, node1.address)).to.be.revertedWith("Ownable: caller is not the owner")
+            await expect(otherValidator.addValidator(0, node1.address))
+                .to.be.revertedWith('OwnableUnauthorizedAccount')
+
             // Update App Nodes
             await validator.removeValidator(0, validator1.address)
             await validator.removeValidator(0, validator2.address)
@@ -118,11 +120,13 @@ describe("Token Bridge Test", () => {
             await bridge.deposit(tokenAddress, toDeposit, ft3_account_id)
 
             // normal user cannot call emergencyWithdraw
-            await expect(bridge.emergencyWithdraw(tokenAddress, beneficiary.address)).to.be.revertedWith("Ownable: caller is not the owner")
+            await expect(bridge.emergencyWithdraw(tokenAddress, beneficiary.address))
+                .to.be.revertedWith('OwnableUnauthorizedAccount')
 
             const adminBridge = new TokenBridge__factory(deployer).attach(bridgeAddress)
             // admin or owner cannot call emergencyWithdraw before setting time
-            await expect(adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address)).to.be.revertedWith("TokenBridge: cannot do emergency withdrawl before setting timestamp")
+            await expect(adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address))
+                .to.be.revertedWith("TokenBridge: cannot do emergency withdrawl before setting timestamp")
 
             // admin can call emergencyWithdraw after setting time
             expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(0)
@@ -154,10 +158,10 @@ describe("Token Bridge Test", () => {
             const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
 
-            await expect(bridge.pause()).to.be.revertedWith("Ownable: caller is not the owner")
+            await expect(bridge.pause()).to.be.revertedWith('OwnableUnauthorizedAccount')
             await expect(bridge.deposit(bridgeAddress, toDeposit, ft3_account_id)).to.be.revertedWith('TokenBridge: not allow token')
             await bridgeOwner.pause()
-            await expect(bridge.deposit(tokenAddress, toDeposit, ft3_account_id)).to.be.revertedWith('Pausable: paused')
+            await expect(bridge.deposit(tokenAddress, toDeposit, ft3_account_id)).to.be.revertedWith('EnforcedPause()')
             await bridgeOwner.unpause()
             let tx: ContractTransaction = await bridge.deposit(tokenAddress, toDeposit, ft3_account_id)
             let receipt: ContractReceipt = await tx.wait()
@@ -214,8 +218,8 @@ describe("Token Bridge Test", () => {
                 let dependenciesHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(dependencies))
 
                 // This merkle root is calculated in the postchain code
-                let extraDataMerkleRoot = "084FE92782C73BE4AD04B6CA167F8513EE9FB4693DD58C3CD96AC266209B0F23"
-                let wrongNetworkIdExtraDataMerkleRoot = "3FA75D6A93D7F8F5BB4B17F0C8F27B1ABB6B08CF907A203F957FBB101D8EC8F2"
+                let extraDataMerkleRoot = "672D33B35488E3C965E6A393B922CDCF79C51976DA97A6B7B3079DE1DF6DB89E"
+                let wrongNetworkIdExtraDataMerkleRoot = "512B99A96BC206862ED76AFC1B555037D3A14D5A62DC4778A548D38A5FCDA9C1"
 
                 let node1 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(blockchainRid))
                 let node2 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(previousBlockRid))
@@ -336,15 +340,15 @@ describe("Token Bridge Test", () => {
                 };
                 let sigs = [
                     DecodeHexStringToByteArray(sig1.substring(2, sig1.length)),
-                    DecodeHexStringToByteArray(sig3.substring(2, sig3.length)),
-                    DecodeHexStringToByteArray(sig2.substring(2, sig2.length))
+                    DecodeHexStringToByteArray(sig2.substring(2, sig2.length)),
+                    DecodeHexStringToByteArray(sig3.substring(2, sig3.length))
                 ];
                 let wrongNetworkIdSigs = [
                     DecodeHexStringToByteArray(wrongNetworkIdSig1.substring(2, wrongNetworkIdSig1.length)),
-                    DecodeHexStringToByteArray(wrongNetworkIdSig3.substring(2, wrongNetworkIdSig3.length)),
-                    DecodeHexStringToByteArray(wrongNetworkIdSig2.substring(2, wrongNetworkIdSig2.length))
+                    DecodeHexStringToByteArray(wrongNetworkIdSig2.substring(2, wrongNetworkIdSig2.length)),
+                    DecodeHexStringToByteArray(wrongNetworkIdSig3.substring(2, wrongNetworkIdSig3.length))
                 ]
-                let validators = [validator1.address, validator3.address, validator2.address];
+                let validators = [validator1.address, validator2.address, validator3.address];
                 await bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid))
                 await expect(bridge.withdrawRequest(wrongNetworkIdData, wrongNetworkIdEventProof,
                     DecodeHexStringToByteArray(wrongNetworkIdBlockHeader), wrongNetworkIdSigs, validators, 
@@ -411,7 +415,7 @@ describe("Token Bridge Test", () => {
                 await expect(bridge.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     extraProof)
-                ).to.be.revertedWith('Pausable: paused')
+                ).to.be.revertedWith('EnforcedPause()')
                 await bridgeOwner.unpause()
                 await bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(maliciousBlockchainRid))
                 await expect(bridge.withdrawRequest(data, eventProof,
@@ -462,7 +466,7 @@ describe("Token Bridge Test", () => {
                 await bridgeOwner.pause()
                 await expect(bridge.withdraw(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
-                    user.address)).to.be.revertedWith('Pausable: paused')
+                    user.address)).to.be.revertedWith('EnforcedPause()')
                 await bridgeOwner.unpause()
                 // now user can withdraw the fund
                 await expect(bridge.withdraw(
@@ -538,7 +542,7 @@ describe("Token Bridge Test", () => {
                 let dependenciesHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(dependencies))
 
                 // This merkle root is calculated in the postchain code
-                let extraDataMerkleRoot = "8E052CEB23DB2111FBB13A1C2F6B3639C4EA8F447022A1B9BFF42442EF939F17"
+                let extraDataMerkleRoot = "A1C05DC4AFAE5375A20F89785FA362C6BCF74310C5209F1C023C6334C31DE3C4"
 
                 let node1 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(blockchainRid))
                 let node2 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(previousBlockRid))
@@ -632,10 +636,10 @@ describe("Token Bridge Test", () => {
                 };
                 let sigs = [
                     DecodeHexStringToByteArray(sig1.substring(2, sig1.length)),
-                    DecodeHexStringToByteArray(sig3.substring(2, sig2.length)),
-                    DecodeHexStringToByteArray(sig2.substring(2, sig2.length))
+                    DecodeHexStringToByteArray(sig2.substring(2, sig2.length)),
+                    DecodeHexStringToByteArray(sig3.substring(2, sig3.length))
                 ];
-                let validators = [validator1.address, validator3.address, validator2.address];
+                let validators = [validator1.address, validator2.address, validator3.address];
                 await bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid))
                 await expect(bridgeDelegator.withdrawRequest(maliciousData, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators, 
@@ -759,7 +763,7 @@ describe("Token Bridge Test", () => {
             let blockRid = postchainMerkleNodeHash([0x7, node1, node2])
 
             // non admin cannot trigger mass exit
-            await expect(otherTokenBridge.triggerMassExit(100, blockRid)).to.be.revertedWith("Ownable: caller is not the owner")
+            await expect(otherTokenBridge.triggerMassExit(100, blockRid)).to.be.revertedWith('OwnableUnauthorizedAccount')
 
             // admin can trigger mass exit
             await adminTokenBridge.triggerMassExit(100, blockRid)
@@ -773,7 +777,7 @@ describe("Token Bridge Test", () => {
             expect((await adminTokenBridge.massExitBlock()).height).to.be.equal(200)
 
             // postpone mass exit
-            await expect(otherTokenBridge.postponeMassExit()).to.be.revertedWith("Ownable: caller is not the owner")
+            await expect(otherTokenBridge.postponeMassExit()).to.be.revertedWith('OwnableUnauthorizedAccount')
             await adminTokenBridge.postponeMassExit()
             expect(await adminTokenBridge.isMassExit()).to.be.false
         })

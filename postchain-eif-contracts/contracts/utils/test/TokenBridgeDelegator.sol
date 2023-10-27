@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.19;
 
 import "../../TokenBridge.sol";
 
@@ -11,11 +11,11 @@ contract TokenBridgeDelegator {
         _bridge = bridge;
     }
 
-    function approve(IERC20Upgradeable token, address _spender, uint256 _amount) public returns(bool) {
+    function approve(ERC20Upgradeable token, address _spender, uint256 _amount) public returns(bool) {
         return token.approve(_spender, _amount);
     }
 
-    function deposit(IERC20Upgradeable token, uint256 amount, bytes32 ft3_account_id) public returns (bool) {
+    function deposit(ERC20Upgradeable token, uint256 amount, bytes32 ft3_account_id) public returns (bool) {
         return _bridge.deposit(token, amount, ft3_account_id);
     }
 
