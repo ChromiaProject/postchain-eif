@@ -56,9 +56,8 @@ describe("Token", () => {
       const toSend = ethers.utils.parseEther("1.1");
 
       // Notice await is on the expect
-      await expect(senderInstance.transfer(receiver.address, toSend)).to.be.revertedWith(
-        "transfer amount exceeds balance",
-      );
+      await expect(senderInstance.transfer(receiver.address, toSend))
+        .to.be.revertedWith('ERC20InsufficientBalance');
     });
   });
 });

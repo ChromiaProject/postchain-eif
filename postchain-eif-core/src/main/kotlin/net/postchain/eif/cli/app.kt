@@ -8,6 +8,5 @@ class Eif : CliktCommand() {
 }
 
 fun main(args: Array<String>) = Eif().subcommands(
-        AbiJsonToGtvXmlCommand(),
         PubkeyToEthereumAddressCommand()
 ).main(args)

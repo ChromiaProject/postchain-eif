@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./utils/cryptography/ECDSA.sol";
@@ -14,7 +14,7 @@ contract Validator is Ownable {
     event ValidatorAdded(uint height, address indexed _validator);
     event ValidatorRemoved(uint height, address indexed _validator);
 
-    constructor(address[] memory _validators) {
+    constructor(address[] memory _validators) Ownable(msg.sender) {
         validators[0] = _validators;
         for (uint i = 0; i < validators[0].length; i++) {
             validatorMap[0][validators[0][i]] = true;

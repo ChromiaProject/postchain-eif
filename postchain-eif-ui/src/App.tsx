@@ -11,6 +11,7 @@ const goerliBridgeAddress = process.env.REACT_APP_GOERLI_TOKEN_BRIDGE_ADDRESS
 const bscBridgeAddress = process.env.REACT_APP_BSC_TOKEN_BRIDGE_ADDRESS
 const mumbaiBridgeAddress = process.env.REACT_APP_MUMBAI_TOKEN_BRIDGE_ADDRESS
 const sepoliaBridgeAddress = process.env.REACT_APP_SEPOLIA_TOKEN_BRIDGE_ADDRESS
+const holeskyBridgeAddress = process.env.REACT_APP_HOLESKY_TOKEN_BRIDGE_ADDRESS
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ function App() {
                         <option value="97">97 - BNB Smart Chain Testnet</option>
                         <option value="80001">80001 - Polygon Mumbai</option>
                         <option value="11155111">11155111 - Sepolia test network</option>
+                        <option value="17000">17000 - Holesky Test Network</option>
                     </select>
                     <label class="label">
                         <span class="label-text">Pick the token</span>
@@ -51,6 +53,8 @@ function App() {
                         <option value="0xd35CCeEAD182dcee0F148EbaC9447DA2c4D449c4">USDC (Goerli)</option>
                         <option value="0x63bfb2118771bd0da7A6936667A7BB705A06c1bA">LINK (Goerli)</option>
                         <option value="0x932Ca55B9Ef0b3094E8Fa82435b3b4c50d713043">G_NFTS (Goerli)</option>
+                        <option value="0x679170cC953B01D270349A344c4ED5634344ca04">ALICE (Sepolia)</option>
+                        <option value="0x779877A7B0D9E8603169DdbD7836e478b4624789">LINK (Sepolia)</option>
                         <option value="0xeD24FC36d5Ee211Ea25A80239Fb8C4Cfd80f12Ee">BUSD (BSC Testnet)</option>
                         <option value="0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06">LINK (BSC Testnet)</option>
                         <option value="0x326C977E6efc84E512bB9C30f76E30c160eD06FB">LINK (Mumbai)</option>
@@ -61,6 +65,7 @@ function App() {
                 {chainId == 97 && !!tokenAddress && !!bscBridgeAddress && (<Bridge bridgeAddress={bscBridgeAddress} tokenAddress={tokenAddress} />)}
                 {chainId == 80001 && !!tokenAddress && !!mumbaiBridgeAddress && (<Bridge bridgeAddress={mumbaiBridgeAddress} tokenAddress={tokenAddress} />)}
                 {chainId == 11155111 && !!tokenAddress && !!sepoliaBridgeAddress && (<Bridge bridgeAddress={sepoliaBridgeAddress} tokenAddress={tokenAddress} />)}
+                {chainId == 17000 && !!tokenAddress && !!holeskyBridgeAddress && (<Bridge bridgeAddress={holeskyBridgeAddress} tokenAddress={tokenAddress} />)}
             </div>
             <ReactQueryDevtools initialIsOpen={false} />
             <Toaster position="top-right" />            

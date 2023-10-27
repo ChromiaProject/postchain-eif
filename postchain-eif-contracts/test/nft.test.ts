@@ -118,7 +118,7 @@ describe("Non Fungible Token", () => {
                 let state = blockNumber.substring(2, blockNumber.length).concat(event)
                 let hashRootState = keccak256(DecodeHexStringToByteArray(state))
                 let eifLeaf = hashRootEvent.substring(2, hashRootEvent.length).concat(hashRootState.substring(2, hashRootState.length))
- 
+                
                 let blockchainRid = "977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795"
                 let maliciousBlockchainRid = "efe4a2423cc6d39eb91bc9baac4ec325825ff7c12093d45a554dab732129eefc"
                 let previousBlockRid = "49e46bf022de1515cbb2bf0f69c62c071825a9b940e8f3892acb5d2021832ba0"
@@ -128,7 +128,7 @@ describe("Non Fungible Token", () => {
                 let dependenciesHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(dependencies))
 
                 // This merkle root is calculated in the postchain code
-                let extraDataMerkleRoot = "258E024FB2F9EEC50F5338292159E98DB661DD8F69895104F7548882B9E1E5EB"
+                let extraDataMerkleRoot = "12E32638A905B35D5AD0D663B7A0018FEBA942CF8EF32F46AC31E9EA5195B0B1"
 
                 let timestamp = 1629878444220
                 let height = 46

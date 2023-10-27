@@ -8,7 +8,6 @@ import { NetworkUserConfig } from "hardhat/types";
 import "@nomiclabs/hardhat-waffle";
 import "@typechain/hardhat";
 import "@nomiclabs/hardhat-ethers";
-import "@nomiclabs/hardhat-waffle";
 import "@openzeppelin/hardhat-upgrades";
 
 import "hardhat-gas-reporter";
@@ -25,6 +24,7 @@ const chainIds = {
   ganache: 1337,
   goerli: 5,
   sepolia: 11155111,
+  holesky: 17000,
   hardhat: 31337,
   mainnet: 1,
   bsc: 97,
@@ -59,7 +59,7 @@ const config: HardhatUserConfig = {
     },
     hardhat: {
       accounts: {
-        mnemonic: "",
+        mnemonic: "manage discover reunion amount train dash jewel industry connect ride victory shift",
       },
       chainId: chainIds.hardhat,
       // See https://github.com/sc-forks/solidity-coverage/issues/652
@@ -68,6 +68,7 @@ const config: HardhatUserConfig = {
     mainnet: createTestnetConfig("mainnet"),
     goerli: createTestnetConfig("goerli"),
     sepolia: createTestnetConfig("sepolia"),
+    holesky: createTestnetConfig("holesky"),
     bsc: {
       accounts: {
         count: 10,
@@ -97,7 +98,7 @@ const config: HardhatUserConfig = {
   },
   solidity: {
     compilers: [{
-      version: "0.8.2",
+      version: "0.8.20",
       settings: {
         // Disable the optimizer when debugging
         // https://hardhat.org/hardhat-network/#solidity-optimizer-support

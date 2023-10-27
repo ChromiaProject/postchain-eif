@@ -5,14 +5,15 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 /**
- * @notice A mintable ERC20
+ * @notice ALICE token
  */
-contract TestToken is ERC20, AccessControl {
+contract ALICE is ERC20, AccessControl {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
-    constructor() ERC20("Test Token", "TST") {
+    constructor() ERC20("ALICE", "ALICE") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
+        _mint(msg.sender, 1000000*10**18);
     }
 
     function mint(address to, uint256 amount) external {

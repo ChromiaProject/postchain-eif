@@ -1,11 +1,11 @@
 import { task } from "hardhat/config";
-import {TestToken, TestToken__factory} from "../../src/types";
+import {ALICE, ALICE__factory} from "../../src/types";
 
-task("deploy:token")
+task("deploy:alice", "Deploy ALICE token")
   .addFlag('verify', 'Verify contracts at Etherscan')
   .setAction(async ({ verify }, hre) => {
-    const tokenFactory: TestToken__factory = await hre.ethers.getContractFactory("TestToken");
-    const token: TestToken = <TestToken>await tokenFactory.deploy()
+    const tokenFactory: ALICE__factory = await hre.ethers.getContractFactory("ALICE");
+    const token: ALICE = <ALICE>await tokenFactory.deploy()
     await token.deployed();
     console.log("token deployed to: ", token.address);
 
@@ -16,6 +16,7 @@ task("deploy:token")
             address: token.address,
             constructorArguments: [],
             libraries: {},
+            contract: "contracts/token/AliceToken.sol:ALICE",
         });
     }
   });
