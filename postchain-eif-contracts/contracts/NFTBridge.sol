@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.19;
 
 // Upgradeable implementations
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 // Interfaces
 import "@openzeppelin/contracts/interfaces/IERC721.sol";
@@ -67,7 +67,7 @@ contract NFTBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reentr
     }
 
     function initialize(IValidator _validator) public initializer {
-        __Ownable_init();
+        __Ownable_init(_msgSender());
 
         uint256 id;
         assembly {

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.19;
 
 // Interfaces
 import "@openzeppelin/contracts/interfaces/IERC721.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
 // Internal libraries
 import "./utils/cryptography/Hash.sol";
@@ -16,7 +16,7 @@ library Postchain {
     struct Event {
         uint256 serialNumber;
         uint256 networkId;
-        IERC20Upgradeable token;
+        IERC20 token;
         address beneficiary;
         uint256 amount;
     }
@@ -40,7 +40,7 @@ library Postchain {
         bytes32 extraDataHashedLeaf;
     }
 
-    function verifyEvent(bytes32 _hash, bytes memory _event) internal pure returns (IERC20Upgradeable, address, uint256, uint256) {
+    function verifyEvent(bytes32 _hash, bytes memory _event) internal pure returns (IERC20, address, uint256, uint256) {
         Event memory evt = abi.decode(_event, (Event));
         bytes32 hash = keccak256(_event);
         if (hash != _hash) {

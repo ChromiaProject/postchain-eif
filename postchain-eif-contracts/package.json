@@ -59,7 +59,7 @@
     "yarn-upgrade-all": "^0.5.4"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "4.6.0",
-    "@openzeppelin/contracts-upgradeable": "4.6.0"
+    "@openzeppelin/contracts": "5.0.0",
+    "@openzeppelin/contracts-upgradeable": "5.0.0"
   }
 }
