@@ -9,7 +9,7 @@ import net.postchain.eif.EventProcessor
 import net.postchain.logging.BLOCKCHAIN_RID_TAG
 import net.postchain.logging.CHAIN_IID_TAG
 
-private const val NETWORK_ID_TAG = "network_id"
+const val NETWORK_ID_TAG = "network_id"
 
 class EifMetricsRegistry {
 
