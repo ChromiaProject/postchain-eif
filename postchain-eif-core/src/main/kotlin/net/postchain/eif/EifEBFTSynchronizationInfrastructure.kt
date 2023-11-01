@@ -9,6 +9,7 @@ import net.postchain.eif.config.EifBlockchainConfig
 import net.postchain.eif.config.EvmBlockchainConfig
 import net.postchain.eif.config.EvmConfig
 import net.postchain.eif.metrics.EifMetricsRegistry
+import net.postchain.eif.metrics.RpcUsageMetrics
 import net.postchain.gtv.mapper.toObject
 import net.postchain.gtx.GTXModuleAware
 import java.math.BigInteger
@@ -39,7 +40,7 @@ class EifSynchronizationInfrastructureExtension(
                     }
 
                     val evmConfig = EvmConfig.fromAppConfig(evmBlockchainName, postchainContext.appConfig)
-                    val eventProcessor = initializeEventProcessor(evmBlockchainConfig, engine, evmConfig)
+                    val eventProcessor = initializeEventProcessor(cfg, evmBlockchainConfig, engine, evmConfig)
                     ext.addEventProcessor(evmBlockchainConfig.networkId, eventProcessor)
                     eventProcessors[cfg.blockchainRid.toHex()]?.set(evmBlockchainConfig.networkId, eventProcessor)
                     eifMetricsRegistry.registerMetrics(cfg.chainID, cfg.blockchainRid, evmBlockchainConfig.networkId, eventProcessor)
@@ -62,7 +63,7 @@ class EifSynchronizationInfrastructureExtension(
         eventProcessors.clear()
     }
 
-    private fun initializeEventProcessor(evmBlockchainConfig: EvmBlockchainConfig, engine: BlockchainEngine, evmConfig: EvmConfig): EventProcessor {
+    private fun initializeEventProcessor(cfg: BlockchainConfiguration, evmBlockchainConfig: EvmBlockchainConfig, engine: BlockchainEngine, evmConfig: EvmConfig): EventProcessor {
         return if ("ignore".equals(evmConfig.urls, ignoreCase = true)) {
             logger.warn("EIF is running in disconnected mode. No events will be validated against ethereum.")
             NoOpEventProcessor()
@@ -70,6 +71,7 @@ class EifSynchronizationInfrastructureExtension(
             val urls = evmConfig.urls.split(",").map { it.trim() }
             val web3jServices = Web3jServiceFactory.buildServices(evmConfig)
             val events = evmBlockchainConfig.events.asArray().map(GtvToEventMapper::map)
+            val metrics = RpcUsageMetrics(cfg.chainID, cfg.blockchainRid, evmBlockchainConfig.networkId)
             EvmEventProcessor(
                     evmBlockchainConfig.networkId,
                     web3jServices,
@@ -82,7 +84,7 @@ class EifSynchronizationInfrastructureExtension(
                     BigInteger.valueOf(evmBlockchainConfig.skipToHeight),
                     BigInteger.valueOf(evmConfig.lastEvmBlockHeight),
                     engine,
-                    Web3jRequestHandler(evmConfig.minRetryDelay, evmConfig.maxRetryDelay, evmConfig.maxTryErrors, urls),
+                    Web3jRequestHandler(evmConfig.minRetryDelay, evmConfig.maxRetryDelay, evmConfig.maxTryErrors, urls, metrics),
                     evmConfig.delayWhenNoNewBlocks
             )
         }
