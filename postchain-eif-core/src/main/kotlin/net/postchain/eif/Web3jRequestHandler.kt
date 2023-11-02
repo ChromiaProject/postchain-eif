@@ -3,6 +3,7 @@ package net.postchain.eif
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import mu.KLogging
+import net.postchain.eif.metrics.RpcUsageMetrics
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.Response
 import org.web3j.protocol.exceptions.ClientConnectionException
@@ -14,7 +15,8 @@ class Web3jRequestHandler(
         private val baseTimeout: Long,
         private val maxTimeout: Long,
         private val maxTryErrors: Long,
-        private val urls: List<String>
+        private val urls: List<String>,
+        private val metrics: RpcUsageMetrics? = null
 ) {
     companion object : KLogging() {
         const val DELAY_POWER_BASE = 1.2
@@ -30,6 +32,7 @@ class Web3jRequestHandler(
             val currentIndex = index
             val response = try {
                 val response = requests[index].send()
+                metrics?.createUsageCounter(index)?.increment()
                 if (response.hasError()) {
                     logger.error("Web3j request failed with error code: ${response.error.code} and message: ${response.error.message}")
                 }
