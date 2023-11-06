@@ -1,3 +1,4 @@
+
 function test_evm_block() {
     val contract_address = x"b7eB5d60Dd5610A82A4844Beb3F7d750316d3D32";
     val token_address = x"39615b16b74589919c9ce1ea73f1fc5d53141a78";
@@ -22,11 +23,11 @@ function test_evm_block() {
     ).sign(admin_privkey).run();
 
     rell.test.tx().op(
-        eif.add_new_evm_erc20(network_id, token_address, token_name, token_symbol, token_decimal)
+        a.add_new_evm_erc20(network_id, token_address, token_name, token_symbol, token_decimal)
     ).sign(admin_privkey).run();
     
     rell.test.tx().op(
-        eif.add_new_token_mapping(network_id, token_address, asset_id)
+        a.add_new_token_mapping(network_id, token_address, asset_id)
     ).sign(admin_privkey).run();
 
     val auth = auth_descriptor(
@@ -52,7 +53,7 @@ function test_evm_block() {
     val evm_account = evm.evm_account @ { .address == user_evm_address };
     val ft3_account = evm_account.account;
 
-    val event_data_list = list<eif.event_data>();
+    val event_data_list = list<c.event_data>();
     val indexed_values = list<gtv>();
     val non_indexed_values = list<gtv>();
     indexed_values.add(user_evm_address.to_gtv());
@@ -63,7 +64,7 @@ function test_evm_block() {
     non_indexed_values.add((token_name).to_gtv());
     non_indexed_values.add((token_symbol).to_gtv());
     non_indexed_values.add((token_decimal).to_gtv());
-    val e = eif.event_data(
+    val e = c.event_data(
         tnx_hash = x"26b1a0d2c8ed8e32efff45232a106b459aeb23c98d83478eb5f29ca4109be13c",
         log_index = 1,
         signature = x"4090023c909f5c377c211a8e8aedd778ec5de71852d4d66b4bb2fe6fc033211f",
@@ -77,7 +78,7 @@ function test_evm_block() {
     val block_hash = x"508ccf97bb5fac1546ac0040793e32d0336e764d62b60810fd460d445adfde64";
     event_data_list.add(e);
     rell.test.tx().op(
-        eif.evm_block_op(network_id, block_height, block_hash, event_data_list)
+        ft.evm_block_op(network_id, block_height, block_hash, event_data_list)
     ).run();
     val state = list<gtv>();
     state.add(to_32_byte_array(user_evm_address).to_gtv());
@@ -96,9 +97,9 @@ function test_evm_block() {
     assert_equals(last_block.evm_block_hash, block_hash);
 
     // bridge some ft3 token to evm
-    val auth_id = eif.auth_id(account_id = ft3_account.id, auth_descriptor_id = auth.hash());
+    val auth_id = ft.auth_id(account_id = ft3_account.id, auth_descriptor_id = auth.hash());
     rell.test.tx().op(
-        eif.bridge_ft_token_to_evm(auth_id, network_id, token_address, user_evm_address, amount/2)
+        ft.bridge_ft_token_to_evm(auth_id, network_id, token_address, user_evm_address, amount/2)
     ).sign(user_privkey).run();
 
     val withdraw_info = list<gtv>();
@@ -121,7 +122,7 @@ function test_evm_block() {
 
     // user can also deposit from ft3 account to EIF
     rell.test.tx().op(
-        eif.deposit_ft_token(auth_id, network_id, token_address, user_evm_address, amount/4)
+        ft.deposit_ft_token(auth_id, network_id, token_address, user_evm_address, amount/4)
     ).sign(user_privkey).run();
 
     val state_3 = list<gtv>();
@@ -143,7 +144,7 @@ function test_evm_block() {
     val s_1 = x"136c7364dd5549001b7eba351c448dd8c2483f078f8e102d4f48084b7e04212e";
     val v_1 = 0;
     val tx = rell.test.tx().op(
-        eif.claim_ERC20(network_id, token_address, user_evm_address, amount/4, r_1, s_1, v_1, user_pubkey, account_id)
+        ft.claim_ERC20(network_id, token_address, user_evm_address, amount/4, r_1, s_1, v_1, user_pubkey, account_id)
     );
     tx.run_must_fail("participants is empty");
     tx.sign(user_privkey).run();
@@ -174,7 +175,7 @@ function test_evm_block() {
     other_indexed_values.add(token_address.to_gtv());
     other_indexed_values.add(account_id.to_gtv());
 
-    val e1 = eif.event_data(
+    val e1 = c.event_data(
         tnx_hash = x"26b1a0d2c8ed8e32efff45232a106b459aeb23c98d83478eb5f29ca4109be13d",
         log_index = 2,
         signature = x"4090023c909f5c377c211a8e8aedd778ec5de71852d4d66b4bb2fe6fc033211f",
@@ -183,10 +184,10 @@ function test_evm_block() {
         indexed_values = other_indexed_values,
         non_indexed_values = non_indexed_values
     );
-    val other_event_data_list = list<eif.event_data>();
+    val other_event_data_list = list<c.event_data>();
     other_event_data_list.add(e1);
     rell.test.tx().op(
-        eif.evm_block_op(network_id, 101, x"508ccf97bb5fac1546ac0040793e32d0336e764d62b60810fd460d445adfde65", other_event_data_list)
+        ft.evm_block_op(network_id, 101, x"508ccf97bb5fac1546ac0040793e32d0336e764d62b60810fd460d445adfde65", other_event_data_list)
     ).run();
 
     val other_state = list<gtv>();
@@ -196,7 +197,7 @@ function test_evm_block() {
     other_state.add((amount).to_gtv());
     assert_events(("eif_state", (account_number_2, other_state).to_gtv_pretty()));
 
-    val balance = eif.evm_balance_of_erc20(network_id, token_address, other_evm_address);
+    val balance = ft.evm_balance_of_erc20(network_id, token_address, other_evm_address);
     assert_equals(balance, amount);
 
     // withdraw erc20 token from EIF to evm chain
@@ -206,7 +207,7 @@ function test_evm_block() {
 
     val withdraw_amount = amount - 1000000;
     rell.test.tx().op(
-        eif.withdraw_ERC20(network_id, token_address, other_evm_address, withdraw_amount, r, s, v, other_pubkey)
+        ft.withdraw_ERC20(network_id, token_address, other_evm_address, withdraw_amount, r, s, v, other_pubkey)
     ).sign(other_privkey).run();
 
     val other_withdraw_info = list<gtv>();
