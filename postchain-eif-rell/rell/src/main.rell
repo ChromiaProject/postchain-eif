@@ -1,14 +1,13 @@
 module;
 
 /* For testing */
-// import ^.lib.access.admin;
-import ^.lib.eif.*;
-// import ^.lib.dip.dip_basic_dev.*;
+import ^.lib.eif;
+import ^.lib.eif.evm;
+import ^.lib.eif.ft4;
+import ^.lib.eif.common;
+import ^.lib.eif.admin;
+import ^.lib.eif.utils;
 import ^.lib.ft4.ft4_basic_dev.*;
-// import ^.lib.originals.originals_basic_dev.*;
-// import ^.lib.originals.tests.extensions;
-// import dip_owner_access: ^.lib.dip.external.access.owner_based;
-// import originals_owner_access: ^.lib.originals.external.access.owner_based;
 
 /* For release */
 //import dip.dip_basic.*;

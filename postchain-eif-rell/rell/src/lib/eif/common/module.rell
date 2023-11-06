@@ -1,6 +1,11 @@
 @mount('eif.data')
 module;
 
+import u: ^.utils;
+import a: ^.admin;
+import acc: ^^^.lib.ft4.accounts;
+import ass: ^^^.lib.ft4.assets;
+
 entity evm_block {
     network_id: integer;
     evm_block_height: integer;
@@ -44,6 +49,14 @@ entity evm_erc20 {
     key network_id, address;
 }
 
+entity evm_erc20_balance {
+    network_id: integer;
+    token: evm_erc20;
+    beneficiary: byte_array;
+    mutable amount: big_integer;
+    key token, beneficiary;
+}
+
 object withdraw_stats {
     mutable withdraw_count: integer = 0;
 }
@@ -65,4 +78,72 @@ query get_network_accounts(network_id: integer) : list<state_address_dto>{
         accounts_dto.add(state_address_dto(state_n=account.state_n, evm_address=account.evm_beneficiary));
     }
     return accounts_dto;
+}
+
+function get_or_create_evm_account_link(network_id: integer, beneficiary: byte_array): evm_account_link {
+    val account = evm_account_link @? { network_id, beneficiary };
+    if (empty(account)) {
+        val last_state_n = evm_account_link @? {} (@sort_desc .state_n) limit 1;
+        var next_state_n = 0;
+        if (empty(last_state_n)) {
+            next_state_n = 1;
+        } else {
+            next_state_n = last_state_n + 1;
+        }
+
+        return create evm_account_link(
+            network_id,
+            state_n = next_state_n,
+            beneficiary
+        );
+    };
+    return account;
+}
+
+function build_account_state(network_id: integer, beneficiary: byte_array, account: acc.account?) {
+	val state = list<gtv>();
+	state.add(byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv());
+	// In order of asset type
+	// 0: ERC20
+	val erc20_balances = evm_erc20_balance @* { network_id, beneficiary };
+    val balances = list<ass.balance>();
+    if (account != null) {
+        val ft_balances = ass.balance @* { .account == account };
+        for (ft_balance in ft_balances) {
+            val token_mapping = a.token_mapping @? {.asset == ft_balance.asset};
+            if (token_mapping != null) {
+                if (token_mapping.token.network_id != network_id) {
+                    continue;
+                }
+                balances.add(ft_balance);
+            }
+        }
+    }
+	val erc20_byte_offset = (erc20_balances.size() + balances.size()) * 2 * 32; // 2 values per entry
+	state.add(erc20_byte_offset.to_gtv());
+
+    // update state for eif balance
+	for (balance in erc20_balances) {
+		state.add(byte_array.from_hex(u.to_zero_padded_hex(balance.token.address)).to_gtv());
+		state.add((balance.amount).to_gtv());
+    }
+
+    // update state for ft balance
+    for (balance in balances) {
+        val token_mapping = a.token_mapping @ {.asset == balance.asset};
+        state.add(byte_array.from_hex(u.to_zero_padded_hex(token_mapping.token.address)).to_gtv());
+        state.add((balance.amount).to_gtv());
+    }
+
+	// 1: ERC721
+	// val erc721_balances = evm_erc721_balance @* { network_id, beneficiary };
+	// val erc721_byte_offset = erc721_balances.size() * 2 * 32; // 2 values per entry
+	// state.add(erc721_byte_offset.to_gtv());
+	// for (balance in erc721_balances) {
+	// 	state.add(byte_array.from_hex("000000000000000000000000" + balance.token.address.sub(2)).to_gtv());
+	// 	state.add(balance.token.token_id.to_gtv());
+	// }
+	// Add new asset types here
+	// ------------------------ //
+	return state;
 }
