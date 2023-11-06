@@ -27,3 +27,42 @@ struct event_data {
     indexed_values: list<gtv>;
     non_indexed_values: list<gtv>;
 }
+
+entity evm_account_link {
+    network_id: integer;
+    state_n: integer;
+    evm_beneficiary: byte_array;
+    key network_id, state_n, evm_beneficiary;
+}
+
+entity evm_erc20 {
+    network_id: integer;
+    address: byte_array;
+    name: text;
+    symbol: text;
+    decimals: integer;
+    key network_id, address;
+}
+
+object withdraw_stats {
+    mutable withdraw_count: integer = 0;
+}
+
+struct state_data {
+    state_n: integer;
+    account: list<gtv>;
+}
+
+struct state_address_dto {
+    state_n: integer;
+    evm_address: byte_array;
+}
+
+query get_network_accounts(network_id: integer) : list<state_address_dto>{
+    var accounts = evm_account_link @* {.network_id == network_id};
+    val accounts_dto = list<state_address_dto>();
+    for(account in accounts){
+        accounts_dto.add(state_address_dto(state_n=account.state_n, evm_address=account.evm_beneficiary));
+    }
+    return accounts_dto;
+}
