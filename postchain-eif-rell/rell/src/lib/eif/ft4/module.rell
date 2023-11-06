@@ -7,8 +7,8 @@ import a: ^.admin;
 import u: ^.utils;
 import ^.evm;
 
-import acc: ^^.lib.ft4.accounts;
-import ass: ^^.lib.ft4.assets;
+import acc: ^^^.lib.ft4.accounts;
+import ass: ^^^.lib.ft4.assets;
 
 entity evm_erc20_balance {
     network_id: integer;

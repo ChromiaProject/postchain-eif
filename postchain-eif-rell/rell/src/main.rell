@@ -2,7 +2,7 @@ module;
 
 /* For testing */
 // import ^.lib.access.admin;
-import ^.eif;
+import ^.lib.eif;
 // import ^.lib.dip.dip_basic_dev.*;
 import ^.lib.ft4.ft4_basic_dev.*;
 // import ^.lib.originals.originals_basic_dev.*;

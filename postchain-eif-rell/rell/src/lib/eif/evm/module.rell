@@ -1,8 +1,8 @@
 @mount('eif.evm')
 module;
 
-import acc: ^^.lib.ft4.accounts;
-import auth: ^^.lib.ft4.auth;
+import acc: ^^^.lib.ft4.accounts;
+import auth: ^^^.lib.ft4.auth;
 
 entity evm_account {
   key acc.account;

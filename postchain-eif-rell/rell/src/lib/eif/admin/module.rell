@@ -1,8 +1,8 @@
 @mount('eif.admin')
 module;
 
-import admin: ^^.lib.ft4.admin;
-import ass: ^^.lib.ft4.assets;
+import admin: ^^^.lib.ft4.admin;
+import ass: ^^^.lib.ft4.assets;
 import c: ^.common;
 
 entity token_mapping {
