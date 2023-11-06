@@ -287,7 +287,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
                 gtv(to32Bytes(testToken.contractAddress.substring(2))), // encode gtv array with assumption that the data contains only byte32 and uint256
                 gtv(totalDepositedAmount)
         ))
-        val accounts = blockQuery.query("get_network_accounts",
+        val accounts = blockQuery.query("eif.data.get_network_accounts",
                 gtv("network_id" to gtv(networkId))).get()
         val accountNumber = accounts[0].asDict()["state_n"]!!
 
@@ -342,7 +342,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
         assertEquals(totalDepositedAmount - withdrawAmount, balance)
 
         // Get and verify the withdrawal data
-        val withdrawInfo = blockQuery.query("get_erc20_withdrawal", gtv(
+        val withdrawInfo = blockQuery.query("eif.ft4.get_erc20_withdrawal", gtv(
                 "network_id" to gtv(networkId),
                 "token_address" to gtv(testTokenAddress),
                 "beneficiary" to gtv(userEvmAddress)
@@ -457,7 +457,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
             bridge.triggerMassExit(Uint256(lastBlockHeight), Bytes32(lastBlockRID)).send()
 
             // Withdraw request on evm for the last postchain withdraw
-            val withdrawInfo2 = blockQuery.query("get_erc20_withdrawal", gtv(
+            val withdrawInfo2 = blockQuery.query("eif.ft4.get_erc20_withdrawal", gtv(
                     "network_id" to gtv(networkId),
                     "token_address" to gtv(testTokenAddress),
                     "beneficiary" to gtv(userEvmAddress)
@@ -595,7 +595,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
             sealBlock()
             snapshotHeights.add(currentBlockHeight)
 
-            val withdrawInfo3 = blockQuery.query("get_erc20_withdrawal", gtv(
+            val withdrawInfo3 = blockQuery.query("eif.ft4.get_erc20_withdrawal", gtv(
                     "network_id" to gtv(networkId),
                     "token_address" to gtv(testTokenAddress),
                     "beneficiary" to gtv(userEvmAddress)
@@ -710,7 +710,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
     // Add new evm erc20 token
     private fun addNewEvmErc20(tokenAddress: ByteArray, name: String, symbol: String, decimal: Long, bcRid: BlockchainRid, sigMaker: SigMaker): ByteArray {
         val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
-        b.addOperation("add_new_evm_erc20", gtv(networkId), gtv(tokenAddress), gtv(name), gtv(symbol), gtv(decimal))
+        b.addOperation("eif.admin.add_new_evm_erc20", gtv(networkId), gtv(tokenAddress), gtv(name), gtv(symbol), gtv(decimal))
         return b.finish()
                 .sign(sigMaker)
                 .buildGtx()
@@ -720,7 +720,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
     // Add new token mapping
     private fun addTokenMapping(tokenAddress: ByteArray, assetId: Gtv, bcRid: BlockchainRid, sigMaker: SigMaker): ByteArray {
         val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
-        b.addOperation("add_new_token_mapping", gtv(networkId), gtv(tokenAddress), assetId)
+        b.addOperation("eif.admin.add_new_token_mapping", gtv(networkId), gtv(tokenAddress), assetId)
         return b.finish()
                 .sign(sigMaker)
                 .buildGtx()
@@ -750,7 +750,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
                                     authId: Gtv, tokenAddress: ByteArray,
                                     userEvmAddress: ByteArray, withdrawAmount: BigInteger, bcRid: BlockchainRid): ByteArray {
         val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
-        b.addOperation("bridge_ft_token_to_evm", authId, gtv(networkId), gtv(tokenAddress), gtv(userEvmAddress), gtv(withdrawAmount))
+        b.addOperation("eif.ft4.bridge_ft_token_to_evm", authId, gtv(networkId), gtv(tokenAddress), gtv(userEvmAddress), gtv(withdrawAmount))
         b.addOperation("nop", GtvInteger(System.currentTimeMillis()))
         val signer = cryptoSystem.buildSigMaker(KeyPair(userPubkey, userPriKey))
         return b.finish()

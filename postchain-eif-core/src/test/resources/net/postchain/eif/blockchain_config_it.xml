@@ -320,13 +320,6 @@
                 <dict>
                     <entry key="moduleArgs">
                         <dict>
-                            <entry key="eif">
-                                <dict>
-                                    <entry key="sync_transfers_inside_dapp">
-                                        <int>1</int>
-                                    </entry>
-                                </dict>
-                            </entry>
                             <entry key="lib.ft4.accounts">
                                 <dict>
                                     <entry key="rate_limit_active">
@@ -359,12 +352,130 @@
                     </entry>
                     <entry key="sources">
                         <dict>
-                            <entry key="eif/evm/module.rell">
+                            <entry key="lib/eif/admin/module.rell">
+                                <string>@mount('eif.admin')
+module;
+
+import admin: ^^^.lib.ft4.admin;
+import ass: ^^^.lib.ft4.assets;
+import c: ^.common;
+
+entity token_mapping {
+    key token: c.evm_erc20;
+    key asset: ass.asset;
+}
+
+operation add_new_evm_erc20(network_id: integer, token_address: byte_array, name: text, symbol: text, decimals: integer) {
+    admin.require_admin();
+    require(empty(c.evm_erc20 @? { network_id, .address == token_address }), "token already existed");
+    create c.evm_erc20(
+        network_id,
+        address = token_address,
+        name,
+        symbol,
+        decimals
+    );
+}
+
+operation add_new_token_mapping(network_id: integer, token_address: byte_array, asset_id: byte_array) {
+    admin.require_admin();
+
+    val token = require(
+        c.evm_erc20 @? { network_id, .address == token_address },
+        "Token does not exist: " + token_address
+    );
+
+    val asset = require(
+        ass.asset @? { .id == asset_id },
+        "Asset does not exist: " + asset_id
+    );
+
+    require(
+        empty(token_mapping @? { token, asset }),
+        "Token was already mapped: " + token_address
+    );
+
+    create token_mapping(token, asset);
+}
+</string>
+                            </entry>
+                            <entry key="lib/eif/common/module.rell">
+                                <string>@mount('eif.data')
+module;
+
+entity evm_block {
+    network_id: integer;
+    evm_block_height: integer;
+    evm_block_hash: byte_array;
+    key network_id, evm_block_height, evm_block_hash;
+}
+
+entity evm_event {
+    index evm_block;
+    tnx_hash: byte_array;
+    log_index: integer;
+    event_signature: byte_array;
+    contract_address: byte_array;
+    indexed_values: byte_array;
+    non_indexed_values: byte_array;
+}
+
+struct event_data {
+    tnx_hash: byte_array;
+    log_index: integer;
+    signature: byte_array;
+    contract_address: byte_array;
+    name: text;
+    indexed_values: list&lt;gtv&gt;;
+    non_indexed_values: list&lt;gtv&gt;;
+}
+
+entity evm_account_link {
+    network_id: integer;
+    state_n: integer;
+    evm_beneficiary: byte_array;
+    key network_id, state_n, evm_beneficiary;
+}
+
+entity evm_erc20 {
+    network_id: integer;
+    address: byte_array;
+    name: text;
+    symbol: text;
+    decimals: integer;
+    key network_id, address;
+}
+
+object withdraw_stats {
+    mutable withdraw_count: integer = 0;
+}
+
+struct state_data {
+    state_n: integer;
+    account: list&lt;gtv&gt;;
+}
+
+struct state_address_dto {
+    state_n: integer;
+    evm_address: byte_array;
+}
+
+query get_network_accounts(network_id: integer) : list&lt;state_address_dto&gt;{
+    var accounts = evm_account_link @* {.network_id == network_id};
+    val accounts_dto = list&lt;state_address_dto&gt;();
+    for(account in accounts){
+        accounts_dto.add(state_address_dto(state_n=account.state_n, evm_address=account.evm_beneficiary));
+    }
+    return accounts_dto;
+}
+</string>
+                            </entry>
+                            <entry key="lib/eif/evm/module.rell">
                                 <string>@mount('eif.evm')
 module;
 
-import acc: ^^.lib.ft4.accounts;
-import auth: ^^.lib.ft4.auth;
+import acc: ^^^.lib.ft4.accounts;
+import auth: ^^^.lib.ft4.auth;
 
 entity evm_account {
   key acc.account;
@@ -435,155 +546,41 @@ function _recover_address_from_evm_signature(message: text, auth.signature): byt
 
 </string>
                             </entry>
-                            <entry key="eif/helpers.rell">
-                                <string>operation evm_block_op(network_id: integer, evm_block_height: integer, evm_block_hash: byte_array, events: list&lt;event_data&gt;) {
-    evm_block_fn(network_id, evm_block_height, evm_block_hash, events);
+                            <entry key="lib/eif/ft4/helpers.rell">
+                                <string>import ^.*;
+import c: ^.common;
+
+operation evm_block_op(network_id: integer, evm_block_height: integer, evm_block_hash: byte_array, events: list&lt;c.event_data&gt;) {
+    _evm_block(network_id, evm_block_height, evm_block_hash, events);
 }</string>
                             </entry>
-                            <entry key="eif/module.rell">
-                                <string>import acc: ^.lib.ft4.accounts;
-import ass: ^.lib.ft4.assets;
-import admin: ^.lib.ft4.admin;
-import .evm;
+                            <entry key="lib/eif/ft4/module.rell">
+                                <string>@mount('eif.ft4')
+module;
 
-struct module_args {
-    sync_transfers_inside_dapp: boolean;
-}
+import root: ^.*;
+import c: ^.common;
+import a: ^.admin;
+import u: ^.utils;
+import ^.evm;
 
-// namespace eif.INonFungibleOriginal {
-//     val interface = "eif.INonFungibleOriginal";
-
-//     function dependencies() = [
-//         og.chromia.INonFungibleOriginal.interface
-//     ];
-
-//     val id = dip.Attribute.I(interface, name = "id");
-//     val address = dip.Attribute.I(interface, name = "address");
-//     val symbol = dip.Attribute.I(interface, name = "symbol");
-//     val uri = dip.Attribute.I(interface, name = "uri");
-
-//  function register(account: ft3.acc.account) {
-//      dip.InterfaceFactory.new(interface,
-//          [
-//                 id: dip.Type(dip.Integer.T()),
-//                 address: dip.Type(dip.Text.T(), [dip.Optional()]),
-//                 symbol: dip.Type(dip.Text.T(), [dip.Optional()]),
-//                 uri: dip.Type(dip.Text.T(), [dip.Optional()])
-//             ],
-//             dependencies() @* {} (dip.Interface.get($)),
-//             account = account,
-//             is_open = true
-//      );
-//  }
-
-//  function get() = dip.Interface.get(interface);
-//  function has(dip.instance) = dip.Interface.is_a(instance, get());
-// }
-
-entity token_mapping {
-    key token: evm_erc20;
-    key asset: ass.asset;
-}
-
-// entity nft_mapping {
-//     network_id: integer;
-//     address: byte_array;
-//     interface: dip.Interface.dclass;
-//     key network_id, address;
-// }
-
-entity evm_account_link {
-    network_id: integer;
-    state_n: integer;
-    evm_beneficiary: byte_array;
-    key network_id, state_n, evm_beneficiary;
-}
-
-entity evm_block {
-    network_id: integer;
-    evm_block_height: integer;
-    evm_block_hash: byte_array;
-    key network_id, evm_block_height, evm_block_hash;
-}
-
-entity evm_erc20 {
-    network_id: integer;
-    address: byte_array;
-    name: text;
-    symbol: text;
-    decimals: integer;
-    key network_id, address;
-}
-
-// entity evm_erc721 {
-//     key network_id: integer, address: byte_array, token_id: integer;
-//     name: text;
-//     symbol: text;
-//     uri: text;
-// }
-
-entity evm_event {
-    index evm_block;
-    tnx_hash: byte_array;
-    log_index: integer;
-    event_signature: byte_array;
-    contract_address: byte_array;
-    indexed_values: byte_array;
-    non_indexed_values: byte_array;
-}
+import acc: ^^^.lib.ft4.accounts;
+import ass: ^^^.lib.ft4.assets;
 
 entity evm_erc20_balance {
     network_id: integer;
-    token: evm_erc20;
+    token: c.evm_erc20;
     beneficiary: byte_array;
     mutable amount: big_integer;
     key token, beneficiary;
 }
 
-// entity evm_erc721_balance {
-//     network_id: integer;
-//     token: evm_erc721;
-//     beneficiary: byte_array;
-//     key token, beneficiary;
-// }
-
 entity evm_erc20_withdraw {
     key serial: integer;
     network_id: integer;
-    index token: evm_erc20;
+    index token: c.evm_erc20;
     index beneficiary: byte_array;
     amount: big_integer;
-}
-
-// entity evm_erc721_withdraw {
-//     key serial: integer;
-//     network_id: integer;
-//     index token: evm_erc721;
-//     index beneficiary: byte_array;
-// }
-
-object withdraw_stats {
-    mutable withdraw_count: integer = 0;
-}
-
-struct event_data {
-    tnx_hash: byte_array;
-    log_index: integer;
-    signature: byte_array;
-    contract_address: byte_array;
-    name: text;
-    indexed_values: list&lt;gtv&gt;;
-    non_indexed_values: list&lt;gtv&gt;;
-}
-
-struct state_data {
-    state_n: integer;
-    account: list&lt;gtv&gt;;
-}
-
-struct state_address_dto {
-    state_n: integer;
-    evm_address: byte_array;
 }
 
 struct auth_id {
@@ -591,19 +588,8 @@ struct auth_id {
     auth_descriptor_id: byte_array;
 }
 
-query get_network_accounts(network_id: integer) : list&lt;state_address_dto&gt;{
-    var accounts = evm_account_link @* {.network_id == network_id};
-    val accounts_dto = list&lt;state_address_dto&gt;();
-    for(account in accounts){
-        accounts_dto.add(state_address_dto(state_n=account.state_n, evm_address=account.evm_beneficiary));
-    }
-    return accounts_dto;
-}
-
-query get_last_evm_block(network_id: integer) { return evm_block @? {network_id} (@sort_desc .evm_block_height, .evm_block_hash) limit 1;}
-
 query get_erc20_withdrawal(network_id: integer, token_address: byte_array, beneficiary: byte_array) {
-    val token = evm_erc20 @? { network_id, .address == token_address };
+    val token = c.evm_erc20 @? { network_id, .address == token_address };
     if (empty(token)) {
         return null;
     }
@@ -611,17 +597,8 @@ query get_erc20_withdrawal(network_id: integer, token_address: byte_array, benef
     return evm_erc20_withdraw @* { network_id, token , beneficiary } (@sort_desc .serial, .network_id, token = .token.address, .beneficiary, .amount);
 }
 
-// query get_erc721_withdrawal(network_id: integer, token_address: byte_array, token_id: integer, beneficiary: byte_array) {
-//     val token = evm_erc721 @? { network_id, .address == token_address, token_id };
-//     if (empty(token)) {
-//         return null;
-//     }
-
-//     return evm_erc721_withdraw @* { network_id, token, beneficiary } (@sort_desc .serial, .network_id, token = .token.address, .beneficiary);
-// }
-
 query evm_balance_of_erc20(network_id: integer, token_address: byte_array, beneficiary: byte_array): big_integer {
-    val t = evm_erc20 @? { network_id, .address == token_address };
+    val t = c.evm_erc20 @? { network_id, .address == token_address };
     if (empty(t)) {
         return 0;
     }
@@ -632,21 +609,365 @@ query evm_balance_of_erc20(network_id: integer, token_address: byte_array, benef
     return b;
 }
 
-// query evm_has_erc721(network_id: integer, token_address: byte_array, token_id: integer, beneficiary: byte_array): boolean {
-//     val t = evm_erc721 @? { network_id, .address == token_address, token_id };
-//     if (empty(t)) {
-//         return false;
-//     }
-//     val b = evm_erc721_balance @? { network_id, .token == t, beneficiary };
-//     return not empty(b);
-// }
+@extend(root.evm_block_fn) function(c.evm_block, network_id: integer, token_address: byte_array, beneficiary: byte_array, evm.evm_account?, event: c.event_data, indexed_values_bytes: byte_array, non_indexed_values_bytes: byte_array) {
+    if (event.name != "DepositedERC20") return;
+    // ignore the unsupported token, move to process next events if any
+    val token = c.evm_erc20 @? { network_id, .address == token_address };
+    if (empty(token)) {
+        log("ignore the unsupported token, move to process next events if any: " + token_address);
+        return;
+    }
+    val token_mapping = a.token_mapping @? { .token == token };
+    if (empty(token_mapping)) {
+        log("no token_mapping");
+        return;
+    }
 
-operation __evm_block(network_id: integer, evm_block_height: integer, evm_block_hash: byte_array, events: list&lt;event_data&gt;) {
-    evm_block_fn(network_id, evm_block_height, evm_block_hash, events);
+    // ignore event if ft asset does not exist
+    val ft_asset = ass.asset @? { .id == token_mapping.asset.id };
+    if (empty(ft_asset)) {
+        log("ignore event if ft asset does not exist: " + token_mapping.asset.id);
+        return;
+    }
+    val amount = big_integer.from_gtv(event.non_indexed_values[1]);
+    val evm_event = create c.evm_event(
+        evm_block,
+        tnx_hash = event.tnx_hash,
+        log_index = event.log_index,
+        event_signature = event.signature,
+        contract_address = event.contract_address,
+        indexed_values = indexed_values_bytes,
+        non_indexed_values = non_indexed_values_bytes
+    );
+
+    // if user account does not exist, record the state into EIF for withdraw back to EVM chains later.
+    // This feature is to avoid losing fund of user
+    if (empty(evm_account)) {
+        val name = text.from_gtv(event.non_indexed_values[2]);
+        val symbol = text.from_gtv(event.non_indexed_values[3]);
+        val decimals = integer.from_gtv(event.non_indexed_values[4]);
+        log("record the state into EIF for withdraw back to EVM chains later for beneficiary: " + beneficiary);
+        deposit_ERC20(network_id, beneficiary, token_address, amount, name, symbol, decimals);
+
+        val account_link = get_or_create_evm_account_link(network_id, beneficiary);
+        val state = build_account_state(network_id, beneficiary, null);
+        val state_data = c.state_data(
+            account_link.state_n,
+            account = state
+        );
+        op_context.emit_event("eif_state", state_data.to_gtv());
+    } else {
+        // mint postchain token for ft account
+        val ft_account = evm_account.account;
+        log("mint postchain token for ft account: " + ft_account.id);
+        val ft_balance = ass.ensure_balance( ft_account, ft_asset );
+        ft_balance.amount += amount;
+        val ft_beneficiary = evm.evm_account @ { .account == ft_account } ( .address );
+        val account_link = get_or_create_evm_account_link(token_mapping.token.network_id, ft_beneficiary);
+        val state = build_account_state(network_id, ft_beneficiary, ft_account);
+        val state_data = c.state_data(
+            account_link.state_n,
+            account = state
+        );
+        op_context.emit_event("eif_state", state_data.to_gtv());
+    }
 }
 
-function evm_block_fn(network_id: integer, evm_block_height: integer, evm_block_hash: byte_array, events: list&lt;event_data&gt;) { 
-    val evm_block = create evm_block(
+operation deposit_ft_token(auth_id, network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
+    require(amount &gt; 0, "amount should larger than 0");
+    val token = require(c.evm_erc20 @? { network_id, .address == token_address }, "token is not support");
+    val token_mapping = require(a.token_mapping @? { token }, "token is not support");
+    val asset = require(ass.asset @? { .id == token_mapping.asset.id }, "asset does not exist");
+
+    val account = acc.account @ { .id == auth_id.account_id };
+    val account_auth_descriptor = acc.auth_descriptor_by_id(account, auth_id.auth_descriptor_id);
+    acc._auth(account, account_auth_descriptor, ["T"]);
+
+    // burn ft token of the account
+    ass.Unsafe.burn(account, asset, amount);
+
+    // update the postchain EIF state for equivalent account
+    deposit_ERC20(network_id, beneficiary, token_address, amount, token_mapping.token.name, token_mapping.token.symbol, token_mapping.token.decimals);
+
+    // update relevant account state
+    update_account_state(account.id, asset.id);
+}
+
+operation bridge_ft_token_to_evm(auth_id, network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
+    require(amount &gt; 0, "amount should larger than 0");
+    val token = require(c.evm_erc20 @? { network_id, .address == token_address }, "token is not support");
+    val token_mapping = require(a.token_mapping @? { token }, "token is not support");
+    val asset = require(ass.asset @? { .id == token_mapping.asset.id }, "asset does not exist");
+
+    val account = acc.account @ { .id == auth_id.account_id };
+    val account_auth_descriptor = acc.auth_descriptor_by_id(account, auth_id.auth_descriptor_id);
+    acc._auth(account, account_auth_descriptor, ["T"]);
+
+    // burn ft token of the account and update relevant account state
+    ass.Unsafe.burn(account, asset, amount);
+    update_account_state(account.id, asset.id);
+
+    update c.withdraw_stats(withdraw_count += 1);
+    val next_serial = c.withdraw_stats.withdraw_count;
+
+    create evm_erc20_withdraw(
+        serial = next_serial,
+        network_id,
+        token,
+        beneficiary,
+        amount
+    );
+
+    val withdraw_info = list&lt;gtv&gt;();
+    withdraw_info.add(next_serial.to_gtv());
+    withdraw_info.add(network_id.to_gtv());
+    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv());
+    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv());
+    withdraw_info.add(amount.to_gtv());
+
+    op_context.emit_event("eif_event", withdraw_info.to_gtv());
+}
+
+// user can claim ft asset back to specific account id on postchain after deposit it into EIF
+operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer,
+                        r: byte_array, s: byte_array, v: integer, pk: text, account_id: byte_array) {
+    require(amount &gt; 0, "Must withdraw an amount larger than 0");
+    val recovered_pubkey = crypto.eth_ecrecover(r, s, v, u.hash_eth_message(pk));
+    val eth_address = u.get_eth_address(recovered_pubkey);
+    require(eth_address == beneficiary, "beneficiary is not correct, " + "b: " + beneficiary + " e: " + eth_address);
+    val participants = op_context.get_signers();
+    require_not_empty(participants, "participants is empty");
+    require(participants.size() == 1, "only support single auth");
+    require(participants[0].to_hex() == pk, "participant is not correct, " + participants[0].to_hex() + ", " + pk);
+
+    val token = require(
+        c.evm_erc20 @? { network_id, .address == token_address },
+        "unsupport token: " + token_address
+    );
+    val token_mapping = require(
+        a.token_mapping @? { .token == token },
+        "no token mapping"
+    );
+    val ft_asset = require(
+        ass.asset @? { .id == token_mapping.asset.id },
+        "ft asset does not exist: " + token_mapping.asset.id
+    );
+    val balance = evm_erc20_balance @? { network_id, token, beneficiary };
+    require_not_empty(balance, "No balance for this token");
+    require(balance.amount &gt;= amount, "Balance is too low");
+    update balance(.amount -= amount);
+
+    update c.withdraw_stats(withdraw_count += 1);
+    val next_serial = c.withdraw_stats.withdraw_count;
+
+    // net_id = 0 means withdraw from postchain snapshot state into ft account
+    val net_id = 0;
+    create evm_erc20_withdraw(
+        serial = next_serial,
+        network_id = net_id,
+        token,
+        beneficiary,
+        amount
+    );
+
+    val withdraw_info = list&lt;gtv&gt;();
+    withdraw_info.add(next_serial.to_gtv());
+    withdraw_info.add(net_id.to_gtv());
+    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv());
+    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv());
+    withdraw_info.add(amount.to_gtv());
+
+    val account = acc.account @ { account_id };
+    val ft_balance = ass.ensure_balance(account , ft_asset );
+    ft_balance.amount += amount;
+    emit_withdraw(network_id, beneficiary, account, withdraw_info);
+}
+
+operation withdraw_ERC20(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer,
+                                                    r: byte_array, s: byte_array, v: integer, pk: text) {
+    require(amount &gt; 0, "Must withdraw an amount larger than 0");
+
+    // ensure that the signer also control the beneficiary account
+    val recovered_pubkey = crypto.eth_ecrecover(r, s, v, u.hash_eth_message(pk));
+    val eth_address = u.get_eth_address(recovered_pubkey);
+    require(eth_address == beneficiary, "beneficiary is not correct, " + "b: " + beneficiary + " e: " + eth_address);
+    val participants = op_context.get_signers();
+    require_not_empty(participants, "participants is empty");
+    require(participants.size() == 1, "only support single auth");
+    require(participants[0].to_hex() == pk, "participant is not correct, " + participants[0].to_hex() + ", " + pk);
+
+    val token = c.evm_erc20 @? { network_id, .address == token_address };
+    if (empty(token)) {
+        return;
+    }
+    val balance = evm_erc20_balance @? { network_id, token, beneficiary };
+    require_not_empty(balance, "No balance for this token");
+    require(balance.amount &gt;= amount, "Balance is too low");
+    update balance(.amount -= amount);
+
+    update c.withdraw_stats(withdraw_count += 1);
+    val next_serial = c.withdraw_stats.withdraw_count;
+
+    create evm_erc20_withdraw(
+        serial = next_serial,
+        network_id,
+        token,
+        beneficiary,
+        amount
+    );
+
+    val withdraw_info = list&lt;gtv&gt;();
+    withdraw_info.add(next_serial.to_gtv());
+    withdraw_info.add(network_id.to_gtv());
+    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv());
+    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv());
+    withdraw_info.add(amount.to_gtv());
+
+    val account = evm.get_account_by_evm_address(eth_address);
+    emit_withdraw(network_id, beneficiary, account, withdraw_info);
+}
+
+function get_or_create_evm_account_link(network_id: integer, beneficiary: byte_array): c.evm_account_link {
+    val account = c.evm_account_link @? { network_id, beneficiary };
+    if (empty(account)) {
+        val last_state_n = c.evm_account_link @? {} (@sort_desc .state_n) limit 1;
+        var next_state_n = 0;
+        if (empty(last_state_n)) {
+            next_state_n = 1;
+        } else {
+            next_state_n = last_state_n + 1;
+        }
+
+        return create c.evm_account_link(
+            network_id,
+            state_n = next_state_n,
+            beneficiary
+        );
+    };
+    return account;
+}
+
+function build_account_state(network_id: integer, beneficiary: byte_array, account: acc.account?) {
+	val state = list&lt;gtv&gt;();
+	state.add(byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv());
+	// In order of asset type
+	// 0: ERC20
+	val erc20_balances = evm_erc20_balance @* { network_id, beneficiary };
+    val balances = list&lt;ass.balance&gt;();
+    if (account != null) {
+        val ft_balances = ass.balance @* { .account == account };
+        for (ft_balance in ft_balances) {
+            val token_mapping = a.token_mapping @? {.asset == ft_balance.asset};
+            if (token_mapping != null) {
+                if (token_mapping.token.network_id != network_id) {
+                    continue;
+                }
+                balances.add(ft_balance);
+            }
+        }
+    }
+	val erc20_byte_offset = (erc20_balances.size() + balances.size()) * 2 * 32; // 2 values per entry
+	state.add(erc20_byte_offset.to_gtv());
+
+    // update state for eif balance
+	for (balance in erc20_balances) {
+		state.add(byte_array.from_hex(u.to_zero_padded_hex(balance.token.address)).to_gtv());
+		state.add((balance.amount).to_gtv());
+    }
+
+    // update state for ft balance
+    for (balance in balances) {
+        val token_mapping = a.token_mapping @ {.asset == balance.asset};
+        state.add(byte_array.from_hex(u.to_zero_padded_hex(token_mapping.token.address)).to_gtv());
+        state.add((balance.amount).to_gtv());
+    }
+
+	// 1: ERC721
+	// val erc721_balances = evm_erc721_balance @* { network_id, beneficiary };
+	// val erc721_byte_offset = erc721_balances.size() * 2 * 32; // 2 values per entry
+	// state.add(erc721_byte_offset.to_gtv());
+	// for (balance in erc721_balances) {
+	// 	state.add(byte_array.from_hex("000000000000000000000000" + balance.token.address.sub(2)).to_gtv());
+	// 	state.add(balance.token.token_id.to_gtv());
+	// }
+	// Add new asset types here
+	// ------------------------ //
+	return state;
+}
+
+function deposit_ERC20(network_id: integer, beneficiary: byte_array, token_address: byte_array, amount: big_integer, name: text, symbol: text, decimals: integer) {
+    log("deposit_ERC20: " + token_address + " : " + beneficiary + " : " + name);
+    var token = c.evm_erc20 @? { network_id, .address == token_address };
+    if (empty(token)) {
+        token = create c.evm_erc20(
+            network_id,
+            address = token_address,
+            name,
+            symbol,
+            decimals
+        );
+    }
+
+    val balance = evm_erc20_balance @? { network_id, token, beneficiary };
+    if (empty(balance)) {
+        create evm_erc20_balance(
+            network_id,
+            token,
+            beneficiary,
+            amount
+        );
+    } else {
+        update balance (.amount += amount);
+    }
+}
+
+function emit_withdraw(network_id: integer, beneficiary: byte_array, account: acc.account?, eth_event_data: list&lt;gtv&gt;) {
+    val account_link = get_or_create_evm_account_link(network_id, beneficiary);
+    val state = build_account_state(network_id, beneficiary, account);
+    val state_data = c.state_data(
+        account_link.state_n,
+        account = state
+    );
+
+    op_context.emit_event("eif_state", state_data.to_gtv());
+    op_context.emit_event("eif_event", eth_event_data.to_gtv());
+}
+
+@extend(ass.after_transfer) function after_transfer_eif(from: acc.account, to: acc.account, ass.asset, amount: big_integer) {
+    update_account_state(from.id, asset.id);
+    update_account_state(to.id, asset.id);
+}
+
+function update_account_state(account_id: byte_array, asset_id: byte_array) {
+    val account = acc.account @ { .id == account_id };
+    val beneficiary = evm.evm_account @ { .account == account } ( .address );
+    val asset = ass.asset @ { .id == asset_id };
+    val token_mapping = a.token_mapping @? { .asset == asset };
+    if (empty(token_mapping)) {
+        return;
+    }
+    val network_id = token_mapping.token.network_id;
+    val account_link = get_or_create_evm_account_link(network_id, beneficiary);
+    val state = build_account_state(network_id, beneficiary, account);
+    val state_data = c.state_data(
+        account_link.state_n,
+        account = state
+    );
+    op_context.emit_event("eif_state", state_data.to_gtv());
+}</string>
+                            </entry>
+                            <entry key="lib/eif/module.rell">
+                                <string>import c: .common;
+import .evm;
+
+query get_last_evm_block(network_id: integer) { return c.evm_block @? {network_id} (@sort_desc .evm_block_height, .evm_block_hash) limit 1;}
+
+operation __evm_block(network_id: integer, evm_block_height: integer, evm_block_hash: byte_array, events: list&lt;c.event_data&gt;) {
+    _evm_block(network_id, evm_block_height, evm_block_hash, events);
+}
+
+function _evm_block(network_id: integer, evm_block_height: integer, evm_block_hash: byte_array, events: list&lt;c.event_data&gt;) {
+    val evm_block = create c.evm_block(
         network_id,
         evm_block_height,
         evm_block_hash
@@ -673,692 +994,27 @@ function evm_block_fn(network_id: integer, evm_block_height: integer, evm_block_
         val token_address = byte_array.from_gtv(event.indexed_values[1]);
         val evm_account = evm.evm_account @? { .address == beneficiary };
 
-        when (event.name) {
-            "DepositedERC20" -&gt; {
-                // ignore the unsupport token, move to process next events if any
-                val token = evm_erc20 @? { network_id, .address == token_address };
-                if (empty(token)) {
-                    log("ignore the unsupport token, move to process next events if any: " + token_address);
-                    continue;
-                }
-                val token_mapping = token_mapping @? { .token == token!! };
-                if (empty(token_mapping)) {
-                    log("no token_mapping");
-                    continue;
-                }
-
-                // ignore event if ft asset does not exist
-                val ft_asset = ass.asset @? { .id == token_mapping!!.asset.id };
-                if (empty(ft_asset)) {
-                    log("ignore event if ft asset does not exist: " + token_mapping.asset.id);
-                    continue;
-                }
-                val amount = big_integer.from_gtv(event.non_indexed_values[1]);
-                val evm_event = create evm_event(
-                    evm_block,
-                    tnx_hash = event.tnx_hash,
-                    log_index = event.log_index,
-                    event_signature = event.signature,
-                    contract_address = event.contract_address,
-                    indexed_values = indexed_values_bytes,
-                    non_indexed_values = non_indexed_values_bytes
-                );
-
-                // if user account does not exist, record the state into EIF for withdraw back to EVM chains later.
-                // This feature is to avoid losing fund of user  
-                if (empty(evm_account)) {
-                    val name = text.from_gtv(event.non_indexed_values[2]);
-                    val symbol = text.from_gtv(event.non_indexed_values[3]);
-                    val decimals = integer.from_gtv(event.non_indexed_values[4]);
-                    log("record the state into EIF for withdraw back to EVM chains later for beneficiary: " + beneficiary);
-                    deposit_ERC20(network_id, beneficiary, token_address, amount, name, symbol, decimals);
-                
-                    val account_link = get_or_create_evm_account_link(network_id, beneficiary);
-                    val state = build_account_state(network_id, beneficiary, null);
-                    val state_data = state_data(
-                        account_link.state_n,
-                        account = state
-                    );
-                    op_context.emit_event("eif_state", state_data.to_gtv());
-                } else {
-                    // mint postchain token for ft account
-                    val ft_account = evm_account.account;
-                    log("mint postchain token for ft account: " + ft_account.id);
-                    val ft_balance = ass.ensure_balance( ft_account, ft_asset!! );
-                    ft_balance.amount += amount;
-                    val ft_beneficiary = evm.evm_account @ { .account == ft_account } ( .address );
-                    val account_link = get_or_create_evm_account_link(token_mapping.token.network_id, ft_beneficiary);
-                    val state = build_account_state(network_id, ft_beneficiary, ft_account);
-                    val state_data = state_data(
-                        account_link.state_n,
-                        account = state
-                    );
-                    op_context.emit_event("eif_state", state_data.to_gtv());
-                }
-            }
-            // "DepositedERC721" -&gt; {
-            //     // ignore event if dip instance does not exist
-            //     val interface = nft_mapping @? { network_id, .address == token_address }.interface;
-            //     if (empty(interface)) {
-            //         log("nft token was not mapping yet: " + token_address);
-            //         continue;
-            //     }
-                
-            //     val evm_event = create evm_event(
-            //         evm_block,
-            //         tnx_hash = event.tnx_hash,
-            //         log_index = event.log_index,
-            //         event_signature = event.signature,
-            //         contract_address = event.contract_address,
-            //         indexed_values = indexed_values_bytes,
-            //         non_indexed_values = non_indexed_values_bytes
-            //     );
-
-            //     val token_id = integer.from_gtv(event.non_indexed_values[1]);
-            //     val name = text.from_gtv(event.non_indexed_values[2]);
-            //     val symbol = text.from_gtv(event.non_indexed_values[3]);
-            //     val uri = text.from_gtv(event.non_indexed_values[4]);
-
-            //     if (empty(evm_account)) {
-            //         log("deposit nft into EIF: " + name);
-            //         deposit_ERC721(network_id, beneficiary, token_address, token_id, name, symbol, uri);
-
-            //         val account_link = get_or_create_evm_account_link(network_id, beneficiary);
-            //         val state = build_account_state(network_id, beneficiary, null);
-            //         val state_data = state_data(
-            //             account_link.state_n,
-            //             account = state
-            //         );
-            //         op_context.emit_event("eif_state", state_data.to_gtv());
-            //     } else {
-            //         val ft3_account = evm_account.account;
-            //         log("mint postchain original for ft3 account: " + ft3_account.id);
-            //         require(interface!!.name == eif.INonFungibleOriginal.interface, "interface is not supported: " + interface!!.name);
-            //         val original_type = og.Minter.I(
-            //             interface_name = interface.name,
-            //             [
-            //                 eif.INonFungibleOriginal.symbol: dip.Text.T(symbol),
-            //                 // eif.INonFungibleOriginal.uri: dip.Text.T(uri),
-            //                 eif.INonFungibleOriginal.id: dip.Integer.T(token_id),
-            //                 // eif.INonFungibleOriginal.address: dip.Text.T(token_address),
-            //                 og.chromia.IOriginal.name: dip.Text.T(name),
-            //                 og.chromia.IOriginal.creator_id: dip.ByteArray.T(ft3_account.id),
-            //                 og.chromia.IOriginal.creator_name: dip.Text.T("User")
-            //             ]
-            //         );
-            //         og.Minter.mint_non_fungible_original(ft3_account, "eif", original_type, dip.Meta.Engine.access(ft3_account));
-            //     }
-            // }
-        }
+        evm_block_fn(evm_block, network_id, token_address, beneficiary, evm_account, event, indexed_values_bytes, non_indexed_values_bytes);
     }
 }
 
-operation add_new_evm_erc20(network_id: integer, token_address: byte_array, name: text, symbol: text, decimals: integer) {
-    admin.require_admin();
-    require(empty(evm_erc20 @? { network_id, .address == token_address }), "token already existed");
-    create evm_erc20(
-        network_id,
-        address = token_address,
-        name,
-        symbol,
-        decimals
-    );
-}
 
-operation add_new_token_mapping(network_id: integer, token_address: byte_array, asset_id: byte_array) {
-    admin.require_admin();
-
-    val token = require(
-        evm_erc20 @? { network_id, .address == token_address },
-        "Token does not exist: " + token_address
-    );
-
-    val asset = require(
-        ass.asset @? { .id == asset_id },
-        "Asset does not exist: " + asset_id
-    );
-
-    require(
-        empty(token_mapping @? { token, asset }),
-        "Token was already mapped: " + token_address
-    );
-
-    create token_mapping(token, asset);
-}
-
-// operation register_chromia_base_originals() {
-//     admin.require_admin("Only admin can init chromia base original interfaces");
-
-//     val admin_account = require(
-//         acc.account @? { .id == admin.account_id() }, 
-//         "admin account was not defined: " + admin.account_id()
-//     );
-
-//     val dclass = dip.Interface.dclass @? { og.chromia.INonFungibleOriginal.interface };
-//     if (empty(dclass)) {
-//         og.initialize_original_interfaces(admin_account);
-//     }
-// }
-
-// operation init_eif_original_interface() {
-//     admin.require_admin("Only admin can define new original interface");
-
-//     val admin_account = require(
-//         acc.account @? { .id == admin.account_id() }, 
-//         "admin account was not defined: " + admin.account_id()
-//     );
-
-//     require(
-//         empty(dip.Interface.dclass @? { eif.INonFungibleOriginal.interface }),
-//         "eif non fungible original interface was already defined"
-//     );
-//     eif.INonFungibleOriginal.register(admin_account);
-// }
-
-// operation add_eif_nft_mapping(network_id: integer, token_address: byte_array) {
-//     admin.require_admin("Only admin can do eif nft mapping");
-
-//     val dclass = require(
-//         dip.Interface.dclass @? { eif.INonFungibleOriginal.interface },
-//         "dclass does not exist: " + eif.INonFungibleOriginal.interface
-//     );
-
-//     require(
-//         empty(nft_mapping @? {}),
-//         "eif non fungible token was already mapped: " + token_address
-//     );
-
-//     create nft_mapping(network_id, token_address, dclass);
-// }
-
-operation deposit_ft_token(auth_id, network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
-    require(amount &gt; 0, "amount should larger than 0");
-    val token = require(evm_erc20 @? { network_id, .address == token_address }, "token is not support");
-    val token_mapping = require(token_mapping @? { token }, "token is not support");
-    val asset = require(ass.asset @? { .id == token_mapping.asset.id }, "asset does not exist");
-
-    val account = acc.account @ { .id == auth_id.account_id };
-    val account_auth_descriptor = acc.auth_descriptor_by_id(account, auth_id.auth_descriptor_id);
-    acc._auth(account, account_auth_descriptor, ["T"]);
-
-    // burn ft token of the account
-    ass.Unsafe.burn(account, asset, amount);
-
-    // update the postchain EIF state for equivalent account
-    deposit_ERC20(network_id, beneficiary, token_address, amount, token_mapping.token.name, token_mapping.token.symbol, token_mapping.token.decimals);
-
-    // update relevant account state
-    update_account_state(account.id, asset.id);
-}
-
-operation bridge_ft_token_to_evm(auth_id, network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
-    require(amount &gt; 0, "amount should larger than 0");
-    val token = require(evm_erc20 @? { network_id, .address == token_address }, "token is not support");
-    val token_mapping = require(token_mapping @? { token }, "token is not support");
-    val asset = require(ass.asset @? { .id == token_mapping.asset.id }, "asset does not exist");
-
-    val account = acc.account @ { .id == auth_id.account_id };
-    val account_auth_descriptor = acc.auth_descriptor_by_id(account, auth_id.auth_descriptor_id);
-    acc._auth(account, account_auth_descriptor, ["T"]);
-
-    // burn ft token of the account and update relevant account state
-    ass.Unsafe.burn(account, asset, amount);
-    update_account_state(account.id, asset.id);
-
-    update withdraw_stats(withdraw_count += 1);
-    val next_serial = withdraw_stats.withdraw_count;
-
-    create evm_erc20_withdraw(
-        serial = next_serial,
-        network_id,
-        token,
-        beneficiary,
-        amount
-    );
-
-    val withdraw_info = list&lt;gtv&gt;();
-    withdraw_info.add(next_serial.to_gtv());
-    withdraw_info.add(network_id.to_gtv());
-    withdraw_info.add(byte_array.from_hex(to_zero_padded_hex(token_address)).to_gtv());
-    withdraw_info.add(byte_array.from_hex(to_zero_padded_hex(beneficiary)).to_gtv());
-    withdraw_info.add(amount.to_gtv());
-
-    op_context.emit_event("eif_event", withdraw_info.to_gtv());
-}
-
-// operation deposit_non_fungible_original(auth_id, asset_id: byte_array, network_id: integer, token_address: byte_array, beneficiary: byte_array) {
-//     val account = do_auth(auth_id, ["T"]);
-//     val ft3_burn_account = ensure_locked_account("BURN", account);
-
-//     val instance = og.Id.get_instance(asset_id);
-//     val dclass = dip.instance_dclass @ { instance, .direct == true} .dclass;
-//     require(dclass.name == eif.INonFungibleOriginal.interface, "interface is not support: " + dclass.name);
-//     og.Ownership.transfer(account, instance, ft3_burn_account.id, 1);
-
-//     val token_id = dip.Integer.get_value(instance, eif.INonFungibleOriginal.id);
-//     var name = dip.Text.get_value(instance, og.chromia.IOriginal.name) ?: "";
-//     var symbol = dip.Text.get_value(instance, eif.INonFungibleOriginal.symbol) ?: "";
-//     var uri = dip.Text.get_value(instance, eif.INonFungibleOriginal.uri) ?: "";
-
-//     deposit_ERC721(network_id, beneficiary, token_address, token_id!!, name, symbol, uri);
-// }
-
-// operation bridge_non_fungible_original_to_evm(auth_id, asset_id: byte_array, network_id: integer, token_address: byte_array, beneficiary: byte_array) {
-//     val account = do_auth(auth_id, ["T"]);
-//     val ft3_burn_account = ensure_locked_account("BURN", account);
-
-//     val instance = og.Id.get_instance(asset_id);
-//     val dclass = dip.instance_dclass @ { instance, .direct == true} .dclass;
-//     require(dclass.name == eif.INonFungibleOriginal.interface, "interface is not support: " + dclass.name);
-//     og.Ownership.transfer(account, instance, ft3_burn_account.id, 1);
-
-//     require(
-//         nft_mapping @? { network_id, .address == token_address }.interface, 
-//         "nft token was not mapping yet: " + token_address
-//     );
-
-//     var token_id = require(dip.Integer.get_value(instance, eif.INonFungibleOriginal.id), "cannot bridge the non fungile token without token id");
-//     var name = dip.Text.get_value(instance, og.chromia.IOriginal.name) ?: "";
-//     var symbol = dip.Text.get_value(instance, eif.INonFungibleOriginal.symbol) ?: "";
-//     var uri = dip.Text.get_value(instance, eif.INonFungibleOriginal.uri) ?: "";
-
-//     var token = evm_erc721 @? { network_id, .address == token_address, token_id };
-//     if (empty(token)) {
-//         token = create evm_erc721(
-//             network_id,
-//             address = token_address,
-//             token_id,
-//             name,
-//             symbol,
-//             uri
-//         );
-//     }
-
-//     update withdraw_stats(withdraw_count += 1);
-//     val next_serial = withdraw_stats.withdraw_count;
-
-//     create evm_erc721_withdraw(
-//         serial = next_serial,
-//         network_id,
-//         token,
-//         beneficiary
-//     );
-
-//     val withdraw_info = list&lt;gtv&gt;();
-//     withdraw_info.add(next_serial.to_gtv());
-//     withdraw_info.add(network_id.to_gtv());
-//     withdraw_info.add(byte_array.from_hex(to_zero_padded_hex(token_address)).to_gtv());
-//     withdraw_info.add(byte_array.from_hex(to_zero_padded_hex(beneficiary)).to_gtv());
-//     withdraw_info.add(token_id.to_gtv());
-
-//     op_context.emit_event("eif_event", withdraw_info.to_gtv());
-// }
-
-// user can claim ft asset back to specific account id on postchain after deposit it into EIF
-operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer, 
-                        r: byte_array, s: byte_array, v: integer, pk: text, account_id: byte_array) {
-    require(amount &gt; 0, "Must withdraw an amount larger than 0");
-    val recovered_pubkey = crypto.eth_ecrecover(r, s, v, hash_eth_message(pk));
-    val eth_address = get_eth_address(recovered_pubkey);
-    require(eth_address == beneficiary, "beneficiary is not correct, " + "b: " + beneficiary + " e: " + eth_address);
-    val participants = op_context.get_signers();
-    require_not_empty(participants, "participants is empty");
-    require(participants.size() == 1, "only support single auth");
-    require(participants[0].to_hex() == pk, "participant is not correct, " + participants[0].to_hex() + ", " + pk);
-
-    val token = require(
-        evm_erc20 @? { network_id, .address == token_address }, 
-        "unsupport token: " + token_address
-    );
-    val token_mapping = require(
-        token_mapping @? { .token == token },
-        "no token mapping"
-    );
-    val ft_asset = require(
-        ass.asset @? { .id == token_mapping.asset.id }, 
-        "ft asset does not exist: " + token_mapping.asset.id
-    );
-    val balance = evm_erc20_balance @? { network_id, token, beneficiary };
-    require_not_empty(balance, "No balance for this token");
-    require(balance.amount &gt;= amount, "Balance is too low");
-    update balance(.amount -= amount);
-
-    update withdraw_stats(withdraw_count += 1);
-    val next_serial = withdraw_stats.withdraw_count;
-
-    // net_id = 0 means withdraw from postchain snapshot state into ft account
-    val net_id = 0;
-    create evm_erc20_withdraw(
-        serial = next_serial,
-        network_id = net_id,
-        token,
-        beneficiary,
-        amount
-    );
-
-    val withdraw_info = list&lt;gtv&gt;();
-    withdraw_info.add(next_serial.to_gtv());
-    withdraw_info.add(net_id.to_gtv());
-    withdraw_info.add(byte_array.from_hex(to_zero_padded_hex(token_address)).to_gtv());
-    withdraw_info.add(byte_array.from_hex(to_zero_padded_hex(beneficiary)).to_gtv());
-    withdraw_info.add(amount.to_gtv());
-
-    val account = acc.account @ { account_id };
-    val ft_balance = ass.ensure_balance(account , ft_asset );
-    ft_balance.amount += amount;
-    emit_withdraw(network_id, beneficiary, account, withdraw_info);
-}
-
-// user can claim non-fungible token instance back to specific account id on postchain after deposit it into EIF
-// operation claim_ERC721(network_id: integer, token_address: byte_array, beneficiary: byte_array, token_id: integer,
-//                         r: byte_array, s: byte_array, v: integer, pk: text, account_id: byte_array) {
-//     val recovered_pubkey = crypto.eth_ecrecover(r, s, v, hash_eth_message(pk));
-//     val eth_address = get_eth_address(recovered_pubkey);
-//     require(eth_address == beneficiary, "beneficiary is not correct, " + "b: " + beneficiary + " e: " + eth_address);
-//     val participants = op_context.get_signers();
-//     require_not_empty(participants, "participants is empty");
-//     require(participants.size() == 1, "only support single auth");
-//     require(participants[0].to_hex() == pk, "ft3 participant is not correct, " + participants[0].to_hex() + ", " + pk);
-
-//     val token = require(
-//         evm_erc721 @? { network_id, .address == token_address, token_id }, 
-//         "token does not exist: " + token_address + " : " + token_id
-//     );
-
-//     val interface = require(
-//         nft_mapping @? { network_id, .address == token_address }.interface, 
-//         "nft token was not mapping yet: " + token_address
-//     );
-//     require(interface.name == eif.INonFungibleOriginal.interface, "interface is not support: " + interface.name);
-
-//     val balance = evm_erc721_balance @? { network_id, token, beneficiary };
-//     require_not_empty(balance, "No balance for this token");
-//     delete balance;
-
-//     update withdraw_stats(withdraw_count += 1);
-//     val next_serial = withdraw_stats.withdraw_count;
-
-//     // net_id = 0 means withdraw from postchain snapshot state into FT3
-//     val net_id = 0;
-//     create evm_erc721_withdraw(
-//         serial = next_serial,
-//         network_id = net_id,
-//         token,
-//         beneficiary
-//     );
-
-//     val withdraw_info = list&lt;gtv&gt;();
-//     withdraw_info.add(next_serial.to_gtv());
-//     withdraw_info.add(net_id.to_gtv());
-//     withdraw_info.add(byte_array.from_hex(to_zero_padded_hex(token_address)).to_gtv());
-//     withdraw_info.add(byte_array.from_hex(to_zero_padded_hex(beneficiary)).to_gtv());
-//     withdraw_info.add(token_id.to_gtv());
-
-//     val original_type = og.Minter.I(
-//         interface_name = interface.name,
-//         [
-//             eif.INonFungibleOriginal.symbol: dip.Text.T(token.symbol),
-//             // eif.INonFungibleOriginal.uri: dip.Text.T(uri),
-//             eif.INonFungibleOriginal.id: dip.Integer.T(token.token_id),
-//             // eif.INonFungibleOriginal.address: dip.Text.T(token_address),
-//             og.chromia.IOriginal.name: dip.Text.T(token.name),
-//             og.chromia.IOriginal.creator_id: dip.ByteArray.T(account_id),
-//             og.chromia.IOriginal.creator_name: dip.Text.T("User")
-//         ]
-//     );
-//     val account = require(acc.account @? { account_id }, "account does not exist: " + account_id);
-//     og.Minter.mint_non_fungible_original(account, "eif", original_type, dip.Meta.Engine.access(account));
-
-//     emit_withdraw(network_id, beneficiary, account, withdraw_info);
-// }
-
-operation withdraw_ERC20(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer, 
-                                                    r: byte_array, s: byte_array, v: integer, pk: text) {
-    require(amount &gt; 0, "Must withdraw an amount larger than 0");
-
-    // ensure that the signer also control the beneficiary account
-    val recovered_pubkey = crypto.eth_ecrecover(r, s, v, hash_eth_message(pk));
-    val eth_address = get_eth_address(recovered_pubkey);
-    require(eth_address == beneficiary, "beneficiary is not correct, " + "b: " + beneficiary + " e: " + eth_address);
-    val participants = op_context.get_signers();
-    require_not_empty(participants, "participants is empty");
-    require(participants.size() == 1, "only support single auth");
-    require(participants[0].to_hex() == pk, "participant is not correct, " + participants[0].to_hex() + ", " + pk);
-
-    val token = evm_erc20 @? { network_id, .address == token_address };
-    if (empty(token)) {
-        return;
-    }
-    val balance = evm_erc20_balance @? { network_id, token, beneficiary };
-    require_not_empty(balance, "No balance for this token");
-    require(balance.amount &gt;= amount, "Balance is too low");
-    update balance(.amount -= amount);
-
-    update withdraw_stats(withdraw_count += 1);
-    val next_serial = withdraw_stats.withdraw_count;
-
-    create evm_erc20_withdraw(
-        serial = next_serial,
-        network_id,
-        token,
-        beneficiary,
-        amount
-    );
-
-    val withdraw_info = list&lt;gtv&gt;();
-    withdraw_info.add(next_serial.to_gtv());
-    withdraw_info.add(network_id.to_gtv());
-    withdraw_info.add(byte_array.from_hex(to_zero_padded_hex(token_address)).to_gtv());
-    withdraw_info.add(byte_array.from_hex(to_zero_padded_hex(beneficiary)).to_gtv());
-    withdraw_info.add(amount.to_gtv());
-
-    val account = evm.get_account_by_evm_address(eth_address);
-    emit_withdraw(network_id, beneficiary, account, withdraw_info);
-}
-
-// operation withdraw_ERC721(network_id: integer, token_address: byte_array, beneficiary: byte_array, token_id: integer,
-//                                                         r: byte_array, s: byte_array, v: integer, pk: text) {
-//     // ensure that the signer also control the beneficiary account
-//     val recovered_pubkey = crypto.eth_ecrecover(r, s, v, hash_eth_message(pk));
-//     val eth_address = get_eth_address(recovered_pubkey);
-//     require(eth_address == beneficiary, "beneficiary is not correct, " + "b: " + beneficiary + " e: " + eth_address);
-//     val participants = op_context.get_signers();
-//     require_not_empty(participants, "participants is empty");
-//     require(participants.size() == 1, "only support single auth");
-//     require(participants[0].to_hex() == pk, "ft3 participant is not correct, " + participants[0].to_hex() + ", " + pk);    
-
-//     val token = evm_erc721 @? { network_id, .address == token_address, token_id };
-//     if (empty(token)) {
-//         return;
-//     }
-
-//     val balance = evm_erc721_balance @? { network_id, token, beneficiary };
-//     require_not_empty(balance, "No balance for this token");
-//     delete balance;
-
-//     update withdraw_stats(withdraw_count += 1);
-//     val next_serial = withdraw_stats.withdraw_count;
-
-//     create evm_erc721_withdraw(
-//         serial = next_serial,
-//         network_id,
-//         token,
-//         beneficiary
-//     );
-
-//     val withdraw_info = list&lt;gtv&gt;();
-//     withdraw_info.add(next_serial.to_gtv());
-//     withdraw_info.add(network_id.to_gtv());
-//     withdraw_info.add(byte_array.from_hex(to_zero_padded_hex(token_address)).to_gtv());
-//     withdraw_info.add(byte_array.from_hex(to_zero_padded_hex(beneficiary)).to_gtv());
-//     withdraw_info.add(token_id.to_gtv());
-
-//     val account = evm.get_account_by_evm_address(eth_address);
-//     emit_withdraw(network_id, beneficiary, account, withdraw_info);
-// }
-
-function get_or_create_evm_account_link(network_id: integer, beneficiary: byte_array): evm_account_link {
-    val account = evm_account_link @? { network_id, beneficiary };
-    if (empty(account)) {
-        val last_state_n = evm_account_link @? {} (@sort_desc .state_n) limit 1;
-        var next_state_n = 0;
-        if (empty(last_state_n)) {
-            next_state_n = 1;
-        } else {
-            next_state_n = last_state_n + 1;
-        }
-
-        return create evm_account_link(
-            network_id,
-            state_n = next_state_n,
-            beneficiary
-        );
-    };
-    return account;
-}
-
-function build_account_state(network_id: integer, beneficiary: byte_array, account: acc.account?) {
-    val state = list&lt;gtv&gt;();
-    state.add(byte_array.from_hex(to_zero_padded_hex(beneficiary)).to_gtv());
-    // In order of asset type
-    // 0: ERC20
-    val erc20_balances = evm_erc20_balance @* { network_id, beneficiary };
-    val balances = list&lt;ass.balance&gt;();
-    if (account != null) {
-        val ft_balances = ass.balance @* { .account == account };
-        for (ft_balance in ft_balances) {
-            val token_mapping = token_mapping @? {.asset == ft_balance.asset};
-            if (token_mapping != null) {
-                if (token_mapping.token.network_id != network_id) {
-                    continue;
-                }
-                balances.add(ft_balance);
-            }
-        }
-    }
-    val erc20_byte_offset = (erc20_balances.size() + balances.size()) * 2 * 32; // 2 values per entry
-    state.add(erc20_byte_offset.to_gtv());
-
-    // update state for eif balance
-    for (balance in erc20_balances) {
-        state.add(byte_array.from_hex(to_zero_padded_hex(balance.token.address)).to_gtv());
-        state.add((balance.amount).to_gtv());
-    }
-
-    // update state for ft balance
-    for (balance in balances) {
-        val token_mapping = token_mapping @ {.asset == balance.asset};
-        state.add(byte_array.from_hex(to_zero_padded_hex(token_mapping.token.address)).to_gtv());
-        state.add((balance.amount).to_gtv());
-    }
-
-    // 1: ERC721
-    // val erc721_balances = evm_erc721_balance @* { network_id, beneficiary };
-    // val erc721_byte_offset = erc721_balances.size() * 2 * 32; // 2 values per entry
-    // state.add(erc721_byte_offset.to_gtv());
-    // for (balance in erc721_balances) {
-    //  state.add(byte_array.from_hex("000000000000000000000000" + balance.token.address.sub(2)).to_gtv());
-    //  state.add(balance.token.token_id.to_gtv());
-    // }
-    // Add new asset types here
-    // ------------------------ //
-    return state;
-}
-
-function deposit_ERC20(network_id: integer, beneficiary: byte_array, token_address: byte_array, amount: big_integer, name: text, symbol: text, decimals: integer) {
-    log("deposit_ERC20: " + token_address + " : " + beneficiary + " : " + name);
-    var token = evm_erc20 @? { network_id, .address == token_address };
-    if (empty(token)) {
-        token = create evm_erc20(
-            network_id,
-            address = token_address,
-            name,
-            symbol,
-            decimals
-        );
-    }
-
-    val balance = evm_erc20_balance @? { network_id, token, beneficiary };
-    if (empty(balance)) {
-        create evm_erc20_balance(
-            network_id,
-            token,
-            beneficiary,
-            amount
-        );
-    } else {
-        update balance (.amount += amount);
-    }
-}
-
-// function deposit_ERC721(network_id: integer, beneficiary: byte_array, token_address: byte_array, token_id: integer, name: text, symbol: text, uri: text) {
-//     var token = evm_erc721 @? { network_id, .address == token_address, token_id };
-//     if (empty(token)) {
-//         token = create evm_erc721(
-//             network_id,
-//             address = token_address,
-//             token_id,
-//             name,
-//             symbol,
-//             uri
-//         );
-//     }
-
-//     create evm_erc721_balance(
-//         network_id,
-//         token,
-//         beneficiary
-//     );
-// }
-
-function emit_withdraw(network_id: integer, beneficiary: byte_array, account: acc.account?, eth_event_data: list&lt;gtv&gt;) {
-    val account_link = get_or_create_evm_account_link(network_id, beneficiary);
-    val state = build_account_state(network_id, beneficiary, account);
-    val state_data = state_data(
-        account_link.state_n,
-        account = state
-    );
-
-    op_context.emit_event("eif_state", state_data.to_gtv());
-    op_context.emit_event("eif_event", eth_event_data.to_gtv());
-}
+@extendable function evm_block_fn(c.evm_block, network_id: integer, token_address: byte_array, beneficiary: byte_array, evm.evm_account?, event: c.event_data, indexed_values_bytes: byte_array, non_indexed_values_bytes: byte_array);
+</string>
+                            </entry>
+                            <entry key="lib/eif/utils/module.rell">
+                                <string>@mount('eif.utils')
+module;
 
 function to_zero_padded_hex(array: byte_array) = "000000000000000000000000" + array.to_hex();
 
 function get_eth_address(pk: byte_array) = crypto.keccak256(pk).sub(12);
 
 function hash_eth_message(msg: text) = crypto.keccak256(("\u0019Ethereum Signed Message:\n" + msg.size().to_text() + msg).to_bytes());
-
-function is_syncing_transfers_inside_dapp() = chain_context.args.sync_transfers_inside_dapp;
-
-@extend(ass.after_transfer) function after_transfer_eif(from: acc.account, to: acc.account, ass.asset, amount: big_integer) {
-    if (not is_syncing_transfers_inside_dapp()) return;
-
-    update_account_state(from.id, asset.id);
-    update_account_state(to.id, asset.id);
-}
-
-function update_account_state(account_id: byte_array, asset_id: byte_array) {
-    val account = acc.account @ { .id == account_id };
-    val beneficiary = evm.evm_account @ { .account == account } ( .address );
-    val asset = ass.asset @ { .id == asset_id };
-    val token_mapping = token_mapping @? { .asset == asset };
-    if (empty(token_mapping)) {
-        return;
-    }
-    val network_id = token_mapping.token.network_id;
-    val account_link = get_or_create_evm_account_link(network_id, beneficiary);
-    val state = build_account_state(network_id, beneficiary, account);
-    val state_data = state_data(
-        account_link.state_n,
-        account = state
-    );
-    op_context.emit_event("eif_state", state_data.to_gtv());
-}</string>
+</string>
                             </entry>
                             <entry key="lib/ft4/accounts/auth_basic.rell">
-                                <string>import u: ^.utils;
-
+                                <string>
 struct single_sig_args {
     flags: set&lt;text&gt;;
     pubkey;
@@ -1373,44 +1029,44 @@ struct multi_sig_args {
 /*
  * Returns VALID if valid.
  */
-function check_single_sig_auth(args: byte_array, participants: list&lt;byte_array&gt;, required_flags: list&lt;text&gt;): u.validation_result {
+function check_single_sig_auth(args: byte_array, participants: list&lt;byte_array&gt;, required_flags: list&lt;text&gt;): utils.validation_result {
     if(participants.size() &gt; 1) {
-        return u.invalid("Single sig Auth Descriptor must have only one participant.");
+        return utils.invalid("Single sig Auth Descriptor must have only one participant.");
     }
     if (participants.size() &lt; 1) {
-        return u.invalid("Single sig Auth Descriptor's participant list is empty.");
+        return utils.invalid("Single sig Auth Descriptor's participant list is empty.");
     }
 
     val ss_args = single_sig_args.from_bytes(args);
     if ( check_required_flags(ss_args.flags, required_flags)) {
         if (op_context.is_signer(participants[0])) {
-            return u.VALID;
+            return utils.VALID;
         } else {
-            return u.invalid("The participant is not the signer of this transaction.");
+            return utils.invalid("The participant is not the signer of this transaction.");
         }
     } else {
-        return u.invalid("Some required flags " + required_flags.to_text() + " are missing on the (single sig) Auth Descriptor.");
+        return utils.invalid("Some required flags " + required_flags.to_text() + " are missing on the (single sig) Auth Descriptor.");
     }
 }
 
 /*
  * Returns VALID if valid.
  */
-function check_multi_sig_auth(args: byte_array, participants: list&lt;byte_array&gt;, required_flags: list&lt;text&gt;): u.validation_result {
+function check_multi_sig_auth(args: byte_array, participants: list&lt;byte_array&gt;, required_flags: list&lt;text&gt;): utils.validation_result {
     val multi_sign_args = multi_sig_args.from_bytes(args);
     if (not (check_required_flags(multi_sign_args.flags, required_flags))) {
-       return u.invalid("Some required flags " + required_flags.to_text() + " are missing on the (multi sig) Auth Descriptor.");
+       return utils.invalid("Some required flags " + required_flags.to_text() + " are missing on the (multi sig) Auth Descriptor.");
     }
     var num_sign = multi_sign_args.signatures_required;
     for(s in participants) {
         if(op_context.is_signer(s)) {
             num_sign -= 1;
             if(num_sign &lt; 1) {
-                return u.VALID;
+                return utils.VALID;
             }
         }
     }
-    return u.invalid("Transaction must be signed by at least " + multi_sign_args.signatures_required + " participants in the Auth Descriptor.");
+    return utils.invalid("Transaction must be signed by at least " + multi_sign_args.signatures_required + " participants in the Auth Descriptor.");
 }
 
 /*
@@ -1441,11 +1097,11 @@ function get_flags_from_args(a_t: auth_type, args: byte_array): set&lt;text&gt; 
 /*
  * Returns VALID if authentication arguments are valid.
  */
-function check_auth_args(a_t: auth_type, args: byte_array, participants: list&lt;byte_array&gt;, required_flags: list&lt;text&gt;): u.validation_result {
+function check_auth_args(a_t: auth_type, args: byte_array, participants: list&lt;byte_array&gt;, required_flags: list&lt;text&gt;): utils.validation_result {
     return when (a_t) {
         S -&gt; check_single_sig_auth(args, participants, required_flags);
         M -&gt; check_multi_sig_auth(args, participants, required_flags);
-        else -&gt; u.invalid("Don't recognize authentication type (S or M).");
+        else -&gt; utils.invalid("Don't recognize authentication type (S or M).");
     };
 }
 
@@ -1457,15 +1113,15 @@ function check_auth_args(a_t: auth_type, args: byte_array, participants: list&lt
  * 4. Clean away expired Auth Descs on the account.
  */
 function require_auth(account, account_auth_descriptor, required_flags: list&lt;text&gt;) {
-    require(is_valid(account_auth_descriptor), "Invalid Auth Descriptor structure.");
+	require(is_valid(account_auth_descriptor), "Invalid Auth Descriptor structure.");
 
-    val result: u.validation_result = check_auth_args(
-            account_auth_descriptor.auth_type,
-            account_auth_descriptor.args,
+	val result: utils.validation_result = check_auth_args(
+       		account_auth_descriptor.auth_type,
+       		account_auth_descriptor.args,
             get_participants(account_auth_descriptor.auth_type, account_auth_descriptor.args),
-            //auth_descriptor_participant @* { account_auth_descriptor } ( .id ),
-            required_flags
-    );
+       		//auth_descriptor_participant @* { account_auth_descriptor } ( .id ),
+       		required_flags
+	);
 
     require(result.valid, result.error!!); // Prints a precise error message.
 
@@ -1490,106 +1146,106 @@ function get_participants(a_t: auth_type, args: byte_array): list&lt;byte_array&
                             <entry key="lib/ft4/accounts/auth_descriptor_rule.rell">
                                 <string>
 enum rule_variable {
-    block_height,
-    block_time,
-    op_count
+	block_height,
+	block_time,
+	op_count
 }
 
 enum rule_operator {
-    lt,
-    le,
-    eq,
-    ge,
-    gt
+	lt,
+	le,
+	eq,
+	ge,
+	gt
 }
 
 struct rule_expression {
-    variable: text;
-    operator: text;
-    value: gtv;
+	variable: text;
+	operator: text;
+	value: gtv;
 }
 
 entity auth_descriptor_rule_variable {
-    key account_auth_descriptor, name;
-    mutable value: byte_array;
+	key account_auth_descriptor, name;
+	mutable value: byte_array;
 }
 
 function is_valid(auth_descriptor: account_auth_descriptor): boolean {
-    if (auth_descriptor.rules == null.to_gtv().to_bytes()) {
-        return true;
-    }
-    
-    return is_rule_valid(
-        gtv.from_bytes(auth_descriptor.rules), 
-        load_variables(auth_descriptor)
-    );
+	if (auth_descriptor.rules == null.to_gtv().to_bytes()) {
+		return true;
+	}
+	
+	return is_rule_valid(
+		gtv.from_bytes(auth_descriptor.rules), 
+		load_variables(auth_descriptor)
+	);
 }
 
 function is_rule_valid(rule: gtv, variables: map&lt;text, gtv&gt;): boolean {
-    val parameters = list&lt;gtv&gt;.from_gtv(rule);
-    val operator = text.from_gtv(parameters[1]);
-    
-    if (operator == "and") {
-        return handle_composed_rule(rule, variables);
-    } else {
-        return handle_single_rule(rule, variables);
-    }
+	val parameters = list&lt;gtv&gt;.from_gtv(rule);
+	val operator = text.from_gtv(parameters[1]);
+	
+	if (operator == "and") {
+		return handle_composed_rule(rule, variables);
+	} else {
+		return handle_single_rule(rule, variables);
+	}
 }
 
 function handle_single_rule(rule: gtv, variables: map&lt;text, gtv&gt;): boolean {
-    return evaluate_int_variable_rule(
-        rule_expression.from_gtv(rule), 
-        variables
-    );  
+	return evaluate_int_variable_rule(
+		rule_expression.from_gtv(rule), 
+		variables
+	);	
 }
 
  
 function handle_composed_rule(rule: gtv, variables: map&lt;text, gtv&gt;): boolean {
-    val parameters = list&lt;gtv&gt;.from_gtv(rule);
-    val operator = text.from_gtv(parameters[1]);
-    if (operator == "and") {
-        return is_rule_valid(parameters[0], variables) and is_rule_valid(parameters[2], variables);
-    } else {
-        return false;
-    }
+	val parameters = list&lt;gtv&gt;.from_gtv(rule);
+	val operator = text.from_gtv(parameters[1]);
+	if (operator == "and") {
+		return is_rule_valid(parameters[0], variables) and is_rule_valid(parameters[2], variables);
+	} else {
+		return false;
+	}
 }
 
 function is_active(account_auth_descriptor): boolean {
-    if (account_auth_descriptor.rules == null.to_gtv().to_bytes()) { 
-        return true;
-    }
-    
-    return is_rule_active(gtv.from_bytes(account_auth_descriptor.rules), map&lt;text, gtv&gt;());
+	if (account_auth_descriptor.rules == null.to_gtv().to_bytes()) { 
+		return true;
+	}
+	
+	return is_rule_active(gtv.from_bytes(account_auth_descriptor.rules), map&lt;text, gtv&gt;());
 }
 
 
 function is_rule_active(r: gtv, variables: map&lt;text, gtv&gt;): boolean {
-    val parameters = list&lt;gtv&gt;.from_gtv(r);
-    val operator = text.from_gtv(parameters[1]);
-    when (operator) {
-        "and" -&gt; {
-            return is_rule_active(parameters[0], variables) and is_rule_active(parameters[2], variables);
-        }
-        else -&gt; {
-            return is_simple_rule_active(r, variables);
-        }
-    }
+	val parameters = list&lt;gtv&gt;.from_gtv(r);
+	val operator = text.from_gtv(parameters[1]);
+	when (operator) {
+		"and" -&gt; {
+			return is_rule_active(parameters[0], variables) and is_rule_active(parameters[2], variables);
+		}
+		else -&gt; {
+			return is_simple_rule_active(r, variables);
+		}
+	}
 }
 
 function is_simple_rule_active(rule: gtv, variables: map&lt;text, gtv&gt;): boolean {
-    val parameters = list&lt;gtv&gt;.from_gtv(rule);
-    val variable_name = text.from_gtv(parameters[0]);
-    when (rule_variable.value(variable_name)) {
-        rule_variable.block_height -&gt; {
-            return is_block_height_rule_active(rule);
-        }
-        rule_variable.block_time -&gt; {
-            return is_block_time_rule_active(rule);
-        }       
-        rule_variable.op_count -&gt; {
-            return is_op_count_rule_active(rule);
-        }
-    }
+	val parameters = list&lt;gtv&gt;.from_gtv(rule);
+	val variable_name = text.from_gtv(parameters[0]);
+	when (rule_variable.value(variable_name)) {
+		rule_variable.block_height -&gt; {
+			return is_block_height_rule_active(rule);
+		}
+		rule_variable.block_time -&gt; {
+			return is_block_time_rule_active(rule);
+		}		
+		rule_variable.op_count -&gt; {
+			return is_op_count_rule_active(rule);
+		}
+	}
 }
 
 /*
@@ -1597,28 +1253,28 @@ function is_simple_rule_active(rule: gtv, variables: map&lt;text, gtv&gt;): bool
  */
 
 function evaluate_int_variable_rule(rule: rule_expression, variables: map&lt;text, gtv&gt;): boolean {
-    val variable = rule_variable.value(rule.variable);
-    val operator = rule_operator.value(rule.operator);
-    val current_value = variable_value(variable, variables);
-    val defined_value = integer.from_gtv(rule.value);
+	val variable = rule_variable.value(rule.variable);
+	val operator = rule_operator.value(rule.operator);
+	val current_value = variable_value(variable, variables);
+	val defined_value = integer.from_gtv(rule.value);
 
-    when (operator) {
-        rule_operator.lt -&gt; {
-            return current_value &lt; defined_value;
-        }
-        rule_operator.le -&gt; {
-            return current_value &lt;= defined_value;
-        }
-        rule_operator.eq -&gt; {
-            return current_value == defined_value;
-        }
-        rule_operator.ge -&gt; {
-            return current_value &gt;= defined_value;
-        }
-        rule_operator.gt -&gt; {
-            return current_value &gt; defined_value;
-        }
-    }
+	when (operator) {
+		rule_operator.lt -&gt; {
+			return current_value &lt; defined_value;
+		}
+		rule_operator.le -&gt; {
+			return current_value &lt;= defined_value;
+		}
+		rule_operator.eq -&gt; {
+			return current_value == defined_value;
+		}
+		rule_operator.ge -&gt; {
+			return current_value &gt;= defined_value;
+		}
+		rule_operator.gt -&gt; {
+			return current_value &gt; defined_value;
+		}
+	}
 }
 
 
@@ -1626,107 +1282,107 @@ function evaluate_int_variable_rule(rule: rule_expression, variables: map&lt;tex
  * Called from _add_auth_descriptor function
  */
 function setup_auth_descriptor_variables(account_auth_descriptor) {
-    
-    if (account_auth_descriptor.rules == null.to_gtv().to_bytes()) {
-        return;
-    } 
-    
-    val variables = get_variable_names_set(gtv.from_bytes(account_auth_descriptor.rules));
-    
-    for (variable in variables) {
-        when (variable) {
-            rule_variable.op_count.name -&gt; {
-                create auth_descriptor_rule_variable(
-                    account_auth_descriptor,
-                    name = variable,
-                    value = op_count_variable_initial_value().to_bytes()
-                );
-            }
-        }
-    }
+	
+	if (account_auth_descriptor.rules == null.to_gtv().to_bytes()) {
+		return;
+	} 
+	
+	val variables = get_variable_names_set(gtv.from_bytes(account_auth_descriptor.rules));
+	
+	for (variable in variables) {
+		when (variable) {
+			rule_variable.op_count.name -&gt; {
+				create auth_descriptor_rule_variable(
+					account_auth_descriptor,
+					name = variable,
+					value = op_count_variable_initial_value().to_bytes()
+				);
+			}
+		}
+	}
 }
  
 function update_variables(account_auth_descriptor, variables: map&lt;text, gtv&gt;) {
-    for ((name, value) in variables) {
-        val variable = require(
-            auth_descriptor_rule_variable @? { account_auth_descriptor, name },
-            "No auth descriptor variable found: %s, %s".format(name, integer.from_gtv(value))
-            );
-        val int_value = integer.from_gtv(value);
-        
-        when (name) {
-            rule_variable.op_count.name -&gt; {
-                variable.value = (int_value + 1).to_gtv().to_bytes();
-            }
-        }
-    }
+	for ((name, value) in variables) {
+		val variable = require(
+			auth_descriptor_rule_variable @? { account_auth_descriptor, name },
+			"No auth descriptor variable found: %s, %s".format(name, integer.from_gtv(value))
+			);
+		val int_value = integer.from_gtv(value);
+		
+		when (name) {
+			rule_variable.op_count.name -&gt; {
+				variable.value = (int_value + 1).to_gtv().to_bytes();
+			}
+		}
+	}
 }
  
 function variable_value(variable: rule_variable, variables: map&lt;text, gtv&gt;): integer {
-    when (variable) {
-        rule_variable.block_height -&gt; {
-            return op_context.block_height;
-        }
-        rule_variable.block_time -&gt; {
-            return op_context.last_block_time;
-        }
-        rule_variable.op_count -&gt; {
-            return integer.from_gtv(variables[rule_variable.op_count.name]);
-        }
-    }
+	when (variable) {
+		rule_variable.block_height -&gt; {
+			return op_context.block_height;
+		}
+		rule_variable.block_time -&gt; {
+			return op_context.last_block_time;
+		}
+		rule_variable.op_count -&gt; {
+			return integer.from_gtv(variables[rule_variable.op_count.name]);
+		}
+	}
 }
 
 /*
  * Analyze the rules before assigning them to an authenticator descriptor
  */
  function analyze_auth_descriptor_rules(rules: gtv, hop: integer) {
-    require(hop&lt;3, "Too many rules");
-    if (rules == null.to_gtv()) {
-        return;
-    }
-    
-    val params = list&lt;gtv&gt;.from_gtv(rules);
-    require(params.size() &lt;=3, "Too many params");
-    
-    val operator = text.from_gtv(params[1]);
-    if(operator == "and") {
-        analyze_auth_descriptor_rules(params[0], hop+1); 
-        analyze_auth_descriptor_rules(params[2], hop+1);
-    }   
-    
-    return;
+ 	require(hop&lt;3, "Too many rules");
+ 	if (rules == null.to_gtv()) {
+		return;
+	}
+	
+ 	val params = list&lt;gtv&gt;.from_gtv(rules);
+ 	require(params.size() &lt;=3, "Too many params");
+ 	
+ 	val operator = text.from_gtv(params[1]);
+ 	if(operator == "and") {
+ 		analyze_auth_descriptor_rules(params[0], hop+1); 
+ 		analyze_auth_descriptor_rules(params[2], hop+1);
+ 	} 	
+ 	
+	return;
  }
 
 /*
  * Returns set of variable names used in a rule
  */
 function get_variable_names_set(rules: gtv): set&lt;text&gt; {
-    val parameters = list&lt;gtv&gt;.from_gtv(rules);
-    val operator = text.from_gtv(parameters[1]);
-    var vars = set&lt;text&gt;();
-    if (operator == "and") {
-        vars.add_all(get_variable_names_set(parameters[0]));
-        vars.add_all(get_variable_names_set(parameters[2]));
-    } else {
-        vars.add(text.from_gtv(parameters[0]));
-    }
-    return vars;
+	val parameters = list&lt;gtv&gt;.from_gtv(rules);
+	val operator = text.from_gtv(parameters[1]);
+	var vars = set&lt;text&gt;();
+	if (operator == "and") {
+		vars.add_all(get_variable_names_set(parameters[0]));
+		vars.add_all(get_variable_names_set(parameters[2]));
+	} else {
+		vars.add(text.from_gtv(parameters[0]));
+	}
+	return vars;
 } 
 
 function load_variables(account_auth_descriptor): map&lt;text, gtv&gt; {
-    val variables = auth_descriptor_rule_variable @* { account_auth_descriptor };
-    
-    val variables_map = map&lt;text, gtv&gt;();
-    for (variable in variables) {
-        variables_map[variable.name] = gtv.from_bytes(variable.value);
-    }
-    
-    return variables_map;
+	val variables = auth_descriptor_rule_variable @* { account_auth_descriptor };
+	
+	val variables_map = map&lt;text, gtv&gt;();
+	for (variable in variables) {
+		variables_map[variable.name] = gtv.from_bytes(variable.value);
+	}
+	
+	return variables_map;
 }
 
 function update_auth_descriptor_rule_variables(account_auth_descriptor) {
-    val variables = load_variables(account_auth_descriptor);
-    update_variables(account_auth_descriptor, variables);
+	val variables = load_variables(account_auth_descriptor);
+	update_variables(account_auth_descriptor, variables);
 }
 
 /*
@@ -1734,13 +1390,13 @@ function update_auth_descriptor_rule_variables(account_auth_descriptor) {
  */
 
 function delete_expired_auth_descriptors(account) {
-    val auth_descriptors = account_auth_descriptor @* { account };
-    
-    for (auth_descriptor in auth_descriptors) {
-        if (is_active(auth_descriptor) and not is_valid(auth_descriptor)) {
-            _delete_auth_descriptor(auth_descriptor);
-        }
-    }
+	val auth_descriptors = account_auth_descriptor @* { account };
+	
+	for (auth_descriptor in auth_descriptors) {
+		if (is_active(auth_descriptor) and not is_valid(auth_descriptor)) {
+			_delete_auth_descriptor(auth_descriptor);
+		}
+	}
 }
 
 /****************************************************************************************
@@ -1748,21 +1404,21 @@ function delete_expired_auth_descriptors(account) {
  ****************************************************************************************/
 
 function is_block_time_rule_active(r: gtv): boolean {
-    val parameters = list&lt;gtv&gt;.from_gtv(r);
-    val operator = rule_operator.value(text.from_gtv(parameters[1]));
-    val value = integer.from_gtv(parameters[2]);
-    when (operator) {
-        rule_operator.gt -&gt; {
-            return op_context.last_block_time &gt; value;
-        }
-        rule_operator.ge,
-        rule_operator.eq -&gt; {
-            return op_context.last_block_time &gt;= value;
-        }
-        else -&gt; {
-            return true;
-        }
-    }
+	val parameters = list&lt;gtv&gt;.from_gtv(r);
+	val operator = rule_operator.value(text.from_gtv(parameters[1]));
+	val value = integer.from_gtv(parameters[2]);
+	when (operator) {
+		rule_operator.gt -&gt; {
+			return op_context.last_block_time &gt; value;
+		}
+		rule_operator.ge,
+		rule_operator.eq -&gt; {
+			return op_context.last_block_time &gt;= value;
+		}
+		else -&gt; {
+			return true;
+		}
+	}
 }
 
 
@@ -1771,21 +1427,21 @@ function is_block_time_rule_active(r: gtv): boolean {
  ****************************************************************************************/
 
 function is_block_height_rule_active(r: gtv): boolean {
-    val parameters = list&lt;gtv&gt;.from_gtv(r);
-    val operator = rule_operator.value(text.from_gtv(parameters[1]));
-    val value = integer.from_gtv(parameters[2]);
-    when (operator) {
-        rule_operator.gt -&gt; {
-            return op_context.block_height &gt; value;
-        }
-        rule_operator.ge,
-        rule_operator.eq -&gt; {
-            return op_context.block_height &gt;= value;
-        }
-        else -&gt; {
-            return true;
-        }
-    }
+	val parameters = list&lt;gtv&gt;.from_gtv(r);
+	val operator = rule_operator.value(text.from_gtv(parameters[1]));
+	val value = integer.from_gtv(parameters[2]);
+	when (operator) {
+		rule_operator.gt -&gt; {
+			return op_context.block_height &gt; value;
+		}
+		rule_operator.ge,
+		rule_operator.eq -&gt; {
+			return op_context.block_height &gt;= value;
+		}
+		else -&gt; {
+			return true;
+		}
+	}
 }
 
 
@@ -1794,11 +1450,11 @@ function is_block_height_rule_active(r: gtv): boolean {
  ****************************************************************************************/
  
  function op_count_variable_initial_value(): gtv {
-    return (1).to_gtv();
+ 	return (1).to_gtv();
  }
  
  function is_op_count_rule_active(rule: gtv): boolean {
-    return true;
+ 	return true;
  }
 </string>
                             </entry>
@@ -1819,168 +1475,23 @@ function Account(id: byte_array) = require(
     account @? { id },
     "Account not found: %s".format(id)
 );
-
-// TODO: Merge with `authenticate` function.
-function _authenticate(required_flags: set&lt;text&gt;, message_template: text? = null): account {
-    require(op_context.op_index &gt; 0, "Expected at least two operations");
-
-    val previous_op = op_context.get_all_operations()[op_context.op_index - 1];
-    require(
-        previous_op.name in ["ft4.evm_auth", "ft4.ft_auth"],
-        "Error authenticating operation. Incorrect auth operation %s".format(previous_op.name)
-    );
-
-    val account = when (previous_op.name) {
-        "ft4.evm_auth" -&gt; _validate_eth_signature(previous_op, required_flags, message_template);
-        "ft4.ft_auth" -&gt; _validate_ft4_signature(previous_op.args, required_flags);
-        else -&gt; null;
-    };
-
-    val valid_account = require(account, "Invalid auth operation: %s".format(previous_op.name));
-
-    rate_limit(valid_account);
-
-    return valid_account;
-}
-
-function _validate_eth_signature(auth_op: gtx_operation, required_flags: set&lt;text&gt;, auth_message_template: text?): account {
-    val validated_args = _validate_eth_arguments(auth_op.args, required_flags);
-    val op_to_auth = op_context.get_all_operations()[op_context.op_index];
-    val template = auth_message_template ?: auth.generate_auth_message_template(chain_context.blockchain_rid, op_to_auth);
-    val message = create_message_from_template(
-        validated_args, 
-        template, 
-        op_to_auth.args, 
-        validated_args.account_auth_descriptor.ctr
-    );
-
-    var recovered_keys = 
-        if (validated_args.account_auth_descriptor.auth_type in [auth_type.ES, auth_type.S]) [_recover_eth_key(message, validated_args.signatures[0], validated_args.account_auth_descriptor.id)] 
-        else _recover_multiple_eth_keys(message, validated_args.signatures, validated_args.account_auth_descriptor);
-    
-    validated_args.account_auth_descriptor.ctr += 1;
-    
-    return validated_args.account;
-}
-
-function create_message_from_template(eth_auth_args, message_template: text, args: list&lt;gtv&gt;, ctr: integer): text {
-    require(message_template.contains("{nonce}"), "Message template has to include '{nonce}'");
-    var message = message_template;
-    
-    // TODO: check if this is still needed
-    for (i in range(args.size())) {
-        message = message.replace("{%d}".format(i), "%s".format(args[i]).replace("\"", ""));
-    }
-    
-    return message
-        .replace("{account_id}", eth_auth_args.account.id.to_hex())
-        .replace("{auth_descriptor_id}", eth_auth_args.account_auth_descriptor.id.to_hex())
-        .replace("{nonce}", ctr.to_text().replace("\"", ""));
-}
-
-function _validate_eth_arguments(auth_args: list&lt;gtv&gt;, required_flags: set&lt;text&gt;): eth_auth_args {
-    require(auth_args.size() == 3, "Incorrect number of arguments to auth operation");
-
-    val account_id = byte_array.from_gtv(auth_args[0]);
-    val auth_descriptor_id = byte_array.from_gtv(auth_args[1]);
-    val signatures = list&lt;auth.signature&gt;.from_gtv(auth_args[2]);
-
-    val account = Account(account_id);
-    
-    val auth_descriptor = require(
-        account_auth_descriptor @? { .id == auth_descriptor_id, .account == account },
-        "Auth descriptor '%s' not found for account '%s'".format(auth_descriptor_id, account_id)
-    );
-
-    require(is_valid(auth_descriptor));
-    
-    val has_all_flags = when (auth_descriptor.auth_type) {
-        S, ES -&gt; single_sig_args.from_bytes(auth_descriptor.args).flags.contains_all(required_flags);
-        M, EM -&gt; multi_sig_args.from_bytes(auth_descriptor.args).flags.contains_all(required_flags);
-    };
-    
-    require(has_all_flags, "The auth descriptor does not have the required permissions");
-
-    return eth_auth_args(account, auth_descriptor, signatures);
-}
-
-function _recover_multiple_eth_keys(message: text, signatures: list&lt;auth.signature&gt;, account_auth_descriptor) {
-    var recovered_keys = list&lt;byte_array&gt;();
-    for (i in range(signatures.size())) {
-        recovered_keys.add(
-            _recover_eth_key(
-                message,
-                signatures[i],
-                account_auth_descriptor.id
-            )
-        );
-    }
-    require(
-        recovered_keys.size() &gt;= multi_sig_args.from_bytes(account_auth_descriptor.args).signatures_required, 
-        "Minimum number of valid signatures not reached"
-    );
-    return recovered_keys;
-}
-
-function _recover_eth_key(message: text, auth.signature, auth_descriptor_id: byte_array) {
-    require(message != "", "Empty messages are not allowed");
-
-    val msg_hash = keccak256(("\u0019Ethereum Signed Message:\n" + message.size().to_text() + message).to_bytes());
-    val eth_pubkey = eth_ecrecover(
-        signature.r,
-        signature.s,
-        signature.v - 27,
-        msg_hash
-    );
-
-    val recovered_address = keccak256(eth_pubkey).sub(12);
-    val participant = auth_descriptor_participant @? {
-        .account_auth_descriptor.id == auth_descriptor_id,
-        .id == recovered_address
-    };
-    require(participant, "Invalid signature");
-
-    return recovered_address;
-}
-
-function _validate_ft4_signature(auth_args: list&lt;gtv&gt;, required_flags: set&lt;text&gt;): account {
-    val account_id = byte_array.from_gtv(auth_args[0]);
-    val auth_descriptor_id = byte_array.from_gtv(auth_args[1]);
-
-    val account = Account(account_id);
-    val external_keys = auth_descriptor_participant @* {
-        .account_auth_descriptor.account == account,
-        .account_auth_descriptor.id == auth_descriptor_id, 
-        .id in op_context.get_signers()
-    };
-
-    require(external_keys.size() &gt; 0, "The provided key(s) is not a signer of this auth descriptor");
-    for (external in external_keys) {
-        require_auth(
-            external.account_auth_descriptor.account,
-            external.account_auth_descriptor,
-            list(required_flags)
-        );
-    }
-
-    return account;
-}
 </string>
                             </entry>
                             <entry key="lib/ft4/accounts/external/module.rell">
                                 <string>@mount('ft4')
 module;
+
+import ^^.accounts;
+import ^^.assets;
+import ^^.auth;
+import ^^.utils;
 </string>
                             </entry>
                             <entry key="lib/ft4/accounts/external/operations.rell">
-                                <string>import acc: ^^.accounts;
-import ^^.assets;
-import ^^.auth;
-
-
+                                <string>
 function delete_auth_descriptor_message(gtv) {
     val params = struct&lt;delete_auth_descriptor&gt;.from_gtv(gtv);
-    return "Please sign the message\nto delete auth descriptor:\n%s\n\nfrom account\n{account_id}\n\nNonce: {nonce}".format(params.auth_descriptor_id);
+    return "Please sign the message\nto delete auth descriptor:\n%s\n\nfrom account\n{account_id}".format(params.auth_descriptor_id);
 }
 
 @extend(auth.auth_handler)
@@ -1994,14 +1505,14 @@ operation delete_auth_descriptor(auth_descriptor_id: byte_array) {
     // val flags = if (auth_descriptor_id == delete_descriptor_id) list&lt;text&gt;() else ["A"];
     val account = auth.authenticate();
 
-    acc._delete_auth_descriptor(
-        acc.auth_descriptor_by_id(account, auth_descriptor_id)
+    accounts._delete_auth_descriptor(
+        accounts.auth_descriptor_by_id(account, auth_descriptor_id)
     );    
 }
 
 function delete_all_auth_descriptors_exclude_message(gtv) {
     val params = struct&lt;delete_all_auth_descriptors_exclude&gt;.from_gtv(gtv);
-    return "Please sign the message\nto delete all auth descriptors excluding:\n%s\n\n from account:\n{account_id}\n\nNonce: {nonce}".format(params.auth_descriptor_id);
+    return "Please sign the message\nto delete all auth descriptors excluding:\n%s\n\n from account:\n{account_id}".format(params.auth_descriptor_id);
 }
 
 @extend(auth.auth_handler)
@@ -2012,18 +1523,18 @@ function () = auth.add_auth_handler(
 );
 
 operation delete_all_auth_descriptors_exclude(account_id: byte_array, auth_descriptor_id: byte_array) {
-    val account =  acc.account_by_id(account_id);
-    val auth_descriptor = acc.auth_descriptor_by_id(account, auth_descriptor_id);
-    acc._auth(account, auth_descriptor, ["A"]);
+    val account =  accounts.account_by_id(account_id);
+    val auth_descriptor = accounts.auth_descriptor_by_id(account, auth_descriptor_id);
+    accounts._auth(account, auth_descriptor, ["A"]);
 
-    acc._delete_all_auth_descriptors_exclude(auth_descriptor);
+    accounts._delete_all_auth_descriptors_exclude(auth_descriptor);
 }
 
 function add_auth_descriptor_message(gtv) {
     val params = struct&lt;add_auth_descriptor&gt;.from_gtv(gtv);
     val flags = params.new_desc.args[0];
 
-    return "Please sign the message\nto add auth descriptor\nwith flags:\n%s\n\nto account:\n{account_id}\n\nNonce: {nonce}".format(flags);
+    return "Please sign the message\nto add auth descriptor\nwith flags:\n%s\n\nto account:\n{account_id}".format(flags);
 }
 
 @extend(auth.auth_handler)
@@ -2033,26 +1544,24 @@ function () = auth.add_auth_handler(
     message = add_auth_descriptor_message(*)
 );
 
-operation add_auth_descriptor(new_desc: acc.auth_descriptor) {
+operation add_auth_descriptor(new_desc: accounts.auth_descriptor) {
     val account = auth.authenticate();
-    acc.add_auth_descriptor_to_account(account, new_desc);
+    accounts.add_auth_descriptor_to_account(account, new_desc);
 }
 </string>
                             </entry>
                             <entry key="lib/ft4/accounts/external/queries.rell">
-                                <string>import acc: ^;
-import utils: ^^.utils;
-
+                                <string>
 query get_config() {
     return (
-        rate_limit = acc.get_rate_limit_config()
+        rate_limit = accounts.get_rate_limit_config()
     );
 }
 
 query get_account_rate_limit_last_update(account_id: byte_array) {
-    if (acc.get_rate_limit_config().active == false) return (points = 0, last_update = 0);
+    if (accounts.get_rate_limit_config().active == false) return (points = 0, last_update = 0);
     
-    return acc.rl_state @ { .account.id == account_id }
+    return accounts.rl_state @ { .account.id == account_id }
     (
         .points, 
         .last_update
@@ -2060,60 +1569,54 @@ query get_account_rate_limit_last_update(account_id: byte_array) {
 }
 
 query is_auth_descriptor_valid(account_id: byte_array, auth_descriptor_id: byte_array) {
-    return acc.is_valid(acc.account_auth_descriptor @ {
+    return accounts.is_valid(accounts.account_auth_descriptor @ {
         .account.id == account_id,
         .id == auth_descriptor_id
     });
 }
 
 query _get_account_auth_descriptors(id: byte_array) {
-    return acc.account_auth_descriptor @* {
+    return accounts.account_auth_descriptor @* {
         .account.id == id
-    } (
-        auth_type = .auth_type,
-        args = gtv.from_bytes(.args),
-        rules = gtv.from_bytes(.rules)
-    );
+    } ( accounts.get_auth_descriptor_data($) );
 }
 
 query get_account_auth_descriptors(id: byte_array, page_size: integer, page_cursor: text?) {
     return utils.make_page(
-        acc.get_paginated_auth_descriptors(id, page_size, page_cursor), 
+        accounts.get_paginated_auth_descriptors(id, page_size, page_cursor), 
         page_size
     );
 }
 
 query get_account_auth_descriptors_by_participant_id(account_id: byte_array, participant_id: byte_array) {
-    return (ad: acc.account_auth_descriptor, p: acc.auth_descriptor_participant) @* {
+    return (ad: accounts.account_auth_descriptor, p: accounts.auth_descriptor_participant) @* {
         ad.account.id == account_id,
         p.id == participant_id,
         ad == p.account_auth_descriptor
     } (
-        auth_type = ad.auth_type,
-        args = gtv.from_bytes(ad.args),
-        rules = gtv.from_bytes(ad.rules)
+        accounts.get_auth_descriptor_data(ad)
     );
 }
 
 query get_account_by_id(id: byte_array) {
-    return acc.account @? { id } ( .id );
+    return accounts.account @? { id } ( .id );
 }
 
-query get_account_by_auth_descriptor(acc.auth_descriptor) {
-    return acc.account @? { .id == auth_descriptor.hash() } ( .id );
+query get_account_by_auth_descriptor(accounts.auth_descriptor) {
+    return accounts.account @? { .id == auth_descriptor.hash() } ( .id );
 }
 
 query get_accounts_by_participant_id(id: byte_array) {
-    return acc.auth_descriptor_participant @* { id } ( .account_auth_descriptor.account.id );
+    return accounts.auth_descriptor_participant @* { id } ( .account_auth_descriptor.account.id );
 }
 
 query _get_accounts_by_auth_descriptor_id(id: byte_array) {
-    return acc.account_auth_descriptor @* { id } ( .account.id );
+    return accounts.account_auth_descriptor @* { id } ( .account.id );
 }
 
 query get_accounts_by_auth_descriptor_id(id: byte_array, page_size: integer, page_cursor: text?) {
     return utils.make_page(
-        acc.get_paginated_accounts_by_ad_id(id, page_size, page_cursor),
+        accounts.get_paginated_accounts_by_ad_id(id, page_size, page_cursor),
         page_size
     );
 }
@@ -2121,7 +1624,7 @@ query get_accounts_by_auth_descriptor_id(id: byte_array, page_size: integer, pag
 query get_auth_descriptor_nonce(
     account_id: byte_array, 
     auth_descriptor_id: byte_array
-) = acc.account_auth_descriptor @ { 
+) = accounts.account_auth_descriptor @ { 
         .account.id == account_id, 
         .id == auth_descriptor_id 
     } ( .ctr );
@@ -2132,14 +1635,16 @@ query get_auth_descriptor_nonce(
 module;
 
 struct module_args {
-    rate_limit_active: boolean;
-    rate_limit_max_points: integer;
+	rate_limit_active: boolean;
+	rate_limit_max_points: integer;
     rate_limit_recovery_time: integer;
     rate_limit_points_at_account_creation: integer;    
 }
 
 import ^.auth;
 import ^.utils;
+import ^.version;
+import .external;
 
 enum auth_type {
     S, M, ES, EM,
@@ -2170,6 +1675,7 @@ entity account_auth_descriptor {
     args: byte_array;
     rules: byte_array;
     mutable ctr: integer;
+    created: timestamp;
 }
 
 entity auth_descriptor_participant {
@@ -2189,6 +1695,7 @@ entity rl_state {
 function add_auth_descriptor_to_account(account, auth_descriptor): byte_array {
     val id = auth_descriptor.hash();
 
+    validate_auth_descriptor_args(auth_descriptor);
     analyze_auth_descriptor_rules(auth_descriptor.rules, 0);
 
     val account_auth_descriptor = create account_auth_descriptor (
@@ -2196,16 +1703,14 @@ function add_auth_descriptor_to_account(account, auth_descriptor): byte_array {
         auth_descriptor.auth_type,
         args = auth_descriptor.args.to_gtv().to_bytes(),
         rules = auth_descriptor.rules.to_gtv().to_bytes(),
-        0
+        created = op_context.last_block_time,
+        ctr = 0
     );
-     
-    when (auth_descriptor.auth_type) {
-        S, M -&gt; _add_ft_auth_participant(account, auth_descriptor, account_auth_descriptor);
-        ES, EM -&gt; _add_eth_auth_participant(account, auth_descriptor, account_auth_descriptor);
-    }
-     
-     setup_auth_descriptor_variables(account_auth_descriptor);
-     return id;
+
+    _add_auth_participant(account, auth_descriptor, account_auth_descriptor);
+
+    setup_auth_descriptor_variables(account_auth_descriptor);
+    return id;
 }
 
 function _delete_auth_descriptor(auth_descriptor: account_auth_descriptor) {
@@ -2252,7 +1757,7 @@ function create_account_with_auth(auth_descriptor): byte_array {
     return id;
 }
 
-function _add_ft_auth_participant(account, auth_descriptor, account_auth_descriptor) {
+function _add_auth_participant(account, auth_descriptor, account_auth_descriptor) {
     val participants = get_participants(auth_descriptor.auth_type, auth_descriptor.args.to_gtv().to_bytes());
     require(op_context.get_signers().size() &gt;= participants.size(), "Too few transaction signers");
     for (participant in participants) {
@@ -2298,15 +1803,20 @@ function get_paginated_auth_descriptors(id: byte_array, page_size: integer, page
         .rowid &gt; (before_rowid ?: rowid(0))
     } (
         utils.pagination_result(
-            data = (
-                id = .id,
-                auth_type = .auth_type,
-                args = gtv.from_bytes(.args),
-                rules = gtv.from_bytes(.rules)
-            ).to_gtv_pretty(),
+            data = get_auth_descriptor_data($).to_gtv_pretty(),
             rowid = .rowid
         )
     ) limit utils.fetch_data_size(page_size);
+}
+
+function get_auth_descriptor_data(ad: account_auth_descriptor) {
+    return (
+        id = ad.id,
+        auth_type = ad.auth_type,
+        args = gtv.from_bytes(ad.args),
+        rules = gtv.from_bytes(ad.rules),
+        created = ad.created
+    );
 }
 
 function get_paginated_accounts_by_ad_id(id: byte_array, page_size: integer, page_cursor: text?) {
@@ -2320,6 +1830,13 @@ function get_paginated_accounts_by_ad_id(id: byte_array, page_size: integer, pag
             rowid=.rowid
         )
     ) limit utils.fetch_data_size(page_size);
+}
+
+function validate_auth_descriptor_args(auth_descriptor) {
+    when (auth_descriptor.auth_type) {
+        S, ES -&gt; single_sig_args.from_gtv(auth_descriptor.args.to_gtv());
+        M, EM -&gt; multi_sig_args.from_gtv(auth_descriptor.args.to_gtv());
+    }
 }
 
 namespace Unsafe {
@@ -2344,19 +1861,16 @@ namespace Unsafe {
     function _add_auth_descriptor(account, auth_descriptor): byte_array {
         val id = auth_descriptor.hash();
         
+        validate_auth_descriptor_args(auth_descriptor);
         analyze_auth_descriptor_rules(auth_descriptor.rules, 0);
-     
-        when (auth_descriptor.auth_type) {
-            S, ES -&gt; single_sig_args.from_gtv(auth_descriptor.args.to_gtv());
-            M, EM -&gt; multi_sig_args.from_gtv(auth_descriptor.args.to_gtv());
-        }
         
         val account_auth_descriptor = create account_auth_descriptor (
             account, id,
             auth_descriptor.auth_type,
             args = auth_descriptor.args.to_gtv().to_bytes(),
             rules = auth_descriptor.rules.to_gtv().to_bytes(),
-            0
+            created = op_context.last_block_time,
+            ctr = 0
         );
         
         for (participant in get_participants(auth_descriptor.auth_type, auth_descriptor.args.to_gtv().to_bytes())) {
@@ -2407,7 +1921,7 @@ function add_rate_limit_points(account, amount: integer) {
         rl_state@?{account}, 
         "Rate limiter state not found for the account with ID: %s".format(account.id)
     );
-    state.points += amount;
+	state.points += amount;
 }
 
 function get_rate_limit_config() {
@@ -2426,6 +1940,7 @@ module;
 import ^.accounts;
 import ^.assets;
 import ^.utils;
+import ^.version;
 
 struct module_args {
     admin_pubkey: pubkey;
@@ -2458,14 +1973,13 @@ operation mint(account_id: byte_array, asset_id: byte_array, amount: big_integer
 
 operation add_rate_limit_points(account_id: byte_array, amount: integer) {
     require_admin();
-    accounts.add_rate_limit_points(accounts.Account(account_id), amount);
+	accounts.add_rate_limit_points(accounts.Account(account_id), amount);
 }
 
 </string>
                             </entry>
                             <entry key="lib/ft4/assets/asset.rell">
-                                <string>import acc: ^.accounts;
-
+                                <string>
 entity asset {
     key id: byte_array;
     name;
@@ -2482,18 +1996,30 @@ function Asset(id: byte_array) = require(
 );
 
 entity balance {
-    key acc.account, asset;
+    key accounts.account, asset;
     mutable amount: big_integer = 0L;
 }
 
 val max_asset_amount = big_integer.from_hex("ff".repeat(32));
 
-function ensure_balance(acc.account, asset): balance {
+function ensure_balance(accounts.account, asset): balance {
     val balance = balance @? {asset, account};
     if (balance != null) {
        return balance;
     }
     else return create balance(account, asset, amount = 0L);
+}
+
+function map_asset(asset: asset) {
+    return (
+        id = asset.id,
+        name = asset.name,
+        symbol = asset.symbol,
+        decimals = asset.decimals,
+        brid = asset.issuing_brid,
+        icon_url = asset.icon_url,
+        supply = asset.total_supply
+    );
 }
 
 function get_paginated_asset_balances(account_id: byte_array, page_size: integer, page_cursor: text?): list&lt;utils.pagination_result&gt; {
@@ -2504,15 +2030,7 @@ function get_paginated_asset_balances(account_id: byte_array, page_size: integer
     } (
         utils.pagination_result(
             data = (
-                asset = (
-                    id = .asset.id,
-                    name = .asset.name,
-                    symbol = .asset.symbol,
-                    decimals = .asset.decimals,
-                    brid = .asset.issuing_brid,
-                    supply = .asset.total_supply,
-                    icon_url = .asset.icon_url
-                ),
+                asset = map_asset(.asset),
                 amount = .amount
             ).to_gtv_pretty(),
             rowid = .rowid
@@ -2526,15 +2044,7 @@ function get_all_assets(page_size: integer, page_cursor: text?) {
         .rowid &gt; (before_rowid ?: rowid(0))
     } (
         utils.pagination_result(
-            data = (
-                id = .id,
-                symbol = .symbol,
-                name = .name,
-                decimals = .decimals,
-                brid = .issuing_brid,
-                icon_url = .icon_url,
-                supply = .total_supply
-            ).to_gtv_pretty(),
+            data = (map_asset($)).to_gtv_pretty(),
             rowid = .rowid
         )
     ) limit utils.fetch_data_size(page_size);
@@ -2542,13 +2052,7 @@ function get_all_assets(page_size: integer, page_cursor: text?) {
 
 function get_asset_balances(account_id: byte_array) {
     return balance @* { .account.id == account_id } (
-        asset = (
-            id = .asset.id,
-            name = .asset.name,
-            decimals = .asset.decimals,
-            brid = .asset.issuing_brid,
-            supply = .asset.total_supply
-        ),
+        asset = map_asset(.asset),
         amount = .amount
     );
 }
@@ -2573,15 +2077,7 @@ function get_paginated_asset_balances_by_name(name, page_size: integer, page_cur
         .rowid &gt; (before_rowid ?: rowid(0))
     } (
         utils.pagination_result(
-            data = (
-                id = .id,
-                name = .name,
-                symbol = .symbol,
-                decimals = .decimals,
-                brid = .issuing_brid,
-                icon_url = .icon_url,
-                supply = .total_supply
-            ).to_gtv_pretty(),
+            data = (map_asset($)).to_gtv_pretty(),
             rowid = .rowid
         )
     ) limit utils.fetch_data_size(page_size);
@@ -2599,7 +2095,7 @@ function require_zero_exclusive_asset_amount_limits(value: big_integer, name) {
 }
 
 namespace Unsafe {
-    function mint(acc.account, asset, amount: big_integer) {
+    function mint(accounts.account, asset, amount: big_integer) {
         require_zero_exclusive_asset_amount_limits(amount, "Parameter amount");
         require(
             asset.issuing_brid == chain_context.blockchain_rid,
@@ -2637,7 +2133,7 @@ namespace Unsafe {
         after_mint(account, asset, amount);
     }
 
-    function burn(acc.account, asset, amount: big_integer) {
+    function burn(accounts.account, asset, amount: big_integer) {
         require_zero_exclusive_asset_amount_limits(amount, "Parameter amount");
         require(
             asset.issuing_brid == chain_context.blockchain_rid,
@@ -2704,38 +2200,40 @@ namespace Unsafe {
                             </entry>
                             <entry key="lib/ft4/assets/extensions.rell">
                                 <string>
-@extendable function before_transfer(from: acc.account, to: acc.account, assets.asset, amount: big_integer);
+@extendable function before_transfer(from: accounts.account, to: accounts.account, assets.asset, amount: big_integer);
 
-@extendable function after_transfer(from: acc.account, to: acc.account, assets.asset, amount: big_integer);
+@extendable function after_transfer(from: accounts.account, to: accounts.account, assets.asset, amount: big_integer);
 
-@extendable function before_mint(acc.account, asset, amount: big_integer);
+@extendable function before_mint(accounts.account, asset, amount: big_integer);
 
-@extendable function after_mint(acc.account, asset, amount: big_integer);
+@extendable function after_mint(accounts.account, asset, amount: big_integer);
 
-@extendable function before_burn(acc.account, asset, amount: big_integer);
+@extendable function before_burn(accounts.account, asset, amount: big_integer);
 
-@extendable function after_burn(acc.account, asset, amount: big_integer);
+@extendable function after_burn(accounts.account, asset, amount: big_integer);
 </string>
                             </entry>
                             <entry key="lib/ft4/assets/external/module.rell">
                                 <string>@mount('ft4')
 module;
+
+import ^^.accounts;
+import ^^.assets;
+import ^^.auth;
+import ^^.utils;
 </string>
                             </entry>
                             <entry key="lib/ft4/assets/external/operations.rell">
-                                <string>import ^^.assets;
-import ^^.auth;
-
-query transfer_auth_data(gtv) = auth.auth_data(["T"], "Do you want to transfer %s from account %s to account %s? Nonce: %s");
-
+                                <string>
 function transfer_message(gtv) {
     val params = struct&lt;transfer&gt;.from_gtv(gtv);
     val asset = assets.Asset(params.asset_id);
 
-    return "Please sign the message\nto transfer %s %s\n\nfrom:\n{account_id}\n\nto:\n%s\n\nNonce: {nonce}"
+    return "Please sign the message\nto transfer %s %s\n(id: %s)\n\nfrom:\n{account_id}\n\nto:\n%s"
         .format(
             assets.format_amount_with_decimals(params.amount, asset.decimals),
             asset.name,
+            asset.id,
             params.receiver_id
         );
 }
@@ -2749,7 +2247,7 @@ function () = auth.add_auth_handler(
 
 operation transfer(receiver_id: byte_array, asset_id: byte_array, amount: big_integer) {
     val account = auth.authenticate();
-    assets.Unsafe.transfer(account, acc.Account(receiver_id), assets.Asset(asset_id), amount);
+    assets.Unsafe.transfer(account, accounts.Account(receiver_id), assets.Asset(asset_id), amount);
 }
 
 @extend(auth.auth_handler)
@@ -2763,7 +2261,7 @@ function burn_message(gtv) {
     val params = struct&lt;burn&gt;.from_gtv(gtv);
     val asset = assets.Asset(params.asset_id);
 
-    return "Please sign the message\nto burn %s %s\n\nfrom:\n{account_id}\n\nNonce: {nonce}"
+    return "Please sign the message\nto burn %s %s\n\nfrom:\n{account_id}"
         .format(
             assets.format_amount_with_decimals(params.amount, asset.decimals),
             asset.name
@@ -2777,10 +2275,7 @@ operation burn(asset_id: byte_array, amount: big_integer) {
 </string>
                             </entry>
                             <entry key="lib/ft4/assets/external/queries.rell">
-                                <string>import ^^.assets;
-import acc: ^^.accounts;
-import ^^.utils;
-
+                                <string>
 query _get_asset_balances(account_id: byte_array) {
     return assets.get_asset_balances(account_id);
 }
@@ -2797,13 +2292,13 @@ query get_asset_balance(account_id: byte_array, asset_id: byte_array) {
         .account.id == account_id,
         .asset.id == asset_id
     } (
-        asset = extract_asset_data(.asset),
+        asset = assets.map_asset(.asset),
         amount = .amount
     );
 }
 
 query get_asset_by_name(name) {
-    return assets.asset @* { name } ( extract_asset_data($) );
+    return assets.asset @* { name } ( assets.map_asset($) );
 }
 
 query get_assets_by_name(name, page_size: integer, page_cursor: text?) {
@@ -2814,15 +2309,15 @@ query get_assets_by_name(name, page_size: integer, page_cursor: text?) {
 }
 
 query get_asset_by_id(asset_id: byte_array) {
-    return assets.asset @? { .id == asset_id } ( extract_asset_data($) );
+    return assets.asset @? { .id == asset_id } ( assets.map_asset($) );
 }
 
 query get_asset_by_symbol(symbol: text) {
-    return assets.asset @? { .symbol == symbol } ( extract_asset_data($) );
+    return assets.asset @? { .symbol == symbol } ( assets.map_asset($) );
 } 
 
 query _get_all_assets() {
-    return assets.asset @* {} ( extract_asset_data($) );
+    return assets.asset @* {} ( assets.map_asset($) );
 }
 
 query get_all_assets(page_size: integer, page_cursor: text?) {
@@ -2833,7 +2328,7 @@ query get_all_assets(page_size: integer, page_cursor: text?) {
 }
 
 query get_transfer_history(account_id: byte_array, filter: assets.filter, page_size: integer, page_cursor: text?) {
-    val account = acc.account @? { account_id };
+    val account = accounts.account @? { account_id };
     if (empty(account)) return null;
 
     val paginated_transfers = assets.get_paginated_transfers(account, filter, page_size, page_cursor);
@@ -2844,27 +2339,12 @@ query get_transfer_history_entry(rowid) {
     val entry = assets.transfer_history_entry @? { .rowid == rowid };
     return if (empty(entry)) null else assets.extract_data_from_transfer_history_entry(entry);
 }
-
-function extract_asset_data(assets.asset) {
-    return (
-        id = asset.id,
-        symbol = asset.symbol,
-        name = asset.name,
-        decimals = asset.decimals,
-        brid = asset.issuing_brid,
-        icon_url = asset.icon_url,
-        supply = asset.total_supply
-    );
-}
 </string>
                             </entry>
                             <entry key="lib/ft4/assets/history.rell">
-                                <string>import acc: ^.accounts;
-import ^.assets;
-import ^.utils;
-
+                                <string>
 @log entity transfer_history_entry {
-    index acc.account, asset;
+    index accounts.account, asset;
     delta: big_integer;
 
     // helps to locate exact position of transfer entry in transaction
@@ -2904,6 +2384,7 @@ function extract_data_from_transfer_history_entry(entry: transfer_history_entry)
         decimals = entry.asset.decimals,
         asset = entry.asset.name,
         asset_id = entry.asset.id,
+        asset_data = map_asset(entry.asset),
         is_input = entry.is_input,
         timestamp = entry.transaction.block.timestamp,
         block_height = entry.transaction.block.block_height,
@@ -2915,7 +2396,7 @@ function extract_data_from_transfer_history_entry(entry: transfer_history_entry)
     );
 }
 
-function get_paginated_transfers(acc.account, filter, page_size: integer, page_cursor: text?) {
+function get_paginated_transfers(accounts.account, filter, page_size: integer, page_cursor: text?) {
     var before_rowid: rowid? = null;
     if (page_cursor??) {
         val cursor = utils.decode_cursor(page_cursor);
@@ -2939,20 +2420,27 @@ function get_paginated_transfers(acc.account, filter, page_size: integer, page_c
                             </entry>
                             <entry key="lib/ft4/assets/module.rell">
                                 <string>@mount('ft4')
-module;</string>
+module;
+
+import .external;
+import ^.accounts;
+import ^.assets;
+import ^.utils;
+import ^.version;
+</string>
                             </entry>
                             <entry key="lib/ft4/assets/transfer.rell">
-                                <string>import acc: ^.accounts;
-
-function deduct_balance(acc.account, asset, amount: big_integer) {
-    val balance = balance @ { account, asset };
+                                <string>
+function deduct_balance(accounts.account, asset, amount: big_integer) {
+    val balance = balance @? { account, asset };
+    require(balance, "User does not have asset &lt;%s&gt; in account &lt;%s&gt;".format(asset.id, account.id));
     require(balance.amount &gt;= amount, "Balance is too low");
     balance.amount -= amount;
 }
 
 namespace Unsafe {
    
-   function transfer(from: acc.account, to: acc.account, assets.asset, amount: big_integer) {
+   function transfer(from: accounts.account, to: accounts.account, assets.asset, amount: big_integer) {
       require_zero_exclusive_asset_amount_limits(amount, "Parameter amount");
       require(from != to, "Sender and receiver have to be different");
 
@@ -2992,13 +2480,192 @@ namespace Unsafe {
                             </entry>
                             <entry key="lib/ft4/auth/authentication.rell">
                                 <string>
-function authenticate() {
+function authenticate(is_strict: boolean = true) {
     val op = op_context.get_all_operations()[op_context.op_index];
-    val flags = get_auth_flags(op.name);
-    // FIXME: call from evm auth handler instead from this place
-    val message = get_auth_message_template(op.name, op.args.to_gtv());
-    return accounts._authenticate(set(flags), message);
+
+    require(op_context.op_index &gt; 0, "Expected at least two operations, make sure that you included auth operation.");
+
+    val previous_op = op_context.get_all_operations()[op_context.op_index - 1];
+    require(
+        previous_op.name in ["ft4.evm_auth", "ft4.ft_auth"],
+        "Error authenticating operation. Incorrect auth operation %s".format(previous_op.name)
+    );
+
+    val account = when (previous_op.name) {
+        "ft4.evm_auth" -&gt; _validate_eth_signature(previous_op, is_strict);
+        "ft4.ft_auth" -&gt; _validate_ft4_signature(previous_op.args);
+        else -&gt; null;
+    };
+
+    val valid_account = require(account, "Invalid auth operation: %s".format(previous_op.name));
+
+    accounts.rate_limit(valid_account);
+
+    return valid_account;
 }
+
+function get_auth_flags(op_name: name, is_strict: boolean) = get_auth_handler(op_name, is_strict).flags;
+
+function get_auth_message_template(op_name: name, op_args: gtv, is_strict: boolean) {
+    val formatter = get_auth_handler(op_name, is_strict).message_formatter;
+
+    val message = if (formatter??) formatter(op_args) else generate_operation_auth_message(chain_context.blockchain_rid, gtx_operation(
+        name = op_name,
+        args = list&lt;gtv&gt;.from_gtv(op_args)
+    ));
+
+    return utils.make_auth_message(message);
+}
+
+function _validate_eth_signature(auth_op: gtx_operation, is_strict: boolean): accounts.account {
+    val op = op_context.get_all_operations()[op_context.op_index];
+    val flags = get_auth_flags(op.name, is_strict);
+    val message_template = get_auth_message_template(op.name, op.args.to_gtv(), is_strict);
+    val validated_args = _validate_eth_arguments(auth_op.args, set(flags));
+    val message = create_message_from_template(
+        validated_args, 
+        message_template, 
+        op.args, 
+        validated_args.account_auth_descriptor.ctr
+    );
+
+    var recovered_keys = 
+        if (validated_args.account_auth_descriptor.auth_type in [accounts.auth_type.S, accounts.auth_type.ES]) [_validate_eth_address(message, validated_args.signatures[0], validated_args.account_auth_descriptor)] 
+        else _recover_multiple_eth_keys(message, validated_args.signatures, validated_args.account_auth_descriptor);
+    
+    validated_args.account_auth_descriptor.ctr += 1;
+    
+    return validated_args.account;
+}
+
+function create_message_from_template(accounts.eth_auth_args, message_template: text, args: list&lt;gtv&gt;, ctr: integer): text {
+    require(message_template.contains("{nonce}"), "Message template has to include '{nonce}'");
+    require(message_template.contains("{brid}"), "Message template has to include '{brid}'");
+    var message = message_template;
+    
+    // TODO: check if this is still needed
+    for (i in range(args.size())) {
+        message = message.replace("{%d}".format(i), "%s".format(args[i]).replace("\"", ""));
+    }
+    
+    return message
+        .replace("{account_id}", eth_auth_args.account.id.to_hex())
+        .replace("{auth_descriptor_id}", eth_auth_args.account_auth_descriptor.id.to_hex())
+        .replace("{nonce}", ctr.to_text().replace("\"", ""))
+        .replace("{brid}", chain_context.blockchain_rid.to_hex());
+}
+
+function _validate_eth_arguments(auth_args: list&lt;gtv&gt;, required_flags: set&lt;text&gt;): accounts.eth_auth_args {
+    require(auth_args.size() == 3, "Incorrect number of arguments to auth operation");
+
+    val account_id = byte_array.from_gtv(auth_args[0]);
+    val auth_descriptor_id = byte_array.from_gtv(auth_args[1]);
+    val signatures = list&lt;signature&gt;.from_gtv(auth_args[2]);
+
+    val account = accounts.Account(account_id);
+    
+    val auth_descriptor = require(
+        accounts.account_auth_descriptor @? { .id == auth_descriptor_id, .account == account },
+        "Auth descriptor '%s' not found for account '%s'".format(auth_descriptor_id, account_id)
+    );
+
+    require(accounts.is_valid(auth_descriptor));
+    
+    val has_all_flags = when (auth_descriptor.auth_type) {
+        S, ES -&gt; accounts.single_sig_args.from_bytes(auth_descriptor.args).flags.contains_all(required_flags);
+        M, EM -&gt; accounts.multi_sig_args.from_bytes(auth_descriptor.args).flags.contains_all(required_flags);
+    };
+    
+    require(has_all_flags, "The auth descriptor does not have the required permissions");
+
+    return accounts.eth_auth_args(account, auth_descriptor, signatures);
+}
+
+function _validate_ft4_signature(auth_args: list&lt;gtv&gt;): accounts.account {
+    val account_id = byte_array.from_gtv(auth_args[0]);
+    val auth_descriptor_id = byte_array.from_gtv(auth_args[1]);
+    val flags = get_auth_flags(op_context.get_all_operations()[op_context.op_index].name, is_strict=false);
+
+    val account = accounts.Account(account_id);
+    val auth_descriptor = require(
+        accounts.account_auth_descriptor @? { .account == account, .id == auth_descriptor_id },
+        "Cannot find auth descriptor &lt;%s&gt; for account &lt;%s&gt;".format(auth_descriptor_id, account_id)
+    );
+
+    accounts.require_auth(account, auth_descriptor, list(flags));
+    return account;
+}
+
+function _recover_eth_address(message: text, signature) {
+    require(message != "", "Empty messages are not allowed");
+
+    val msg_hash = keccak256(("\u0019Ethereum Signed Message:\n" + message.size().to_text() + message).to_bytes());
+    val eth_pubkey = eth_ecrecover(
+        signature.r,
+        signature.s,
+        signature.v - 27,
+        msg_hash
+    );
+    
+    return utils.evm_address_from_pubkey(eth_pubkey);
+}
+
+function _validate_eth_address(message: text, signature, accounts.account_auth_descriptor) {
+    val recovered_address = _recover_eth_address(message, signature);
+    val participant = accounts.auth_descriptor_participant @? {
+        .account_auth_descriptor == account_auth_descriptor,
+        .id == recovered_address
+    };
+    require(participant, "Invalid signature on message: \n%s".format(message));
+
+    return recovered_address;
+}
+
+function _recover_multiple_eth_keys(message: text, signatures: list&lt;signature&gt;, accounts.account_auth_descriptor) {
+    var recovered_keys = list&lt;byte_array&gt;();
+    for (i in range(signatures.size())) {
+        recovered_keys.add(
+            _validate_eth_address(
+                message,
+                signatures[i],
+                account_auth_descriptor
+            )
+        );
+    }
+    require(
+        recovered_keys.size() &gt;= accounts.multi_sig_args.from_bytes(account_auth_descriptor.args).signatures_required, 
+        "Minimum number of valid signatures not reached"
+    );
+    return recovered_keys;
+}
+</string>
+                            </entry>
+                            <entry key="lib/ft4/auth/external/module.rell">
+                                <string>@mount('ft4')
+module;
+
+import ^^.auth;
+</string>
+                            </entry>
+                            <entry key="lib/ft4/auth/external/operations.rell">
+                                <string>
+operation evm_auth(
+    account_id: byte_array,
+    auth_descriptor_id: byte_array,
+    signatures: list&lt;auth.signature&gt;
+) {}
+
+operation ft_auth(
+    account_id: byte_array,
+    auth_descriptor_id: byte_array
+) {}
+</string>
+                            </entry>
+                            <entry key="lib/ft4/auth/external/queries.rell">
+                                <string>
+query get_auth_flags(op_name: name) = auth.get_auth_handler(op_name, is_strict=false).flags;
+
+query get_auth_message_template(op_name: name, op_args: gtv) = auth.get_auth_message_template(op_name, op_args, is_strict=false);
 </string>
                             </entry>
                             <entry key="lib/ft4/auth/login.rell">
@@ -3037,6 +2704,9 @@ function add_login_config(name = DEFAULT_LOGIN_CONFIG_NAME, flags: list&lt;text&
 module;
 
 import ^.accounts;
+import ^.utils;
+import ^.version;
+import .external;
 
 struct auth_data {
     flags: list&lt;text&gt;;
@@ -3068,10 +2738,12 @@ function auth_handler(): map&lt;name, _auth_handler&gt;;
 /*
  * Finds auth handler for provided operation name.
  */
-function get_auth_handler(op_name: name) {
+function get_auth_handler(op_name: name, is_strict: boolean) {
     require_valid_scope_name(op_name);
     val auth_handlers = auth_handler();
     if (op_name in auth_handlers) return auth_handlers[op_name];
+
+    require(not is_strict, "Strict mode is used and no auth handler matches exactly &lt;%s&gt;".format(op_name));
 
     val handler = get_mount_scope_auth_handler(auth_handlers, op_name);
     if (handler??) return handler;
@@ -3110,21 +2782,22 @@ function get_mount_scope_auth_handler(auth_handlers: map&lt;name, _auth_handler&
 
 /*
  * Creates message from operation name and arguments.
- * It is used when `evm_auth` is used to authenticate a user, 
+ * It is used when `evm_auth` is used to authenticate a user, 
  * but auth message is not specified in the auth handler of the operation.
  */
-function generate_auth_message_template(brid: byte_array, op: gtx_operation) {
-    var message = "Please sign the message to call\noperation:\n- %s\n\n".format(op.name);
+function generate_operation_auth_message(brid: byte_array, op: gtx_operation) {
+    var message = "Please sign the message to call\noperation:\n- %s".format(op.name);
 
     if (op.args.size() &gt; 0) {
+        message = message + "\n\n";
         var arguments = "with arguments:\n";
         for (arg in op.args) {
             arguments = arguments + "- %s\n".format(arg).replace("\"", "");
         }
-        message = message + arguments + "\n";
+        message = message + arguments.sub(0, arguments.size() - 1);
     }
     
-    return message + "Nonce: {nonce}";
+    return message;
 }
 
 function join_text_list(components: list&lt;text&gt;, count: integer) {
@@ -3143,43 +2816,17 @@ function require_valid_scope_name(name) =
     );
 </string>
                             </entry>
-                            <entry key="lib/ft4/auth/operations.rell">
-                                <string>
-operation evm_auth(
-    account_id: byte_array,
-    auth_descriptor_id: byte_array,
-    signatures: list&lt;signature&gt;
-) {}
-
-operation ft_auth(
-    account_id: byte_array,
-    auth_descriptor_id: byte_array
-) {}
-</string>
-                            </entry>
-                            <entry key="lib/ft4/auth/queries.rell">
-                                <string>
-query get_auth_flags(op_name: name) = get_auth_handler(op_name).flags;
-
-query get_auth_message_template(op_name: name, op_args: gtv) {
-    val formatter = get_auth_handler(op_name).message_formatter;
-
-    return if (formatter??) formatter(op_args) else generate_auth_message_template(chain_context.blockchain_rid, gtx_operation(
-        name = op_name,
-        args = list&lt;gtv&gt;.from_gtv(op_args)
-    ));
-}
-</string>
-                            </entry>
                             <entry key="lib/ft4/ft4_basic_dev.rell">
                                 <string>module;
 
 namespace ft4 {
     import acc: ^.accounts;
+    import ^.accounts;
     import ^.assets;
     import ^.auth;
     import ^.admin;
     import acc_ext: ^.accounts.external;
+    import accounts_ext: ^.accounts.external;
     import assets_ext: ^.assets.external;
     import ^.version;
 }
@@ -3260,23 +2907,37 @@ struct validation_result {
 
 val VALID = validation_result(true, null);
 
-function invalid(error: text) = validation_result(false, error);</string>
+function invalid(error: text) = validation_result(false, error);
+
+function make_auth_message(message: text) {
+    return "Blockchain:\n{brid}\n\n" + message + "\n\nNonce: {nonce}";
+}
+
+function evm_address_from_pubkey(pubkey) = keccak256(pubkey).sub(12);
+</string>
                             </entry>
                             <entry key="lib/ft4/version.rell">
                                 <string>@mount('ft4')
 module;
 
-query get_version(): text = "0.1.0r";
+query get_version(): text = "0.1.6";
 </string>
                             </entry>
                             <entry key="main.rell">
                                 <string>module;
 
 /* For testing */
-// import ^.lib.access.admin;
-import ^.eif;
-// import ^.lib.dip.dip_basic_dev.*;
+import ^.lib.eif;
+import ^.lib.eif.evm;
+import ^.lib.eif.ft4;
+import ^.lib.eif.common;
+import ^.lib.eif.admin;
+import ^.lib.eif.utils;
 import ^.lib.ft4.ft4_basic_dev.*;
+// import ^.lib.access.admin;
+// import ^.lib.eif;
+// import ^.lib.dip.dip_basic_dev.*;
+// import ^.lib.ft3.ft3_basic_dev.*;
 // import ^.lib.originals.originals_basic_dev.*;
 // import ^.lib.originals.tests.extensions;
 // import dip_owner_access: ^.lib.dip.external.access.owner_based;
@@ -3300,6 +2961,13 @@ import ^.lib.ft4.ft4_basic_dev.*;
         <array>
             <bytea>03a301697bdfcd704313ba48e51d567543f2a182031efd6915ddc07bbcc4e16070</bytea>
         </array>
+    </entry>
+    <entry key="revolt">
+        <dict>
+            <entry key="fast_revolt_status_timeout">
+                <int>2000</int>
+            </entry>
+        </dict>
     </entry>
     <entry key="sync_ext">
         <array>
