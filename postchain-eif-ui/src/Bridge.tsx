@@ -9,20 +9,14 @@ import ERC20TokenArtifacts from "./postchain-eif-contracts/artifacts/@openzeppel
 import ERC721TokenArtifacts from "./postchain-eif-contracts/artifacts/@openzeppelin/contracts/token/ERC721/ERC721.sol/ERC721.json";
 import BridgeArtifacts from "./postchain-eif-contracts/artifacts/contracts/TokenBridge.sol/TokenBridge.json";
 
-import { restClient, gtxClient, util } from "postchain-client"
+import { createClient, newSignatureProvider } from "postchain-client"
 import { hexZeroPad, keccak256 } from "ethers/lib/utils";
 import { intToHex } from "ethjs-util";
 import { Signature } from "./types";
 import { createAuthDesc } from "./util";
 
-const postchainURL = process.env.REACT_APP_POSTCHAIN_URL || ""
-const blockchainRID = process.env.REACT_APP_POSTCHAIN_BRID || ""
-const rest = restClient.createRestClient(postchainURL, blockchainRID, 5);
-const client = gtxClient.createClient(
-  rest,
-  Buffer.from(blockchainRID, 'hex'),
-  []
-)
+const postchainURL:string = process.env.REACT_APP_POSTCHAIN_URL || ""
+const blockchainRid:string = process.env.REACT_APP_POSTCHAIN_BRID || ""
 
 interface Props {
   bridgeAddress: string;
@@ -55,23 +49,36 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
     var tokenContract;
     let balance;
     let withdraws;
+    const client = await createClient({
+      nodeUrlPool: postchainURL,
+      blockchainRid,
+    })
     if (tokenType === "ERC721") {
       tokenContract = new ethers.Contract(tokenAddress, ERC721TokenArtifacts.abi, library);
-      const hasToken = await client.query('evm_has_erc721', { "network_id": chainId, "token_address": token_address.toLowerCase(), "beneficiary": beneficiary.toLowerCase(), "token_id": tokenId })
+      const hasToken = await client.query("evm_has_erc721", { 
+        network_id: chainId || 1, 
+        token_address: token_address.toLowerCase(), 
+        beneficiary: beneficiary.toLowerCase(), 
+        token_id: tokenId,
+      })
       balance = hasToken ? 1 : 0;
       withdraws = await client.query('get_erc721_withdrawal', {
-        'network_id': chainId,
-        'token_address': token_address.toLowerCase(),
-        'token_id': tokenId,
-        'beneficiary': beneficiary.toLowerCase()
+        network_id: chainId || 1,
+        token_address: token_address.toLowerCase(),
+        token_id: tokenId,
+        beneficiary: beneficiary.toLowerCase(),
       });
     } else {
       tokenContract = new ethers.Contract(tokenAddress, ERC20TokenArtifacts.abi, library);
-      balance = await client.query('evm_balance_of_erc20', { "network_id": chainId, "token_address": token_address.toLowerCase(), "beneficiary": beneficiary.toLowerCase() })
-      withdraws = await client.query('get_erc20_withdrawal', {
-        'network_id': chainId,
-        'token_address': token_address.toLowerCase(),
-        'beneficiary': beneficiary.toLowerCase()
+      balance = await client.query('eif.ft4.evm_balance_of_erc20', { 
+        network_id: chainId || 1, 
+        token_address: token_address.toLowerCase(), 
+        beneficiary: beneficiary.toLowerCase(),
+      })
+      withdraws = await client.query('eif.ft4.get_erc20_withdrawal', {
+        network_id: chainId || 1,
+        token_address: token_address.toLowerCase(),
+        beneficiary: beneficiary.toLowerCase(),
       });
     }
     const name = await tokenContract.name();
@@ -127,7 +134,7 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
         BridgeArtifacts.abi,
         library
       )
-      let  calldata = bridge.interface.encodeFunctionData("setBlockchainRid", [Buffer.from(blockchainRID, 'hex')])
+      let  calldata = bridge.interface.encodeFunctionData("setBlockchainRid", [Buffer.from(blockchainRid, 'hex')])
       await sendTnx(signer, bridgeAddress, calldata)
     } catch (error) {
       console.log(error)
@@ -137,7 +144,11 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
   const withdrawRequest = async (eventHash: string) => {
     const signer = library.getSigner()
     try {
-      let data = await client.query('get_event_merkle_proof', { "eventHash": eventHash })
+      const client = await createClient({
+        nodeUrlPool: postchainURL,
+        blockchainRid,
+      })
+      let data = await client.query('get_event_merkle_proof', { eventHash })
       let event = JSON.parse(JSON.stringify(data))
       const bridge = new ethers.Contract(
         bridgeAddress,
@@ -193,7 +204,14 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
   const withdrawBySnapshot = async () => {
     const signer = library.getSigner()
     try {
-      let data = await client.query('get_account_state_merkle_proof', { "blockHeight": parseInt(blockHeight), "accountNumber": parseInt(accountNUmber)})
+      const client = await createClient({
+        nodeUrlPool: postchainURL,
+        blockchainRid,
+      })
+      let data = await client.query('get_account_state_merkle_proof', { 
+        blockHeight: parseInt(blockHeight), 
+        accountNumber: parseInt(accountNUmber),
+      })
       let state = JSON.parse(JSON.stringify(data))
       const bridge = new ethers.Contract(
         bridgeAddress,
@@ -439,9 +457,9 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
     tokenType = "ERC20"
   }
 
-  const waitConfirmation = function (txRID) {
+  const waitConfirmation = function (client, signedTx) {
     return new Promise((resolve, reject) => {
-      rest.status(txRID, (err, res) => {
+      client.sendTransaction(signedTx, (err, res) => {
         if (err) {
           resolve(err);
         } else {
@@ -457,7 +475,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
               reject(Error("Server lost our message"))
               break
             case "waiting":
-              setTimeout(() => waitConfirmation(txRID).then(resolve, reject), 100)
+              setTimeout(() => waitConfirmation(client, signedTx).then(resolve, reject), 100)
               break
             default:
               console.log(status)
@@ -470,12 +488,15 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
 
   const postchainRegisterEVMAccount = async () => {
     try {
+      const client = await createClient({
+        nodeUrlPool: postchainURL,
+        blockchainRid,
+      })
       const messageTemplate = "Create account for EVM wallet:\n{1}\n\nDisposable key:\n{2}"
       const evmKey = account?.slice(2) || "" // Remove '0x'
       const message = messageTemplate
                         .replace("{1}", evmKey.toLowerCase())
                         .replace("{2}", userPUB.toString("hex"))
-      var tx = client.newTransaction([userPUB])
       const signer = library.getSigner()
       var sig: string = await signer.signMessage(message);
       sig = sig.slice(2)
@@ -487,66 +508,93 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         s,
         v
       ]
-      tx.addOperation("ft3.evm.register_account", evmKey.toLowerCase(), createAuthDesc(userPUB.toString("hex")), signature)
-      tx.addOperation("nop", Date.now())
-      tx.sign(userPRIV, userPUB)
-      let txRID = tx.getTxRID()
-      tx.send((err) => {
-        if (err !== null) {
-          console.log(err)
-          return
-        }
-        toast.promise(waitConfirmation(txRID), {
-          loading: `Transaction submitted. Wait for confirmation...`,
-          success: <b>Transaction confirmed!</b>,
-          error: <b>Transaction failed!.</b>,
-        })
+      const tx = {
+        operations: [
+          {
+            name: "ft3.evm.register_account",
+            args: [
+              evmKey.toLowerCase(), 
+              createAuthDesc(userPUB.toString("hex")), 
+              signature
+            ]
+          }
+        ],
+        signers: [userPUB]
+      }
+      const userSignatureProvider = newSignatureProvider({privKey: userPRIV})
+      const uniqueTx = client.addNop(tx)
+      const signedTx = await client.signTransaction(
+        uniqueTx,
+        userSignatureProvider
+      )
+      toast.promise(waitConfirmation(client, signedTx), {
+        loading: `Transaction submitted. Wait for confirmation...`,
+        success: <b>Transaction confirmed!</b>,
+        error: <b>Transaction failed!.</b>,
       })
     } catch (error) {
       console.log(error)
     }
   }
 
-  const postchainRegisterChromiaBaseOriginals =async () => {
+  const postchainRegisterChromiaBaseOriginals = async () => {
     try {
-      var tx = client.newTransaction([adminPUB])
-      tx.addOperation("register_chromia_base_originals")
-      tx.addOperation("nop", Date.now())
-      tx.sign(adminPRIV, adminPUB)
-      let txRID = tx.getTxRID()
-      tx.send((err) => {
-        if (err !== null) {
-          console.log(err)
-          return
-        }
-        toast.promise(waitConfirmation(txRID), {
-          loading: `Transaction submitted. Wait for confirmation...`,
-          success: <b>Transaction confirmed!</b>,
-          error: <b>Transaction failed!.</b>,
-        })
+      const client = await createClient({
+        nodeUrlPool: postchainURL,
+        blockchainRid,
+      })
+      const tx = {
+        operations: [
+          {
+            name: "register_chromia_base_originals",
+            args: [
+            ]
+          }
+        ],
+        signers: [adminPUB]
+      }
+      const adminSignatureProvider = newSignatureProvider({privKey: adminPRIV})
+      const uniqueTx = client.addNop(tx)
+      const signedTx = await client.signTransaction(
+        uniqueTx,
+        adminSignatureProvider
+      )
+      toast.promise(waitConfirmation(client, signedTx), {
+        loading: `Transaction submitted. Wait for confirmation...`,
+        success: <b>Transaction confirmed!</b>,
+        error: <b>Transaction failed!.</b>,
       })
     } catch (error) {
       console.log(error)
     }
   }
 
-  const postchainInitEifOriginalInterface =async () => {
+  const postchainInitEifOriginalInterface = async () => {
     try {
-      var tx = client.newTransaction([adminPUB])
-      tx.addOperation("init_eif_original_interface")
-      tx.addOperation("nop", Date.now())
-      tx.sign(adminPRIV, adminPUB)
-      let txRID = tx.getTxRID()
-      tx.send((err) => {
-        if (err !== null) {
-          console.log(err)
-          return
-        }
-        toast.promise(waitConfirmation(txRID), {
-          loading: `Transaction submitted. Wait for confirmation...`,
-          success: <b>Transaction confirmed!</b>,
-          error: <b>Transaction failed!.</b>,
-        })
+      const client = await createClient({
+        nodeUrlPool: postchainURL,
+        blockchainRid,
+      })
+      const tx = {
+        operations: [
+          {
+            name: "init_eif_original_interface",
+            args: [
+            ]
+          }
+        ],
+        signers: [adminPUB]
+      }
+      const adminSignatureProvider = newSignatureProvider({privKey: adminPRIV})
+      const uniqueTx = client.addNop(tx)
+      const signedTx = await client.signTransaction(
+        uniqueTx,
+        adminSignatureProvider
+      )
+      toast.promise(waitConfirmation(client, signedTx), {
+        loading: `Transaction submitted. Wait for confirmation...`,
+        success: <b>Transaction confirmed!</b>,
+        error: <b>Transaction failed!.</b>,
       })
     } catch (error) {
       console.log(error)
@@ -555,21 +603,32 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
 
   const postchainAddEifNftMapping = async () => {
     try {
-      var tx = client.newTransaction([adminPUB])
-      tx.addOperation("add_eif_nft_mapping", chainId, token_address.toLowerCase())
-      tx.addOperation("nop", Date.now())
-      tx.sign(adminPRIV, adminPUB)
-      let txRID = tx.getTxRID()
-      tx.send((err) => {
-        if (err !== null) {
-          console.log(err)
-          return
-        }
-        toast.promise(waitConfirmation(txRID), {
-          loading: `Transaction submitted. Wait for confirmation...`,
-          success: <b>Transaction confirmed!</b>,
-          error: <b>Transaction failed!.</b>,
-        })
+      const client = await createClient({
+        nodeUrlPool: postchainURL,
+        blockchainRid,
+      })
+      const tx = {
+        operations: [
+          {
+            name: "add_eif_nft_mapping",
+            args: [
+              chainId || 1,
+              token_address.toLowerCase()
+            ]
+          }
+        ],
+        signers: [adminPUB]
+      }
+      const adminSignatureProvider = newSignatureProvider({privKey: adminPRIV})
+      const uniqueTx = client.addNop(tx)
+      const signedTx = await client.signTransaction(
+        uniqueTx,
+        adminSignatureProvider
+      )
+      toast.promise(waitConfirmation(client, signedTx), {
+        loading: `Transaction submitted. Wait for confirmation...`,
+        success: <b>Transaction confirmed!</b>,
+        error: <b>Transaction failed!.</b>,
       })
     } catch (error) {
       console.log(error)
@@ -578,23 +637,37 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
 
   const postchainCreateAsset = async () => {
     try {
+      const client = await createClient({
+        nodeUrlPool: postchainURL,
+        blockchainRid,
+      })      
       var tokenContract = new ethers.Contract(tokenAddress, ERC20TokenArtifacts.abi, library)
-      let name = await tokenContract.name()
-      var tx = client.newTransaction([adminPUB])
-      tx.addOperation("ft3.dev_register_asset", name, Buffer.from(blockchainRID, 'hex'))
-      tx.addOperation("nop", Date.now())
-      tx.sign(adminPRIV, adminPUB)
-      let txRID = tx.getTxRID()
-      tx.send((err) => {
-        if (err !== null) {
-          console.log(err)
-          return
-        }
-        toast.promise(waitConfirmation(txRID), {
-          loading: `Transaction submitted. Wait for confirmation...`,
-          success: <b>Transaction confirmed!</b>,
-          error: <b>Transaction failed!.</b>,
-        })
+      let name: string = await tokenContract.name()
+      let symbol: string = await tokenContract.symbol()
+      let decimals: number = await tokenContract.decimals()
+      const tx = {
+        operations: [
+          {
+            name: "ft4.admin.register_asset",
+            args: [
+              name,
+              symbol,
+              decimals
+            ]
+          }
+        ],
+        signers: [adminPUB]
+      }
+      const adminSignatureProvider = newSignatureProvider({privKey: adminPRIV})
+      const uniqueTx = client.addNop(tx)
+      const signedTx = await client.signTransaction(
+        uniqueTx,
+        adminSignatureProvider
+      )
+      toast.promise(waitConfirmation(client, signedTx), {
+        loading: `Transaction submitted. Wait for confirmation...`,
+        success: <b>Transaction confirmed!</b>,
+        error: <b>Transaction failed!.</b>,
       })
     } catch (error) {
       console.log(error)
@@ -603,21 +676,33 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
 
   const postchainAddTokenMapping = async () => {
     try {
-      var tx = client.newTransaction([adminPUB])
-      tx.addOperation("add_new_token_mapping", chainId, token_address.toLowerCase(), Buffer.from(assetId, 'hex'))
-      tx.addOperation("nop", Date.now())
-      tx.sign(adminPRIV, adminPUB)
-      let txRID = tx.getTxRID()
-      tx.send((err) => {
-        if (err !== null) {
-          console.log(err)
-          return
-        }
-        toast.promise(waitConfirmation(txRID), {
-          loading: `Transaction submitted. Wait for confirmation...`,
-          success: <b>Transaction confirmed!</b>,
-          error: <b>Transaction failed!.</b>,
-        })
+      const client = await createClient({
+        nodeUrlPool: postchainURL,
+        blockchainRid,
+      })      
+      const tx = {
+        operations: [
+          {
+            name: "eif.admin.add_new_token_mapping",
+            args: [
+              chainId || 1,
+              token_address.toLowerCase(),
+              Buffer.from(assetId, 'hex')
+            ]
+          }
+        ],
+        signers: [adminPUB]
+      }
+      const adminSignatureProvider = newSignatureProvider({privKey: adminPRIV})
+      const uniqueTx = client.addNop(tx)
+      const signedTx = await client.signTransaction(
+        uniqueTx,
+        adminSignatureProvider
+      )
+      toast.promise(waitConfirmation(client, signedTx), {
+        loading: `Transaction submitted. Wait for confirmation...`,
+        success: <b>Transaction confirmed!</b>,
+        error: <b>Transaction failed!.</b>,
       })
     } catch (error) {
       console.log(error)
@@ -626,25 +711,39 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
 
   const postchainRegisterERC20Token = async () => {
     try {
+      const client = await createClient({
+        nodeUrlPool: postchainURL,
+        blockchainRid,
+      })      
       var tokenContract = new ethers.Contract(tokenAddress, ERC20TokenArtifacts.abi, library)
       let name: string = await tokenContract.name()
       let symbol: string = await tokenContract.symbol()
       let decimals: number = await tokenContract.decimals()
-      var tx = client.newTransaction([adminPUB])
-      tx.addOperation("add_new_evm_erc20", chainId, token_address.toLowerCase(), name, symbol, decimals)
-      tx.addOperation("nop", Date.now())
-      tx.sign(adminPRIV, adminPUB)
-      let txRID = tx.getTxRID()
-      tx.send((err) => {
-        if (err !== null) {
-          console.log(err)
-          return
-        }
-        toast.promise(waitConfirmation(txRID), {
-          loading: `Transaction submitted. Wait for confirmation...`,
-          success: <b>Transaction confirmed!</b>,
-          error: <b>Transaction failed!.</b>,
-        })
+      const tx = {
+        operations: [
+          {
+            name: "eif.admin.register_erc20_token",
+            args: [
+              chainId || 1,
+              token_address.toLowerCase(),
+              name,
+              symbol,
+              decimals
+            ]
+          }
+        ],
+        signers: [adminPUB]
+      }
+      const adminSignatureProvider = newSignatureProvider({privKey: adminPRIV})
+      const uniqueTx = client.addNop(tx)
+      const signedTx = await client.signTransaction(
+        uniqueTx,
+        adminSignatureProvider
+      )
+      toast.promise(waitConfirmation(client, signedTx), {
+        loading: `Transaction submitted. Wait for confirmation...`,
+        success: <b>Transaction confirmed!.</b>,
+        error: <b>Transaction failed!.</b>,
       })
     } catch (error) {
       console.log(error)
@@ -653,9 +752,17 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
 
   const postchainWithdraw = async () => {
     try {
-      var tx = client.newTransaction([userPUB])
+      const client = await createClient({
+        nodeUrlPool: postchainURL,
+        blockchainRid,
+      })      
+      const tx = {
+        operations: [
+        ],
+        signers: [userPUB]
+      }
       const signer = library.getSigner()
-      const pk = util.toBuffer(userPUB).toString('hex')
+      const pk = userPUB.toString('hex')
       var signature = await signer.signMessage(pk);
       signature = signature.split('x')[1];
       var r = Buffer.from(signature.substring(0, 64), 'hex')
@@ -663,24 +770,45 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       var v = parseInt(signature.substring(128, 130), 16) - 27
 
       if (tokenType === "ERC721") {
-        tx.addOperation("withdraw_ERC721", chainId, token_address.toLowerCase(), beneficiary.toLowerCase(), tokenId, r, s, v, pk)
+        tx.operations.push({
+          name: "withdraw_ERC721",
+          args: [
+            chainId || 1,
+            token_address.toLowerCase(),
+            beneficiary.toLowerCase(),
+            tokenId,
+            r,
+            s,
+            v,
+            pk
+          ]
+        })
       } else {
         const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
-        tx.addOperation("withdraw_ERC20", chainId, token_address.toLowerCase(), beneficiary.toLowerCase(), parseInt(amount), r, s, v, pk)
-      }
-      tx.addOperation("nop", Date.now())
-      tx.sign(userPRIV, userPUB)
-      let txRID = tx.getTxRID()
-      tx.send((err) => {
-        if (err !== null) {
-          console.log(err)
-          return
-        }
-        toast.promise(waitConfirmation(txRID), {
-          loading: `Transaction submitted. Wait for confirmation...`,
-          success: <b>Transaction confirmed!</b>,
-          error: <b>Transaction failed!.</b>,
+        tx.operations.push({
+          name: "eif.ft4.withdraw_ERC20",
+          args: [
+            chainId || 1,
+            token_address.toLowerCase(),
+            beneficiary.toLowerCase(),
+            parseInt(amount),
+            r,
+            s,
+            v,
+            pk
+          ]
         })
+      }
+      const userSignatureProvider = newSignatureProvider({privKey: userPRIV})
+      const uniqueTx = client.addNop(tx)
+      const signedTx = await client.signTransaction(
+        uniqueTx,
+        userSignatureProvider
+      )
+      toast.promise(waitConfirmation(client, signedTx), {
+        loading: `Transaction submitted. Wait for confirmation...`,
+        success: <b>Transaction confirmed!.</b>,
+        error: <b>Transaction failed!.</b>,
       })
     } catch (error) {
       console.log(error)
@@ -689,9 +817,17 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
 
   const postchainClaim = async () => {
     try {
-      var tx = client.newTransaction([userPUB])
+      const client = await createClient({
+        nodeUrlPool: postchainURL,
+        blockchainRid,
+      })      
+      const tx = {
+        operations: [
+        ],
+        signers: [userPUB]
+      }
       const signer = library.getSigner()
-      const pk = util.toBuffer(userPUB).toString('hex')
+      const pk = userPUB.toString('hex')
       var signature = await signer.signMessage(pk);
       signature = signature.split('x')[1];
       var r = Buffer.from(signature.substring(0, 64), 'hex')
@@ -699,24 +835,48 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       var v = parseInt(signature.substring(128, 130), 16) - 27
 
       if (tokenType === "ERC721") {
-        tx.addOperation("claim_ERC721", chainId, token_address.toLowerCase(), beneficiary.toLowerCase(), tokenId, r, s, v, pk, Buffer.from(accountId, "hex"))
+        tx.operations.push({
+          name: "claim_ERC721",
+          args: [
+            chainId || 1,
+            token_address.toLowerCase(),
+            beneficiary.toLowerCase(),
+            tokenId,
+            r,
+            s,
+            v,
+            pk,
+            Buffer.from(accountId, "hex")
+          ]
+        })
+
       } else {
         const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
-        tx.addOperation("claim_ERC20", chainId, token_address.toLowerCase(), beneficiary.toLowerCase(), parseInt(amount), r, s, v, pk, Buffer.from(accountId, "hex"))
-      }
-      tx.addOperation("nop", Date.now())
-      tx.sign(userPRIV, userPUB)
-      let txRID = tx.getTxRID()
-      tx.send((err) => {
-        if (err !== null) {
-          console.log(err)
-          return
-        }
-        toast.promise(waitConfirmation(txRID), {
-          loading: `Transaction submitted. Wait for confirmation...`,
-          success: <b>Transaction confirmed!</b>,
-          error: <b>Transaction failed!.</b>,
+        tx.operations.push({
+          name: "eif.ft4.claim_ERC20",
+          args: [
+            chainId || 1,
+            token_address.toLowerCase(),
+            beneficiary.toLowerCase(),
+            parseInt(amount),
+            r,
+            s,
+            v,
+            pk,
+            Buffer.from(accountId, "hex")
+          ]
         })
+      }
+      const userSignatureProvider = newSignatureProvider({privKey: userPRIV})
+      const uniqueTx = client.addNop(tx)
+      const signedTx = await client.signTransaction(
+        uniqueTx,
+        userSignatureProvider
+      )
+      toast.promise(waitConfirmation(client, signedTx), {
+        loading: `Transaction submitted. Wait for confirmation...`,
+        success: <b>Transaction confirmed!.</b>,
+        error: <b>Transaction failed!.</b>,
       })
     } catch (error) {
       console.log(error)
@@ -725,27 +885,50 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
 
   const postchainDeposit = async () => {
     try {
-      var tx = client.newTransaction([userPUB])
+      const client = await createClient({
+        nodeUrlPool: postchainURL,
+        blockchainRid,
+      })      
+      const tx = {
+        operations: [
+        ],
+        signers: [userPUB]
+      }
       const auth = [Buffer.from(accountId, 'hex'), Buffer.from(authDescId, 'hex')]
       if (tokenType === "ERC721") {
-        tx.addOperation("deposit_non_fungible_original", auth, Buffer.from(assetId, 'hex'), chainId, token_address.toLowerCase(), beneficiary.toLowerCase())
+        tx.operations.push({
+          name: "deposit_non_fungible_original",
+          args: [
+            auth,
+            Buffer.from(assetId, 'hex'),
+            chainId || 1,
+            token_address.toLowerCase(),
+            beneficiary.toLowerCase(),
+          ]
+        })
       } else {
         const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
-        tx.addOperation("deposit_ft3_token", auth, chainId, token_address.toLowerCase(), beneficiary.toLowerCase(), parseInt(amount))
-      }
-      tx.addOperation("nop", Date.now())
-      tx.sign(userPRIV, userPUB)
-      let txRID = tx.getTxRID()
-      tx.send((err) => {
-        if (err !== null) {
-          console.log(err)
-          return
-        }
-        toast.promise(waitConfirmation(txRID), {
-          loading: `Transaction submitted. Wait for confirmation...`,
-          success: <b>Transaction confirmed!</b>,
-          error: <b>Transaction failed!.</b>,
+        tx.operations.push({
+          name: "eif.ft4.deposit_ft_token",
+          args: [
+            auth,
+            chainId || 1,
+            token_address.toLowerCase(),
+            beneficiary.toLowerCase(),
+            parseInt(amount)
+          ]
         })
+      }
+      const userSignatureProvider = newSignatureProvider({privKey: userPRIV})
+      const uniqueTx = client.addNop(tx)
+      const signedTx = await client.signTransaction(
+        uniqueTx,
+        userSignatureProvider
+      )
+      toast.promise(waitConfirmation(client, signedTx), {
+        loading: `Transaction submitted. Wait for confirmation...`,
+        success: <b>Transaction confirmed!.</b>,
+        error: <b>Transaction failed!.</b>,
       })
     } catch (error) {
       console.log(error)
@@ -754,27 +937,50 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
 
   const postchainBridgeToEVM = async () => {
     try {
-      var tx = client.newTransaction([userPUB])
+      const client = await createClient({
+        nodeUrlPool: postchainURL,
+        blockchainRid,
+      })      
+      const tx = {
+        operations: [
+        ],
+        signers: [userPUB]
+      }
       const auth = [Buffer.from(accountId, 'hex'), Buffer.from(authDescId, 'hex')]
       if (tokenType === "ERC721") {
-        tx.addOperation("bridge_non_fungible_original_to_evm", auth, Buffer.from(assetId, 'hex'), chainId, token_address.toLowerCase(), beneficiary.toLowerCase())
+        tx.operations.push({
+          name: "bridge_non_fungible_original_to_evm",
+          args: [
+            auth,
+            Buffer.from(assetId, 'hex'),
+            chainId || 1,
+            token_address.toLowerCase(),
+            beneficiary.toLowerCase(),
+          ]
+        })
       } else {
         const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
-        tx.addOperation("bridge_ft3_token_to_evm", auth, chainId, token_address.toLowerCase(), beneficiary.toLowerCase(), parseInt(amount))
-      }
-      tx.addOperation("nop", Date.now())
-      tx.sign(userPRIV, userPUB)
-      let txRID = tx.getTxRID()
-      tx.send((err) => {
-        if (err !== null) {
-          console.log(err)
-          return
-        }
-        toast.promise(waitConfirmation(txRID), {
-          loading: `Transaction submitted. Wait for confirmation...`,
-          success: <b>Transaction confirmed!</b>,
-          error: <b>Transaction failed!.</b>,
+        tx.operations.push({
+          name: "eif.ft4.bridge_ft_token_to_evm",
+          args: [
+            auth,
+            chainId || 1,
+            token_address.toLowerCase(),
+            beneficiary.toLowerCase(),
+            parseInt(amount)
+          ]
         })
+      }
+      const userSignatureProvider = newSignatureProvider({privKey: userPRIV})
+      const uniqueTx = client.addNop(tx)
+      const signedTx = await client.signTransaction(
+        uniqueTx,
+        userSignatureProvider
+      )
+      toast.promise(waitConfirmation(client, signedTx), {
+        loading: `Transaction submitted. Wait for confirmation...`,
+        success: <b>Transaction confirmed!.</b>,
+        error: <b>Transaction failed!.</b>,
       })
     } catch (error) {
       console.log(error)
@@ -909,6 +1115,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       const calldata = bridge.interface.encodeFunctionData("fundNFT", [tokenAddress, id])
       await sendTnx(signer, bridgeAddress, calldata)
     } catch (error) {
+      console.log(error)
     }
   };
 
@@ -924,6 +1131,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       const calldata = bridge.interface.encodeFunctionData("depositNFT", [tokenAddress, id, Buffer.from(accountId, 'hex')])
       await sendTnx(signer, bridgeAddress, calldata)
     } catch (error) {
+      console.log(error)
     }
   };
 
@@ -935,6 +1143,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       const calldata = tokenContract.interface.encodeFunctionData("approve", [bridgeAddress, value])
       await sendTnx(signer, tokenAddress, calldata)
     } catch (error) {
+      console.log(error)
     }
   };
 
