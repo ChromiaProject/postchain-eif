@@ -116,13 +116,18 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
   const calculateEventLeafHash = (...args: any) => {
     let event: string = ''
     args.forEach(arg => {
-      if (typeof arg === 'number') {
+      if (typeof arg === 'bigint') {
+        event += hexZeroPad("0x" + arg.toString(16), 32).substring(2)
+      } else if (typeof arg === 'number') {
         event += hexZeroPad(intToHex(arg), 32).substring(2)
+      } else if (arg instanceof Uint8Array) {
+        event += hexZeroPad("0x" + Buffer.from(arg).toString('hex'), 32).substring(2)
       } else if (typeof arg === 'string') {
         event += hexZeroPad("0x" + arg, 32).substring(2)
       }
     })
     let eventHash = keccak256(DecodeHexStringToByteArray(event))
+    console.log(eventHash)
     return eventHash.substring(2, eventHash.length)
   }
 
@@ -148,45 +153,77 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
         nodeUrlPool: postchainURL,
         blockchainRid,
       })
+      interface BlockWitness {
+        pubkey: DataObject;
+        sig: DataObject;
+      }
+      
+      interface DataObject {
+        type: string;
+        data: number[];
+      }
+      
+      interface EventProof {
+        leaf: DataObject;
+        merkleProofs: DataObject[];
+        position: BigNumber;
+      }
+      
+      interface ExtraMerkleProof {
+        extraMerkleProofs: DataObject[];
+        extraRoot: DataObject;
+        hashedLeaf: DataObject;
+        leaf: DataObject;
+        position: BigNumber;
+      }
+      
+      interface RootObject {
+        blockHeader: DataObject;
+        blockWitness: BlockWitness[];
+        eventData: DataObject;
+        eventProof: EventProof;
+        extraMerkleProof: ExtraMerkleProof;
+      }
+
       let data = await client.query('get_event_merkle_proof', { eventHash })
-      let event = JSON.parse(JSON.stringify(data))
+      let event: RootObject = JSON.parse(JSON.stringify(data))
       const bridge = new ethers.Contract(
         bridgeAddress,
         BridgeArtifacts.abi,
         library
       )
 
-      const blockHeader = "0x" + event.blockHeader
+      const blockHeader = "0x" + Buffer.from(event.blockHeader.data).toString('hex')
       const blockWitness = event.blockWitness
-      blockWitness.sort((a, b) => (a.pubkey > b.pubkey) ? 1 : ((a.pubkey < b.pubkey) ? -1 : 0))
+      blockWitness.sort((a, b) => (Buffer.from(a.pubkey.data).toString('hex') > Buffer.from(b.pubkey.data).toString('hex')) ? 1 : (Buffer.from(a.pubkey.data).toString('hex') < Buffer.from(b.pubkey.data).toString('hex')) ? -1 : 0)
       let sigs = new Array<string>(blockWitness.length)
       let signers = new Array<string>(blockWitness.length)
       for (let i = 0; i < blockWitness.length; i++) {
-        sigs[i] = "0x" + blockWitness[i].sig
-        signers[i] = "0x" + blockWitness[i].pubkey
+        sigs[i] = "0x" + Buffer.from(blockWitness[i].sig.data).toString('hex')
+        signers[i] = "0x" + Buffer.from(blockWitness[i].pubkey.data).toString('hex')
       }
 
-      const eventData = "0x" + event.eventData
+      const eventData = "0x" + Buffer.from(event.eventData.data).toString('hex')
       const eventProof = event.eventProof
       let merkleProofs = new Array<String>(eventProof.merkleProofs.length)
       for (let i = 0; i < eventProof.merkleProofs.length; i++) {
-        merkleProofs[i] = "0x" + eventProof.merkleProofs[i]
+        merkleProofs[i] = "0x" + Buffer.from(eventProof.merkleProofs[i].data).toString('hex')
       }
       const evtProof = {
-        leaf: "0x" + eventProof.leaf,
+        leaf: "0x" + Buffer.from(eventProof.leaf.data).toString('hex'),
         position: eventProof.position,
         merkleProofs: merkleProofs,
       }
       const extraMerkleProof = event.extraMerkleProof
       let extraMerkleProofs = new Array<String>(extraMerkleProof.extraMerkleProofs.length)
       for (let i = 0; i < extraMerkleProof.extraMerkleProofs.length; i++) {
-        extraMerkleProofs[i] = "0x" + extraMerkleProof.extraMerkleProofs[i]
+        extraMerkleProofs[i] = "0x" + Buffer.from(extraMerkleProof.extraMerkleProofs[i].data).toString('hex')
       }
       const extraProof = {
-        leaf: "0x" + extraMerkleProof.leaf,
-        hashedLeaf: "0x" + extraMerkleProof.hashedLeaf,
+        leaf: "0x" + Buffer.from(extraMerkleProof.leaf.data).toString('hex'),
+        hashedLeaf: "0x" + Buffer.from(extraMerkleProof.hashedLeaf.data).toString('hex'),
         position: extraMerkleProof.position,
-        extraRoot: "0x" + extraMerkleProof.extraRoot,
+        extraRoot: "0x" + Buffer.from(extraMerkleProof.extraRoot.data).toString('hex'),
         extraMerkleProofs: extraMerkleProofs,
       }
       var calldata
@@ -457,35 +494,6 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
     tokenType = "ERC20"
   }
 
-  const waitConfirmation = function (client, signedTx) {
-    return new Promise((resolve, reject) => {
-      client.sendTransaction(signedTx, (err, res) => {
-        if (err) {
-          resolve(err);
-        } else {
-          const status = res.status;
-          switch (status) {
-            case "confirmed":
-              resolve(null)
-              break;
-            case "rejected":
-              reject(Error("Message was rejected"))
-              break
-            case "unknown":
-              reject(Error("Server lost our message"))
-              break
-            case "waiting":
-              setTimeout(() => waitConfirmation(client, signedTx).then(resolve, reject), 100)
-              break
-            default:
-              console.log(status)
-              reject(Error("got unexpected response from server"))
-          }
-        }
-      })
-    })
-  }
-
   const postchainRegisterEVMAccount = async () => {
     try {
       const client = await createClient({
@@ -511,7 +519,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       const tx = {
         operations: [
           {
-            name: "ft3.evm.register_account",
+            name: "eif.evm.register_account",
             args: [
               evmKey.toLowerCase(), 
               createAuthDesc(userPUB.toString("hex")), 
@@ -527,7 +535,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         uniqueTx,
         userSignatureProvider
       )
-      toast.promise(waitConfirmation(client, signedTx), {
+      toast.promise(client.sendTransaction(signedTx), {
         loading: `Transaction submitted. Wait for confirmation...`,
         success: <b>Transaction confirmed!</b>,
         error: <b>Transaction failed!.</b>,
@@ -559,7 +567,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         uniqueTx,
         adminSignatureProvider
       )
-      toast.promise(waitConfirmation(client, signedTx), {
+      toast.promise(client.sendTransaction(signedTx), {
         loading: `Transaction submitted. Wait for confirmation...`,
         success: <b>Transaction confirmed!</b>,
         error: <b>Transaction failed!.</b>,
@@ -591,7 +599,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         uniqueTx,
         adminSignatureProvider
       )
-      toast.promise(waitConfirmation(client, signedTx), {
+      toast.promise(client.sendTransaction(signedTx), {
         loading: `Transaction submitted. Wait for confirmation...`,
         success: <b>Transaction confirmed!</b>,
         error: <b>Transaction failed!.</b>,
@@ -625,7 +633,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         uniqueTx,
         adminSignatureProvider
       )
-      toast.promise(waitConfirmation(client, signedTx), {
+      toast.promise(client.sendTransaction(signedTx), {
         loading: `Transaction submitted. Wait for confirmation...`,
         success: <b>Transaction confirmed!</b>,
         error: <b>Transaction failed!.</b>,
@@ -652,7 +660,8 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
             args: [
               name,
               symbol,
-              decimals
+              decimals,
+              ""
             ]
           }
         ],
@@ -664,7 +673,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         uniqueTx,
         adminSignatureProvider
       )
-      toast.promise(waitConfirmation(client, signedTx), {
+      toast.promise(client.sendTransaction(signedTx), {
         loading: `Transaction submitted. Wait for confirmation...`,
         success: <b>Transaction confirmed!</b>,
         error: <b>Transaction failed!.</b>,
@@ -699,7 +708,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         uniqueTx,
         adminSignatureProvider
       )
-      toast.promise(waitConfirmation(client, signedTx), {
+      toast.promise(client.sendTransaction(signedTx), {
         loading: `Transaction submitted. Wait for confirmation...`,
         success: <b>Transaction confirmed!</b>,
         error: <b>Transaction failed!.</b>,
@@ -722,7 +731,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       const tx = {
         operations: [
           {
-            name: "eif.admin.register_erc20_token",
+            name: "eif.admin.add_new_evm_erc20",
             args: [
               chainId || 1,
               token_address.toLowerCase(),
@@ -740,7 +749,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         uniqueTx,
         adminSignatureProvider
       )
-      toast.promise(waitConfirmation(client, signedTx), {
+      toast.promise(client.sendTransaction(signedTx), {
         loading: `Transaction submitted. Wait for confirmation...`,
         success: <b>Transaction confirmed!.</b>,
         error: <b>Transaction failed!.</b>,
@@ -784,14 +793,14 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
           ]
         })
       } else {
-        const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString()
+        const amount = ethers.BigNumber.from(withdrawAmount).mul(ethers.BigNumber.from(10).pow(unit)).toString
         tx.operations.push({
           name: "eif.ft4.withdraw_ERC20",
           args: [
             chainId || 1,
             token_address.toLowerCase(),
             beneficiary.toLowerCase(),
-            parseInt(amount),
+            BigInt(amount),
             r,
             s,
             v,
@@ -805,7 +814,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         uniqueTx,
         userSignatureProvider
       )
-      toast.promise(waitConfirmation(client, signedTx), {
+      toast.promise(client.sendTransaction(signedTx), {
         loading: `Transaction submitted. Wait for confirmation...`,
         success: <b>Transaction confirmed!.</b>,
         error: <b>Transaction failed!.</b>,
@@ -858,7 +867,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
             chainId || 1,
             token_address.toLowerCase(),
             beneficiary.toLowerCase(),
-            parseInt(amount),
+            BigInt(amount),
             r,
             s,
             v,
@@ -873,7 +882,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         uniqueTx,
         userSignatureProvider
       )
-      toast.promise(waitConfirmation(client, signedTx), {
+      toast.promise(client.sendTransaction(signedTx), {
         loading: `Transaction submitted. Wait for confirmation...`,
         success: <b>Transaction confirmed!.</b>,
         error: <b>Transaction failed!.</b>,
@@ -915,7 +924,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
             chainId || 1,
             token_address.toLowerCase(),
             beneficiary.toLowerCase(),
-            parseInt(amount)
+            BigInt(amount)
           ]
         })
       }
@@ -925,7 +934,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         uniqueTx,
         userSignatureProvider
       )
-      toast.promise(waitConfirmation(client, signedTx), {
+      toast.promise(client.sendTransaction(signedTx), {
         loading: `Transaction submitted. Wait for confirmation...`,
         success: <b>Transaction confirmed!.</b>,
         error: <b>Transaction failed!.</b>,
@@ -967,7 +976,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
             chainId || 1,
             token_address.toLowerCase(),
             beneficiary.toLowerCase(),
-            parseInt(amount)
+            BigInt(amount)
           ]
         })
       }
@@ -977,7 +986,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         uniqueTx,
         userSignatureProvider
       )
-      toast.promise(waitConfirmation(client, signedTx), {
+      toast.promise(client.sendTransaction(signedTx), {
         loading: `Transaction submitted. Wait for confirmation...`,
         success: <b>Transaction confirmed!.</b>,
         error: <b>Transaction failed!.</b>,
