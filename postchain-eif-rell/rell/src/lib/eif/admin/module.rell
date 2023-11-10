@@ -1,0 +1,44 @@
+@mount('eif.admin')
+module;
+
+import admin: ^^^.lib.ft4.admin;
+import ass: ^^^.lib.ft4.assets;
+import c: ^.common;
+
+entity token_mapping {
+    key token: c.evm_erc20;
+    key asset: ass.asset;
+}
+
+operation add_new_evm_erc20(network_id: integer, token_address: byte_array, name: text, symbol: text, decimals: integer) {
+    admin.require_admin();
+    require(empty(c.evm_erc20 @? { network_id, .address == token_address }), "token already existed");
+    create c.evm_erc20(
+        network_id,
+        address = token_address,
+        name,
+        symbol,
+        decimals
+    );
+}
+
+operation add_new_token_mapping(network_id: integer, token_address: byte_array, asset_id: byte_array) {
+    admin.require_admin();
+
+    val token = require(
+        c.evm_erc20 @? { network_id, .address == token_address },
+        "Token does not exist: " + token_address
+    );
+
+    val asset = require(
+        ass.asset @? { .id == asset_id },
+        "Asset does not exist: " + asset_id
+    );
+
+    require(
+        empty(token_mapping @? { token, asset }),
+        "Token was already mapped: " + token_address
+    );
+
+    create token_mapping(token, asset);
+}

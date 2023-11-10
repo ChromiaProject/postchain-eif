@@ -1,0 +1,8 @@
+@mount('eif.utils')
+module;
+
+function to_zero_padded_hex(array: byte_array) = "000000000000000000000000" + array.to_hex();
+
+function get_eth_address(pk: byte_array) = crypto.keccak256(pk).sub(12);
+
+function hash_eth_message(msg: text) = crypto.keccak256(("\u0019Ethereum Signed Message:\n" + msg.size().to_text() + msg).to_bytes());
