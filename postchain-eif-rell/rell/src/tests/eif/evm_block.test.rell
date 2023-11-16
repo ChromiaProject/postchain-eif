@@ -23,11 +23,11 @@ function test_evm_block() {
     ).sign(admin_privkey).run();
 
     rell.test.tx().op(
-        a.add_new_evm_erc20(network_id, token_address, token_name, token_symbol, token_decimal)
+        ft.add_new_evm_erc20(network_id, token_address, token_name, token_symbol, token_decimal)
     ).sign(admin_privkey).run();
     
     rell.test.tx().op(
-        a.add_new_token_mapping(network_id, token_address, asset_id)
+        ft.add_new_token_mapping(network_id, token_address, asset_id)
     ).sign(admin_privkey).run();
 
     val auth = auth_descriptor(

@@ -1,13 +1,7 @@
 @mount('eif.data')
 module;
 
-import u: ^.utils;
-import a: ^.admin;
 import acc: lib.ft4.accounts;
-import ass: lib.ft4.assets;
-import dip_core: lib.dip.core;
-import dip_attributes: lib.dip.attributes;
-import originals_core: lib.originals.core;
 
 entity evm_block {
     network_id: integer;
@@ -43,37 +37,6 @@ entity evm_account_link {
     key network_id, state_n, evm_beneficiary;
 }
 
-entity evm_erc20 {
-    network_id: integer;
-    address: byte_array;
-    name: text;
-    symbol: text;
-    decimals: integer;
-    key network_id, address;
-}
-
-entity evm_erc721 {
-    key network_id: integer, address: byte_array, token_id: integer;
-    name: text;
-    symbol: text;
-    uri: text;
-}
-
-entity evm_erc20_balance {
-    network_id: integer;
-    token: evm_erc20;
-    beneficiary: byte_array;
-    mutable amount: big_integer;
-    key token, beneficiary;
-}
-
-entity evm_erc721_balance {
-    network_id: integer;
-    token: evm_erc721;
-    beneficiary: byte_array;
-    key token, beneficiary;
-}
-
 object withdraw_stats {
     mutable withdraw_count: integer = 0;
 }
@@ -86,36 +49,6 @@ struct state_data {
 struct state_address_dto {
     state_n: integer;
     evm_address: byte_array;
-}
-
-namespace eif.INonFungibleOriginal {
-    val interface = "eif.INonFungibleOriginal";
-
-    function dependencies() = [
-        originals_core.chromia.INonFungibleOriginal.interface
-    ];
-
-    val id = dip_core.Attribute.I(interface, name = "id");
-    val address = dip_core.Attribute.I(interface, name = "address");
-    val symbol = dip_core.Attribute.I(interface, name = "symbol");
-    val uri = dip_core.Attribute.I(interface, name = "uri");
-
-	function register(account: acc.account) {
-		dip_core.InterfaceFactory.new(interface,
-			[
-                id: dip_attributes.Type(dip_attributes.Integer.T()),
-                address: dip_attributes.Type(dip_attributes.Text.T(), [dip_attributes.Optional()]),
-                symbol: dip_attributes.Type(dip_attributes.Text.T(), [dip_attributes.Optional()]),
-                uri: dip_attributes.Type(dip_attributes.Text.T(), [dip_attributes.Optional()])
-            ],
-            dependencies() @* {} (dip_core.Interface.get($)),
-            account = account,
-            is_open = true
-		);
-	}
-
-	function get() = dip_core.Interface.get(interface);
-	function has(dip_core.instance) = dip_core.Interface.is_a(instance, get());
 }
 
 query get_network_accounts(network_id: integer) : list<state_address_dto>{
@@ -149,48 +82,8 @@ function get_or_create_evm_account_link(network_id: integer, beneficiary: byte_a
 
 function build_account_state(network_id: integer, beneficiary: byte_array, account: acc.account?) {
 	val state = list<gtv>();
-	state.add(byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv());
-	// In order of asset type
-	// 0: ERC20
-	val erc20_balances = evm_erc20_balance @* { network_id, beneficiary };
-    val balances = list<ass.balance>();
-    if (account != null) {
-        val ft_balances = ass.balance @* { .account == account };
-        for (ft_balance in ft_balances) {
-            val token_mapping = a.token_mapping @? {.asset == ft_balance.asset};
-            if (token_mapping != null) {
-                if (token_mapping.token.network_id != network_id) {
-                    continue;
-                }
-                balances.add(ft_balance);
-            }
-        }
-    }
-	val erc20_byte_offset = (erc20_balances.size() + balances.size()) * 2 * 32; // 2 values per entry
-	state.add(erc20_byte_offset.to_gtv());
-
-    // update state for eif balance
-	for (balance in erc20_balances) {
-		state.add(byte_array.from_hex(u.to_zero_padded_hex(balance.token.address)).to_gtv());
-		state.add((balance.amount).to_gtv());
-    }
-
-    // update state for ft balance
-    for (balance in balances) {
-        val token_mapping = a.token_mapping @ {.asset == balance.asset};
-        state.add(byte_array.from_hex(u.to_zero_padded_hex(token_mapping.token.address)).to_gtv());
-        state.add((balance.amount).to_gtv());
-    }
-
-	// 1: ERC721
-	// val erc721_balances = evm_erc721_balance @* { network_id, beneficiary };
-	// val erc721_byte_offset = erc721_balances.size() * 2 * 32; // 2 values per entry
-	// state.add(erc721_byte_offset.to_gtv());
-	// for (balance in erc721_balances) {
-	// 	state.add(byte_array.from_hex("000000000000000000000000" + balance.token.address.sub(2)).to_gtv());
-	// 	state.add(balance.token.token_id.to_gtv());
-	// }
-	// Add new asset types here
-	// ------------------------ //
+    state.add_all(build_account_state_fn(network_id, beneficiary, account));
 	return state;
 }
+
+@extendable function build_account_state_fn(network_id: integer, beneficiary: byte_array, account: acc.account?): list<gtv>;
