@@ -59,7 +59,7 @@ libs:
     rid: x"593D6EBA650BAC473E105C047B2C43A099164870304B3E5E324F714FF2F3F82F"
     insecure: false
   pagination:
-    registry: git@bitbucket.org:chromawallet/lib-pagination-utils.git
+    registry: https://bitbucket.org/chromawallet/lib-pagination-utils
     path: rell/src/core/pagination
     tagOrBranch: master
     insecure: true
