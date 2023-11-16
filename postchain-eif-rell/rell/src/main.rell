@@ -1,12 +1,13 @@
 module;
 
 /* For testing */
-import ^.lib.eif;
-import ^.lib.eif.evm;
-import ^.lib.eif.ft4;
-import ^.lib.eif.common;
-import ^.lib.eif.admin;
-import ^.lib.eif.utils;
+import ^.eif;
+import ^.eif.evm;
+import ^.eif.ft4;
+import ^.eif.originals;
+import ^.eif.common;
+import ^.eif.admin;
+import ^.eif.utils;
 import ^.lib.ft4.ft4_basic_dev.*;
 
 /* For release */

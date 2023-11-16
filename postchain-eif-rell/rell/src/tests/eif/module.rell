@@ -1,10 +1,10 @@
 @test module;
 
-import lib.eif;
-import evm: lib.eif.evm;
-import ft: lib.eif.ft4;
-import c: lib.eif.common;
-import a: lib.eif.admin;
+import eif;
+import evm: eif.evm;
+import ft: eif.ft4;
+import c: eif.common;
+import a: eif.admin;
 import ft_auth: lib.ft4.auth;
 import admin: lib.ft4.admin;
 import ac: lib.ft4.accounts;

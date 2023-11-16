@@ -1,4 +1,4 @@
-import u: lib.eif.utils;
+import u: eif.utils;
 
 function test_to_zero_padded_hex() {
     val input = "b7eB5d60Dd5610A82A4844Beb3F7d750316d3D32";

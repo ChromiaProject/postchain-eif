@@ -3,8 +3,11 @@ module;
 
 import u: ^.utils;
 import a: ^.admin;
-import acc: ^^^.lib.ft4.accounts;
-import ass: ^^^.lib.ft4.assets;
+import acc: lib.ft4.accounts;
+import ass: lib.ft4.assets;
+import dip_core: lib.dip.core;
+import dip_attributes: lib.dip.attributes;
+import originals_core: lib.originals.core;
 
 entity evm_block {
     network_id: integer;
@@ -49,11 +52,25 @@ entity evm_erc20 {
     key network_id, address;
 }
 
+entity evm_erc721 {
+    key network_id: integer, address: byte_array, token_id: integer;
+    name: text;
+    symbol: text;
+    uri: text;
+}
+
 entity evm_erc20_balance {
     network_id: integer;
     token: evm_erc20;
     beneficiary: byte_array;
     mutable amount: big_integer;
+    key token, beneficiary;
+}
+
+entity evm_erc721_balance {
+    network_id: integer;
+    token: evm_erc721;
+    beneficiary: byte_array;
     key token, beneficiary;
 }
 
@@ -69,6 +86,36 @@ struct state_data {
 struct state_address_dto {
     state_n: integer;
     evm_address: byte_array;
+}
+
+namespace eif.INonFungibleOriginal {
+    val interface = "eif.INonFungibleOriginal";
+
+    function dependencies() = [
+        originals_core.chromia.INonFungibleOriginal.interface
+    ];
+
+    val id = dip_core.Attribute.I(interface, name = "id");
+    val address = dip_core.Attribute.I(interface, name = "address");
+    val symbol = dip_core.Attribute.I(interface, name = "symbol");
+    val uri = dip_core.Attribute.I(interface, name = "uri");
+
+	function register(account: acc.account) {
+		dip_core.InterfaceFactory.new(interface,
+			[
+                id: dip_attributes.Type(dip_attributes.Integer.T()),
+                address: dip_attributes.Type(dip_attributes.Text.T(), [dip_attributes.Optional()]),
+                symbol: dip_attributes.Type(dip_attributes.Text.T(), [dip_attributes.Optional()]),
+                uri: dip_attributes.Type(dip_attributes.Text.T(), [dip_attributes.Optional()])
+            ],
+            dependencies() @* {} (dip_core.Interface.get($)),
+            account = account,
+            is_open = true
+		);
+	}
+
+	function get() = dip_core.Interface.get(interface);
+	function has(dip_core.instance) = dip_core.Interface.is_a(instance, get());
 }
 
 query get_network_accounts(network_id: integer) : list<state_address_dto>{
