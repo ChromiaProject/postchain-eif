@@ -1,6 +1,0 @@
-entity account_link {
-  main: ft_accounts.account;
-  index special: ft_accounts.account;
-  reason: text;
-  key main, special;
-}
