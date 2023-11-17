@@ -133,7 +133,17 @@ query evm_has_erc721(network_id: integer, token_address: byte_array, token_id: i
     return not empty(b);
 }
 
-@extend(root.evm_block_fn) function(c.evm_block, network_id: integer, token_address: byte_array, beneficiary: byte_array, evm.evm_account?, event: c.event_data, indexed_values_bytes: byte_array, non_indexed_values_bytes: byte_array) {
+@extend(root.evm_block_fn)
+function(
+    c.evm_block,
+    network_id: integer,
+    token_address: byte_array,
+    beneficiary: byte_array,
+    evm.evm_account?,
+    event: c.event_data,
+    indexed_values_bytes: byte_array,
+    non_indexed_values_bytes: byte_array
+) {
     if (event.name != "DepositedERC721") return;
 
     // ignore event if dip instance does not exist
@@ -189,17 +199,22 @@ query evm_has_erc721(network_id: integer, token_address: byte_array, token_id: i
     }
 }
 
-@extend(c.build_account_state_fn) function(network_id: integer, beneficiary: byte_array, account: acc.account?): map<integer, list<gtv>> {
-	val state = list<gtv>();
-	// 1: ERC721
-	val erc721_balances = evm_erc721_balance @* { network_id, beneficiary };
-	val erc721_byte_offset = erc721_balances.size() * 2 * 32; // 2 values per entry
-	state.add(erc721_byte_offset.to_gtv());
-	for (balance in erc721_balances) {
-		state.add(byte_array.from_hex("000000000000000000000000" + balance.token.address.sub(2)).to_gtv());
-		state.add(balance.token.token_id.to_gtv());
-	}
-    
+@extend(c.build_account_state_fn)
+function(
+    network_id: integer,
+    beneficiary: byte_array,
+    account: acc.account?
+): map<integer, list<gtv>> {
+    val state = list<gtv>();
+    // 1: ERC721
+    val erc721_balances = evm_erc721_balance @* { network_id, beneficiary };
+    val erc721_byte_offset = erc721_balances.size() * 2 * 32; // 2 values per entry
+    state.add(erc721_byte_offset.to_gtv());
+    for (balance in erc721_balances) {
+        state.add(byte_array.from_hex("000000000000000000000000" + balance.token.address.sub(2)).to_gtv());
+        state.add(balance.token.token_id.to_gtv());
+    }
+
     val states = map<integer, list<gtv>>();
     states.put(1, state);
     return states;

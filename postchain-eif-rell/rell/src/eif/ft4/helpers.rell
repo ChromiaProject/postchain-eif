@@ -1,6 +1,11 @@
 import ^.*;
 import c: ^.common;
 
-operation evm_block_op(network_id: integer, evm_block_height: integer, evm_block_hash: byte_array, events: list<c.event_data>) {
+operation evm_block_op(
+    network_id: integer,
+    evm_block_height: integer,
+    evm_block_hash: byte_array,
+    events: list<c.event_data>
+) {
     _evm_block(network_id, evm_block_height, evm_block_hash, events);
 }
