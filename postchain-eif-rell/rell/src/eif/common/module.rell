@@ -1,6 +1,7 @@
 @mount('eif.data')
 module;
 
+import u: ^.utils;
 import acc: lib.ft4.accounts;
 
 entity evm_block {
@@ -82,8 +83,17 @@ function get_or_create_evm_account_link(network_id: integer, beneficiary: byte_a
 
 function build_account_state(network_id: integer, beneficiary: byte_array, account: acc.account?) {
 	val state = list<gtv>();
-    state.add_all(build_account_state_fn(network_id, beneficiary, account));
+	state.add(byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv());
+
+	val state_map = map<integer, list<gtv>>();
+    state_map.put_all(build_account_state_fn(network_id, beneficiary, account));
+    var keys = list<integer>();
+    keys.add_all(state_map.keys());
+    keys = keys.sorted();
+    for (k in keys) {
+        state.add_all(state_map[k]);
+    }
 	return state;
 }
 
-@extendable function build_account_state_fn(network_id: integer, beneficiary: byte_array, account: acc.account?): list<gtv>;
+@extendable function build_account_state_fn(network_id: integer, beneficiary: byte_array, account: acc.account?): map<integer, list<gtv>>;

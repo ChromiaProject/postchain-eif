@@ -189,7 +189,7 @@ query evm_has_erc721(network_id: integer, token_address: byte_array, token_id: i
     }
 }
 
-@extend(c.build_account_state_fn) function(network_id: integer, beneficiary: byte_array, account: acc.account?): list<gtv> {
+@extend(c.build_account_state_fn) function(network_id: integer, beneficiary: byte_array, account: acc.account?): map<integer, list<gtv>> {
 	val state = list<gtv>();
 	// 1: ERC721
 	val erc721_balances = evm_erc721_balance @* { network_id, beneficiary };
@@ -200,7 +200,9 @@ query evm_has_erc721(network_id: integer, token_address: byte_array, token_id: i
 		state.add(balance.token.token_id.to_gtv());
 	}
     
-    return state;
+    val states = map<integer, list<gtv>>();
+    states.put(1, state);
+    return states;
 }
 
 function deposit_ERC721(network_id: integer, beneficiary: byte_array, token_address: byte_array, token_id: integer, name: text, symbol: text, uri: text) {

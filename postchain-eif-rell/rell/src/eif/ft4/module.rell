@@ -99,11 +99,8 @@ query evm_balance_of_erc20(network_id: integer, token_address: byte_array, benef
     return b;
 }
 
-@extend(c.build_account_state_fn) function(network_id: integer, beneficiary: byte_array, account: acc.account?): list<gtv> {
-	val state = list<gtv>();
-    
-	state.add(byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv());
-	// In order of asset type
+@extend(c.build_account_state_fn) function(network_id: integer, beneficiary: byte_array, account: acc.account?): map<integer, list<gtv>> {
+    val state = list<gtv>();
 	// 0: ERC20
 	val erc20_balances = evm_erc20_balance @* { network_id, beneficiary };
     val balances = list<ass.balance>();
@@ -135,7 +132,9 @@ query evm_balance_of_erc20(network_id: integer, token_address: byte_array, benef
         state.add((balance.amount).to_gtv());
     }
 
-    return state;
+    val states = map<integer, list<gtv>>();
+    states.put(0, state);
+    return states;
 }
 
 @extend(root.evm_block_fn) function(c.evm_block, network_id: integer, token_address: byte_array, beneficiary: byte_array, evm.evm_account?, event: c.event_data, indexed_values_bytes: byte_array, non_indexed_values_bytes: byte_array) {
