@@ -1,0 +1,8 @@
+@mount('ft4')
+module;
+
+import .external;
+import ^.accounts;
+import ^.assets;
+import ^.utils;
+import ^.version;

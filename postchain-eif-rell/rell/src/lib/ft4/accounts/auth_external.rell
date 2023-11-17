@@ -1,0 +1,16 @@
+
+struct eth_auth_args {
+    account;
+    account_auth_descriptor;
+    signatures: list<auth.signature>;
+}
+
+function AuthDescriptor(id: byte_array) = require(
+    account_auth_descriptor @? { id },
+    "Provided auth descriptor id does not exist %s".format(id)
+);
+
+function Account(id: byte_array) = require(
+    account @? { id },
+    "Account not found: %s".format(id)
+);

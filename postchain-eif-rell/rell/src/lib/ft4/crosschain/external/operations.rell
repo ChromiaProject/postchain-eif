@@ -1,0 +1,226 @@
+import ^^.assets;
+import ^^.accounts;
+import ^^.auth;
+import crosschain: ^;
+import ^^^.iccf;
+
+val INIT_TRANSFER_OP_NAME = "ft4.crosschain.init_transfer";
+val APPLY_TRANSFER_OP_NAME = "ft4.crosschain.apply_transfer";
+
+function init_transfer_message(gtv) {
+    val params = struct<init_transfer>.from_gtv(gtv);
+    val asset = assets.Asset(params.asset_id);
+
+    return "Please sign the message\n"+
+    "to transfer %s %s\n\n"+
+    "from:\n-account {account_id}\n-chain: %s\n\n"+
+    "to:\n-account %s\n-chain: %s\n\nNonce: {nonce}"
+        .format(
+            assets.format_amount_with_decimals(params.amount, asset.decimals),
+            asset.name,
+            chain_context.blockchain_rid,
+            params.receiver_id,
+            params.hops[params.hops.size()-1]
+        );
+}
+
+@extend(auth.auth_handler)
+function () = auth.add_auth_handler(
+    scope = "ft4.crosschain.init_transfer",
+    flags = ["T"],
+    message = init_transfer_message(*)
+);
+
+operation init_transfer(
+    receiver_id: byte_array,
+    asset_id: byte_array,
+    amount: big_integer,
+    hops: list<byte_array>
+) {
+    val account = auth.authenticate();
+    val asset = require(
+        assets.asset @? { .id == asset_id }, 
+        "Asset not found '%s'".format(asset_id)
+    );
+
+    crosschain.Unsafe.update_balances_if_needed(
+        account,
+        crosschain.ensure_blockchain_account(hops[0]),
+        asset,
+        amount
+    );
+
+    create crosschain.pending_transfer(
+        account = account,
+        transaction = op_context.transaction,
+        op_index = op_context.op_index
+    );
+}
+
+operation apply_transfer(
+    init_transfer_tx: gtx_transaction,
+    init_tx_op_index: integer,
+    previous_hop_tx: gtx_transaction,
+    op_index: integer,
+    hop_index: integer
+) {
+    val init_transfer_details = get_init_transfer_details(init_transfer_tx, init_tx_op_index);
+
+    if (hop_index == 0) {
+        /* 
+         * For the first hop init_transfer_tx and previous_hop_tx are equal.
+         * Consider making previous_hop_tx optional, so that we don't have to send the same transaction twice.
+         */ 
+        
+        require(
+            init_transfer_tx == previous_hop_tx,
+            "Invalid parameter. Previous hop tx must be equal to init transfer tx"
+        );
+
+        require(
+            op_index == init_tx_op_index,
+            "Invalid parameter. init_transfer indexes should be same"
+        );
+    } else {
+        val previous_hop_details = get_apply_transfer_details(previous_hop_tx, op_index);
+        
+        require(
+            init_transfer_details.tx_rid == previous_hop_details.init.tx_rid,
+            "apply_transfer of previous hop does not correspond to init_transfer"
+        );
+
+        require(
+            init_tx_op_index == previous_hop_details.args.init_tx_op_index,
+            "This transfer does not correspond to transfer of provided previous hop"
+        );
+    }
+
+    val my_brid = chain_context.blockchain_rid;
+
+    val init_args = init_transfer_details.args;
+
+    require(
+        init_args.hops.size() > hop_index,
+        "Argument mismatch: init_args.hops size (%d) is greater than hop_index (%d)".format(init_args.hops.size(), hop_index)
+    );
+
+    val current_hop_brid = init_transfer_details.args.hops[hop_index];
+    require(
+        current_hop_brid == my_brid,
+        "This transaction hop must happen on a chain with brid %s".format(current_hop_brid)
+    );
+
+    val from_brid = previous_hop_tx.body.blockchain_rid; 
+
+    if (hop_index > 0) {
+        val previous_hop_brid = init_transfer_details.args.hops[hop_index - 1];
+        require(
+            from_brid == previous_hop_brid,
+            "Argument mismatch: init_args.hops (%s) and tx blockchain_rid (%s) don't correspond"
+                .format(
+                    previous_hop_brid, from_brid
+                )
+        );
+    }
+
+    require(
+        iccf.check_iccf_proof(from_brid, previous_hop_tx.to_gtv().hash()),
+        "Missing proof for previous hop"
+    );
+
+    val asset = assets.Asset(init_args.asset_id);
+
+    val receiver: accounts.account;
+    if (init_transfer_details.args.hops.size() > hop_index + 1) {
+        // this hop is not last
+        val next_hop = init_transfer_details.args.hops[hop_index + 1];
+        receiver = crosschain.ensure_blockchain_account(next_hop);
+    } else {
+        // final hop -- send money to recipient account
+        receiver = accounts.account @ { init_transfer_details.args.receiver_id };
+    }
+
+    crosschain.Unsafe.update_balances_if_needed(
+        crosschain.ensure_blockchain_account(from_brid),
+        receiver,
+        asset,
+        init_transfer_details.args.amount
+    );
+
+    // Add transfer to applied transfers table so that it cannot be applied more than once
+    create crosschain.applied_transfers(init_transfer_details.tx_rid, init_tx_op_index);
+}
+
+operation complete_transfer(
+    final_apply_transfer_tx: gtx_transaction,
+    op_index: integer
+) {
+    require(
+        iccf.check_iccf_proof(
+            final_apply_transfer_tx.body.blockchain_rid,
+            final_apply_transfer_tx.to_gtv().hash()
+        ),
+        "Could not delete pedning transfer as the proof is not anchored yet"
+    );
+
+    require(
+        final_apply_transfer_tx.body.operations[op_index].name == "ft4.crosschain.apply_transfer",
+        "Operation at op_index was not apply_transfer"
+    );
+
+    // map gtv args to struct
+    val final_apply_transfer_args = struct<apply_transfer>.from_gtv(final_apply_transfer_tx.body.operations[op_index].args.to_gtv());
+
+    // extract init transfer tx details
+    val init_transfer_tx_hash = final_apply_transfer_args.init_transfer_tx.to_gtv().hash();
+    val init_transfer_args = struct<init_transfer>.from_gtv(final_apply_transfer_args.init_transfer_tx.body.operations[final_apply_transfer_args.init_tx_op_index].args.to_gtv());
+
+    require(
+        final_apply_transfer_args.hop_index == init_transfer_args.hops.size() - 1,
+        "The provided transaction does not represent the final hop in this cross chain transfer"
+    );
+    require(
+        init_transfer_args.hops[final_apply_transfer_args.hop_index] == final_apply_transfer_tx.body.blockchain_rid,
+        "The provided transaction was not applied to the expected target chain"
+    );
+
+    // delete the pending transfer as it is now completed
+    delete crosschain.pending_transfer @ { .transaction.tx_hash == init_transfer_tx_hash, .op_index == final_apply_transfer_args.init_tx_op_index };
+}
+
+function get_init_transfer_details(tx: gtx_transaction, op_index: integer) {
+    val op = tx.body.operations[op_index]; 
+
+    require(
+        op.name == INIT_TRANSFER_OP_NAME,
+        "Invalid parameters. Expected <%s> at index <%d>, found <%s>".format(INIT_TRANSFER_OP_NAME, op_index, op.name)
+    );
+
+    val tx_rid = tx.hash();
+    val args = struct<init_transfer>.from_gtv(op.args.to_gtv());
+
+    return (
+        tx_rid = tx_rid,
+        args = args
+    );
+}
+
+function get_apply_transfer_details(tx: gtx_transaction, apply_op_index: integer) {
+    val op = tx.body.operations[apply_op_index];
+
+    require(
+        op.name == APPLY_TRANSFER_OP_NAME,
+        "Invalid parameters. Expected <%s> at index <%d>, found <%s>".format(APPLY_TRANSFER_OP_NAME, apply_op_index, op.name)
+    );
+
+    val tx_rid = tx.hash();
+    val args = struct<apply_transfer>.from_gtv(op.args.to_gtv());
+
+    val init_details = get_init_transfer_details(args.init_transfer_tx, args.init_tx_op_index);
+
+    return (
+        tx_rid = tx_rid,
+        args = args,
+        init = init_details
+    );
+}

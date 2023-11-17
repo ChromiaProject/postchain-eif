@@ -1,0 +1,94 @@
+import ^.assets;
+import ^.accounts;
+
+entity applied_transfers { 
+    key tx_rid, op_index; 
+    tx_rid: byte_array;
+    op_index: integer;
+}
+
+entity pending_transfer {
+    key transaction, op_index; 
+    op_index: integer;
+    index accounts.account;
+}
+
+namespace Unsafe {
+
+    function update_balances_if_needed(
+        sender: accounts.account,
+        receiver: accounts.account,
+        assets.asset,
+        amount: big_integer
+    ) {
+        require(
+            sender != receiver,
+            "Cannot transfer to own account"
+        );
+        require(
+            chain_context.blockchain_rid != sender.id,
+            "Cannot transfer from this blockchain's account"
+        );
+        assets.require_zero_exclusive_asset_amount_limits(
+            amount,
+            "Parameter amount"
+        );
+        require(
+            chain_context.blockchain_rid != receiver.id,
+            "Cannot transfer to this blockchain's account"
+        );
+        assets.require_zero_exclusive_asset_amount_limits(
+            amount,
+            "Parameter amount"
+        );
+
+        val origin_brid = asset_origin @? { asset } .origin_brid;
+        val is_sender_blockchain = exists(blockchain_account @? { sender });
+        val is_receiver_blockchain = exists(blockchain_account @? { receiver });
+        
+        val args = [
+            [(amount, sender.id, 0)],
+            [(amount, receiver.id, 0)]
+        ];
+
+        if (
+            not exists(origin_brid)
+            or not is_sender_blockchain
+            or origin_brid != sender.id
+        ) {
+            assets.deduct_balance(
+                sender,
+                asset, 
+                amount
+            );
+        }
+
+        create assets.transfer_history_entry(
+            .account = sender,
+            .asset = asset,
+            .delta = amount,
+            .op_index = op_context.op_index,
+            .is_input = true,
+            .entry_index = 0,
+            .transfer_args = args.to_gtv().to_bytes()
+        );
+
+        if (
+            not exists(origin_brid)
+            or not is_receiver_blockchain
+            or origin_brid != receiver.id
+        ) {
+            assets.ensure_balance(receiver, asset).amount += amount;
+        }
+
+        create assets.transfer_history_entry(
+            .account = receiver,
+            .asset = asset,
+            .delta = amount,
+            .op_index = op_context.op_index,
+            .is_input = false,
+            .entry_index = 0,
+            .transfer_args = args.to_gtv().to_bytes()
+        );
+    }
+}

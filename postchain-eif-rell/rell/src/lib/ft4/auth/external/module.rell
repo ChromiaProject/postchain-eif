@@ -1,0 +1,4 @@
+@mount('ft4')
+module;
+
+import ^^.auth;

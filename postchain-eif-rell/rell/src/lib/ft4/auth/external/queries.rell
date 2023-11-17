@@ -1,0 +1,4 @@
+
+query get_auth_flags(op_name: name) = auth.get_auth_handler(op_name, is_strict=false).flags;
+
+query get_auth_message_template(op_name: name, op_args: gtv) = auth.get_auth_message_template(op_name, op_args, is_strict=false);

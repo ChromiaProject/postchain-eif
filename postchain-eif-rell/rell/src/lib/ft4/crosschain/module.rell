@@ -1,0 +1,22 @@
+@mount('ft4.crosschain')
+module;
+
+import ^.utils;
+
+function get_paginated_pending_transfers(account_id: byte_array, page_size: integer, page_cursor: text?) {
+    val after_rowid = utils.before_rowid(page_cursor);
+
+    return pending_transfer @* {
+        .account.id == account_id,
+        .rowid > (after_rowid ?: rowid(0))
+    } (
+        utils.pagination_result(
+            data = (
+                tx_data = .transaction.tx_data,
+                op_index = .op_index,
+                account_id = .account.id
+            ).to_gtv_pretty(),
+            rowid = .rowid
+        )
+    ) limit utils.fetch_data_size(page_size);
+}

@@ -1,0 +1,20 @@
+import ^^.assets;
+import crosschain: ^;
+import ^^.accounts;
+import ^^.utils;
+
+query get_asset_origin_by_id(asset_id: byte_array) {
+    return crosschain.asset_origin @? { .asset.id == asset_id } .origin_brid;
+}
+
+query get_pending_transfers_for_account(account_id: byte_array, page_size: integer, page_cursor: text?) {
+    return utils.make_page(
+        crosschain.get_paginated_pending_transfers(account_id, page_size, page_cursor),
+        page_size
+    );
+}
+
+query is_transfer_applied(tx_rid: byte_array, op_index: integer) {
+    val transfer = crosschain.applied_transfers @? { .tx_rid == tx_rid, .op_index == op_index };
+    return transfer != null;
+}
