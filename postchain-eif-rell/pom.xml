@@ -31,6 +31,9 @@
                             <goal>rell-install</goal>
                             <goal>rell-integration-test</goal>
                         </goals>
+                        <configuration>
+                            <skip>${skipTests}</skip>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
