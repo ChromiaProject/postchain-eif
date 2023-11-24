@@ -15,16 +15,15 @@ definitions:
       rate_limit_points_at_account_creation: 100
   - &rell_test_args
     lib.ft4.admin:
-      admin_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
+      admin_pubkey: 02897FAC9964FBDF97E6B83ECCBDE4A8D28729E0FB27059487D1B6B29F70B48767
     lib.access.admin:
-      admin_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
+      admin_pubkey: 02897FAC9964FBDF97E6B83ECCBDE4A8D28729E0FB27059487D1B6B29F70B48767
     lib.originals.marketplace:
-      oracle_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
+      oracle_pubkey: 02897FAC9964FBDF97E6B83ECCBDE4A8D28729E0FB27059487D1B6B29F70B48767
 
 test:
   modules:
-    - tests.utils
-    - tests.ft4
+    - tests.originals
   moduleArgs:
     <<: *common_args
     <<: *rell_test_args
@@ -82,6 +81,16 @@ libs:
   originals:
     registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
     path: rell/src/originals
+    tagOrBranch: dev
+    insecure: true
+  projects:
+    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
+    path: rell/src/projects
+    tagOrBranch: dev
+    insecure: true
+  collections:
+    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
+    path: rell/src/collections
     tagOrBranch: dev
     insecure: true
   ft_helper:

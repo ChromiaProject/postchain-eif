@@ -78,7 +78,7 @@ function test_evm_block() {
     val block_hash = x"508ccf97bb5fac1546ac0040793e32d0336e764d62b60810fd460d445adfde64";
     event_data_list.add(e);
     rell.test.tx().op(
-        ft.evm_block_op(network_id, block_height, block_hash, event_data_list)
+        evm_block_op(network_id, block_height, block_hash, event_data_list)
     ).run();
     val state = list<gtv>();
     state.add(to_32_byte_array(user_evm_address).to_gtv());
@@ -92,7 +92,7 @@ function test_evm_block() {
     assert_equals(ft3_balance.account, ft3_account);
     assert_equals(ft3_balance.amount, amount);
 
-    val last_block = eif.get_last_evm_block(network_id)!!;
+    val last_block = get_last_evm_block(network_id)!!;
     assert_equals(last_block.evm_block_height, block_height);
     assert_equals(last_block.evm_block_hash, block_hash);
 
@@ -187,7 +187,7 @@ function test_evm_block() {
     val other_event_data_list = list<c.event_data>();
     other_event_data_list.add(e1);
     rell.test.tx().op(
-        ft.evm_block_op(network_id, 101, x"508ccf97bb5fac1546ac0040793e32d0336e764d62b60810fd460d445adfde65", other_event_data_list)
+        evm_block_op(network_id, 101, x"508ccf97bb5fac1546ac0040793e32d0336e764d62b60810fd460d445adfde65", other_event_data_list)
     ).run();
 
     val other_state = list<gtv>();

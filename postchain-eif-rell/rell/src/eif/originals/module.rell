@@ -11,6 +11,13 @@ import acc: lib.ft4.accounts;
 import dip_core: lib.dip.core;
 import dip_attributes: lib.dip.attributes;
 import originals_core: lib.originals.core;
+import access: lib.collections.external.access.*;
+import hao: lib.originals.originals_collection.external.access.*;
+import lib.collections.{collection};
+
+@extend(access.has_create_collection_permission) function(acc.account) = true;
+
+@extend(hao.has_add_original_to_collection_permission) function(acc.account, original: originals_core.Id.asset_instance, collection) = true;
 
 entity evm_erc721 {
     key network_id: integer, address: byte_array, token_id: integer;
@@ -70,12 +77,12 @@ namespace eif.INonFungibleOriginal {
 	function has(dip_core.instance) = dip_core.Interface.is_a(instance, get());
 }
 
-operation register_chromia_base_originals() {
+operation register_chromia_base_originals(account_id: byte_array) {
     admin.require_admin();
 
     val admin_account = require(
-        acc.account @? { .id == a.account_id() }, 
-        "admin account was not defined: " + a.account_id()
+        acc.account @? { .id == account_id }, 
+        "admin account was not defined: " + account_id
     );
 
     val dclass = dip_core.Interface.dclass @? { originals_core.chromia.INonFungibleOriginal.interface };
@@ -84,12 +91,12 @@ operation register_chromia_base_originals() {
     }
 }
 
-operation init_eif_original_interface() {
+operation init_eif_original_interface(account_id: byte_array) {
     admin.require_admin();
 
     val admin_account = require(
-        acc.account @? { .id == a.account_id() }, 
-        "admin account was not defined: " + a.account_id()
+        acc.account @? { .id == account_id }, 
+        "admin account was not defined: " + account_id
     );
 
     require(
@@ -181,7 +188,7 @@ function(
         op_context.emit_event("eif_state", state_data.to_gtv());
     } else {
         val ft_account = evm_account.account;
-        log("mint postchain original for ft3 account: " + ft_account.id);
+        log("mint a non fungible original for ft account: " + ft_account.id);
         require(interface.name == eif.INonFungibleOriginal.interface, "interface is not supported: " + interface.name);
         val original_type = originals_core.Minter.I(
             interface_name = interface.name,

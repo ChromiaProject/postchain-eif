@@ -1,6 +1,6 @@
 @test module;
 
-import eif;
+import eif.*;
 import evm: eif.evm;
 import ft: eif.ft4;
 import c: eif.common;

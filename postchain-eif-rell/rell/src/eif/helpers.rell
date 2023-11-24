@@ -1,5 +1,4 @@
-import ^.*;
-import c: ^.common;
+import c: .common;
 
 operation evm_block_op(
     network_id: integer,
