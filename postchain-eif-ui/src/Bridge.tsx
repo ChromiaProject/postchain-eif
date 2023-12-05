@@ -7,7 +7,7 @@ import { useQuery } from "react-query";
 
 import ERC20TokenArtifacts from "./postchain-eif-contracts/artifacts/@openzeppelin/contracts/token/ERC20/ERC20.sol/ERC20.json";
 import ERC721TokenArtifacts from "./postchain-eif-contracts/artifacts/@openzeppelin/contracts/token/ERC721/ERC721.sol/ERC721.json";
-import BridgeArtifacts from "./postchain-eif-contracts/artifacts/contracts/TokenBridge.sol/TokenBridge.json";
+import BridgeArtifacts from "./postchain-eif-contracts/artifacts/contracts/NFTBridge.sol/NFTBridge.json";
 
 import { createClient, newSignatureProvider } from "postchain-client"
 import { hexZeroPad, keccak256 } from "ethers/lib/utils";
@@ -469,7 +469,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
   // Remove 0x to pass address like byte_array
   let token_address = tokenAddress.slice(2) || ""
   let beneficiary = account?.slice(2) || ""
-  const tokenId = 0
+  const tokenId = 1
   const userPUB = Buffer.from(
     "038f888dec563b5bc253e87abc90afd26c3287021d10236ea19d248043dc39e0b8",
     "hex"
@@ -479,11 +479,11 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
     "hex"
   );
   const adminPUB = Buffer.from(
-    "02a829e1d7fffbd856a04b53ec7d478d8896803b571c7700ec464d6a9d4f0e3bbd",
+    "02897FAC9964FBDF97E6B83ECCBDE4A8D28729E0FB27059487D1B6B29F70B48767",
     "hex"
   );
   const adminPRIV = Buffer.from(
-    "2e88348d2b7aa474be72eab4ea5613e7a39e9c27078b00a2cdc3ce94d912aeb9",
+    "854D8402085EC5F737B1BE63FFD980981EED2A0DA5FAC6B4468CB1F176BA0321",
     "hex"
   );
   var tokenType: string
@@ -654,6 +654,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
           {
             name: "eif.originals.register_chromia_base_originals",
             args: [
+              Buffer.from(accountId, "hex")
             ]
           }
         ],
@@ -686,6 +687,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
           {
             name: "eif.originals.init_eif_original_interface",
             args: [
+              Buffer.from(accountId, "hex")
             ]
           }
         ],
@@ -756,9 +758,9 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
             ]
           }
         ],
-        signers: [userPUB]
+        signers: [adminPUB]
       }
-      const userSignatureProvider = newSignatureProvider({privKey: userPRIV})
+      const userSignatureProvider = newSignatureProvider({privKey: adminPRIV})
       const uniqueTx = client.addNop(tx)
       const signedTx = await client.signTransaction(
         uniqueTx,

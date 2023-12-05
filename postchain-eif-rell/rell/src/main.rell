@@ -1,7 +1,7 @@
 module;
 
 /* For testing */
-import ^.eif;
+import ^.eif.main;
 import ^.eif.evm;
 import ^.eif.ft4;
 import ^.eif.originals;

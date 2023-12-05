@@ -101,7 +101,7 @@ function test_evm_block() {
     );
     event_data_list.add(e);
     rell.test.tx().op(
-        evm_block_op(network_id, block_height, block_hash, event_data_list)
+        th.evm_block_op(network_id, block_height, block_hash, event_data_list)
     ).run();
 
     val cursor = page.page_cursor(page_size=10, after_rowid=null);
