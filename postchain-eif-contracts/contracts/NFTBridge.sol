@@ -7,34 +7,30 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 // Interfaces
-import "@openzeppelin/contracts/interfaces/IERC721.sol";
 import "@openzeppelin/contracts/interfaces/IERC721Metadata.sol";
-import "@openzeppelin/contracts/interfaces/IERC721Receiver.sol";
 
 // Internal libraries
 import "./Postchain.sol";
-
-interface IValidator {
-    function getValidatorHeight(uint _height) external view returns (uint);
-    function isValidSignatures(uint height, bytes32 hash, bytes[] memory signatures, address[] memory signers) external view returns (bool);
-}
+import "./ERC721C.sol";
+import "./interfaces/IValidator.sol";
 
 // This contract is upgradeable. This imposes restrictions on how storage layout can be modified once it is deployed
 // Some instructions are also not allowed. Read more at: https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable
 // Note: To enhance the security & decentralization, we should call transferOwnership() to external multi-sig owner after deploy the smart contract
-contract NFTBridge is Initializable, OwnableUpgradeable, IERC721Receiver, ReentrancyGuardUpgradeable {
+contract NFTBridge is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
     using Postchain for bytes32;
     using MerkleProof for bytes32[];
 
     uint constant WITHDRAW_OFFSET = 2; // need to update when deploy contract on production
 
-    mapping (IERC721 => bool) public _allowedNFT;
-    mapping (IERC721 => mapping(uint256 => address)) public _owners;
-    mapping (bytes32 => WithdrawNFT) public _withdrawNFT;
     IValidator public validator;
-    uint256 public networkId;
 
+    mapping (ERC721C => bool) public _allowedNFT;
+    mapping (bytes32 => WithdrawNFT) public _withdrawNFT;
+
+    // EVM network id
+    uint256 public networkId;
     // Postchain/Chromia blockchain rid
     bytes32 private blockchainRid;
 
@@ -44,24 +40,23 @@ contract NFTBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reentr
     enum Status {
         Pending,
         Withdrawable,
-        Withdrawn,
-        PostchainWithdrawn
+        Withdrawn
     }
 
     struct WithdrawNFT {
-        IERC721 nft;
+        ERC721C nft;
         address beneficiary;
-        uint256 tokenId;
+        bytes32 assetId;
+        string tokenURI;
         uint256 block_number;
         Status status;
     }
 
-    event FundedERC721(address indexed sender, IERC721 indexed nft, uint tokenId);
-    event DepositedERC721(address indexed sender, IERC721 indexed nft, bytes32 indexed ft3_account_id, uint networkId, uint tokenId, string name, string symbol, string tokenURI);
-    event WithdrawRequestNFT(address indexed beneficiary, IERC721 indexed token, uint256 tokenId);
-    event WithdrawalNFT(address indexed beneficiary, IERC721 indexed nft, uint256 tokenId);
+    event DepositedERC721(address indexed sender, ERC721C indexed nft, bytes32 indexed ft_account_id, uint networkId, bytes32 ft_asset_id, uint tokenId, string name, string symbol, string tokenURI);
+    event WithdrawRequestNFT(address indexed beneficiary, ERC721C indexed nft, bytes32 ft_asset_id);
+    event WithdrawalNFT(address indexed beneficiary, ERC721C indexed nft, bytes32 ft_asset_id);
 
-    modifier isAllowNFT(IERC721 nft) {
+    modifier isAllowNFT(ERC721C nft) {
         require(_allowedNFT[nft], "NFTBridge: not allow nft");
         _;
     }
@@ -81,41 +76,15 @@ contract NFTBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reentr
         blockchainRid = rid;
     }
 
-    /**
-     * @dev See {IERC721Receiver-onERC721Received}.
-     *
-     * Always returns `IERC721Receiver.onERC721Received.selector`.
-     */
-    function onERC721Received(
-        address,
-        address,
-        uint256,
-        bytes memory
-    ) public virtual override returns (bytes4) {
-        return this.onERC721Received.selector;
-    }
-
-    function allowNFT(IERC721 nft) onlyOwner public {
+    function allowNFT(ERC721C nft) onlyOwner public {
         _allowedNFT[nft] = true;
     }
 
-    /**
-     * @dev admin need to fund nft for bridge; otherwise, user cannot claim
-     * and they might need to withdraw back to postchain.
-     */
-    function fundNFT(IERC721 nft, uint256 tokenId) isAllowNFT(nft) onlyOwner public returns (bool) {
-        nft.safeTransferFrom(msg.sender, address(this), tokenId);
-        _owners[nft][tokenId] = msg.sender;
-        emit FundedERC721(msg.sender, nft, tokenId);
-        return true;
-    }
-
-    function depositNFT(IERC721 nft, uint256 tokenId, bytes32 ft3_account_id) isAllowNFT(nft) public returns (bool) {
-        nft.safeTransferFrom(msg.sender, address(this), tokenId);
-        _owners[nft][tokenId] = msg.sender;
+    function depositNFT(ERC721C nft, uint256 tokenId, bytes32 ft_account_id) isAllowNFT(nft) public returns (bool) {
         (string memory name, string memory symbol, string memory tokenURI) = _getNFTInfo(nft, tokenId);
-
-        emit DepositedERC721(msg.sender, nft, ft3_account_id, networkId, tokenId, name, symbol, tokenURI);
+        bytes32 ft_asset_id = nft.getAssetId(tokenId);
+        nft.burn(tokenId);
+        emit DepositedERC721(msg.sender, nft, ft_account_id, networkId, ft_asset_id, tokenId, name, symbol, tokenURI);
         return true;
     }
 
@@ -154,46 +123,33 @@ contract NFTBridge is Initializable, OwnableUpgradeable, IERC721Receiver, Reentr
     function _updateWithdrawNFT(bytes32 hash, bytes memory _event) internal returns (bool) {
         WithdrawNFT storage wd = _withdrawNFT[hash];
         {
-            (IERC721 nft, address beneficiary, uint256 tokenId, uint256 netId) = hash.verifyEventNFT(_event);
+            (ERC721C nft, address beneficiary, uint256 netId, bytes32 ft_asset_id) = hash.verifyEventNFT(_event);
             require(networkId == netId, "NFTBridge: incorrect network id");
             wd.nft = nft;
+            wd.tokenURI = "";
             wd.beneficiary = beneficiary;
-            wd.tokenId = tokenId;
+            wd.assetId = ft_asset_id;
             wd.block_number = block.number + WITHDRAW_OFFSET;
             wd.status = Status.Withdrawable;
             _withdrawNFT[hash] = wd;
-            emit WithdrawRequestNFT(beneficiary, nft, tokenId);
+            emit WithdrawRequestNFT(beneficiary, nft, ft_asset_id);
         }
         return true;
     }
 
     function withdrawNFT(bytes32 _hash, address payable beneficiary) public nonReentrant {
         WithdrawNFT storage wd = _withdrawNFT[_hash];
-        uint tokenId = wd.tokenId;
         require(wd.beneficiary == beneficiary, "NFTBridge: no nft for the beneficiary");
         require(wd.block_number <= block.number, "NFTBridge: not mature enough to withdraw the nft");
         require(wd.status == Status.Withdrawable, "NFTBridge: nft is pending or was already claimed");
-        require(_owners[wd.nft][tokenId] != address(0), "NFTBridge: nft token id does not exist or was already claimed");
         wd.status = Status.Withdrawn;
-        _owners[wd.nft][tokenId] = address(0);
-        wd.nft.safeTransferFrom(address(this), beneficiary, tokenId);
-        emit WithdrawalNFT(beneficiary, wd.nft, tokenId);
-    }
-
-    function withdrawNFT2Postchain(bytes32 _hash, bytes32 ft3_account_id) public nonReentrant {
-        WithdrawNFT storage wd = _withdrawNFT[_hash];
-        uint tokenId = wd.tokenId;
-        require(wd.beneficiary == msg.sender, "NFTBridge: no nft for the beneficiary");
-        require(wd.block_number <= block.number, "NFTBridge: not mature enough to withdraw the nft");
-        require(wd.status == Status.Withdrawable, "NFTBridge: nft is pending or was already claimed");
-        wd.status = Status.PostchainWithdrawn;
-        (string memory name, string memory symbol, string memory tokenURI) = _getNFTInfo(wd.nft, tokenId);
-        emit DepositedERC721(msg.sender, wd.nft, ft3_account_id, networkId, tokenId, name, symbol, tokenURI);
+        wd.nft.safeMint(beneficiary, wd.assetId, wd.tokenURI);
+        emit WithdrawalNFT(beneficiary, wd.nft, wd.assetId);
     }
 
     /**
      */
-    function _getNFTInfo(IERC721 nft, uint256 tokenId) internal view returns (string memory name, string memory symbol, string memory tokenURI) {
+    function _getNFTInfo(ERC721C nft, uint256 tokenId) internal view returns (string memory name, string memory symbol, string memory tokenURI) {
         if (nft.supportsInterface(type(IERC721Metadata).interfaceId)) {
             bool success;
             bytes memory _name;

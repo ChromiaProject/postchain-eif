@@ -22,7 +22,8 @@
     "import:bridge": "npx hardhat import:bridge",
     "prepare:nft": "npx hardhat prepare:nft",
     "upgrade:nft": "npx hardhat upgrade:nft",
-    "deploy:alice": "npx hardhat deploy:alice"
+    "deploy:alice": "npx hardhat deploy:alice",
+    "deploy:nft": "npx hardhat deploy:nft"
   },
   "author": "",
   "license": "MIT",

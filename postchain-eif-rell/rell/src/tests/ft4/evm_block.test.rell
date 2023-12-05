@@ -97,7 +97,7 @@ function test_evm_block() {
     assert_equals(last_block.evm_block_hash, block_hash);
 
     // bridge some ft3 token to evm
-    val auth_id = ft.auth_id(account_id = ft3_account.id, auth_descriptor_id = auth.hash());
+    val auth_id = c.auth_id(account_id = ft3_account.id, auth_descriptor_id = auth.hash());
     rell.test.tx().op(
         ft.bridge_ft_token_to_evm(auth_id, network_id, token_address, user_evm_address, amount/2)
     ).sign(user_privkey).run();

@@ -1,7 +1,7 @@
 @mount('eif.ft4')
 module;
 
-import root: ^.*;
+import root: ^.main;
 import c: ^.common;
 import u: ^.utils;
 import ^.evm;
@@ -38,11 +38,6 @@ entity evm_erc20_balance {
 entity token_mapping {
     key token: evm_erc20;
     key asset: ass.asset;
-}
-
-struct auth_id {
-    account_id: byte_array;
-    auth_descriptor_id: byte_array;
 }
 
 operation add_new_evm_erc20(network_id: integer, token_address: byte_array, name: text, symbol: text, decimals: integer) {
@@ -216,7 +211,7 @@ function(
     }
 }
 
-operation deposit_ft_token(auth_id, network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
+operation deposit_ft_token(c.auth_id, network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
     require(amount > 0, "amount should larger than 0");
     val token = require(evm_erc20 @? { network_id, .address == token_address }, "token is not support");
     val token_mapping = require(token_mapping @? { token }, "token is not support");
@@ -236,7 +231,7 @@ operation deposit_ft_token(auth_id, network_id: integer, token_address: byte_arr
     update_account_state(account.id, asset.id);
 }
 
-operation bridge_ft_token_to_evm(auth_id, network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
+operation bridge_ft_token_to_evm(c.auth_id, network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
     require(amount > 0, "amount should larger than 0");
     val token = require(evm_erc20 @? { network_id, .address == token_address }, "token is not support");
     val token_mapping = require(token_mapping @? { token }, "token is not support");

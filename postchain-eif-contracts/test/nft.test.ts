@@ -10,7 +10,8 @@ import { intToHex } from "ethjs-util";
 
 chai.use(solidity);
 const { expect } = chai;
-const ft3_account_id = "0x95471c57f0bc16284cb1016eba3b2736fa5fb2a640e2f20984079f4349f867ff"
+const ft_account_id = "0x95471c57f0bc16284cb1016eba3b2736fa5fb2a640e2f20984079f4349f867ff"
+const ft_asset_id = "0x30316e4d3311a9784755a0830efbab88d8c279ea4aaaac3095d459c9845be085"
 const WITHDRAW_OFFSET = "0x2";
 
 describe("Non Fungible Token", () => {
@@ -42,38 +43,41 @@ describe("Non Fungible Token", () => {
         const bridge = await upgrades.deployProxy(factory, [validatorAddress])
         await bridge.allowNFT(nftAddress)
         bridgeAddress = bridge.address
+
+        // Token bridge should be granted to mint ERC721
+        await tokenContract.grantRole(await tokenContract.MINTER_ROLE(), bridgeAddress)
     });
 
     describe("Deposit NFT", async () => {
         it("User can deposit NFT to target smartcontract", async () => {
             const [deployer, user] = await ethers.getSigners()
             const tokenInstance = new ERC721Mock__factory(deployer).attach(nftAddress)
-            const tokenId = BigNumber.from(8888)
+            const tokenId = BigNumber.from(0)
+            const tokenURI = "abc.xyz"
 
-            await tokenInstance.mint(user.address, tokenId)
+            await tokenInstance.safeMint(user.address, ft_asset_id, tokenURI)
             expect(await tokenInstance.balanceOf(user.address)).to.eq(1)
             expect(await tokenInstance.ownerOf(tokenId)).to.eq(user.address)
 
             const bridge = new NFTBridge__factory(user).attach(bridgeAddress)
             const tokenApproveInstance = new ERC721Mock__factory(user).attach(nftAddress)
             await tokenApproveInstance.setApprovalForAll(bridgeAddress, true)
-            let tokenURI = await tokenApproveInstance.tokenURI(tokenId)
-            expect(tokenURI).to.eq(baseURI+tokenId.toString())
-            await expect(bridge.depositNFT(nftAddress, tokenId, ft3_account_id))
+            let actualTokenURI = await tokenApproveInstance.tokenURI(tokenId)
+            expect(actualTokenURI).to.eq(baseURI+tokenURI)
+            await expect(bridge.depositNFT(nftAddress, tokenId, ft_account_id))
                     .to.emit(bridge, "DepositedERC721")
                     .withArgs(
                         user.address,
                         nftAddress,
-                        ft3_account_id,
+                        ft_account_id,
                         network.config.chainId,
+                        ft_asset_id,
                         tokenId,
                         name,
                         symbol,
-                        tokenURI
+                        actualTokenURI
                     )
-
-            expect(await tokenInstance.balanceOf(bridgeAddress)).to.eq(1)
-            expect(await tokenInstance.ownerOf(tokenId)).to.eq(bridgeAddress)
+            expect(await tokenInstance.balanceOf(user.address)).to.eq(0)
         })
     })
 
@@ -81,9 +85,9 @@ describe("Non Fungible Token", () => {
         it("User can withdraw NFT by providing properly proof data", async () => {
             const [deployer, user] = await ethers.getSigners()
             const tokenInstance = new ERC721Mock__factory(deployer).attach(nftAddress)
-            const tokenId = BigNumber.from(8888)
+            const tokenId = BigNumber.from(0)
 
-            await tokenInstance.mint(user.address, tokenId)
+            await tokenInstance.safeMint(user.address, ft_asset_id, "")
             expect(await tokenInstance.balanceOf(user.address)).to.eq(1)
             expect(await tokenInstance.ownerOf(tokenId)).to.eq(user.address)
 
@@ -91,8 +95,8 @@ describe("Non Fungible Token", () => {
             const bridgeOwner = new NFTBridge__factory(ownerAddress).attach(bridgeAddress)
             const tokenApproveInstance = new ERC721Mock__factory(user).attach(nftAddress)
             await tokenApproveInstance.setApprovalForAll(bridgeAddress, true)
-            await expect(bridge.depositNFT(bridgeAddress, tokenId, ft3_account_id)).to.be.revertedWith('NFTBridge: not allow nft')
-            let tx: ContractTransaction = await bridge.depositNFT(nftAddress, tokenId, ft3_account_id)
+            await expect(bridge.depositNFT(bridgeAddress, tokenId, ft_account_id)).to.be.revertedWith('NFTBridge: not allow nft')
+            let tx: ContractTransaction = await bridge.depositNFT(nftAddress, tokenId, ft_account_id)
             let receipt: ContractReceipt = await tx.wait()
             let logs = receipt.events?.filter((x) =>  {return x.event == 'DepositedERC721'})
             if (logs !== undefined) {
@@ -104,13 +108,13 @@ describe("Non Fungible Token", () => {
                 const networkId = hexZeroPad(intToHex(network.config.chainId == undefined ? 1 : network.config.chainId), 32)                
                 const contractAddress = hexZeroPad(nftAddress, 32)
                 const toAddress = hexZeroPad(user.address, 32)
-                const tokenIdHex = hexZeroPad(tokenId.toHexString(), 32)
+                const assetId = hexZeroPad(ft_asset_id, 32)
                 let event: string = ''
                 event = event.concat(serialNumber.substring(2, serialNumber.length))
                 event = event.concat(networkId.substring(2, networkId.length))
                 event = event.concat(contractAddress.substring(2, contractAddress.length))
                 event = event.concat(toAddress.substring(2, toAddress.length))
-                event = event.concat(tokenIdHex.substring(2, tokenIdHex.length))
+                event = event.concat(assetId.substring(2, assetId.length))
 
                 let data = DecodeHexStringToByteArray(event)
                 let hashEventLeaf = keccak256(data)
@@ -118,7 +122,7 @@ describe("Non Fungible Token", () => {
                 let state = blockNumber.substring(2, blockNumber.length).concat(event)
                 let hashRootState = keccak256(DecodeHexStringToByteArray(state))
                 let eifLeaf = hashRootEvent.substring(2, hashRootEvent.length).concat(hashRootState.substring(2, hashRootState.length))
-                
+
                 let blockchainRid = "977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795"
                 let maliciousBlockchainRid = "efe4a2423cc6d39eb91bc9baac4ec325825ff7c12093d45a554dab732129eefc"
                 let previousBlockRid = "49e46bf022de1515cbb2bf0f69c62c071825a9b940e8f3892acb5d2021832ba0"
@@ -128,7 +132,7 @@ describe("Non Fungible Token", () => {
                 let dependenciesHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(dependencies))
 
                 // This merkle root is calculated in the postchain code
-                let extraDataMerkleRoot = "12E32638A905B35D5AD0D663B7A0018FEBA942CF8EF32F46AC31E9EA5195B0B1"
+                let extraDataMerkleRoot = "DD56C370D69EE98EA83CED502579B31EB506D1C7A9705A3FCB621CA7729C6B66"
 
                 let timestamp = 1629878444220
                 let height = 46
@@ -184,7 +188,7 @@ describe("Non Fungible Token", () => {
                 maliciousEvent = maliciousEvent.concat(networkId.substring(2, networkId.length))
                 maliciousEvent = maliciousEvent.concat(toAddress.substring(2, toAddress.length))
                 maliciousEvent = maliciousEvent.concat(contractAddress.substring(2, contractAddress.length))
-                maliciousEvent = maliciousEvent.concat(tokenIdHex.substring(2, tokenIdHex.length))                
+                maliciousEvent = maliciousEvent.concat(assetId.substring(2, assetId.length))
                 let maliciousData = DecodeHexStringToByteArray(maliciousEvent)
 
                 await bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid))
@@ -273,7 +277,7 @@ describe("Non Fungible Token", () => {
                     DecodeHexStringToByteArray(blockHeader),
                     [DecodeHexStringToByteArray(sig.substring(2, sig.length))], [validators.address], el2Proof)
                 ).to.emit(bridge, "WithdrawRequestNFT")
-                .withArgs(user.address, nftAddress, tokenId)
+                .withArgs(user.address, nftAddress, ft_asset_id)
 
                 await expect(bridge.withdrawRequestNFT(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader),
@@ -289,17 +293,12 @@ describe("Non Fungible Token", () => {
                     user.address)).to.revertedWith("NFTBridge: not mature enough to withdraw the nft")
 
                 await ethers.provider.send('hardhat_mine', [WITHDRAW_OFFSET])
-                expect(await tokenInstance.balanceOf(bridgeAddress)).to.eq(1)
-                expect(await tokenInstance.ownerOf(tokenId)).to.eq(bridgeAddress)
 
                 await expect(bridge.withdrawNFT(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
                     user.address))
                 .to.emit(bridge, "WithdrawalNFT")
-                .withArgs(user.address, nftAddress, tokenId)
-
-                expect(await tokenInstance.balanceOf(user.address)).to.eq(1)
-                expect(await tokenInstance.ownerOf(tokenId)).to.eq(user.address)
+                .withArgs(user.address, nftAddress, ft_asset_id)
 
                 await expect(bridge.withdrawNFT(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),

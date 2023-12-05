@@ -77,6 +77,12 @@ You also can deploy ALICE token for test
 $ yarn deploy:alice --network sepolia --verify
 ```
 
+Deploy NFT token
+
+```sh
+$ yarn deploy:nft --network sepolia --verify --name "PudgyPenguins" --symbol "PPG"
+```
+
 ### Added plugins
 
 - Gas reporter [hardhat-gas-reporter](https://hardhat.org/plugins/hardhat-gas-reporter.html)

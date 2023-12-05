@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-// Interfaces
-import "@openzeppelin/contracts/interfaces/IERC721.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-
 // Internal libraries
 import "./utils/cryptography/Hash.sol";
 import "./utils/cryptography/MerkleProof.sol";
 import "./Data.sol";
+
+// OpenZeppelin libraries
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./ERC721C.sol";
 
 library Postchain {
     using MerkleProof for bytes32[];
@@ -24,9 +24,9 @@ library Postchain {
     struct EventNFT {
         uint256 serialNumber;
         uint256 networkId;
-        IERC721 nft;
+        ERC721C nft;
         address beneficiary;
-        uint256 tokenId;
+        bytes32 assetId;
     }
 
     struct BlockHeaderData {
@@ -49,13 +49,13 @@ library Postchain {
         return (evt.token, evt.beneficiary, evt.amount, evt.networkId);
     }
 
-    function verifyEventNFT(bytes32 _hash, bytes memory _event) internal pure returns (IERC721, address, uint256, uint256) {
+    function verifyEventNFT(bytes32 _hash, bytes memory _event) internal pure returns (ERC721C, address, uint256, bytes32) {
         EventNFT memory evt = abi.decode(_event, (EventNFT));
         bytes32 hash = keccak256(_event);
         if (hash != _hash) {
             revert('Postchain: invalid event');
         }
-        return (evt.nft, evt.beneficiary, evt.tokenId, evt.networkId);
+        return (evt.nft, evt.beneficiary, evt.networkId, evt.assetId);
     }    
 
     function verifyBlockHeader(

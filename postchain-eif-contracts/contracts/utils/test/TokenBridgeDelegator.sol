@@ -11,11 +11,11 @@ contract TokenBridgeDelegator {
         _bridge = bridge;
     }
 
-    function approve(ERC20Upgradeable token, address _spender, uint256 _amount) public returns(bool) {
+    function approve(IERC20 token, address _spender, uint256 _amount) public returns(bool) {
         return token.approve(_spender, _amount);
     }
 
-    function deposit(ERC20Upgradeable token, uint256 amount, bytes32 ft3_account_id) public returns (bool) {
+    function deposit(IERC20 token, uint256 amount, bytes32 ft3_account_id) public returns (bool) {
         return _bridge.deposit(token, amount, ft3_account_id);
     }
 

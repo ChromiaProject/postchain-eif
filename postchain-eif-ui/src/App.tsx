@@ -52,9 +52,9 @@ function App() {
                         <option value="0x5C221E77624690fff6dd741493D735a17716c26B">DAI (Goerli)</option>
                         <option value="0xd35CCeEAD182dcee0F148EbaC9447DA2c4D449c4">USDC (Goerli)</option>
                         <option value="0x63bfb2118771bd0da7A6936667A7BB705A06c1bA">LINK (Goerli)</option>
-                        <option value="0x932Ca55B9Ef0b3094E8Fa82435b3b4c50d713043">G_NFTS (Goerli)</option>
                         <option value="0x679170cC953B01D270349A344c4ED5634344ca04">ALICE (Sepolia)</option>
                         <option value="0x779877A7B0D9E8603169DdbD7836e478b4624789">LINK (Sepolia)</option>
+                        <option value="0xaaF1e8673B9050ED05FC89C9D19179E68F9E73c5">PudgyPenguins (PPG) (Sepolia)</option>
                         <option value="0xeD24FC36d5Ee211Ea25A80239Fb8C4Cfd80f12Ee">BUSD (BSC Testnet)</option>
                         <option value="0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06">LINK (BSC Testnet)</option>
                         <option value="0x326C977E6efc84E512bB9C30f76E30c160eD06FB">LINK (Mumbai)</option>

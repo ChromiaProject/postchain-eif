@@ -11,11 +11,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 // Internal libraries
 import "./Postchain.sol";
-
-interface IValidator {
-    function getValidatorHeight(uint _height) external view returns (uint);
-    function isValidSignatures(uint height, bytes32 hash, bytes[] memory signatures, address[] memory signers) external view returns (bool);
-}
+import "./interfaces/IValidator.sol";
 
 // This contract is upgradeable. This imposes restrictions on how storage layout can be modified once it is deployed
 // Some instructions are also not allowed. Read more at: https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable

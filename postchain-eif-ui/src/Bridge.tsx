@@ -55,17 +55,16 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
     })
     if (tokenType === "ERC721") {
       tokenContract = new ethers.Contract(tokenAddress, ERC721TokenArtifacts.abi, library);
-      const hasToken = await client.query("evm_has_erc721", { 
+      const hasToken = await client.query("eif.originals.evm_has_erc721", {
         network_id: chainId || 1, 
-        token_address: token_address.toLowerCase(), 
-        beneficiary: beneficiary.toLowerCase(), 
-        token_id: tokenId,
-      })
-      balance = hasToken ? 1 : 0;
-      withdraws = await client.query('get_erc721_withdrawal', {
-        network_id: chainId || 1,
         token_address: token_address.toLowerCase(),
         token_id: tokenId,
+        beneficiary: beneficiary.toLowerCase(),
+      })
+      balance = hasToken ? 1 : 0;
+      withdraws = await client.query('eif.originals.get_erc721_withdrawal', {
+        network_id: chainId || 1,
+        token_address: token_address.toLowerCase(),
         beneficiary: beneficiary.toLowerCase(),
       });
     } else {
@@ -424,11 +423,11 @@ const TokenInfo = ({ tokenAddress, bridgeAddress, tokenType, tokenId }: { tokenA
           </thead>
           <tbody>
             {data?.withdraws?.map((w) => {
-              const eventHash = tokenType === 'ERC20' ? calculateEventLeafHash(w.serial, chainId, w.token, w.beneficiary, w.amount)
-                : calculateEventLeafHash(w.serial, chainId, w.token, w.beneficiary, tokenId)
+              const eventHash = tokenType === 'ERC20' ? calculateEventLeafHash(w.serial, chainId, w.token_address, w.beneficiary, w.amount)
+                : calculateEventLeafHash(w.serial, chainId, w.token_address, w.beneficiary, w.asset_id)
               return (<tr key={w?.serial}>
                 <th>{w?.serial}</th>
-                <td>{tokenType === "ERC20" ? Number(formatUnits(w?.amount.toString() ?? 0, data?.decimals)).toFixed(6) : tokenId}</td>
+                <td>{tokenType === "ERC20" ? Number(formatUnits(w?.amount.toString() ?? 0, data?.decimals)).toFixed(6) : w?.asset_id}</td>
                 <td>
                   <button type="button" className="btn btn-outline btn-accent" onClick={() => withdrawRequest(eventHash)}>
                     Withdraw Request
@@ -470,7 +469,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
   // Remove 0x to pass address like byte_array
   let token_address = tokenAddress.slice(2) || ""
   let beneficiary = account?.slice(2) || ""
-  const tokenId = 380
+  const tokenId = 0
   const userPUB = Buffer.from(
     "038f888dec563b5bc253e87abc90afd26c3287021d10236ea19d248043dc39e0b8",
     "hex"
@@ -488,10 +487,109 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
     "hex"
   );
   var tokenType: string
-  if (tokenAddress === "0x932Ca55B9Ef0b3094E8Fa82435b3b4c50d713043") {
+  if (tokenAddress === "0xaaF1e8673B9050ED05FC89C9D19179E68F9E73c5") {
     tokenType = "ERC721"
   } else {
     tokenType = "ERC20"
+  }
+
+  const postchainCreateAdminAccount = async () => {
+    try {
+      const client = await createClient({
+        nodeUrlPool: postchainURL,
+        blockchainRid,
+      })
+      const tx = {
+        operations: [
+          {
+            name: "eif.originals.create_admin_account",
+            args: [
+              adminPUB
+            ]
+          }
+        ],
+        signers: [adminPUB]
+      }
+      const adminSignatureProvider = newSignatureProvider({privKey: adminPRIV})
+      const uniqueTx = client.addNop(tx)
+      const signedTx = await client.signTransaction(
+        uniqueTx,
+        adminSignatureProvider
+      )
+      toast.promise(client.sendTransaction(signedTx), {
+        loading: `Transaction submitted. Wait for confirmation...`,
+        success: <b>Transaction confirmed!</b>,
+        error: <b>Transaction failed!.</b>,
+      })
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  const postchainCreateProject = async () => {
+    try {
+      const client = await createClient({
+        nodeUrlPool: postchainURL,
+        blockchainRid,
+      })
+      const tx = {
+        operations: [
+          {
+            name: "eif.originals.create_project",
+            args: [
+              Buffer.from(accountId, "hex")
+            ]
+          }
+        ],
+        signers: [adminPUB]
+      }
+      const adminSignatureProvider = newSignatureProvider({privKey: adminPRIV})
+      const uniqueTx = client.addNop(tx)
+      const signedTx = await client.signTransaction(
+        uniqueTx,
+        adminSignatureProvider
+      )
+      toast.promise(client.sendTransaction(signedTx), {
+        loading: `Transaction submitted. Wait for confirmation...`,
+        success: <b>Transaction confirmed!</b>,
+        error: <b>Transaction failed!.</b>,
+      })
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  const postchainCreateCollection = async () => {
+    try {
+      const client = await createClient({
+        nodeUrlPool: postchainURL,
+        blockchainRid,
+      })
+      const tx = {
+        operations: [
+          {
+            name: "eif.originals.create_collection",
+            args: [
+              Buffer.from(accountId, "hex")
+            ]
+          }
+        ],
+        signers: [adminPUB]
+      }
+      const adminSignatureProvider = newSignatureProvider({privKey: adminPRIV})
+      const uniqueTx = client.addNop(tx)
+      const signedTx = await client.signTransaction(
+        uniqueTx,
+        adminSignatureProvider
+      )
+      toast.promise(client.sendTransaction(signedTx), {
+        loading: `Transaction submitted. Wait for confirmation...`,
+        success: <b>Transaction confirmed!</b>,
+        error: <b>Transaction failed!.</b>,
+      })
+    } catch (error) {
+      console.log(error)
+    }
   }
 
   const postchainRegisterEVMAccount = async () => {
@@ -554,7 +652,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       const tx = {
         operations: [
           {
-            name: "register_chromia_base_originals",
+            name: "eif.originals.register_chromia_base_originals",
             args: [
             ]
           }
@@ -586,7 +684,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       const tx = {
         operations: [
           {
-            name: "init_eif_original_interface",
+            name: "eif.originals.init_eif_original_interface",
             args: [
             ]
           }
@@ -618,7 +716,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       const tx = {
         operations: [
           {
-            name: "add_eif_nft_mapping",
+            name: "eif.originals.add_eif_nft_mapping",
             args: [
               chainId || 1,
               token_address.toLowerCase()
@@ -637,6 +735,39 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
         loading: `Transaction submitted. Wait for confirmation...`,
         success: <b>Transaction confirmed!</b>,
         error: <b>Transaction failed!.</b>,
+      })
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  const postchainMintNFT = async () => {
+    try {
+      const client = await createClient({
+        nodeUrlPool: postchainURL,
+        blockchainRid,
+      })
+      const tx = {
+        operations: [
+          {
+            name: "eif.originals.mint_non_fungible_original",
+            args: [
+              Buffer.from(accountId, "hex")
+            ]
+          }
+        ],
+        signers: [userPUB]
+      }
+      const userSignatureProvider = newSignatureProvider({privKey: userPRIV})
+      const uniqueTx = client.addNop(tx)
+      const signedTx = await client.signTransaction(
+        uniqueTx,
+        userSignatureProvider
+      )
+      toast.promise(client.sendTransaction(signedTx), {
+        loading: `Transaction submitted. Wait for confirmation...`,
+        success: <b>Mint NFT confirmed!</b>,
+        error: <b>Mint NFT failed!.</b>,
       })
     } catch (error) {
       console.log(error)
@@ -780,7 +911,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
 
       if (tokenType === "ERC721") {
         tx.operations.push({
-          name: "withdraw_ERC721",
+          name: "eif.originals.withdraw_ERC721",
           args: [
             chainId || 1,
             token_address.toLowerCase(),
@@ -958,7 +1089,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       const auth = [Buffer.from(accountId, 'hex'), Buffer.from(authDescId, 'hex')]
       if (tokenType === "ERC721") {
         tx.operations.push({
-          name: "bridge_non_fungible_original_to_evm",
+          name: "eif.originals.bridge_non_fungible_original_to_evm",
           args: [
             auth,
             Buffer.from(assetId, 'hex'),
@@ -1276,6 +1407,15 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
 
             <div>
               <div className="justify-center card-actions">
+                <button onClick={postchainCreateAdminAccount} type="button" className="btn btn-outline btn-accent">
+                  Create Admin Account
+                </button>
+                <button onClick={postchainCreateProject} type="button" className="btn btn-outline btn-accent">
+                  Create Project
+                </button>
+                <button onClick={postchainCreateCollection} type="button" className="btn btn-outline btn-accent">
+                  Create Collection
+                </button>
                 <button onClick={postchainRegisterChromiaBaseOriginals} type="button" className="btn btn-outline btn-accent">
                   Register Chromia Base Originals
                 </button>
@@ -1284,6 +1424,9 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
                 </button>
                 <button onClick={postchainAddEifNftMapping} type="button" className="btn btn-outline btn-accent">
                   Add Eif Nft Mapping
+                </button>
+                <button onClick={postchainMintNFT} type="button" className="btn btn-outline btn-accent">
+                  Mint NFT
                 </button>
               </div>
             </div>
