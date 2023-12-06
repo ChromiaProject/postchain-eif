@@ -57,8 +57,9 @@ abstract contract ERC721C is IERC721C, ERC721Burnable, AccessControl {
         if (bytes(_tokenURI).length > 0) {
             return string(abi.encodePacked(base, _tokenURI));
         }
-        // If there is a baseURI but no tokenURI, concatenate the tokenID to the baseURI.
-        return string(abi.encodePacked(base, tokenId.toString()));
+        // If there is a baseURI but no tokenURI, concatenate the assetId to the baseURI.
+        string memory assetId = Strings.toHexString(uint256(_assetIds[tokenId]), 32);
+        return string(abi.encodePacked(base, assetId));
     }
 
     function baseURI() public view virtual returns (string memory) {

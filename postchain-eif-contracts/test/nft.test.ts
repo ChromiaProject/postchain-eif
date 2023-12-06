@@ -53,9 +53,8 @@ describe("Non Fungible Token", () => {
             const [deployer, user] = await ethers.getSigners()
             const tokenInstance = new ERC721Mock__factory(deployer).attach(nftAddress)
             const tokenId = BigNumber.from(0)
-            const tokenURI = "abc.xyz"
 
-            await tokenInstance.safeMint(user.address, ft_asset_id, tokenURI)
+            await tokenInstance.safeMint(user.address, ft_asset_id, "")
             expect(await tokenInstance.balanceOf(user.address)).to.eq(1)
             expect(await tokenInstance.ownerOf(tokenId)).to.eq(user.address)
 
@@ -63,7 +62,7 @@ describe("Non Fungible Token", () => {
             const tokenApproveInstance = new ERC721Mock__factory(user).attach(nftAddress)
             await tokenApproveInstance.setApprovalForAll(bridgeAddress, true)
             let actualTokenURI = await tokenApproveInstance.tokenURI(tokenId)
-            expect(actualTokenURI).to.eq(baseURI+tokenURI)
+            expect(actualTokenURI).to.eq(baseURI+ft_asset_id)
             await expect(bridge.depositNFT(nftAddress, tokenId, ft_account_id))
                     .to.emit(bridge, "DepositedERC721")
                     .withArgs(
