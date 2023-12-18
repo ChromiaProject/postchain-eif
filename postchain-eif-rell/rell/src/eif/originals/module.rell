@@ -3,12 +3,14 @@ module;
 
 import root: ^.*;
 import c: ^.common;
+import u: ^.utils;
 import a: lib.access.admin;
 import ^.evm;
 
 import admin: lib.ft4.admin;
 import acc: lib.ft4.accounts;
 import dip_core: lib.dip.core;
+import ft_helper: lib.ft_helper;
 import dip_attributes: lib.dip.attributes;
 import originals_core: lib.originals.core;
 import access: lib.collections.external.access.*;
@@ -36,8 +38,9 @@ entity evm_erc721_balance {
 entity evm_erc721_withdraw {
     key serial: integer;
     network_id: integer;
-    index token: evm_erc721;
+    index token_address: byte_array;
     index beneficiary: byte_array;
+    asset_id: byte_array;
 }
 
 entity nft_mapping {
@@ -128,7 +131,7 @@ query get_erc721_withdrawal(network_id: integer, token_address: byte_array, toke
         return null;
     }
 
-    return evm_erc721_withdraw @* { network_id, token, beneficiary } (@sort_desc .serial, .network_id, token = .token.address, .beneficiary);
+    return evm_erc721_withdraw @* { network_id, token_address, beneficiary } (@sort_desc .serial, .network_id, token = .token_address, .beneficiary);
 }
 
 query evm_has_erc721(network_id: integer, token_address: byte_array, token_id: integer, beneficiary: byte_array): boolean {
@@ -247,3 +250,42 @@ function deposit_ERC721(network_id: integer, beneficiary: byte_array, token_addr
     );
 }
 
+operation bridge_non_fungible_original_to_evm(c.auth_id, asset_id: byte_array, network_id: integer, token_address: byte_array, beneficiary: byte_array) {
+    val account = acc.account @ { .id == auth_id.account_id };
+    val account_auth_descriptor = acc.auth_descriptor_by_id(account, auth_id.auth_descriptor_id);
+    acc._auth(account, account_auth_descriptor, ["T"]);
+
+    val interface = require(
+        nft_mapping @? { network_id, .address == token_address }.interface, 
+        "nft token was not mapping yet: " + token_address
+    );
+    val instance = originals_core.Id.get_instance(asset_id);
+    require(dip_core.Interface.is_a(instance, interface), "instance is not support: " + interface.name);
+
+    val ft_locked_account = ft_helper.ensure_locked_account("EIF", account);
+    originals_core.Ownership.transfer(account, instance, ft_locked_account.id, 1);
+
+    var name = dip_core.Text.get_value(instance, originals_core.chromia.IOriginal.name) ?: "";
+    var symbol = dip_core.Text.get_value(instance, eif.INonFungibleOriginal.symbol) ?: "";
+    var uri = dip_core.Text.get_value(instance, eif.INonFungibleOriginal.uri) ?: "";
+
+    update c.withdraw_stats(withdraw_count += 1);
+    val next_serial = c.withdraw_stats.withdraw_count;
+
+    create evm_erc721_withdraw(
+        serial = next_serial,
+        network_id,
+        token_address,
+        beneficiary,
+        asset_id
+    );
+
+    val withdraw_info = list<gtv>();
+    withdraw_info.add(next_serial.to_gtv());
+    withdraw_info.add(network_id.to_gtv());
+    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv());
+    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv());
+    withdraw_info.add(asset_id.to_gtv());
+
+    op_context.emit_event("eif_event", withdraw_info.to_gtv());
+}

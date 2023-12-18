@@ -49,9 +49,9 @@ function test_evm_block() {
         evm.register_account(user_evm_address, auth, sig)
     ).sign(user_privkey).run();
 
-    val ft3_asset = ass.asset @ { .id == asset_id };
+    val ft_asset = ass.asset @ { .id == asset_id };
     val evm_account = evm.evm_account @ { .address == user_evm_address };
-    val ft3_account = evm_account.account;
+    val ft_account = evm_account.account;
 
     val event_data_list = list<c.event_data>();
     val indexed_values = list<gtv>();
@@ -87,17 +87,17 @@ function test_evm_block() {
     state.add((amount).to_gtv());
     assert_events(("eif_state", (account_number_1, state).to_gtv_pretty()));
 
-    val ft3_balance = ass.ensure_balance( ft3_account, ft3_asset );
-    assert_equals(ft3_balance.asset, ft3_asset);
-    assert_equals(ft3_balance.account, ft3_account);
-    assert_equals(ft3_balance.amount, amount);
+    val ft_balance = ass.ensure_balance( ft_account, ft_asset );
+    assert_equals(ft_balance.asset, ft_asset);
+    assert_equals(ft_balance.account, ft_account);
+    assert_equals(ft_balance.amount, amount);
 
     val last_block = get_last_evm_block(network_id)!!;
     assert_equals(last_block.evm_block_height, block_height);
     assert_equals(last_block.evm_block_hash, block_hash);
 
     // bridge some ft3 token to evm
-    val auth_id = ft.auth_id(account_id = ft3_account.id, auth_descriptor_id = auth.hash());
+    val auth_id = c.auth_id(account_id = ft_account.id, auth_descriptor_id = auth.hash());
     rell.test.tx().op(
         ft.bridge_ft_token_to_evm(auth_id, network_id, token_address, user_evm_address, amount/2)
     ).sign(user_privkey).run();
@@ -115,10 +115,10 @@ function test_evm_block() {
     state_2.add((amount/2).to_gtv());
     assert_events(("eif_state", (account_number_1, state_2).to_gtv_pretty()), ("eif_event", withdraw_info.to_gtv_pretty()));
 
-    val ft3_balance_2 = ass.ensure_balance( ft3_account, ft3_asset );
-    assert_equals(ft3_balance_2.asset, ft3_asset);
-    assert_equals(ft3_balance_2.account, ft3_account);
-    assert_equals(ft3_balance_2.amount, amount/2);
+    val ft_balance_2 = ass.ensure_balance( ft_account, ft_asset );
+    assert_equals(ft_balance_2.asset, ft_asset);
+    assert_equals(ft_balance_2.account, ft_account);
+    assert_equals(ft_balance_2.amount, amount/2);
 
     // user can also deposit from ft3 account to EIF
     rell.test.tx().op(
@@ -134,10 +134,10 @@ function test_evm_block() {
     state_3.add((amount/4).to_gtv());
     assert_events(("eif_state", (account_number_1, state_3).to_gtv_pretty()));
 
-    val ft3_balance_3 = ass.ensure_balance( ft3_account, ft3_asset );
-    assert_equals(ft3_balance_3.asset, ft3_asset);
-    assert_equals(ft3_balance_3.account, ft3_account);
-    assert_equals(ft3_balance_3.amount, amount/4);
+    val ft_balance_3 = ass.ensure_balance( ft_account, ft_asset );
+    assert_equals(ft_balance_3.asset, ft_asset);
+    assert_equals(ft_balance_3.account, ft_account);
+    assert_equals(ft_balance_3.amount, amount/4);
 
     // and claim token back to ft3 account from EIF
     val r_1 = x"8b7ea2bdf37c7f18555547cac6a84f4ced79f6b3b9de556ff52b75170f2ada75";
@@ -163,10 +163,10 @@ function test_evm_block() {
     state_4.add((amount/2).to_gtv());
     assert_events(("eif_state", (account_number_1, state_4).to_gtv_pretty()), ("eif_event", withdraw_info_1.to_gtv_pretty()));
 
-    val ft3_balance_4 = ass.ensure_balance( ft3_account, ft3_asset );
-    assert_equals(ft3_balance_4.asset, ft3_asset);
-    assert_equals(ft3_balance_4.account, ft3_account);
-    assert_equals(ft3_balance_4.amount, amount/2);
+    val ft_balance_4 = ass.ensure_balance( ft_account, ft_asset );
+    assert_equals(ft_balance_4.asset, ft_asset);
+    assert_equals(ft_balance_4.account, ft_account);
+    assert_equals(ft_balance_4.amount, amount/2);
 
     // deposit into non-existing evm account
     val account_number_2 = 2;
