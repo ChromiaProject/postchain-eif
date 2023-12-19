@@ -656,7 +656,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       const tx = {
         operations: [
           {
-            name: "ft4.ft4.register_asset",
+            name: "ft4.admin.register_asset",
             args: [
               name,
               symbol,

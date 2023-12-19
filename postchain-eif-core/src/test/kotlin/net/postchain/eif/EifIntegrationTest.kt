@@ -710,7 +710,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
     // Add new evm erc20 token
     private fun addNewEvmErc20(tokenAddress: ByteArray, name: String, symbol: String, decimal: Long, bcRid: BlockchainRid, sigMaker: SigMaker): ByteArray {
         val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
-        b.addOperation("eif.admin.add_new_evm_erc20", gtv(networkId), gtv(tokenAddress), gtv(name), gtv(symbol), gtv(decimal))
+        b.addOperation("eif.ft4.add_new_evm_erc20", gtv(networkId), gtv(tokenAddress), gtv(name), gtv(symbol), gtv(decimal))
         return b.finish()
                 .sign(sigMaker)
                 .buildGtx()
@@ -720,7 +720,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
     // Add new token mapping
     private fun addTokenMapping(tokenAddress: ByteArray, assetId: Gtv, bcRid: BlockchainRid, sigMaker: SigMaker): ByteArray {
         val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
-        b.addOperation("eif.admin.add_new_token_mapping", gtv(networkId), gtv(tokenAddress), assetId)
+        b.addOperation("eif.ft4.add_new_token_mapping", gtv(networkId), gtv(tokenAddress), assetId)
         return b.finish()
                 .sign(sigMaker)
                 .buildGtx()
