@@ -1,6 +1,7 @@
 @test module;
 
-import eif.*;
+import main: eif.main;
+import th_eif: eif.test_helper;
 import evm: eif.evm;
 import ft: eif.ft4;
 import c: eif.common;

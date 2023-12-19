@@ -1,7 +1,7 @@
 @mount('eif.ft4')
 module;
 
-import root: ^.*;
+import root: ^.main;
 import c: ^.common;
 import u: ^.utils;
 import ^.evm;

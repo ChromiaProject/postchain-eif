@@ -1,7 +1,7 @@
-@mount('eif.origials')
+@mount('eif.originals')
 module;
 
-import root: ^.*;
+import root: ^.main;
 import c: ^.common;
 import u: ^.utils;
 import a: lib.access.admin;
