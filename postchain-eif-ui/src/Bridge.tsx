@@ -656,7 +656,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       const tx = {
         operations: [
           {
-            name: "ft4.admin.register_asset",
+            name: "ft4.ft4.register_asset",
             args: [
               name,
               symbol,
@@ -692,7 +692,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       const tx = {
         operations: [
           {
-            name: "eif.admin.add_new_token_mapping",
+            name: "eif.ft4.add_new_token_mapping",
             args: [
               chainId || 1,
               token_address.toLowerCase(),
@@ -731,7 +731,7 @@ const Bridge = ({ bridgeAddress, tokenAddress }: Props) => {
       const tx = {
         operations: [
           {
-            name: "eif.admin.add_new_evm_erc20",
+            name: "eif.ft4.add_new_evm_erc20",
             args: [
               chainId || 1,
               token_address.toLowerCase(),
