@@ -192,7 +192,7 @@ class EifBlockBuilderIT : IntegrationTestSetup() {
         val value = node.getBlockchainInstance().blockchainEngine.getBlockQueries().query("gtx_test_get_value", gtv(mapOf(
                 "txRID" to gtv(validTx1.getRID().toHex())
         )))
-        assertEquals(gtv("true"), value.get())
+        assertEquals(gtv(listOf(gtv("true"))), value.get())
     }
 
     @Test
