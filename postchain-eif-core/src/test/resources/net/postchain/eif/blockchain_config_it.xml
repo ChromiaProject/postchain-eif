@@ -466,7 +466,7 @@ import u: ^.utils;
 import ^.evm;
 
 import admin: lib.ft4.admin;
-import acc: lib.ft4.accounts;
+import accounts: lib.ft4.accounts;
 import assets: lib.ft4.assets;
 
 entity evm_erc20 {
@@ -557,7 +557,7 @@ query evm_balance_of_erc20(network_id: integer, token_address: byte_array, benef
 function(
     network_id: integer,
     beneficiary: byte_array,
-    account: acc.account?
+    account: accounts.account?
 ): map&lt;integer, list&lt;gtv&gt;&gt; {
     val state = list&lt;gtv&gt;();
     // 0: ERC20
@@ -674,9 +674,9 @@ operation deposit_ft_token(c.auth_id, network_id: integer, token_address: byte_a
     val token_mapping = require(token_mapping @? { token }, "token is not support");
     val asset = require(assets.asset @? { .id == token_mapping.asset.id }, "asset does not exist");
 
-    val account = acc.account @ { .id == auth_id.account_id };
-    val account_auth_descriptor = acc.auth_descriptor_by_id(account, auth_id.auth_descriptor_id);
-    acc._auth(account, account_auth_descriptor, ["T"]);
+    val account = accounts.account @ { .id == auth_id.account_id };
+    val account_auth_descriptor = accounts.auth_descriptor_by_id(account, auth_id.auth_descriptor_id);
+    accounts._auth(account, account_auth_descriptor, ["T"]);
 
     // burn ft token of the account
     assets.Unsafe.burn(account, asset, amount);
@@ -694,9 +694,9 @@ operation bridge_ft_token_to_evm(c.auth_id, network_id: integer, token_address: 
     val token_mapping = require(token_mapping @? { token }, "token is not support");
     val asset = require(assets.asset @? { .id == token_mapping.asset.id }, "asset does not exist");
 
-    val account = acc.account @ { .id == auth_id.account_id };
-    val account_auth_descriptor = acc.auth_descriptor_by_id(account, auth_id.auth_descriptor_id);
-    acc._auth(account, account_auth_descriptor, ["T"]);
+    val account = accounts.account @ { .id == auth_id.account_id };
+    val account_auth_descriptor = accounts.auth_descriptor_by_id(account, auth_id.auth_descriptor_id);
+    accounts._auth(account, account_auth_descriptor, ["T"]);
 
     // burn ft token of the account and update relevant account state
     assets.Unsafe.burn(account, asset, amount);
@@ -774,7 +774,7 @@ operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiar
         amount.to_gtv()
     ];
 
-    val account = acc.account @ { account_id };
+    val account = accounts.account @ { account_id };
     val ft_balance = assets.ensure_balance(account , ft_asset );
     ft_balance.amount += amount;
     emit_withdraw(network_id, beneficiary, account, withdraw_info);
@@ -851,7 +851,7 @@ function deposit_ERC20(network_id: integer, beneficiary: byte_array, token_addre
     }
 }
 
-function emit_withdraw(network_id: integer, beneficiary: byte_array, account: acc.account?, eth_event_data: list&lt;gtv&gt;) {
+function emit_withdraw(network_id: integer, beneficiary: byte_array, account: accounts.account?, eth_event_data: list&lt;gtv&gt;) {
     val account_link = c.get_or_create_evm_account_link(network_id, beneficiary);
     val state = c.build_account_state(network_id, beneficiary, account);
     val state_data = c.state_data(
@@ -863,13 +863,13 @@ function emit_withdraw(network_id: integer, beneficiary: byte_array, account: ac
     op_context.emit_event("eif_event", eth_event_data.to_gtv());
 }
 
-@extend(assets.after_transfer) function(from: acc.account, to: acc.account, assets.asset, amount: big_integer) {
+@extend(assets.after_transfer) function(from: accounts.account, to: accounts.account, assets.asset, amount: big_integer) {
     update_account_state(from.id, asset.id);
     update_account_state(to.id, asset.id);
 }
 
 function update_account_state(account_id: byte_array, asset_id: byte_array) {
-    val account = acc.account @ { .id == account_id };
+    val account = accounts.account @ { .id == account_id };
     val beneficiary = evm.evm_account @ { .account == account } ( .address );
     val asset = assets.asset @ { .id == asset_id };
     val token_mapping = token_mapping @? { .asset == asset };
