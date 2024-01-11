@@ -94,7 +94,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
     private val validatorBinary = getBinaryFromArtifactResource("/artifacts/contracts/Validator.sol/Validator.json")
 
     private enum class AuthType {
-        S, M, ES, EM
+        S, M
     }
 
     private lateinit var web3j: Web3j
