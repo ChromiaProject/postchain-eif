@@ -233,7 +233,7 @@ operation deposit_ft_token(c.auth_id, network_id: integer, token_address: byte_a
 
 operation bridge_ft_token_to_evm(c.auth_id, network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
     require(amount > 0, "amount should larger than 0");
-    val token = require(evm_erc20 @? { network_id, .address == token_address }, "token is not support");
+    val token = require(evm_erc20 @? { network_id, .address == token_address }, "token is not supported");
     val token_mapping = require(token_mapping @? { token }, "token is not support");
     val asset = require(ass.asset @? { .id == token_mapping.asset.id }, "asset does not exist");
 
