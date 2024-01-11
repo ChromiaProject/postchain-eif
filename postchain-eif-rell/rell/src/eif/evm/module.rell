@@ -56,7 +56,7 @@ function _create_register_message(pubkey, evm_addr: byte_array): text {
                 .replace("{2}", pubkey.to_hex().lower_case());
 }
 
-function _create_login_message(pubkey, accountId: byte_array): text {
+function _create_login_message(pubkey, account_id: byte_array): text {
   return get_login_message()
                 .replace("{1}", pubkey.to_hex().lower_case())
                 .replace("{2}", accountId.to_hex().lower_case())
