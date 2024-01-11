@@ -271,7 +271,7 @@ operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiar
                         r: byte_array, s: byte_array, v: integer, pk: text, account_id: byte_array) {
     require(amount > 0, "Must withdraw an amount larger than 0");
     val recovered_pubkey = crypto.eth_ecrecover(r, s, v, u.hash_eth_message(pk));
-    val eth_address = u.get_eth_address(recovered_pubkey);
+    val eth_address = crypto.eth_pubkey_to_address(recovered_pubkey);
     require(eth_address == beneficiary, "beneficiary is not correct, " + "b: " + beneficiary + " e: " + eth_address);
     val participants = op_context.get_signers();
     require_not_empty(participants, "participants is empty");
@@ -327,7 +327,7 @@ operation withdraw_ERC20(network_id: integer, token_address: byte_array, benefic
 
     // ensure that the signer also control the beneficiary account
     val recovered_pubkey = crypto.eth_ecrecover(r, s, v, u.hash_eth_message(pk));
-    val eth_address = u.get_eth_address(recovered_pubkey);
+    val eth_address = crypto.eth_pubkey_to_address(recovered_pubkey);
     require(eth_address == beneficiary, "beneficiary is not correct, " + "b: " + beneficiary + " e: " + eth_address);
     val participants = op_context.get_signers();
     require_not_empty(participants, "participants is empty");
