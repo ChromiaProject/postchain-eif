@@ -425,12 +425,7 @@ function get_or_create_evm_account_link(network_id: integer, beneficiary: byte_a
     val account = evm_account_link @? { network_id, beneficiary };
     if (empty(account)) {
         val last_state_n = evm_account_link @? { } ( @sort_desc .state_n ) limit 1;
-        var next_state_n = 0;
-        if (empty(last_state_n)) {
-            next_state_n = 1;
-        } else {
-            next_state_n = last_state_n + 1;
-        }
+        val next_state_n = if (empty(last_state_n)) 1 else (last_state_n + 1);
 
         return create evm_account_link (
             network_id,
@@ -438,22 +433,18 @@ function get_or_create_evm_account_link(network_id: integer, beneficiary: byte_a
             beneficiary
         );
     }
-    ;
+
     return account;
 }
 
 function build_account_state(network_id: integer, beneficiary: byte_array, account: acc.account?) {
     val state = list&lt;gtv&gt;();
     state.add(byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv());
-
-    val state_map = map&lt;integer, list&lt;gtv&gt;&gt;();
-    state_map.put_all(build_account_state_fn(network_id, beneficiary, account));
-    var keys = list&lt;integer&gt;();
-    keys.add_all(state_map.keys());
-    keys = keys.sorted();
-    for (k in keys) {
+    val state_map = build_account_state_fn(network_id, beneficiary, account);
+    for (k in state_map.keys().sorted()) {
         state.add_all(state_map[k]);
     }
+    
     return state;
 }
 
@@ -599,10 +590,8 @@ function(
         state.add(byte_array.from_hex(u.to_zero_padded_hex(token_mapping.token.address)).to_gtv());
         state.add((balance.amount).to_gtv());
     }
-
-    val states = map&lt;integer, list&lt;gtv&gt;&gt;();
-    states.put(0, state);
-    return states;
+    
+    return [0: state];
 }
 
 @extend(root.evm_block_fn)
@@ -701,7 +690,7 @@ operation deposit_ft_token(c.auth_id, network_id: integer, token_address: byte_a
 
 operation bridge_ft_token_to_evm(c.auth_id, network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
     require(amount &gt; 0, "amount should larger than 0");
-    val token = require(evm_erc20 @? { network_id, .address == token_address }, "token is not support");
+    val token = require(evm_erc20 @? { network_id, .address == token_address }, "token is not supported");
     val token_mapping = require(token_mapping @? { token }, "token is not support");
     val asset = require(ass.asset @? { .id == token_mapping.asset.id }, "asset does not exist");
 
@@ -724,12 +713,13 @@ operation bridge_ft_token_to_evm(c.auth_id, network_id: integer, token_address: 
         amount
     );
 
-    val withdraw_info = list&lt;gtv&gt;();
-    withdraw_info.add(next_serial.to_gtv());
-    withdraw_info.add(network_id.to_gtv());
-    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv());
-    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv());
-    withdraw_info.add(amount.to_gtv());
+    val withdraw_info = [
+        next_serial.to_gtv(),
+        network_id.to_gtv(),
+        byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv(),
+        byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv(),
+        amount.to_gtv()
+    ];
 
     op_context.emit_event("eif_event", withdraw_info.to_gtv());
 }
@@ -739,7 +729,7 @@ operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiar
                         r: byte_array, s: byte_array, v: integer, pk: text, account_id: byte_array) {
     require(amount &gt; 0, "Must withdraw an amount larger than 0");
     val recovered_pubkey = crypto.eth_ecrecover(r, s, v, u.hash_eth_message(pk));
-    val eth_address = u.get_eth_address(recovered_pubkey);
+    val eth_address = crypto.eth_pubkey_to_address(recovered_pubkey);
     require(eth_address == beneficiary, "beneficiary is not correct, " + "b: " + beneficiary + " e: " + eth_address);
     val participants = op_context.get_signers();
     require_not_empty(participants, "participants is empty");
@@ -776,12 +766,13 @@ operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiar
         amount
     );
 
-    val withdraw_info = list&lt;gtv&gt;();
-    withdraw_info.add(next_serial.to_gtv());
-    withdraw_info.add(net_id.to_gtv());
-    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv());
-    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv());
-    withdraw_info.add(amount.to_gtv());
+    val withdraw_info = [
+        next_serial.to_gtv(),
+        net_id.to_gtv(),
+        byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv(),
+        byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv(),
+        amount.to_gtv()
+    ];
 
     val account = acc.account @ { account_id };
     val ft_balance = ass.ensure_balance(account , ft_asset );
@@ -795,7 +786,7 @@ operation withdraw_ERC20(network_id: integer, token_address: byte_array, benefic
 
     // ensure that the signer also control the beneficiary account
     val recovered_pubkey = crypto.eth_ecrecover(r, s, v, u.hash_eth_message(pk));
-    val eth_address = u.get_eth_address(recovered_pubkey);
+    val eth_address = crypto.eth_pubkey_to_address(recovered_pubkey);
     require(eth_address == beneficiary, "beneficiary is not correct, " + "b: " + beneficiary + " e: " + eth_address);
     val participants = op_context.get_signers();
     require_not_empty(participants, "participants is empty");
@@ -822,12 +813,13 @@ operation withdraw_ERC20(network_id: integer, token_address: byte_array, benefic
         amount
     );
 
-    val withdraw_info = list&lt;gtv&gt;();
-    withdraw_info.add(next_serial.to_gtv());
-    withdraw_info.add(network_id.to_gtv());
-    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv());
-    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv());
-    withdraw_info.add(amount.to_gtv());
+    val withdraw_info = [
+        next_serial.to_gtv(),
+        network_id.to_gtv(),
+        byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv(),
+        byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv(),
+        amount.to_gtv()
+    ];
 
     val account = evm.get_account_by_evm_address(eth_address);
     emit_withdraw(network_id, beneficiary, account, withdraw_info);
@@ -921,21 +913,21 @@ operation register_account(evm_addr: byte_array, acc.auth_descriptor, auth.signa
   val pubkey = op_context.get_signers()[0];
   val account = acc.account @ { .id == acc.create_account_with_auth(auth_descriptor) };
   val register_msg = _create_register_message(pubkey, evm_addr);
-  val recovered_address = _recover_address_from_evm_signature(register_msg, signature);
+  val recovered_address = auth._recover_eth_address(register_msg, signature);
   require(recovered_address == evm_addr, "Signature not valid for the provided key");
 
   create evm_account(account, evm_addr, 0);
 }
 
-operation add_auth_descriptor(accountId: byte_array, acc.auth_descriptor, auth.signature) {
+operation add_auth_descriptor(account_id: byte_array, acc.auth_descriptor, auth.signature) {
   require(op_context.get_signers().size() &gt; 0, "Transaction needs to be signed with disposable key");
   val participants = acc.get_participants(auth_descriptor.auth_type, auth_descriptor.args.to_gtv().to_bytes());
   require(op_context.get_signers().contains_all(participants), "Transaction not signed by auth descriptor key");
   require(_extract_single_sig_args(auth_descriptor).flags == set(["T"]), "Only Transfer permission is allowed");
   
-  val account = acc.account @ { .id == accountId };
+  val account = acc.account @ { .id == account_id };
   val login_msg = _create_login_message(participants[0], account.id);
-  val recovered_address = _recover_address_from_evm_signature(login_msg, signature);
+  val recovered_address = auth._recover_eth_address(login_msg, signature);
   val evm_account = evm_account @? { .address == recovered_address };
   require(evm_account, "Signature not valid for the selected account");
   
@@ -953,21 +945,12 @@ function _create_register_message(pubkey, evm_addr: byte_array): text {
                 .replace("{2}", pubkey.to_hex().lower_case());
 }
 
-function _create_login_message(pubkey, accountId: byte_array): text {
+function _create_login_message(pubkey, account_id: byte_array): text {
   return get_login_message()
                 .replace("{1}", pubkey.to_hex().lower_case())
-                .replace("{2}", accountId.to_hex().lower_case())
-                .replace("{3}", evm_account @ { .account.id == accountId}( .nonce ).to_text());
+                .replace("{2}", account_id.to_hex().lower_case())
+                .replace("{3}", evm_account @ { .account.id == account_id}( .nonce ).to_text());
 }
-
-
-function _recover_address_from_evm_signature(message: text, auth.signature): byte_array {
-    require(message != "", "Empty messages are not allowed");
-    val msg_hash = keccak256(("\u0019Ethereum Signed Message:\n" + message.size().to_text() + message).to_bytes());
-    val eth_pubkey = eth_ecrecover(signature.r, signature.s, signature.v - 27, msg_hash);
-    return keccak256(eth_pubkey).sub(12);
-}
-
 </string>
                             </entry>
                             <entry key="lib/ft4/accounts/auth_basic.rell">
@@ -2950,8 +2933,6 @@ module;
 
 function to_zero_padded_hex(array: byte_array) = "000000000000000000000000" + array.to_hex();
 
-function get_eth_address(pk: byte_array) = crypto.keccak256(pk).sub(12);
-
 function hash_eth_message(msg: text) = crypto.keccak256(("\u0019Ethereum Signed Message:\n" + msg.size().to_text() + msg).to_bytes());
 </string>
                             </entry>
@@ -2966,7 +2947,7 @@ import ^.lib.main;
                         </dict>
                     </entry>
                     <entry key="version">
-                        <string>0.13.1</string>
+                        <string>0.13.5</string>
                     </entry>
                 </dict>
             </entry>
