@@ -70,12 +70,7 @@ function get_or_create_evm_account_link(network_id: integer, beneficiary: byte_a
     val account = evm_account_link @? { network_id, beneficiary };
     if (empty(account)) {
         val last_state_n = evm_account_link @? { } ( @sort_desc .state_n ) limit 1;
-        var next_state_n = 0;
-        if (empty(last_state_n)) {
-            next_state_n = 1;
-        } else {
-            next_state_n = last_state_n + 1;
-        }
+        val next_state_n = if (empty(last_state_n)) 1 else (last_state_n + 1);
 
         return create evm_account_link (
             network_id,
@@ -83,7 +78,7 @@ function get_or_create_evm_account_link(network_id: integer, beneficiary: byte_a
             beneficiary
         );
     }
-    ;
+
     return account;
 }
 
