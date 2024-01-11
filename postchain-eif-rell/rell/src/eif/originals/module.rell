@@ -53,31 +53,31 @@ entity nft_mapping {
 namespace eif.INonFungibleOriginal {
     val interface = "eif.INonFungibleOriginal";
 
-    function dependencies() = [
-        originals_core.chromia.INonFungibleOriginal.interface
-    ];
+    function dependencies() = [originals_core.chromia.INonFungibleOriginal.interface];
 
     val id = dip_core.Attribute.I(interface, name = "id");
     val address = dip_core.Attribute.I(interface, name = "address");
     val symbol = dip_core.Attribute.I(interface, name = "symbol");
     val uri = dip_core.Attribute.I(interface, name = "uri");
 
-	function register(account: acc.account) {
-		dip_core.InterfaceFactory.new(interface,
-			[
-                id: dip_attributes.Type(dip_attributes.Integer.T()),
-                address: dip_attributes.Type(dip_attributes.Text.T(), [dip_attributes.Optional()]),
-                symbol: dip_attributes.Type(dip_attributes.Text.T(), [dip_attributes.Optional()]),
+    function register(account: acc.account) {
+        dip_core.InterfaceFactory.new(
+            interface,
+            [
+                id: dip_attributes.Type(dip_attributes.Integer.T()), 
+                address: dip_attributes.Type(dip_attributes.Text.T(), [dip_attributes.Optional()]), 
+                symbol: dip_attributes.Type(dip_attributes.Text.T(), [dip_attributes.Optional()]), 
                 uri: dip_attributes.Type(dip_attributes.Text.T(), [dip_attributes.Optional()])
             ],
-            dependencies() @* {} (dip_core.Interface.get($)),
+            dependencies() @* { } ( dip_core.Interface.get($) ),
             account = account,
             is_open = true
-		);
-	}
+        );
+    }
 
-	function get() = dip_core.Interface.get(interface);
-	function has(dip_core.instance) = dip_core.Interface.is_a(instance, get());
+    function get() = dip_core.Interface.get(interface);
+
+    function has(dip_core.instance) = dip_core.Interface.is_a(instance, get());
 }
 
 operation register_chromia_base_originals(account_id: byte_array) {
