@@ -30,7 +30,7 @@ operation register_account(evm_addr: byte_array, acc.auth_descriptor, auth.signa
   create evm_account(account, evm_addr, 0);
 }
 
-operation add_auth_descriptor(accountId: byte_array, acc.auth_descriptor, auth.signature) {
+operation add_auth_descriptor(account_id: byte_array, acc.auth_descriptor, auth.signature) {
   require(op_context.get_signers().size() > 0, "Transaction needs to be signed with disposable key");
   val participants = acc.get_participants(auth_descriptor.auth_type, auth_descriptor.args.to_gtv().to_bytes());
   require(op_context.get_signers().contains_all(participants), "Transaction not signed by auth descriptor key");
