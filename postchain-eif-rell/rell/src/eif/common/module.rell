@@ -88,10 +88,7 @@ function build_account_state(network_id: integer, beneficiary: byte_array, accou
 
     val state_map = map<integer, list<gtv>>();
     state_map.put_all(build_account_state_fn(network_id, beneficiary, account));
-    var keys = list<integer>();
-    keys.add_all(state_map.keys());
-    keys = keys.sorted();
-    for (k in keys) {
+    for (k in state_map.keys().sorted()) {
         state.add_all(state_map[k]);
     }
     return state;
