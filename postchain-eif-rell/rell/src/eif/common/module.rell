@@ -85,12 +85,11 @@ function get_or_create_evm_account_link(network_id: integer, beneficiary: byte_a
 function build_account_state(network_id: integer, beneficiary: byte_array, account: acc.account?) {
     val state = list<gtv>();
     state.add(byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv());
-
-    val state_map = map<integer, list<gtv>>();
-    state_map.put_all(build_account_state_fn(network_id, beneficiary, account));
+    val state_map = build_account_state_fn(network_id, beneficiary, account);
     for (k in state_map.keys().sorted()) {
         state.add_all(state_map[k]);
     }
+    
     return state;
 }
 
