@@ -17,7 +17,7 @@ import access: lib.collections.external.access.*;
 import hao: lib.originals.originals_collection.external.access.*;
 import lib.collections.{collection};
 
-@extend(access.has_create_collection_permission) function(acc.account) = true;
+@extend(access.has_create_collection_permission) function(acc.account, collection_data: struct<collection>) = true;
 
 @extend(hao.has_add_original_to_collection_permission) function(acc.account, original: originals_core.Id.asset_instance, collection) = true;
 

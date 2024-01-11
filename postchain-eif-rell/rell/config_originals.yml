@@ -93,6 +93,11 @@ libs:
     path: rell/src/collections
     tagOrBranch: dev
     insecure: true
+  common:
+    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
+    path: rell/src/common
+    tagOrBranch: dev
+    insecure: true
   ft_helper:
     registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
     path: rell/src/ft_helper
