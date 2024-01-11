@@ -44,7 +44,7 @@ blockchains:
 compile:
   source: src
   target: target
-  rellVersion: 0.10.11
+  rellVersion: 0.13.5
 libs:
   ft4:
     registry: https://bitbucket.org/chromawallet/ft3-lib
