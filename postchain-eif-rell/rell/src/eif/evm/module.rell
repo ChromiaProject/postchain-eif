@@ -24,7 +24,7 @@ operation register_account(evm_addr: byte_array, acc.auth_descriptor, auth.signa
   val pubkey = op_context.get_signers()[0];
   val account = acc.account @ { .id == acc.create_account_with_auth(auth_descriptor) };
   val register_msg = _create_register_message(pubkey, evm_addr);
-  val recovered_address = _recover_address_from_evm_signature(register_msg, signature);
+  val recovered_address = auth._recover_eth_address(register_msg, signature);
   require(recovered_address == evm_addr, "Signature not valid for the provided key");
 
   create evm_account(account, evm_addr, 0);
@@ -38,7 +38,7 @@ operation add_auth_descriptor(account_id: byte_array, acc.auth_descriptor, auth.
   
   val account = acc.account @ { .id == account_id };
   val login_msg = _create_login_message(participants[0], account.id);
-  val recovered_address = _recover_address_from_evm_signature(login_msg, signature);
+  val recovered_address = auth._recover_eth_address(login_msg, signature);
   val evm_account = evm_account @? { .address == recovered_address };
   require(evm_account, "Signature not valid for the selected account");
   
@@ -62,12 +62,3 @@ function _create_login_message(pubkey, account_id: byte_array): text {
                 .replace("{2}", account_id.to_hex().lower_case())
                 .replace("{3}", evm_account @ { .account.id == account_id}( .nonce ).to_text());
 }
-
-
-function _recover_address_from_evm_signature(message: text, auth.signature): byte_array {
-    require(message != "", "Empty messages are not allowed");
-    val msg_hash = keccak256(("\u0019Ethereum Signed Message:\n" + message.size().to_text() + message).to_bytes());
-    val eth_pubkey = eth_ecrecover(signature.r, signature.s, signature.v - 27, msg_hash);
-    return keccak256(eth_pubkey).sub(12);
-}
-
