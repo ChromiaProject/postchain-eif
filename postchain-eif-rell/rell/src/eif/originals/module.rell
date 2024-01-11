@@ -225,9 +225,7 @@ function(
         state.add(balance.token.token_id.to_gtv());
     }
 
-    val states = map<integer, list<gtv>>();
-    states.put(1, state);
-    return states;
+    return [1: state];
 }
 
 function deposit_ERC721(network_id: integer, beneficiary: byte_array, token_address: byte_array, token_id: integer, name: text, symbol: text, uri: text) {
@@ -280,12 +278,13 @@ operation bridge_non_fungible_original_to_evm(c.auth_id, asset_id: byte_array, n
         asset_id
     );
 
-    val withdraw_info = list<gtv>();
-    withdraw_info.add(next_serial.to_gtv());
-    withdraw_info.add(network_id.to_gtv());
-    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv());
-    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv());
-    withdraw_info.add(asset_id.to_gtv());
+    val withdraw_info = [
+        next_serial.to_gtv(),
+        network_id.to_gtv(),
+        byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv(),
+        byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv(),
+        asset_id.to_gtv()
+    ];
 
     op_context.emit_event("eif_event", withdraw_info.to_gtv());
 }

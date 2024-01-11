@@ -131,10 +131,8 @@ function(
         state.add(byte_array.from_hex(u.to_zero_padded_hex(token_mapping.token.address)).to_gtv());
         state.add((balance.amount).to_gtv());
     }
-
-    val states = map<integer, list<gtv>>();
-    states.put(0, state);
-    return states;
+    
+    return [0: state];
 }
 
 @extend(root.evm_block_fn)
@@ -256,12 +254,13 @@ operation bridge_ft_token_to_evm(c.auth_id, network_id: integer, token_address: 
         amount
     );
 
-    val withdraw_info = list<gtv>();
-    withdraw_info.add(next_serial.to_gtv());
-    withdraw_info.add(network_id.to_gtv());
-    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv());
-    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv());
-    withdraw_info.add(amount.to_gtv());
+    val withdraw_info = [
+        next_serial.to_gtv(),
+        network_id.to_gtv(),
+        byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv(),
+        byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv(),
+        amount.to_gtv()
+    ];
 
     op_context.emit_event("eif_event", withdraw_info.to_gtv());
 }
@@ -308,12 +307,13 @@ operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiar
         amount
     );
 
-    val withdraw_info = list<gtv>();
-    withdraw_info.add(next_serial.to_gtv());
-    withdraw_info.add(net_id.to_gtv());
-    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv());
-    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv());
-    withdraw_info.add(amount.to_gtv());
+    val withdraw_info = [
+        next_serial.to_gtv(),
+        net_id.to_gtv(),
+        byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv(),
+        byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv(),
+        amount.to_gtv()
+    ];
 
     val account = acc.account @ { account_id };
     val ft_balance = ass.ensure_balance(account , ft_asset );
@@ -354,12 +354,13 @@ operation withdraw_ERC20(network_id: integer, token_address: byte_array, benefic
         amount
     );
 
-    val withdraw_info = list<gtv>();
-    withdraw_info.add(next_serial.to_gtv());
-    withdraw_info.add(network_id.to_gtv());
-    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv());
-    withdraw_info.add(byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv());
-    withdraw_info.add(amount.to_gtv());
+    val withdraw_info = [
+        next_serial.to_gtv(),
+        network_id.to_gtv(),
+        byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv(),
+        byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv(),
+        amount.to_gtv()
+    ];
 
     val account = evm.get_account_by_evm_address(eth_address);
     emit_withdraw(network_id, beneficiary, account, withdraw_info);
