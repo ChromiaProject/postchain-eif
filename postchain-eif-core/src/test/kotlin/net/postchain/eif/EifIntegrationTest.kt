@@ -195,8 +195,12 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
         sealBlock()
 
         val value = node.getBlockchainInstance().blockchainEngine.getBlockQueries()
-                .query("ft4.get_asset_by_name", gtv("name" to gtv(tokenName))).get()
-        val assetId = value[0]["id"]!!
+                .query("ft4.get_assets_by_name", gtv(
+                        "name" to gtv(tokenName),
+                        "page_size" to gtv(1L),
+                        "page_cursor" to GtvNull
+                )).get()
+        val assetId = value["data"]?.get(0)?.get("id")!!
 
         // Register evm account
         val evmAddress = "e105ba42b66d08ac7ca7fc48c583599044a6dab3"
