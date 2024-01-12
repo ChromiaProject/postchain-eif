@@ -9,10 +9,12 @@ definitions:
         events: !include configs/events.yml
   - &common_args
     lib.ft4.accounts:
-      rate_limit_active: true
-      rate_limit_max_points: 200
-      rate_limit_recovery_time: 5000
-      rate_limit_points_at_account_creation: 100
+      rate_limit:
+        active: true
+        max_points: 200
+        recovery_time: 5000
+        points_at_account_creation: 100
+      max_auth_descriptor_rules: 8
   - &rell_test_args
     lib.ft4.admin:
       admin_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
@@ -50,8 +52,8 @@ libs:
   ft4:
     registry: https://bitbucket.org/chromawallet/ft3-lib
     path: rell/src/lib/ft4
-    tagOrBranch: v0.1.7r
-    rid: x"AF18D94EC9B01F9FD82BCE6B12F68D83CF19C9E2B2CDFB49C8AA2C9AA38B31B4"
+    tagOrBranch: v0.2.0r
+    rid: x"4B3DA349B20558F5700E28C110D43E07CCA7160C42D2B5C0A53E1554ACD0971D"
     insecure: false
   iccf:
     registry: https://gitlab.com/chromaway/core/directory-chain

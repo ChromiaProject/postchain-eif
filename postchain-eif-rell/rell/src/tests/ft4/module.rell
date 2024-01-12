@@ -8,5 +8,5 @@ import c: eif.common;
 import ft_auth: lib.ft4.auth;
 import admin: lib.ft4.admin;
 import ac: lib.ft4.accounts;
-import ass: lib.ft4.assets;
+import assets: lib.ft4.assets;
 import lib.ft4.accounts.{auth_descriptor, auth_type};

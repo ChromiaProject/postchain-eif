@@ -8,7 +8,8 @@ import a: lib.access.admin;
 import ^.evm;
 
 import admin: lib.ft4.admin;
-import acc: lib.ft4.accounts;
+import accounts: lib.ft4.accounts;
+import auth: lib.ft4.auth;
 import dip_core: lib.dip.core;
 import ft_helper: lib.ft_helper;
 import dip_attributes: lib.dip.attributes;
@@ -17,9 +18,9 @@ import access: lib.collections.external.access.*;
 import hao: lib.originals.originals_collection.external.access.*;
 import lib.collections.{collection};
 
-@extend(access.has_create_collection_permission) function(acc.account, collection_data: struct<collection>) = true;
+@extend(access.has_create_collection_permission) function(accounts.account, collection_data: struct<collection>) = true;
 
-@extend(hao.has_add_original_to_collection_permission) function(acc.account, original: originals_core.Id.asset_instance, collection) = true;
+@extend(hao.has_add_original_to_collection_permission) function(accounts.account, original: originals_core.Id.asset_instance, collection) = true;
 
 entity evm_erc721 {
     key network_id: integer, address: byte_array, token_id: integer;
@@ -60,7 +61,7 @@ namespace eif.INonFungibleOriginal {
     val symbol = dip_core.Attribute.I(interface, name = "symbol");
     val uri = dip_core.Attribute.I(interface, name = "uri");
 
-    function register(account: acc.account) {
+    function register(account: accounts.account) {
         dip_core.InterfaceFactory.new(
             interface,
             [
@@ -84,7 +85,7 @@ operation register_chromia_base_originals(account_id: byte_array) {
     admin.require_admin();
 
     val admin_account = require(
-        acc.account @? { .id == account_id }, 
+        accounts.account @? { .id == account_id }, 
         "admin account was not defined: " + account_id
     );
 
@@ -98,7 +99,7 @@ operation init_eif_original_interface(account_id: byte_array) {
     admin.require_admin();
 
     val admin_account = require(
-        acc.account @? { .id == account_id }, 
+        accounts.account @? { .id == account_id }, 
         "admin account was not defined: " + account_id
     );
 
@@ -213,7 +214,7 @@ function(
 function(
     network_id: integer,
     beneficiary: byte_array,
-    account: acc.account?
+    account: accounts.account?
 ): map<integer, list<gtv>> {
     val state = list<gtv>();
     // 1: ERC721
@@ -249,9 +250,9 @@ function deposit_ERC721(network_id: integer, beneficiary: byte_array, token_addr
 }
 
 operation bridge_non_fungible_original_to_evm(c.auth_id, asset_id: byte_array, network_id: integer, token_address: byte_array, beneficiary: byte_array) {
-    val account = acc.account @ { .id == auth_id.account_id };
-    val account_auth_descriptor = acc.auth_descriptor_by_id(account, auth_id.auth_descriptor_id);
-    acc._auth(account, account_auth_descriptor, ["T"]);
+    val account = accounts.account @ { .id == auth_id.account_id };
+    val account_auth_descriptor = accounts.auth_descriptor_by_id(account, auth_id.auth_descriptor_id);
+    auth._ft_auth(["T"], account, account_auth_descriptor);
 
     val interface = require(
         nft_mapping @? { network_id, .address == token_address }.interface, 

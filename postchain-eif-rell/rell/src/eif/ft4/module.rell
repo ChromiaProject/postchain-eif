@@ -9,6 +9,7 @@ import ^.evm;
 import admin: lib.ft4.admin;
 import accounts: lib.ft4.accounts;
 import assets: lib.ft4.assets;
+import auth: lib.ft4.auth;
 
 entity evm_erc20 {
     network_id: integer;
@@ -196,8 +197,7 @@ function(
         // mint postchain token for ft account
         val ft_account = evm_account.account;
         log("mint postchain token for ft account: " + ft_account.id);
-        val ft_balance = assets.ensure_balance( ft_account, ft_asset );
-        ft_balance.amount += amount;
+        val ft_balance = assets.increase_balance(ft_account, ft_asset, amount);
         val ft_beneficiary = evm.evm_account @ { .account == ft_account } ( .address );
         val account_link = c.get_or_create_evm_account_link(token_mapping.token.network_id, ft_beneficiary);
         val state = c.build_account_state(network_id, ft_beneficiary, ft_account);
@@ -217,7 +217,7 @@ operation deposit_ft_token(c.auth_id, network_id: integer, token_address: byte_a
 
     val account = accounts.account @ { .id == auth_id.account_id };
     val account_auth_descriptor = accounts.auth_descriptor_by_id(account, auth_id.auth_descriptor_id);
-    accounts._auth(account, account_auth_descriptor, ["T"]);
+    auth._ft_auth(["T"], account, account_auth_descriptor);
 
     // burn ft token of the account
     assets.Unsafe.burn(account, asset, amount);
@@ -237,7 +237,7 @@ operation bridge_ft_token_to_evm(c.auth_id, network_id: integer, token_address: 
 
     val account = accounts.account @ { .id == auth_id.account_id };
     val account_auth_descriptor = accounts.auth_descriptor_by_id(account, auth_id.auth_descriptor_id);
-    accounts._auth(account, account_auth_descriptor, ["T"]);
+    auth._ft_auth(["T"], account, account_auth_descriptor);
 
     // burn ft token of the account and update relevant account state
     assets.Unsafe.burn(account, asset, amount);
@@ -269,7 +269,7 @@ operation bridge_ft_token_to_evm(c.auth_id, network_id: integer, token_address: 
 operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer,
                         r: byte_array, s: byte_array, v: integer, pk: text, account_id: byte_array) {
     require(amount > 0, "Must withdraw an amount larger than 0");
-    val recovered_pubkey = crypto.eth_ecrecover(r, s, v, u.hash_eth_message(pk));
+    val recovered_pubkey = crypto.eth_ecrecover(r, s, v, auth._evm_message_hash(pk));
     val eth_address = crypto.eth_pubkey_to_address(recovered_pubkey);
     require(eth_address == beneficiary, "beneficiary is not correct, " + "b: " + beneficiary + " e: " + eth_address);
     val participants = op_context.get_signers();
@@ -316,8 +316,7 @@ operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiar
     ];
 
     val account = accounts.account @ { account_id };
-    val ft_balance = assets.ensure_balance(account , ft_asset );
-    ft_balance.amount += amount;
+    val ft_balance = assets.increase_balance(account, ft_asset, amount);
     emit_withdraw(network_id, beneficiary, account, withdraw_info);
 }
 
@@ -326,7 +325,7 @@ operation withdraw_ERC20(network_id: integer, token_address: byte_array, benefic
     require(amount > 0, "Must withdraw an amount larger than 0");
 
     // ensure that the signer also control the beneficiary account
-    val recovered_pubkey = crypto.eth_ecrecover(r, s, v, u.hash_eth_message(pk));
+    val recovered_pubkey = crypto.eth_ecrecover(r, s, v, auth._evm_message_hash(pk));
     val eth_address = crypto.eth_pubkey_to_address(recovered_pubkey);
     require(eth_address == beneficiary, "beneficiary is not correct, " + "b: " + beneficiary + " e: " + eth_address);
     val participants = op_context.get_signers();
