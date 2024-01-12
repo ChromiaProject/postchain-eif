@@ -1,0 +1,12 @@
+@test module;
+
+import main: eif.main;
+import th_eif: eif.test_helper;
+import evm: eif.evm;
+import ft: eif.ft4;
+import c: eif.common;
+import ft_auth: lib.ft4.auth;
+import admin: lib.ft4.admin;
+import ac: lib.ft4.accounts;
+import assets: lib.ft4.assets;
+import lib.ft4.accounts.{auth_descriptor, auth_type};

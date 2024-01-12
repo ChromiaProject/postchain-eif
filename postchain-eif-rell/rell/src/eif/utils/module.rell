@@ -1,0 +1,4 @@
+@mount('eif.utils')
+module;
+
+function to_zero_padded_hex(array: byte_array) = "000000000000000000000000" + array.to_hex();

@@ -64,9 +64,10 @@ INFURA_API_KEY="..."
 ETHERSCAN_API_KEY="..."
 ```
 
-Then, run the deploy task:
+Then, run the deployment task:
 
 ```sh
+$ yarn deploy --network sepolia --verify --app 0xCaf200436270A60Cda6543602F2Ea4224E31351d
 $ yarn deploy --network goerli --verify --app 0x659E4A3726275EDFD125F52338ECE0D54D15BD99,0x1A642F0E3C3AF545E7ACBD38B07251B3990914F1,0x75E20828B343D1FE37FAE469AB698E19C17F20B5
 ```
 

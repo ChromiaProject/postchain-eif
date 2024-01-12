@@ -1,0 +1,112 @@
+function test_evm_block() {
+    val network_id = 1;
+    val contract_address = x"b7eB5d60Dd5610A82A4844Beb3F7d750316d3D32";
+    val token_address = x"39615b16b74589919c9ce1ea73f1fc5d53141a78";
+    val event_name = "DepositedERC721";
+    val token_name = "Chromia";
+    val token_symbol = "CHR";
+    val token_id = 8888;
+    val token_uri = "https://chromaway.com/chr/8888";
+
+    val user_pubkey = "038f888dec563b5bc253e87abc90afd26c3287021d10236ea19d248043dc39e0b8";
+    val user_privkey = x"71b5b7f8de0661af934a5e4612f3d0ba183e639bdf4e7452fb6457ed3cfbc825";
+    val user_evm_address = x"e105ba42b66d08ac7ca7fc48c583599044a6dab3";
+
+    // create admin account
+    val admin_auth = test_helper.register_admin();
+
+    // create a project
+    val props = proj.simple_project_props(
+        id = "coa",
+        name = "Chromia Originals",
+        avatar = "https://avatars.githubusercontent.com/u/37784805?s=200&v=4",
+        website = "https://chromia.com",
+        background_image = "https://images.unsplash.com/photo-1612835362596-4b0b2b0b0b0b?ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8Y2hvbWlhJTIwb2ZmaWNlfGVufDB8fDB8fA%3D%3D&ixlib=rb-1.2.1&w=1000&q=80",
+        description = "Chromia Originals is a platform for creating and trading NFTs on Chromia blockchain."
+    );
+
+    rell.test.tx().op(
+        ft_ex.ft_auth(admin_auth.account_id, admin_auth.auth_descriptor.hash()),
+        proj_ex.create_project(props)
+    ).sign(admin_auth.keypair.priv).run();
+
+    // create a collection
+    rell.test.tx().op(
+        ft_ex.ft_auth(admin_auth.account_id, admin_auth.auth_descriptor.hash()),
+        c_ex.create_collection(
+            "eif",
+            "CHR",
+            "Chromia Originals",
+            "Chromia Originals is a platform for creating and trading NFTs on Chromia blockchain.",
+            "https://images.unsplash.com/photo-1612835362596-4b0b2b0b0b0b?ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8Y2hvbWlhJTIwb2ZmaWNlfGVufDB8fDB8fA%3D%3D&ixlib=rb-1.2.1&w=1000&q=80",
+            "https://avatars.githubusercontent.com/u/37784805?s=200&v=4",
+            admin_auth.account_id,
+            "coa"
+        )
+    ).sign(admin_auth.keypair.priv).run();
+
+    rell.test.tx().op(
+        og.register_chromia_base_originals(admin_auth.account_id)
+    ).sign(admin_auth.keypair.priv).run();
+    
+    rell.test.tx().op(
+        og.init_eif_original_interface(admin_auth.account_id)
+    ).sign(admin_auth.keypair.priv).run();
+
+    rell.test.tx().op(
+        og.add_eif_nft_mapping(network_id, token_address)
+    ).sign(admin_auth.keypair.priv).run();
+
+    val auth = auth_descriptor(
+        auth_type.S,
+        [
+            ["T"].to_gtv(),
+            user_pubkey.to_gtv()
+        ],
+        null.to_gtv()
+    );
+    val account_id = auth.hash();
+    val sig = ft_auth.signature(
+        r = x"39b0c8c44a10d0fd70c0ed0e833cf6d93818ae1b10777857eb868516932796dc",
+        s = x"44de8f297cce55c3da8401dd77269d0baf978f60e97ebc5717d4c8eeaed3bea9",
+        v = 28
+    );
+
+    rell.test.tx().op(
+        evm.register_account(user_evm_address, auth, sig)
+    ).sign(user_privkey).run();
+
+    val event_data_list = list<c.event_data>();
+    val block_height = 100;
+    val block_hash = x"508ccf97bb5fac1546ac0040793e32d0336e764d62b60810fd460d445adfde64";
+
+    val indexed_values = list<gtv>();
+    val non_indexed_values = list<gtv>();
+    indexed_values.add(user_evm_address.to_gtv());
+    indexed_values.add(token_address.to_gtv());
+    indexed_values.add(account_id.to_gtv());
+    non_indexed_values.add((network_id).to_gtv());
+    non_indexed_values.add((token_id).to_gtv());
+    non_indexed_values.add((token_name).to_gtv());
+    non_indexed_values.add((token_symbol).to_gtv());
+    non_indexed_values.add((token_uri).to_gtv());
+    val e = c.event_data(
+        tnx_hash = x"26b1a0d2c8ed8e32efff45232a106b459aeb23c98d83478eb5f29ca4109be13c",
+        log_index = 1,
+        signature = x"4090023c909f5c377c211a8e8aedd778ec5de71852d4d66b4bb2fe6fc033211f",
+        contract_address = contract_address,
+        name = event_name,
+        indexed_values = indexed_values,
+        non_indexed_values = non_indexed_values
+    );
+    event_data_list.add(e);
+    rell.test.tx().op(
+        th_eif.evm_block_op(network_id, block_height, block_hash, event_data_list)
+    ).run();
+
+    val cursor = page.page_cursor(page_size=10, after_rowid=null);
+
+    val originals = core.Ownership.get_unlocked_originals_from_owner(account_id, cursor);
+    assert_equals(originals.size(), 1);
+    assert_equals(originals[0].asset.name, token_name);
+}
