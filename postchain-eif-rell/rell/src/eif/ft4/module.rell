@@ -197,7 +197,7 @@ function(
         // mint postchain token for ft account
         val ft_account = evm_account.account;
         log("mint postchain token for ft account: " + ft_account.id);
-        val ft_balance = assets.increase_balance(ft_account, ft_asset, amount);
+        assets.Unsafe.mint(ft_account, ft_asset, amount);
         val ft_beneficiary = evm.evm_account @ { .account == ft_account } ( .address );
         val account_link = c.get_or_create_evm_account_link(token_mapping.token.network_id, ft_beneficiary);
         val state = c.build_account_state(network_id, ft_beneficiary, ft_account);
@@ -316,7 +316,7 @@ operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiar
     ];
 
     val account = accounts.account @ { account_id };
-    val ft_balance = assets.increase_balance(account, ft_asset, amount);
+    assets.Unsafe.mint(account, ft_asset, amount);
     emit_withdraw(network_id, beneficiary, account, withdraw_info);
 }
 
