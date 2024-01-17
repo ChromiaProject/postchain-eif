@@ -2,8 +2,7 @@
 pragma solidity ^0.8.19;
 
 // Interfaces
-import "@openzeppelin/contracts/interfaces/IERC721.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // Internal libraries
 import "./utils/cryptography/Hash.sol";
@@ -19,14 +18,6 @@ library Postchain {
         IERC20 token;
         address beneficiary;
         uint256 amount;
-    }
-
-    struct EventNFT {
-        uint256 serialNumber;
-        uint256 networkId;
-        IERC721 nft;
-        address beneficiary;
-        uint256 tokenId;
     }
 
     struct BlockHeaderData {
@@ -48,15 +39,6 @@ library Postchain {
         }
         return (evt.token, evt.beneficiary, evt.amount, evt.networkId);
     }
-
-    function verifyEventNFT(bytes32 _hash, bytes memory _event) internal pure returns (IERC721, address, uint256, uint256) {
-        EventNFT memory evt = abi.decode(_event, (EventNFT));
-        bytes32 hash = keccak256(_event);
-        if (hash != _hash) {
-            revert('Postchain: invalid event');
-        }
-        return (evt.nft, evt.beneficiary, evt.tokenId, evt.networkId);
-    }    
 
     function verifyBlockHeader(
         bytes32 blockchainRid,
