@@ -451,6 +451,7 @@ operation bridge_ft3_token_to_evm(auth_id, network_id: integer, token_address: b
     val asset = require(ft3.asset @? { .id == token_mapping.asset.id }, "asset does not exist");
 
     val account = do_auth(auth_id, ["T"]);
+    require(evm.evm_account @ { account } ( .address ) == beneficiary, "beneficiary does not match with authenticated account");
 
     // burn ft3 token of the account and update relevant account state
     destroy_asset(account, asset, amount);
