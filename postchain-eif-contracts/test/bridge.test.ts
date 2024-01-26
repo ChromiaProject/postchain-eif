@@ -39,7 +39,7 @@ describe("Token Bridge Test", () => {
         validatorAddress = validatorContract.address
 
         const bridgeFactory = new TokenBridge__factory(admin)
-        const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress])
+        const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress, 2])
         bridgeAddress = bridge.address
 
         const bridgeDelegatorFactory = new TokenBridgeDelegator__factory(deployer)

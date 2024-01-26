@@ -95,7 +95,7 @@ class EthereumEventProcessorIT {
         val initialMint = 50L
         // Deploy token bridge contract
         val bridge = deployRemoteCall(TokenBridge::class.java, web3jServices[0], transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
-            initialize(validatorContract).send()
+            initialize(validatorContract, Uint256(2)).send()
         }
 
         // Mock query for last evm block in this test
@@ -203,10 +203,10 @@ class EthereumEventProcessorIT {
         val initialMint = 20L
         // Deploy two token bridge contracts
         val bridgeFirst = deployRemoteCall(TokenBridge::class.java, web3jServices[0], transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
-            initialize(validatorContract).send()
+            initialize(validatorContract, Uint256(2)).send()
         }
         val bridgeSecond = deployRemoteCall(TokenBridge::class.java, web3jServices[0], transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
-            initialize(validatorContract).send()
+            initialize(validatorContract, Uint256(2)).send()
         }
 
         // Mock query for last evm block in this test
