@@ -161,7 +161,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
      * and they might need to withdraw back to postchain.
      */
     function fund(IERC20 token, uint256 amount) isAllowToken(token) onlyOwner public returns (bool) {
-        token.transferFrom(msg.sender, address(this), amount);
+        token.safeTransferFrom(msg.sender, address(this), amount);
         _balances[token] += amount;
         emit FundedERC20(msg.sender, token, amount);
         return true;
