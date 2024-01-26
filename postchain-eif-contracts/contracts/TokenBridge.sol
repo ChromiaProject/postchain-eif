@@ -96,6 +96,8 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
 
     function initialize(IValidator _validator) public initializer {
         __Ownable_init(_msgSender());
+        __Pausable_init();
+        __ReentrancyGuard_init();
 
         uint256 id;
         assembly {
