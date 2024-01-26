@@ -268,7 +268,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
         val depositNum = 5
         val depositAmount = BigInteger("AA".repeat(16), 16)
         for (i in 1..depositNum) {
-            bridge.deposit(Address(testToken.contractAddress), Uint256(depositAmount), Bytes32(accountId.asByteArray())).send()
+            bridge.deposit(Address(testToken.contractAddress), Uint256(depositAmount)).send()
         }
 
         val totalDepositedAmount = depositNum.toBigInteger() * depositAmount

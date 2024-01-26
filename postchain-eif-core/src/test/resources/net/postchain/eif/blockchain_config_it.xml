@@ -69,20 +69,6 @@
                                                 </dict>
                                                 <dict>
                                                     <entry key="indexed">
-                                                        <int>1</int>
-                                                    </entry>
-                                                    <entry key="internalType">
-                                                        <string>bytes32</string>
-                                                    </entry>
-                                                    <entry key="name">
-                                                        <string>ft3_account_id</string>
-                                                    </entry>
-                                                    <entry key="type">
-                                                        <string>bytes32</string>
-                                                    </entry>
-                                                </dict>
-                                                <dict>
-                                                    <entry key="indexed">
                                                         <int>0</int>
                                                     </entry>
                                                     <entry key="internalType">
@@ -192,20 +178,6 @@
                                                     </entry>
                                                     <entry key="type">
                                                         <string>address</string>
-                                                    </entry>
-                                                </dict>
-                                                <dict>
-                                                    <entry key="indexed">
-                                                        <int>1</int>
-                                                    </entry>
-                                                    <entry key="internalType">
-                                                        <string>bytes32</string>
-                                                    </entry>
-                                                    <entry key="name">
-                                                        <string>ft3_account_id</string>
-                                                    </entry>
-                                                    <entry key="type">
-                                                        <string>bytes32</string>
                                                     </entry>
                                                 </dict>
                                                 <dict>
