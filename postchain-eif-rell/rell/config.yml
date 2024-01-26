@@ -22,7 +22,15 @@ definitions:
       admin_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
     lib.originals.marketplace:
       oracle_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
-
+  - &eif_sender_receiver # Base configuration for a chain that will both send and receive messages
+    gtx:
+      modules:
+        - "net.postchain.eif.EifSenderGTXModule"
+        - "net.postchain.d1.icmf.IcmfSenderGTXModule"
+        - "net.postchain.d1.icmf.IcmfReceiverGTXModule"
+    sync_ext:
+      - "net.postchain.eif.EifSynchronizationInfrastructureExtension"
+      - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"
 test:
   modules:
     - tests.utils
@@ -35,11 +43,14 @@ blockchains:
   eif:
     module: main
     config:
-      gtx:
-        modules: ['net.postchain.eif.EifGTXModule']
       eif:
         <<: *eif_test
-      sync_ext: ['net.postchain.eif.EifSynchronizationInfrastructureExtension']
+      icmf:
+        receiver:
+          local:
+            - topic: "L_EVM_BLOCK_EVENTS"
+              brid: null
+      <<: *eif_sender_receiver
     moduleArgs:
       <<: *common_args
       <<: *rell_test_args
@@ -61,34 +72,9 @@ libs:
     tagOrBranch: 1.9.1
     rid: x"593D6EBA650BAC473E105C047B2C43A099164870304B3E5E324F714FF2F3F82F"
     insecure: false
-  pagination:
-    registry: https://bitbucket.org/chromawallet/lib-pagination-utils
-    path: rell/src/core/pagination
-    tagOrBranch: master
-    insecure: true
-  access:
-    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
-    path: rell/src/access
-    tagOrBranch: dev
-    insecure: true
-  dip:
-    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
-    path: rell/src/dip
-    tagOrBranch: dev
-    insecure: true
-  evm_accounts:
-    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
-    path: rell/src/evm_accounts
-    tagOrBranch: dev
-    insecure: true
-  originals:
-    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
-    path: rell/src/originals
-    tagOrBranch: dev
-    insecure: true
-  ft_helper:
-    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
-    path: rell/src/ft_helper
-    tagOrBranch: dev
-    insecure: true
+  icmf:
+    registry: https://gitlab.com/chromaway/core/directory-chain
+    path: src/messaging/icmf
+    tagOrBranch: 1.29.0
+    rid: x"19D6BC28D527E6D2239843608486A84F44EDCD244E253616F13D1C65893F35F6"
     

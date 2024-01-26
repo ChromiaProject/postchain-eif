@@ -1,0 +1,25 @@
+module;
+
+namespace topic {
+    val EVM_BLOCK_EVENTS = "L_EVM_BLOCK_EVENTS";
+}
+
+namespace msg {
+    struct event_data {
+        tnx_hash: byte_array;
+        log_index: integer;
+        signature: byte_array;
+        contract_address: byte_array;
+        name: text;
+        indexed_values: list<gtv>;
+        non_indexed_values: list<gtv>;
+    }
+
+    struct evm_block {
+        network_id: integer;
+        evm_block_height: integer;
+        evm_block_hash: byte_array;
+        events: list<event_data>;
+    }
+}
+

@@ -1,15 +1,16 @@
 @mount('eif.ft4')
 module;
 
-import root: ^.main;
-import c: ^.common;
-import u: ^.utils;
+import ^.main;
+import ^.common;
+import ^.common.messages. { msg };
+import ^.utils;
 import ^.evm;
 
-import admin: lib.ft4.admin;
-import accounts: lib.ft4.accounts;
-import assets: lib.ft4.assets;
-import auth: lib.ft4.auth;
+import lib.ft4.admin;
+import lib.ft4.accounts;
+import lib.ft4.assets;
+import lib.ft4.auth;
 
 entity evm_erc20 {
     network_id: integer;
@@ -95,8 +96,7 @@ query evm_balance_of_erc20(network_id: integer, token_address: byte_array, benef
     return b;
 }
 
-@extend(c.build_account_state_fn)
-function(
+@extend(common.build_account_state_fn) function(
     network_id: integer,
     beneficiary: byte_array,
     account: accounts.account?
@@ -122,94 +122,109 @@ function(
 
     // update state for eif balance
     for (balance in erc20_balances) {
-        state.add(byte_array.from_hex(u.to_zero_padded_hex(balance.token.address)).to_gtv());
+        state.add(byte_array.from_hex(utils.to_zero_padded_hex(balance.token.address)).to_gtv());
         state.add((balance.amount).to_gtv());
     }
 
     // update state for ft balance
     for (balance in balances) {
         val token_mapping = token_mapping @ { .asset == balance.asset };
-        state.add(byte_array.from_hex(u.to_zero_padded_hex(token_mapping.token.address)).to_gtv());
+        state.add(byte_array.from_hex(utils.to_zero_padded_hex(token_mapping.token.address)).to_gtv());
         state.add((balance.amount).to_gtv());
     }
     
     return [0: state];
 }
 
-@extend(root.evm_block_fn)
-function(
-    c.evm_block,
-    network_id: integer,
-    token_address: byte_array,
-    beneficiary: byte_array,
-    evm.evm_account?,
-    event: c.event_data,
-    indexed_values_bytes: byte_array,
-    non_indexed_values_bytes: byte_array
-) {
-    if (event.name != "DepositedERC20") return;
-    // ignore the unsupported token, move to process next events if any
-    val token = evm_erc20 @? { network_id, .address == token_address };
-    if (empty(token)) {
-        log("ignore the unsupported token, move to process next events if any: " + token_address);
-        return;
-    }
-    val token_mapping = token_mapping @? { .token == token };
-    if (empty(token_mapping)) {
-        log("no token_mapping");
-        return;
-    }
-
-    // ignore event if ft asset does not exist
-    val ft_asset = assets.asset @? { .id == token_mapping.asset.id };
-    if (empty(ft_asset)) {
-        log("ignore event if ft asset does not exist: " + token_mapping.asset.id);
-        return;
-    }
-    val amount = big_integer.from_gtv(event.non_indexed_values[1]);
-    val evm_event = create c.evm_event(
-        evm_block,
-        tnx_hash = event.tnx_hash,
-        log_index = event.log_index,
-        event_signature = event.signature,
-        contract_address = event.contract_address,
-        indexed_values = indexed_values_bytes,
-        non_indexed_values = non_indexed_values_bytes
-    );
-
-    // if user account does not exist, record the state into EIF for withdraw back to EVM chains later.
-    // This feature is to avoid losing fund of user
-    if (empty(evm_account)) {
-        val name = text.from_gtv(event.non_indexed_values[2]);
-        val symbol = text.from_gtv(event.non_indexed_values[3]);
-        val decimals = integer.from_gtv(event.non_indexed_values[4]);
-        log("record the state into EIF for withdraw back to EVM chains later for beneficiary: " + beneficiary);
-        deposit_ERC20(network_id, beneficiary, token_address, amount, name, symbol, decimals);
-
-        val account_link = c.get_or_create_evm_account_link(network_id, beneficiary);
-        val state = c.build_account_state(network_id, beneficiary, null);
-        val state_data = c.state_data(
-            account_link.state_n,
-            account = state
+@extend(main.handle_evm_block) function (msg: msg.evm_block) {
+    var evm_block = common.evm_block @? { .network_id == msg.network_id, .evm_block_height == msg.evm_block_height };
+    if (empty(evm_block)) {
+        evm_block = create common.evm_block (
+            network_id = msg.network_id,
+            evm_block_height = msg.evm_block_height,
+            evm_block_hash = msg.evm_block_hash
         );
-        op_context.emit_event("eif_state", state_data.to_gtv());
-    } else {
-        // mint postchain token for ft account
-        val ft_account = evm_account.account;
-        log("mint postchain token for ft account: " + ft_account.id);
-        assets.Unsafe.mint(ft_account, ft_asset, amount);
-        val ft_beneficiary = evm.evm_account @ { .account == ft_account } ( .address );
-        val account_link = c.get_or_create_evm_account_link(token_mapping.token.network_id, ft_beneficiary);
-        val state = c.build_account_state(network_id, ft_beneficiary, ft_account);
-        val state_data = c.state_data(
-            account_link.state_n,
-            account = state
+    }
+
+    for (event in msg.events) {
+        if (event.name != "DepositedERC20") {
+            continue;
+        }
+
+        var indexed_values_bytes = x"";
+        for (value in event.indexed_values) {
+            indexed_values_bytes += value.to_bytes();
+        }
+        var non_indexed_values_bytes = x"";
+        for (value in event.non_indexed_values) {
+            non_indexed_values_bytes += value.to_bytes();
+        }
+
+        // ignore invalid events' network id
+        val network_id = integer.from_gtv(event.non_indexed_values[0]);
+        if (network_id != msg.network_id) {
+            log("ignore invalid events' network id: " + network_id + " : " + msg.network_id);
+            continue;
+        }
+
+        val beneficiary = byte_array.from_gtv(event.indexed_values[0]);
+        val evm_account = evm.evm_account @? { .address == beneficiary };        
+        val token_address = byte_array.from_gtv(event.indexed_values[1]);
+        val token = evm_erc20 @? { .network_id == msg.network_id, .address == token_address };
+        if (empty(token)) {
+            log("ignore the unsupported token, move to process next events if any: " + token_address);
+            continue;
+        }
+
+        val token_mapping = token_mapping @? { .token == token!! };
+        if (empty(token_mapping)) {
+            log("no token_mapping");
+            continue;
+        }
+
+        val amount = big_integer.from_gtv(event.non_indexed_values[1]);
+        val evm_event = create common.evm_event(
+            evm_block,
+            tnx_hash = event.tnx_hash,
+            log_index = event.log_index,
+            event_signature = event.signature,
+            contract_address = event.contract_address,
+            indexed_values = indexed_values_bytes,
+            non_indexed_values = non_indexed_values_bytes
         );
-        op_context.emit_event("eif_state", state_data.to_gtv());
+
+        if (empty(evm_account)) {
+            val name = text.from_gtv(event.non_indexed_values[2]);
+            val symbol = text.from_gtv(event.non_indexed_values[3]);
+            val decimals = integer.from_gtv(event.non_indexed_values[4]);
+            log("record the state into EIF for withdraw back to EVM chains later for beneficiary: " + beneficiary);
+            deposit_ERC20(msg.network_id, beneficiary, token_address, amount, name, symbol, decimals);
+
+            val account_link = common.get_or_create_evm_account_link(msg.network_id, beneficiary);
+            val state = common.build_account_state(msg.network_id, beneficiary, null);
+            val state_data = common.state_data(
+                account_link.state_n,
+                account = state
+            );
+            op_context.emit_event("eif_state", state_data.to_gtv());
+        } else {
+            // mint postchain token for ft account
+            val ft_account = evm_account.account;
+            log("mint postchain token for ft account: " + ft_account.id);
+            assets.Unsafe.mint(ft_account, token_mapping!!.asset, amount);
+            val ft_beneficiary = evm.evm_account @ { .account == ft_account } ( .address );
+            val account_link = common.get_or_create_evm_account_link(token_mapping.token.network_id, ft_beneficiary);
+            val state = common.build_account_state(network_id, ft_beneficiary, ft_account);
+            val state_data = common.state_data(
+                account_link.state_n,
+                account = state
+            );
+            op_context.emit_event("eif_state", state_data.to_gtv());
+        }
     }
 }
 
-operation deposit_ft_token(c.auth_id, network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
+operation deposit_ft_token(common.auth_id, network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
     require(amount > 0, "amount should larger than 0");
     val token = require(evm_erc20 @? { network_id, .address == token_address }, "token is not support");
     val token_mapping = require(token_mapping @? { token }, "token is not support");
@@ -229,7 +244,7 @@ operation deposit_ft_token(c.auth_id, network_id: integer, token_address: byte_a
     update_account_state(account.id, asset.id);
 }
 
-operation bridge_ft_token_to_evm(c.auth_id, network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
+operation bridge_ft_token_to_evm(common.auth_id, network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
     require(amount > 0, "amount should larger than 0");
     val token = require(evm_erc20 @? { network_id, .address == token_address }, "token is not supported");
     val token_mapping = require(token_mapping @? { token }, "token is not support");
@@ -243,8 +258,8 @@ operation bridge_ft_token_to_evm(c.auth_id, network_id: integer, token_address: 
     assets.Unsafe.burn(account, asset, amount);
     update_account_state(account.id, asset.id);
 
-    update c.withdraw_stats(withdraw_count += 1);
-    val next_serial = c.withdraw_stats.withdraw_count;
+    update common.withdraw_stats(withdraw_count += 1);
+    val next_serial = common.withdraw_stats.withdraw_count;
 
     create evm_erc20_withdraw(
         serial = next_serial,
@@ -257,8 +272,8 @@ operation bridge_ft_token_to_evm(c.auth_id, network_id: integer, token_address: 
     val withdraw_info = [
         next_serial.to_gtv(),
         network_id.to_gtv(),
-        byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv(),
-        byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv(),
+        byte_array.from_hex(utils.to_zero_padded_hex(token_address)).to_gtv(),
+        byte_array.from_hex(utils.to_zero_padded_hex(beneficiary)).to_gtv(),
         amount.to_gtv()
     ];
 
@@ -294,8 +309,8 @@ operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiar
     require(balance.amount >= amount, "Balance is too low");
     update balance(.amount -= amount);
 
-    update c.withdraw_stats(withdraw_count += 1);
-    val next_serial = c.withdraw_stats.withdraw_count;
+    update common.withdraw_stats(withdraw_count += 1);
+    val next_serial = common.withdraw_stats.withdraw_count;
 
     // net_id = 0 means withdraw from postchain snapshot state into ft account
     val net_id = 0;
@@ -310,8 +325,8 @@ operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiar
     val withdraw_info = [
         next_serial.to_gtv(),
         net_id.to_gtv(),
-        byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv(),
-        byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv(),
+        byte_array.from_hex(utils.to_zero_padded_hex(token_address)).to_gtv(),
+        byte_array.from_hex(utils.to_zero_padded_hex(beneficiary)).to_gtv(),
         amount.to_gtv()
     ];
 
@@ -342,8 +357,8 @@ operation withdraw_ERC20(network_id: integer, token_address: byte_array, benefic
     require(balance.amount >= amount, "Balance is too low");
     update balance(.amount -= amount);
 
-    update c.withdraw_stats(withdraw_count += 1);
-    val next_serial = c.withdraw_stats.withdraw_count;
+    update common.withdraw_stats(withdraw_count += 1);
+    val next_serial = common.withdraw_stats.withdraw_count;
 
     create evm_erc20_withdraw(
         serial = next_serial,
@@ -356,8 +371,8 @@ operation withdraw_ERC20(network_id: integer, token_address: byte_array, benefic
     val withdraw_info = [
         next_serial.to_gtv(),
         network_id.to_gtv(),
-        byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv(),
-        byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv(),
+        byte_array.from_hex(utils.to_zero_padded_hex(token_address)).to_gtv(),
+        byte_array.from_hex(utils.to_zero_padded_hex(beneficiary)).to_gtv(),
         amount.to_gtv()
     ];
 
@@ -392,9 +407,9 @@ function deposit_ERC20(network_id: integer, beneficiary: byte_array, token_addre
 }
 
 function emit_withdraw(network_id: integer, beneficiary: byte_array, account: accounts.account?, eth_event_data: list<gtv>) {
-    val account_link = c.get_or_create_evm_account_link(network_id, beneficiary);
-    val state = c.build_account_state(network_id, beneficiary, account);
-    val state_data = c.state_data(
+    val account_link = common.get_or_create_evm_account_link(network_id, beneficiary);
+    val state = common.build_account_state(network_id, beneficiary, account);
+    val state_data = common.state_data(
         account_link.state_n,
         account = state
     );
@@ -417,9 +432,9 @@ function update_account_state(account_id: byte_array, asset_id: byte_array) {
         return;
     }
     val network_id = token_mapping.token.network_id;
-    val account_link = c.get_or_create_evm_account_link(network_id, beneficiary);
-    val state = c.build_account_state(network_id, beneficiary, account);
-    val state_data = c.state_data(
+    val account_link = common.get_or_create_evm_account_link(network_id, beneficiary);
+    val state = common.build_account_state(network_id, beneficiary, account);
+    val state_data = common.state_data(
         account_link.state_n,
         account = state
     );

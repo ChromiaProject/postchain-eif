@@ -1,8 +1,8 @@
 @mount('eif.data')
 module;
 
-import u: ^.utils;
-import acc: lib.ft4.accounts;
+import ^.utils;
+import lib.ft4.accounts;
 
 entity evm_block {
     network_id: integer;
@@ -19,16 +19,6 @@ entity evm_event {
     contract_address: byte_array;
     indexed_values: byte_array;
     non_indexed_values: byte_array;
-}
-
-struct event_data {
-    tnx_hash: byte_array;
-    log_index: integer;
-    signature: byte_array;
-    contract_address: byte_array;
-    name: text;
-    indexed_values: list<gtv>;
-    non_indexed_values: list<gtv>;
 }
 
 entity evm_account_link {
@@ -82,9 +72,9 @@ function get_or_create_evm_account_link(network_id: integer, beneficiary: byte_a
     return account;
 }
 
-function build_account_state(network_id: integer, beneficiary: byte_array, account: acc.account?) {
+function build_account_state(network_id: integer, beneficiary: byte_array, account: accounts.account?) {
     val state = list<gtv>();
-    state.add(byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv());
+    state.add(byte_array.from_hex(utils.to_zero_padded_hex(beneficiary)).to_gtv());
     val state_map = build_account_state_fn(network_id, beneficiary, account);
     for (k in state_map.keys().sorted()) {
         state.add_all(state_map[k]);
@@ -97,5 +87,5 @@ function build_account_state(network_id: integer, beneficiary: byte_array, accou
 function build_account_state_fn(
     network_id: integer,
     beneficiary: byte_array,
-    account: acc.account?
+    account: accounts.account?
 ): map<integer, list<gtv>>;

@@ -1,15 +1,17 @@
-import c: ^.common;
-import ^.evm;
+import ^.common;
+import ^.common.messages. { topic.*, msg };
+import lib.icmf.{ send_message };
+import lib.icmf.receiver.{ receive_icmf_message };
 
 query get_last_evm_block(network_id: integer) {
-    return c.evm_block @? { network_id } ( @sort_desc .evm_block_height, .evm_block_hash ) limit 1;
+    return common.evm_block @? { network_id } ( @sort_desc .evm_block_height, .evm_block_hash ) limit 1;
 }
 
 operation __evm_block(
     network_id: integer,
     evm_block_height: integer,
     evm_block_hash: byte_array,
-    events: list<c.event_data>
+    events: list<msg.event_data>
 ) {
     _evm_block(network_id, evm_block_height, evm_block_hash, events);
 }
@@ -18,56 +20,31 @@ function _evm_block(
     network_id: integer,
     evm_block_height: integer,
     evm_block_hash: byte_array,
-    events: list<c.event_data>
+    events: list<msg.event_data>
 ) {
-    val evm_block = create c.evm_block (
+    create common.evm_block (
         network_id,
         evm_block_height,
         evm_block_hash
     );
 
-    for (event in events) {
-        var indexed_values_bytes = x"";
-        for (value in event.indexed_values) {
-            indexed_values_bytes += value.to_bytes();
-        }
-        var non_indexed_values_bytes = x"";
-        for (value in event.non_indexed_values) {
-            non_indexed_values_bytes += value.to_bytes();
-        }
+    val evm_block = msg.evm_block(
+        network_id,
+        evm_block_height,
+        evm_block_hash,
+        events
+    );
 
-        // ignore invalid events' network id
-        val net_id = integer.from_gtv(event.non_indexed_values[0]);
-        if (net_id != network_id) {
-            log("ignore invalid events' network id: " + net_id + " : " + network_id);
-            continue;
-        }
+    send_message(EVM_BLOCK_EVENTS, evm_block.to_gtv());
+}
 
-        val beneficiary = byte_array.from_gtv(event.indexed_values[0]);
-        val token_address = byte_array.from_gtv(event.indexed_values[1]);
-        val evm_account = evm.evm_account @? { .address == beneficiary };
-
-        evm_block_fn(
-            evm_block,
-            network_id,
-            token_address,
-            beneficiary,
-            evm_account,
-            event,
-            indexed_values_bytes,
-            non_indexed_values_bytes
-        );
+@extend(receive_icmf_message)
+function (sender: byte_array, topic: text, body: gtv) {
+    when (topic) {
+        EVM_BLOCK_EVENTS -> handle_evm_block(msg.evm_block.from_gtv(body));
+        else -> require(false, "Message type %s not handled".format(topic));
     }
 }
 
 @extendable
-function evm_block_fn(
-    c.evm_block,
-    network_id: integer,
-    token_address: byte_array,
-    beneficiary: byte_array,
-    evm.evm_account?,
-    event: c.event_data,
-    indexed_values_bytes: byte_array,
-    non_indexed_values_bytes: byte_array
-);
+function handle_evm_block(evm_block: msg.evm_block) {}
