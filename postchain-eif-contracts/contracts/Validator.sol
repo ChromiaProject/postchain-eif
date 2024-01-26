@@ -81,6 +81,7 @@ contract Validator is Ownable {
     function isValidSignatures(uint height, bytes32 hash, bytes[] memory signatures, address[] memory signers) external view returns (bool) {
         uint _actualSignature = 0;
         uint _requiredSignature = _calculateBFTRequiredNum(validators[height].length);
+        if (_requiredSignature == 0) return false;
         address _lastSigner = address(0);
         for (uint i = 0; i < signatures.length; i++) {
             for (uint k = 0; k < signers.length; k++) {
