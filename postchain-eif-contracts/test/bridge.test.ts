@@ -388,7 +388,7 @@ describe("Token Bridge Test", () => {
                         DecodeHexStringToByteArray(sig1.substring(2, sig1.length)), 
                         DecodeHexStringToByteArray(sig1.substring(2, sig1.length))
                     ], 
-                    [validator1.address, validator2.address],
+                    [validator1.address, validator1.address],
                     extraProof)
                 ).to.be.revertedWith('Validator: duplicate signature or signers is out of order')
                 await expect(bridge.withdrawRequest(data, eventProof,
@@ -675,7 +675,7 @@ describe("Token Bridge Test", () => {
                         DecodeHexStringToByteArray(sig1.substring(2, sig1.length)), 
                         DecodeHexStringToByteArray(sig1.substring(2, sig1.length))
                     ], 
-                    [validator1.address, validator2.address],
+                    [validator1.address, validator1.address],
                     extraProof)
                 ).to.be.revertedWith('Validator: duplicate signature or signers is out of order')
                 await expect(bridgeDelegator.withdrawRequest(data, eventProof,

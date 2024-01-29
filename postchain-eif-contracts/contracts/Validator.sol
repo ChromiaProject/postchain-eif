@@ -84,14 +84,11 @@ contract Validator is Ownable {
         if (_requiredSignature == 0) return false;
         address _lastSigner = address(0);
         for (uint i = 0; i < signatures.length; i++) {
-            for (uint k = 0; k < signers.length; k++) {
-                require(isValidator(height, signers[k]), "Validator: signer is not validator");
-                if (_isValidSignature(hash, signatures[i], signers[k])) {
-                    _actualSignature++;
-                    require(signers[k] > _lastSigner, "Validator: duplicate signature or signers is out of order");
-                    _lastSigner = signers[k];
-                    break;
-                }
+            require(isValidator(height, signers[i]), "Validator: signer is not validator");
+            if (_isValidSignature(hash, signatures[i], signers[i])) {
+                _actualSignature++;
+                require(signers[i] > _lastSigner, "Validator: duplicate signature or signers is out of order");
+                _lastSigner = signers[i];
             }
         }
         return (_actualSignature >= _requiredSignature);
