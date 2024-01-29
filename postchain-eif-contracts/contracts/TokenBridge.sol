@@ -30,7 +30,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
     using SafeERC20 for IERC20;
 
     mapping (IERC20 => bool) public _allowedToken;
-    mapping (IERC20 => uint256) public _balances;
     mapping (bytes32 => Withdraw) public _withdraw;
     IValidator public validator;
     uint256 public networkId;
@@ -166,7 +165,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
      */
     function fund(IERC20 token, uint256 amount) isAllowToken(token) onlyOwner public returns (bool) {
         token.safeTransferFrom(msg.sender, address(this), amount);
-        _balances[token] += amount;
         emit FundedERC20(msg.sender, token, amount);
         return true;
     }
@@ -174,7 +172,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
     function deposit(IERC20 token, uint256 amount) isAllowToken(token) whenNotPaused public returns (bool) {
         (string memory name, string memory symbol, uint8 decimals) = _getTokenInfo(token);
         token.safeTransferFrom(msg.sender, address(this), amount);
-        _balances[token] += amount;
         emit DepositedERC20(msg.sender, token, networkId, amount, name, symbol, decimals);
         return true;
     }
@@ -218,9 +215,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
         {
             (IERC20 token, address beneficiary, uint256 amount, uint256 netId) = hash.verifyEvent(_event);
             require(networkId == netId, "TokenBridge: incorrect network id");
-            // only need to check on `amount <= _balances[token]` on withdraw() function
-            // that will allow user to withdraw the token back to postchain
-            // when the token balance was not fund enough by admin/owner
             require(amount > 0, "TokenBridge: invalid amount to make request withdraw");
             wd.token = token;
             wd.beneficiary = beneficiary;
@@ -238,11 +232,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
         require(wd.beneficiary == beneficiary, "TokenBridge: no fund for the beneficiary");
         require(wd.block_number <= block.number, "TokenBridge: not mature enough to withdraw the fund");
         require(wd.status == Status.Withdrawable, "TokenBridge: fund is pending or was already claimed");
-        require(wd.amount <= _balances[wd.token], "TokenBridge: not enough amount to withdraw");
         wd.status = Status.Withdrawn;
         uint value = wd.amount;
         wd.amount = 0;
-        _balances[wd.token] -= value;
         // only support user to withdraw the token that be funded enough on the EVM bridge
         wd.token.safeTransfer(beneficiary, value);
         emit Withdrawal(beneficiary, wd.token, value);

@@ -96,7 +96,7 @@ describe("Token Bridge Test", () => {
                         18 // Default decimals is 18
                     )
 
-            expect(await bridge._balances(tokenAddress)).to.eq(toDeposit)
+            expect(await tokenInstance.balanceOf(bridge.address)).to.eq(toDeposit)
             expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint.sub(toDeposit))
         })
     })
@@ -128,7 +128,7 @@ describe("Token Bridge Test", () => {
 
             // admin can call emergencyWithdraw after setting time
             expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(0)
-            expect(await adminBridge._balances(tokenAddress)).to.eq(toDeposit)
+            expect(await tokenInstance.balanceOf(adminBridge.address)).to.eq(toDeposit)
             const nighttyDays = 90 * 24 * 60 * 60
             const blockNum= await ethers.provider.getBlockNumber()
             const block = await ethers.provider.getBlock(blockNum)
@@ -136,7 +136,7 @@ describe("Token Bridge Test", () => {
             await ethers.provider.send('evm_setNextBlockTimestamp', [timestamp])
             await adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address)
             expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(toDeposit)
-            expect(await adminBridge._balances(tokenAddress)).to.eq(toDeposit)
+            expect(await tokenInstance.balanceOf(adminBridge.address)).to.eq(0)
         })
     })
 
@@ -456,7 +456,7 @@ describe("Token Bridge Test", () => {
                 await bridgeOwner.unpendingWithdraw(hashEvent)
 
                 expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint.sub(toDeposit))
-                expect(await bridge._balances(tokenAddress)).to.eq(toDeposit)
+                expect(await tokenInstance.balanceOf(bridge.address)).to.eq(toDeposit)
                 await expect(bridge.withdraw(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
                     deployer.address)).to.be.revertedWith('TokenBridge: no fund for the beneficiary')
@@ -472,7 +472,7 @@ describe("Token Bridge Test", () => {
                     user.address))
                 .to.emit(bridge, "Withdrawal")
                 .withArgs(user.address, tokenAddress, toDeposit)
-                expect(await bridge._balances(tokenAddress)).to.eq(0)
+                expect(await tokenInstance.balanceOf(bridge.address)).to.eq(0)
                 expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint)
                 await expect(bridge.withdraw(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
@@ -730,7 +730,7 @@ describe("Token Bridge Test", () => {
                 await bridgeOwner.unpendingWithdraw(hashEvent)
 
                 expect(await tokenInstance.balanceOf(bridgeDelegatorAddress)).to.eq(toMint.sub(toDeposit))
-                expect(await bridge._balances(tokenAddress)).to.eq(toDeposit)
+                expect(await tokenInstance.balanceOf(bridge.address)).to.eq(toDeposit)
                 await expect(bridgeDelegator.withdraw(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
                     deployer.address)).to.be.revertedWith('TokenBridge: no fund for the beneficiary')
@@ -741,7 +741,7 @@ describe("Token Bridge Test", () => {
                     bridgeDelegatorAddress))
                 .to.emit(bridge, "Withdrawal")
                 .withArgs(bridgeDelegatorAddress, tokenAddress, toDeposit)
-                expect(await bridge._balances(tokenAddress)).to.eq(0)
+                expect(await tokenInstance.balanceOf(bridge.address)).to.eq(0)
                 expect(await tokenInstance.balanceOf(bridgeDelegatorAddress)).to.eq(toMint)
                 await expect(bridgeDelegator.withdraw(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
