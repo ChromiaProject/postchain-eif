@@ -10,7 +10,6 @@ import { DecodeHexStringToByteArray, hashGtvBytes32Leaf, hashGtvBytes64Leaf, has
 
 chai.use(solidity);
 const { expect } = chai;
-const ft3_account_id = "0x95471c57f0bc16284cb1016eba3b2736fa5fb2a640e2f20984079f4349f867ff"
 const WITHDRAW_OFFSET = "0x2";
 describe("Token Bridge Test", () => {
     let tokenAddress: string;
@@ -85,12 +84,11 @@ describe("Token Bridge Test", () => {
             const name = await tokenApproveInstance.name()
             const symbol = await tokenApproveInstance.symbol()
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
-            await expect(bridge.deposit(tokenAddress, toDeposit, ft3_account_id))
+            await expect(bridge.deposit(tokenAddress, toDeposit))
                     .to.emit(bridge, "DepositedERC20")
                     .withArgs(
                         user.address,
                         tokenAddress,
-                        ft3_account_id,
                         network.config.chainId,
                         toDeposit,
                         name,
@@ -117,7 +115,7 @@ describe("Token Bridge Test", () => {
             const toDeposit = ethers.utils.parseEther("100")
             const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
-            await bridge.deposit(tokenAddress, toDeposit, ft3_account_id)
+            await bridge.deposit(tokenAddress, toDeposit)
 
             // normal user cannot call emergencyWithdraw
             await expect(bridge.emergencyWithdraw(tokenAddress, beneficiary.address))
@@ -159,11 +157,11 @@ describe("Token Bridge Test", () => {
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
 
             await expect(bridge.pause()).to.be.revertedWith('OwnableUnauthorizedAccount')
-            await expect(bridge.deposit(bridgeAddress, toDeposit, ft3_account_id)).to.be.revertedWith('TokenBridge: not allow token')
+            await expect(bridge.deposit(bridgeAddress, toDeposit)).to.be.revertedWith('TokenBridge: not allow token')
             await bridgeOwner.pause()
-            await expect(bridge.deposit(tokenAddress, toDeposit, ft3_account_id)).to.be.revertedWith('EnforcedPause()')
+            await expect(bridge.deposit(tokenAddress, toDeposit)).to.be.revertedWith('EnforcedPause()')
             await bridgeOwner.unpause()
-            let tx: ContractTransaction = await bridge.deposit(tokenAddress, toDeposit, ft3_account_id)
+            let tx: ContractTransaction = await bridge.deposit(tokenAddress, toDeposit)
             let receipt: ContractReceipt = await tx.wait()
             let logs = receipt.events?.filter((x) =>  {return x.event == 'DepositedERC20'})
             if (logs !== undefined) {
@@ -499,8 +497,8 @@ describe("Token Bridge Test", () => {
             const toDeposit = ethers.utils.parseEther("100")
             await bridgeDelegator.approve(tokenAddress, bridgeAddress, toDeposit)
 
-            await expect(bridge.deposit(bridgeAddress, toDeposit, ft3_account_id)).to.be.revertedWith('TokenBridge: not allow token')
-            let tx: ContractTransaction = await bridgeDelegator.deposit(tokenAddress, toDeposit, ft3_account_id)
+            await expect(bridge.deposit(bridgeAddress, toDeposit)).to.be.revertedWith('TokenBridge: not allow token')
+            let tx: ContractTransaction = await bridgeDelegator.deposit(tokenAddress, toDeposit)
             let receipt: ContractReceipt = await tx.wait()
             let logs = receipt.logs
             if (logs !== undefined) {

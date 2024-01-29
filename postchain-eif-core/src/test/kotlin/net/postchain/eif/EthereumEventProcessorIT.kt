@@ -126,7 +126,7 @@ class EthereumEventProcessorIT {
         bridge.allowToken(Address(testToken.contractAddress)).send()
         // Deposit to postchain
         for (i in 1..5) {
-            bridge.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), accountId).send()
+            bridge.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN)).send()
         }
 
         Awaitility.await()
@@ -175,7 +175,7 @@ class EthereumEventProcessorIT {
             mint(Address(transactionManager.fromAddress), Uint256(max)).send()
             approve(Address(bridge.contractAddress), Uint256(max)).send()
         }
-        bridge.deposit(Address(testToken.contractAddress), Uint256(max), accountId).send()
+        bridge.deposit(Address(testToken.contractAddress), Uint256(max)).send()
 
         Awaitility.await()
                 .atMost(Duration.ONE_MINUTE)
@@ -240,8 +240,8 @@ class EthereumEventProcessorIT {
         bridgeSecond.allowToken(Address(testToken.contractAddress)).send()
 
         // Deposit to postchain
-        bridgeFirst.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), accountId).send()
-        bridgeSecond.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN), accountId).send()
+        bridgeFirst.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN)).send()
+        bridgeSecond.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN)).send()
 
         // Verify we got both events from the different contracts
         Awaitility.await()
