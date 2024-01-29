@@ -149,7 +149,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
 
         // Deploy token bridge contract
         val bridge = Contract.deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
-            initialize(Address(validator.contractAddress)).send()
+            initialize(Address(validator.contractAddress), Uint256(2)).send()
         }
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contract

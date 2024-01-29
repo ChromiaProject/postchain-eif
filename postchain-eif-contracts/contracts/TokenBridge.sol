@@ -24,7 +24,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
 
     uint8 constant ERC20_ACCOUNT_STATE_BYTE_SIZE = 64;
     uint constant EMERGENCY_DURATION = 90 days;
-    uint constant WITHDRAW_OFFSET = 2; // need to update when deploy contract on production
+
     using Postchain for bytes32;
     using MerkleProof for bytes32[];
     using SafeERC20 for IERC20;
@@ -36,6 +36,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
     uint256 public networkId;
     bool public isMassExit;
     PostchainBlock public massExitBlock;
+    uint256 public withdrawOffset;
     uint256 public emergencyTimestamp;
 
     // Postchain/Chromia blockchain rid
@@ -94,7 +95,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
         _;
     }
 
-    function initialize(IValidator _validator) public initializer {
+    function initialize(IValidator _validator, uint256 _withdrawOffset) public initializer {
         __Ownable_init(_msgSender());
         __Pausable_init();
         __ReentrancyGuard_init();
@@ -105,6 +106,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
         }
         networkId = id;
         validator = _validator;
+        withdrawOffset = _withdrawOffset;
         emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
     }
 
@@ -223,7 +225,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
             wd.token = token;
             wd.beneficiary = beneficiary;
             wd.amount = amount;
-            wd.block_number = block.number + WITHDRAW_OFFSET;
+            wd.block_number = block.number + withdrawOffset;
             wd.status = Status.Withdrawable;
             _withdraw[hash] = wd;
             emit WithdrawRequest(beneficiary, token, amount);
