@@ -73,7 +73,7 @@ class EifGTXModule : SimpleGTXModule<Config>(
     }
 
     override fun makeBlockBuilderExtensions(): List<BaseBlockBuilderExtension> {
-        return listOf(EifImplementation(SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)),
+        return listOf(EifBlockBuilderExtension(SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)),
                 conf.levelsPerPage, conf.snapshotsToKeep
         ))
     }
