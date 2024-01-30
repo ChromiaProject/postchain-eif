@@ -14,8 +14,7 @@ object SimpleGtvEncoder {
      *
      * Return bytearray as concatenation of 32 bytes element each
      */
-    fun encodeGtv(v: Gtv): ByteArray {
-        if (v !is GtvArray) throw IllegalArgumentException("input data should be an array")
+    fun encodeGtv(v: GtvArray): ByteArray {
         val a = v.asArray()
         var out = ByteArray(0){0}
         a.forEach {
