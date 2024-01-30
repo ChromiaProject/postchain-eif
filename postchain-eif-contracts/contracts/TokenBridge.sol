@@ -76,12 +76,18 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
         uint blockHeight;
         uint accountNumber;
     }
-
+    
+    event SetBlockchainRid(bytes32 rid);
+    event AllowToken(IERC20 indexed token);
+    event TriggerMassExit(uint indexed height, bytes32 indexed blockRid);
+    event PostponeMassExit();
+    event UpdatedMassExitBlock(uint indexed height, bytes32 indexed blockRid);
+    event PendingWithdraw(bytes32 indexed hash);
+    event UnpendingWithdraw(bytes32 indexed hash);
     event FundedERC20(address indexed sender, IERC20 indexed token, uint amount);
     event DepositedERC20(address indexed sender, IERC20 indexed token, uint networkId, uint amount, string name, string symbol, uint8 decimals);
     event WithdrawRequest(address indexed beneficiary, IERC20 indexed token, uint256 value);
     event Withdrawal(address indexed beneficiary, IERC20 indexed token, uint256 value);
-    event MassExit(uint indexed height, bytes32 indexed blockRid);
     event WithdrawalBySnapshot(address indexed beneficiary);
 
     modifier isAllowToken(IERC20 token) {
@@ -111,6 +117,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
 
     function setBlockchainRid(bytes32 rid) onlyOwner public {
         blockchainRid = rid;
+        emit SetBlockchainRid(rid);
     }
 
     function pause() onlyOwner public {
@@ -123,6 +130,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
 
     function allowToken(IERC20 token) onlyOwner public {
         _allowedToken[token] = true;
+        emit AllowToken(token);
     }
 
     /**
@@ -133,10 +141,12 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
         require(!isMassExit, "TokenBridge: mass exit already set");
         isMassExit = true;
         massExitBlock = PostchainBlock(height, blockRid);
+        emit TriggerMassExit(height, blockRid);
     }
 
     function postponeMassExit() onlyOwner whenMassExit public {
         isMassExit = false;
+        emit PostponeMassExit();
     }
 
     /**
@@ -145,18 +155,21 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
      */
     function updateMassExitBlock(uint height, bytes32 blockRid) onlyOwner whenMassExit public {
         massExitBlock = PostchainBlock(height, blockRid);
+        emit UpdatedMassExitBlock(height, blockRid);
     }
 
     function pendingWithdraw(bytes32 _hash) onlyOwner public {
         Withdraw storage wd = _withdraw[_hash];
         require(wd.status == Status.Withdrawable, "TokenBridge: withdraw request status is not withdrawable");
         wd.status = Status.Pending;
+        emit PendingWithdraw(_hash);
     }
 
     function unpendingWithdraw(bytes32 _hash) onlyOwner public {
         Withdraw storage wd = _withdraw[_hash];
         require(wd.status == Status.Pending, "TokenBridge: withdraw request status is not pending");
         wd.status = Status.Withdrawable;
+        emit UnpendingWithdraw(_hash);
     }
 
     /**
