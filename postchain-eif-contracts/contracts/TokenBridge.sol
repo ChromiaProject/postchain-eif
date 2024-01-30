@@ -115,6 +115,10 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
         emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
     }
 
+    function renounceOwnership() public override onlyOwner {
+        revert("TokenBridge: renounce ownership is not allowed");
+    }
+
     function setBlockchainRid(bytes32 rid) onlyOwner public {
         blockchainRid = rid;
         emit SetBlockchainRid(rid);
