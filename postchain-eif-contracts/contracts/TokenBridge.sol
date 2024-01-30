@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 
 // Upgradeable implementations
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
@@ -20,7 +20,7 @@ interface IValidator {
 // This contract is upgradeable. This imposes restrictions on how storage layout can be modified once it is deployed
 // Some instructions are also not allowed. Read more at: https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable
 // Note: To enhance the security & decentralization, we should call transferOwnership() to external multi-sig owner after deploy the smart contract
-contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeable, ReentrancyGuardUpgradeable {
 
     uint8 constant ERC20_ACCOUNT_STATE_BYTE_SIZE = 64;
     uint constant EMERGENCY_DURATION = 90 days;
