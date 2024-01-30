@@ -11,6 +11,7 @@ import net.postchain.base.snapshot.EventPageStore
 import net.postchain.base.snapshot.SimpleDigestSystem
 import net.postchain.base.snapshot.SnapshotPageStore
 import net.postchain.common.data.KECCAK256
+import net.postchain.common.exception.UserMistake
 import net.postchain.common.hexStringToByteArray
 import net.postchain.core.BlockchainConfiguration
 import net.postchain.core.EContext
@@ -156,9 +157,9 @@ private fun blockHeaderData(
         db: DatabaseAccess,
         ctx: EContext,
         blockHeight: Long
-): Gtv {
+): GtvArray {
     val merkleHashCalculator = GtvMerkleHashCalculator(Secp256K1CryptoSystem())
-    val blockRid = db.getBlockRID(ctx, blockHeight) ?: return GtvNull
+    val blockRid = db.getBlockRID(ctx, blockHeight) ?: throw UserMistake("No block at height $blockHeight")
     val bh = BaseBlockHeader(db.getBlockHeader(ctx, blockRid), merkleHashCalculator).blockHeaderRec
     return gtv(
             bh.gtvBlockchainRid,

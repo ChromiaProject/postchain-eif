@@ -12,6 +12,7 @@ import net.postchain.common.data.Hash
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.core.*
 import net.postchain.gtv.Gtv
+import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvByteArray
 import java.util.*
 
@@ -33,8 +34,8 @@ class EifBlockBuilderExtension(
 
     override fun processEmittedEvent(ctxt: TxEContext, type: String, data: Gtv) {
         when (type) {
-            EIF_EVENT -> emitEifEvent(ctxt, data)
-            EIF_STATE -> emitEifState(data[0].asInteger(), data[1])
+            EIF_EVENT -> emitEifEvent(ctxt, data as GtvArray)
+            EIF_STATE -> emitEifState(data[0].asInteger(), data[1] as GtvArray)
             else -> throw ProgrammerMistake("Unrecognized event")
         }
     }
@@ -66,7 +67,7 @@ class EifBlockBuilderExtension(
      * Serialize, write to leaf store, hash using keccak256.
      * Hashes are remembered and later combined into a Merkle tree
      */
-    private fun emitEifEvent(ctxt: TxEContext, evt: Gtv) {
+    private fun emitEifEvent(ctxt: TxEContext, evt: GtvArray) {
         val data = SimpleGtvEncoder.encodeGtv(evt)
         val hash = ds.digest(data)
         store.writeEvent(ctxt, PREFIX, events.size.toLong(), hash, data)
@@ -78,7 +79,7 @@ class EifBlockBuilderExtension(
      * hash using keccak256. (state_n, hash) pairs are submitted to updateSnapshot
      * during finalization
      */
-    private fun emitEifState(state_n: Long, state: Gtv) {
+    private fun emitEifState(state_n: Long, state: GtvArray) {
         val data = SimpleGtvEncoder.encodeGtv(state)
         val hash = ds.digest(data)
         states[state_n] = hash
