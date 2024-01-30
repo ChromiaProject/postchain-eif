@@ -780,4 +780,12 @@ describe("Token Bridge Test", () => {
             expect(await adminTokenBridge.isMassExit()).to.be.false
         })
     })
+
+    describe("Ownership", async () => {
+        it("renounce ownership is not allowed", async () => {
+            const [admin, other] = await ethers.getSigners()
+            let adminTokenBridge = new TokenBridge__factory(admin).attach(bridgeAddress)
+            await expect(adminTokenBridge.renounceOwnership()).to.be.revertedWith('TokenBridge: renounce ownership is not allowed')
+        })
+    })
 })
