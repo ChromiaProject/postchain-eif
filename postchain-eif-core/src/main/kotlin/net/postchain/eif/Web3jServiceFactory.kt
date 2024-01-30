@@ -9,23 +9,19 @@ import org.web3j.protocol.ipc.WindowsIpcService
 import java.util.concurrent.TimeUnit
 
 object Web3jServiceFactory {
-    fun buildServices(evmConfig: EvmConfig): List<Web3j> {
-        val web3jServices = mutableListOf<Web3j>()
-        val urls = evmConfig.urls.split(",").map { it.trim() }
-        urls.forEach { url ->
-            val web3jService = if (url == "") {
-                HttpService(createOkHttpClient(evmConfig))
-            } else if (url.startsWith("http")) {
-                HttpService(url, createOkHttpClient(evmConfig), false)
-            } else if (System.getProperty("os.name").lowercase().startsWith("win")) {
-                WindowsIpcService(url)
-            } else {
-                UnixIpcService(url)
+    fun buildServices(evmConfig: EvmConfig): List<Web3j> =
+            evmConfig.urls.split(",").map { it.trim() }.map { url ->
+                val web3jService = if (url == "") {
+                    HttpService(createOkHttpClient(evmConfig))
+                } else if (url.startsWith("http")) {
+                    HttpService(url, createOkHttpClient(evmConfig), false)
+                } else if (System.getProperty("os.name").lowercase().startsWith("win")) {
+                    WindowsIpcService(url)
+                } else {
+                    UnixIpcService(url)
+                }
+                Web3j.build(web3jService)
             }
-            web3jServices.add(Web3j.build(web3jService))
-        }
-        return web3jServices
-    }
 
     private fun createOkHttpClient(evmConfig: EvmConfig): OkHttpClient {
         val builder: OkHttpClient.Builder = OkHttpClient.Builder()
