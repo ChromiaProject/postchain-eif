@@ -18,7 +18,7 @@ import java.util.*
 const val EIF_EVENT = "eif_event"
 const val EIF_STATE = "eif_state"
 
-class EifImplementation(
+class EifBlockBuilderExtension(
         private val ds: DigestSystem,
         private val levelsPerPage: Int,
         private val snapshotsToKeep: Int): BaseBlockBuilderExtension, TxEventSink {
