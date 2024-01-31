@@ -231,6 +231,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         Withdraw storage wd = _withdraw[hash];
         {
             (IERC20 token, address beneficiary, uint256 amount, uint256 netId) = hash.verifyEvent(_event);
+            require(_allowedToken[token], "TokenBridge: not allow token");
             require(networkId == netId, "TokenBridge: incorrect network id");
             require(amount > 0, "TokenBridge: invalid amount to make request withdraw");
             wd.token = token;
@@ -299,7 +300,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         offset += 32;
         for (uint i = offset; i < offset + byteSize; i += ERC20_ACCOUNT_STATE_BYTE_SIZE) {
             ERC20AccountState memory accountState = abi.decode(snapshot[i:i + ERC20_ACCOUNT_STATE_BYTE_SIZE], (ERC20AccountState));
-            if (accountState.amount > 0) {
+            if (accountState.amount > 0 && _allowedToken[accountState.token]) {
                 accountState.token.safeTransfer(beneficiary, accountState.amount);
             }
         }
