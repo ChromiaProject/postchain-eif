@@ -74,7 +74,6 @@ class EifSynchronizationInfrastructureExtension(
             val metrics = RpcUsageMetrics(cfg.chainID, cfg.blockchainRid, evmBlockchainConfig.networkId)
             EvmEventProcessor(
                     evmBlockchainConfig.networkId,
-                    web3jServices,
                     evmBlockchainConfig.contracts,
                     events,
                     BigInteger.valueOf(evmBlockchainConfig.evmReadOffset),
@@ -84,7 +83,7 @@ class EifSynchronizationInfrastructureExtension(
                     BigInteger.valueOf(evmBlockchainConfig.skipToHeight),
                     BigInteger.valueOf(evmConfig.lastEvmBlockHeight),
                     engine,
-                    Web3jRequestHandler(evmConfig.minRetryDelay, evmConfig.maxRetryDelay, evmConfig.maxTryErrors, urls, metrics),
+                    Web3jRequestHandler(evmConfig.minRetryDelay, evmConfig.maxRetryDelay, evmConfig.maxTryErrors, urls, web3jServices, metrics),
                     evmConfig.delayWhenNoNewBlocks
             )
         }

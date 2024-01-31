@@ -20,7 +20,6 @@ import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtx.data.OpData
 import org.web3j.abi.EventEncoder
 import org.web3j.abi.datatypes.Event
-import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.core.methods.request.EthFilter
 import org.web3j.protocol.core.methods.response.EthLog
@@ -110,7 +109,6 @@ class NoOpEventProcessor : EventProcessor {
  */
 class EvmEventProcessor(
         private val networkId: Long,
-        private val web3jServices: List<Web3j>,
         private val contractAddresses: List<String>,
         events: List<Event>,
         private val evmReadOffset: BigInteger,
@@ -162,7 +160,7 @@ class EvmEventProcessor(
     private suspend fun fetchEvents() {
         val from = lastReadLogBlockHeight + BigInteger.ONE
 
-        val blockNumberReply = web3jRequestHandler.sendWeb3jRequestWithRetry(web3jServices.map { it.ethBlockNumber()})
+        val blockNumberReply = web3jRequestHandler.sendWeb3jRequestWithRetry { it.ethBlockNumber() }
         val currentBlockHeight = blockNumberReply.blockNumber - evmReadOffset
         // Pacing the reading of logs
         val to = minOf(currentBlockHeight, from + BigInteger.valueOf(maxReadAhead))
@@ -182,7 +180,7 @@ class EvmEventProcessor(
         filter.addOptionalTopics(*eventSignatures)
 
 
-        val logResponse = web3jRequestHandler.sendWeb3jRequestWithRetry(web3jServices.map { it.ethGetLogs(filter) })
+        val logResponse = web3jRequestHandler.sendWeb3jRequestWithRetry { it.ethGetLogs(filter) }
 
         // Ensure events are sorted on txIndex + logIndex, blocks sorted on block number
         val sortedEncodedLogs = logResponse.logs
@@ -202,7 +200,7 @@ class EvmEventProcessor(
 
     override fun shutdown() {
         job.cancel()
-        web3jServices.forEach { it.shutdown() }
+        web3jRequestHandler.close()
     }
 
     @Synchronized

@@ -111,9 +111,9 @@ class EthereumEventProcessorIT {
                 .send().result.blockNumber
         val eventsToRead = listOf(TokenBridge.DEPOSITEDERC20_EVENT)
         val evmEventProcessor =
-                EvmEventProcessor(1L, web3jServices, listOf(bridge.contractAddress), eventsToRead,
+                EvmEventProcessor(1L, listOf(bridge.contractAddress), eventsToRead,
                         BigInteger.ZERO, BigInteger.ONE, 200L, 100L,
-                        contractDeployBlockNumber, BigInteger.ZERO, engineMock, Web3jRequestHandler(500, 60_000, 2, mutableListOf(url)), 500).apply {
+                        contractDeployBlockNumber, BigInteger.ZERO, engineMock, Web3jRequestHandler(500, 60_000, 2, mutableListOf(url), web3jServices), 500).apply {
                 }
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contract
@@ -223,9 +223,9 @@ class EthereumEventProcessorIT {
         val contractAddresses = listOf(bridgeFirst.contractAddress, bridgeSecond.contractAddress)
         val eventsToRead = listOf(TokenBridge.DEPOSITEDERC20_EVENT)
         val evmEventProcessor =
-                EvmEventProcessor(1L, web3jServices, contractAddresses, eventsToRead,
+                EvmEventProcessor(1L, contractAddresses, eventsToRead,
                         BigInteger.ZERO, BigInteger.ONE, 200L, 100L,
-                        contractDeployBlockNumber, BigInteger.ZERO, engineMock, Web3jRequestHandler(500, 60_000, 2, mutableListOf(url)), 500).apply {
+                        contractDeployBlockNumber, BigInteger.ZERO, engineMock, Web3jRequestHandler(500, 60_000, 2, mutableListOf(url), web3jServices), 500).apply {
                 }
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contracts

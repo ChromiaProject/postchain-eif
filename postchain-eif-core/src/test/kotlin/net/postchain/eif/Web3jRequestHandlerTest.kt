@@ -9,6 +9,7 @@ import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
+import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.Response
 
@@ -17,13 +18,14 @@ class Web3jRequestHandlerTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `Assert that web3j requests are sent with exponential back off`() = runTest(StandardTestDispatcher()) {
-        val web3jRequestHandler = Web3jRequestHandler(500, 60_000L, 10, mutableListOf("http://localhost:8545"))
+        val web3jServiceMock: Web3j = mock()
+        val web3jRequestHandler = Web3jRequestHandler(500, 60_000L, 10, listOf("http://localhost:8545"), listOf(web3jServiceMock))
 
         val requestMock: Request<*, Response<*>> = mock {
             on { send() } doThrow RuntimeException("You want me to fail")
         }
         backgroundScope.launch {
-            web3jRequestHandler.sendWeb3jRequestWithRetry(mutableListOf(requestMock))
+            web3jRequestHandler.sendWeb3jRequestWithRetry { requestMock }
         }
 
         testScheduler.advanceTimeBy(1)
