@@ -4,9 +4,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import mu.KLogging
 import net.postchain.eif.metrics.RpcUsageMetrics
+import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.Response
 import org.web3j.protocol.exceptions.ClientConnectionException
+import java.io.Closeable
 import kotlin.coroutines.coroutineContext
 import kotlin.math.min
 import kotlin.random.Random
@@ -16,15 +18,17 @@ class Web3jRequestHandler(
         private val maxTimeout: Long,
         private val maxTryErrors: Long,
         private val urls: List<String>,
+        private val web3jServices: List<Web3j>,
         private val metrics: RpcUsageMetrics? = null
-) {
+) : Closeable {
     companion object : KLogging() {
         const val DELAY_POWER_BASE = 1.2
     }
 
     suspend fun <T : Response<*>> sendWeb3jRequestWithRetry(
-            requests: List<Request<*, T>>
+            requestFactory: (Web3j) -> Request<*, T>
     ): T {
+        val requests = web3jServices.map(requestFactory)
         val retryTimeouts = Array(requests.size) { baseTimeout }
         var tryErrors = 0L
         var index = if (requests.size > 1) Random.nextInt(0, requests.size-1) else 0
@@ -60,5 +64,9 @@ class Web3jRequestHandler(
                 return response
             }
         }
+    }
+
+    override fun close() {
+        web3jServices.forEach { it.shutdown() }
     }
 }
