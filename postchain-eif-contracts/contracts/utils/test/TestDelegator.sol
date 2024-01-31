@@ -25,4 +25,12 @@ contract TestDelegator {
     function hashGtvIntegerLeaf(uint value) external pure returns (bytes32) {
         return Hash.hashGtvIntegerLeaf(value);
     }
+
+    function hashGtvBytes32Leaf(bytes32 value) external pure returns (bytes32) {
+        return Hash.hashGtvBytes32Leaf(value);
+    }
+
+    function hashGtvBytes64Leaf(bytes memory value) external pure returns (bytes32) {
+        return Hash.hashGtvBytes64Leaf(value);
+    }
 }

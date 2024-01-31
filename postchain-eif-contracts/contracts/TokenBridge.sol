@@ -101,6 +101,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     }
 
     function initialize(IValidator _validator, uint256 _withdrawOffset) public initializer {
+        require(address(_validator) != address(0), "TokenBridge: validator address is invalid");
         __Ownable_init(_msgSender());
         __Pausable_init();
         __ReentrancyGuard_init();
@@ -120,6 +121,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     }
 
     function setBlockchainRid(bytes32 rid) onlyOwner public {
+        require(rid != bytes32(0), "TokenBridge: blockchain rid is invalid");
         blockchainRid = rid;
         emit SetBlockchainRid(rid);
     }
@@ -133,6 +135,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     }
 
     function allowToken(IERC20 token) onlyOwner public {
+        require(address(token) != address(0), "TokenBridge: token address is invalid");
         _allowedToken[token] = true;
         emit AllowToken(token);
     }
@@ -150,6 +153,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
 
     function postponeMassExit() onlyOwner whenMassExit public {
         isMassExit = false;
+        massExitBlock = PostchainBlock(0, bytes32(0));
         emit PostponeMassExit();
     }
 
@@ -163,6 +167,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     }
 
     function pendingWithdraw(bytes32 _hash) onlyOwner public {
+        require(_hash != bytes32(0), "TokenBridge: event hash is invalid");
         Withdraw storage wd = _withdraw[_hash];
         require(wd.status == Status.Withdrawable, "TokenBridge: withdraw request status is not withdrawable");
         wd.status = Status.Pending;
@@ -170,6 +175,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     }
 
     function unpendingWithdraw(bytes32 _hash) onlyOwner public {
+        require(_hash != bytes32(0), "TokenBridge: event hash is invalid");
         Withdraw storage wd = _withdraw[_hash];
         require(wd.status == Status.Pending, "TokenBridge: withdraw request status is not pending");
         wd.status = Status.Withdrawable;
@@ -215,6 +221,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         address[] memory signers,
         Data.ExtraProofData memory extraProof
     ) internal view {
+        require(blockchainRid != bytes32(0), "TokenBridge: blockchain rid is not set");
         require(_events[eventProof.leaf] == false, "TokenBridge: event hash was already used");
         {
             (uint height, bytes32 blockRid, bytes32 eventRoot, ) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
@@ -333,7 +340,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
      * by allow admin/owner (multi-sig wallet) to withdraw all the remaining balance after a specific period of time.
      */
     function emergencyWithdraw(IERC20 token, address payable beneficiary) external onlyOwner {
-        require(block.timestamp > emergencyTimestamp, "TokenBridge: cannot do emergency withdrawl before setting timestamp");
+        require(address(token) != address(0), "TokenBridge: token address is invalid");
+        require(beneficiary != address(0), "TokenBridge: beneficiary address is invalid");
+        require(block.timestamp > emergencyTimestamp, "TokenBridge: cannot do emergency withdrawal before setting timestamp");
         uint tokenBalance = token.balanceOf(address(this));
         if (tokenBalance > 0) {
             token.safeTransfer(beneficiary, tokenBalance);

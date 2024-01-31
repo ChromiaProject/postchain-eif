@@ -27,6 +27,7 @@ contract Validator is Ownable {
     }
     
     function addValidator(uint _height, address _validator) external onlyOwner {
+        require(_validator != address(0), "Validator: validator address cannot be zero");
         if (_height < validatorHeights[validatorHeights.length-1]) {
             revert("Validator: cannot update previous heights' validator");
         } else if (_height > validatorHeights[validatorHeights.length-1]) {

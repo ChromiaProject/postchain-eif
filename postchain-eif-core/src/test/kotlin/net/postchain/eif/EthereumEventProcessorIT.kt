@@ -56,7 +56,7 @@ class EthereumEventProcessorIT {
             .create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
     private val accountId = Bytes32("fc91c4abaff09f4c67a0ab84d4e9afd37c929978bea3fa1790403ab6ee85bf33"
             .hexStringToByteArray())
-    private val validatorContract = Address("0x0000000000000000000000000000000000000000")
+    private val validatorContract = Address("0x0000000000000000000000000000000000000001")
     private var url = "http://localhost:8545"
     private var web3jServices = mutableListOf<Web3j>()
     private lateinit var transactionManager: TransactionManager
