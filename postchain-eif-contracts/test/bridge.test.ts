@@ -6,6 +6,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BytesLike, hexZeroPad, keccak256 } from "ethers/lib/utils";
 import { ContractReceipt, ContractTransaction } from "ethers";
 import { intToHex } from "ethjs-util";
+import { constants } from "ethers";
 import { DecodeHexStringToByteArray, hashGtvBytes32Leaf, hashGtvBytes64Leaf, hashGtvIntegerLeaf, postchainMerkleNodeHash} from "./utils"
 
 chai.use(solidity);
@@ -45,6 +46,7 @@ describe("Token Bridge Test", () => {
         const bridgeDelegator = await bridgeDelegatorFactory.deploy(bridgeAddress)
         bridgeDelegatorAddress = bridgeDelegator.address
 
+        await expect(bridge.allowToken(constants.AddressZero)).to.be.revertedWith("TokenBridge: token address is invalid");
         await expect(bridge.allowToken(tokenAddress)).to.emit(bridge, "AllowToken").withArgs(tokenAddress)
     });
 
@@ -55,8 +57,10 @@ describe("Token Bridge Test", () => {
             const otherValidator = new Validator__factory(other).attach(validatorAddress)
             await expect(otherValidator.addValidator(0, node1.address))
                 .to.be.revertedWith('OwnableUnauthorizedAccount')
+            await expect(validator.addValidator(0, constants.AddressZero))
+                .to.be.revertedWith('Validator: validator address cannot be zero')
 
-            // Update App Nodes
+            // Update Validator Nodes
             await validator.removeValidator(0, validator1.address)
             await validator.removeValidator(0, validator2.address)
             await validator.addValidator(0, node1.address)
@@ -124,7 +128,7 @@ describe("Token Bridge Test", () => {
             const adminBridge = new TokenBridge__factory(deployer).attach(bridgeAddress)
             // admin or owner cannot call emergencyWithdraw before setting time
             await expect(adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address))
-                .to.be.revertedWith("TokenBridge: cannot do emergency withdrawl before setting timestamp")
+                .to.be.revertedWith("TokenBridge: cannot do emergency withdrawal before setting timestamp")
 
             // admin can call emergencyWithdraw after setting time
             expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(0)
@@ -134,6 +138,10 @@ describe("Token Bridge Test", () => {
             const block = await ethers.provider.getBlock(blockNum)
             const timestamp = block.timestamp + nighttyDays
             await ethers.provider.send('evm_setNextBlockTimestamp', [timestamp])
+            await expect(adminBridge.emergencyWithdraw(constants.AddressZero, beneficiary.address))
+            .to.be.revertedWith("TokenBridge: token address is invalid")
+            await expect(adminBridge.emergencyWithdraw(tokenAddress, constants.AddressZero))
+            .to.be.revertedWith("TokenBridge: beneficiary address is invalid")
             await adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address)
             expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(toDeposit)
             expect(await tokenInstance.balanceOf(adminBridge.address)).to.eq(0)
@@ -347,6 +355,10 @@ describe("Token Bridge Test", () => {
                     DecodeHexStringToByteArray(wrongNetworkIdSig3.substring(2, wrongNetworkIdSig3.length))
                 ]
                 let validators = [validator1.address, validator2.address, validator3.address];
+                await expect(bridge.withdrawRequest(wrongNetworkIdData, wrongNetworkIdEventProof,
+                    DecodeHexStringToByteArray(wrongNetworkIdBlockHeader), wrongNetworkIdSigs, validators, 
+                    wrongNetworkIdExtraProof)
+                ).to.be.revertedWith('TokenBridge: blockchain rid is not set')
                 await expect(bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid)))
                 .to.emit(bridgeOwner, "SetBlockchainRid")
                 await expect(bridge.withdrawRequest(wrongNetworkIdData, wrongNetworkIdEventProof,
@@ -448,6 +460,7 @@ describe("Token Bridge Test", () => {
                 let hashEvent = DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length))
 
                 // smart contract owner can update withdraw request status to pending (emergency case)
+                await expect(bridgeOwner.pendingWithdraw(constants.HashZero)).to.be.revertedWith('TokenBridge: event hash is invalid')
                 await expect(bridgeOwner.pendingWithdraw(hashEvent))
                 .to.emit(bridge, "PendingWithdraw")
 
@@ -457,6 +470,7 @@ describe("Token Bridge Test", () => {
                     user.address)).to.be.revertedWith('TokenBridge: fund is pending or was already claimed')
 
                 // smart contract owner can set withdraw request status back to withdrawable
+                await expect(bridgeOwner.unpendingWithdraw(constants.HashZero)).to.be.revertedWith('TokenBridge: event hash is invalid')
                 await expect(bridgeOwner.unpendingWithdraw(hashEvent))
                 .to.emit(bridge, "UnpendingWithdraw")
 
@@ -643,6 +657,7 @@ describe("Token Bridge Test", () => {
                     DecodeHexStringToByteArray(sig3.substring(2, sig3.length))
                 ];
                 let validators = [validator1.address, validator2.address, validator3.address];
+                await expect(bridgeOwner.setBlockchainRid(constants.HashZero)).to.be.revertedWith('TokenBridge: blockchain rid is invalid')
                 await expect(bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid)))
                 .to.emit(bridgeOwner, "SetBlockchainRid")
                 await expect(bridgeDelegator.withdrawRequest(maliciousData, eventProof,

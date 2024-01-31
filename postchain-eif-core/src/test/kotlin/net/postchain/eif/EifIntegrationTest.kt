@@ -403,7 +403,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
                     extraProofData
             ).send()
         }
-        assertEquals(exception.message!!.contains("Postchain: invalid blockchain rid"), true)
+        assertEquals(exception.message!!.contains("TokenBridge: blockchain rid is not set"), true)
 
         bridge.setBlockchainRid(Bytes32(bcRid.data)).send()
         var receipt = bridge.withdrawRequest(

@@ -27,6 +27,9 @@ library Hash {
     }
 
     function hashGtvBytes64Leaf(bytes memory value) internal pure returns (bytes32) {
+        if (value.length != 64) {
+            revert("Hash: value must be 64 bytes long");
+        }
         return sha256(abi.encodePacked(
                 uint8(0x1),  // Gtv merkle tree leaf prefix
                 uint8(0xA1), // // Gtv ByteArray tag: CONTEXT_CLASS, CONSTRUCTED, 1
