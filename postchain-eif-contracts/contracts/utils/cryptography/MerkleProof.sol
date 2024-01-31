@@ -50,14 +50,4 @@ library MerkleProof {
         }
         return (r == rootHash);
     }
-    
-    function root(bytes32[] memory nodes) internal pure returns (bytes32) {
-        if (nodes.length == 1) return nodes[0];
-        uint len = nodes.length/2;
-        bytes32[] memory _nodes = new bytes32[](len);
-        for (uint i = 0; i < len; i++) {
-            _nodes[i] = Hash.hash(nodes[i*2], nodes[i*2+1]);
-        }
-        return root(_nodes);
-    }
 }
