@@ -8,6 +8,9 @@ library MerkleProof {
      * @dev verify merkle proof using keccak256
      */
     function verify(bytes32[] memory proofs, bytes32 leaf, uint position, bytes32 rootHash) internal pure returns (bool) {
+        if (leaf == 0x0 || position >= (1 << proofs.length)) {
+            return false;
+        }
         bytes32 r = leaf;
         for (uint i = 0; i < proofs.length; i++) {
             uint b = position & (1 << i);
@@ -25,6 +28,9 @@ library MerkleProof {
      * specific for postchain block header extra data in dictionary data format
      */
     function verifySHA256(bytes32[] memory proofs, bytes32 leaf, uint position, bytes32 rootHash) internal pure returns (bool) {
+        if (position >= (1 << proofs.length)) {
+            return false;
+        }
         bytes32 r = leaf; // hashed leaf
         uint last = proofs.length-1;
         for (uint i = 0; i < last; i++) {
@@ -43,15 +49,5 @@ library MerkleProof {
             r = sha256(abi.encodePacked(uint8(0x08), proofs[last], r));
         }
         return (r == rootHash);
-    }
-    
-    function root(bytes32[] memory nodes) internal pure returns (bytes32) {
-        if (nodes.length == 1) return nodes[0];
-        uint len = nodes.length/2;
-        bytes32[] memory _nodes = new bytes32[](len);
-        for (uint i = 0; i < len; i++) {
-            _nodes[i] = Hash.hash(nodes[i*2], nodes[i*2+1]);
-        }
-        return root(_nodes);
     }
 }
