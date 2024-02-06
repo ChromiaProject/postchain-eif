@@ -437,11 +437,12 @@ describe("Token Bridge Test", () => {
 
                 await expect(bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid)))
                 .to.emit(bridgeOwner, "SetBlockchainRid")
+                let blockNum = await ethers.provider.getBlockNumber()
                 await expect(bridge.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     extraProof)
                 ).to.emit(bridge, "WithdrawRequest")
-                .withArgs(user.address, tokenAddress, toDeposit)
+                .withArgs(user.address, tokenAddress, toDeposit, blockNum+1)
 
                 await expect(bridge.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
@@ -716,11 +717,12 @@ describe("Token Bridge Test", () => {
                     [admin.address, validator1.address],
                     extraProof)
                 ).to.be.revertedWith('Validator: signer is not validator')
+                let blockNum = await ethers.provider.getBlockNumber()
                 await expect(bridgeDelegator.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     extraProof)
                 ).to.emit(bridge, "WithdrawRequest")
-                .withArgs(bridgeDelegatorAddress, tokenAddress, toDeposit)
+                .withArgs(bridgeDelegatorAddress, tokenAddress, toDeposit, blockNum+1)
 
                 await expect(bridgeDelegator.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
