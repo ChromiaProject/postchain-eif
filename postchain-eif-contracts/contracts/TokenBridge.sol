@@ -77,6 +77,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         uint accountNumber;
     }
     
+    event Initialize(IValidator indexed _validator, uint256 _withdrawOffset);
     event SetBlockchainRid(bytes32 rid);
     event AllowToken(IERC20 indexed token);
     event TriggerMassExit(uint indexed height, bytes32 indexed blockRid);
@@ -86,7 +87,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     event UnpendingWithdraw(bytes32 indexed hash);
     event FundedERC20(address indexed sender, IERC20 indexed token, uint amount);
     event DepositedERC20(address indexed sender, IERC20 indexed token, uint networkId, uint amount, string name, string symbol, uint8 decimals);
-    event WithdrawRequest(address indexed beneficiary, IERC20 indexed token, uint256 value);
+    event WithdrawRequest(address indexed beneficiary, IERC20 indexed token, uint256 value, uint256 blockNumber);
     event Withdrawal(address indexed beneficiary, IERC20 indexed token, uint256 value);
     event WithdrawalBySnapshot(address indexed beneficiary);
 
@@ -114,6 +115,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         validator = _validator;
         withdrawOffset = _withdrawOffset;
         emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
+        emit Initialize(_validator, _withdrawOffset);
     }
 
     function renounceOwnership() public override onlyOwner {
@@ -247,7 +249,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
             wd.block_number = block.number + withdrawOffset;
             wd.status = Status.Withdrawable;
             _withdraw[hash] = wd;
-            emit WithdrawRequest(beneficiary, token, amount);
+            emit WithdrawRequest(beneficiary, token, amount, block.number);
         }
         return true;
     }
