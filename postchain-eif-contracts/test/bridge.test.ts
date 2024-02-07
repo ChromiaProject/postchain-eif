@@ -1,7 +1,7 @@
 import { ethers, upgrades, network} from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
-import { TestToken__factory, TokenBridge__factory, TokenBridgeDelegator__factory, Validator__factory } from "../src/types";
+import { TestToken__factory, TokenBridge__factory, TokenBridgeDelegator__factory, Validator__factory, Migration__factory } from "../src/types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BytesLike, hexZeroPad, keccak256 } from "ethers/lib/utils";
 import { ContractReceipt, ContractTransaction } from "ethers";
@@ -11,12 +11,13 @@ import { DecodeHexStringToByteArray, hashGtvBytes32Leaf, hashGtvBytes64Leaf, has
 
 chai.use(solidity);
 const { expect } = chai;
-const WITHDRAW_OFFSET = "0x2";
+const WITHDRAW_OFFSET = "0x20";
 describe("Token Bridge Test", () => {
     let tokenAddress: string;
     let bridgeAddress: string;
     let validatorAddress: string;
     let bridgeDelegatorAddress: string;
+    let migrationAddress: string;
     let admin: SignerWithAddress;
     let validator1: SignerWithAddress;
     let validator2: SignerWithAddress;
@@ -39,12 +40,16 @@ describe("Token Bridge Test", () => {
         validatorAddress = validatorContract.address
 
         const bridgeFactory = new TokenBridge__factory(admin)
-        const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress, 2])
+        const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_OFFSET])
         bridgeAddress = bridge.address
 
         const bridgeDelegatorFactory = new TokenBridgeDelegator__factory(deployer)
         const bridgeDelegator = await bridgeDelegatorFactory.deploy(bridgeAddress)
         bridgeDelegatorAddress = bridgeDelegator.address
+
+        const migrationFactory = new Migration__factory(admin)
+        const migration = await migrationFactory.deploy(validatorAddress, bridgeAddress)
+        migrationAddress = migration.address
 
         await expect(bridge.allowToken(constants.AddressZero)).to.be.revertedWith("TokenBridge: token address is invalid");
         await expect(bridge.allowToken(tokenAddress)).to.emit(bridge, "AllowToken").withArgs(tokenAddress)
@@ -55,20 +60,28 @@ describe("Token Bridge Test", () => {
             const [node1, node2, node3, other] = await ethers.getSigners()
             const validator = new Validator__factory(admin).attach(validatorAddress)
             const otherValidator = new Validator__factory(other).attach(validatorAddress)
-            await expect(otherValidator.addValidator(0, node1.address))
+            await expect(validator.renounceOwnership())
+                .to.be.revertedWith("Validator: renounceOwnership is not allowed")
+            await expect(otherValidator.updateValidators([node1.address]))
                 .to.be.revertedWith('OwnableUnauthorizedAccount')
-            await expect(validator.addValidator(0, constants.AddressZero))
+            await expect(validator.updateValidators([node1.address, constants.AddressZero]))
                 .to.be.revertedWith('Validator: validator address cannot be zero')
 
-            // Update Validator Nodes
-            await validator.removeValidator(0, validator1.address)
-            await validator.removeValidator(0, validator2.address)
-            await validator.addValidator(0, node1.address)
-            await validator.addValidator(0, node2.address)
-            await validator.addValidator(0, node3.address)
-            expect(await validator.validators(0, 0)).to.eq(node1.address)
-            expect(await validator.validators(0, 1)).to.eq(node2.address)
-            expect(await validator.validators(0, 2)).to.eq(node3.address)
+            expect(await validator.getValidatorCount()).to.eq(2)
+
+            // Update validator list
+            const blockNum = await ethers.provider.getBlockNumber()
+            expect(await validator.updateValidators([node1.address]))
+            .to.emit(validator, "UpdateValidators").withArgs(blockNum+1, [node1.address])
+            expect(await validator.validators(0)).to.eq(node1.address)
+            expect(await validator.getValidatorCount()).to.eq(1)
+
+            expect(await validator.updateValidators([node1.address, node2.address, node3.address]))
+            .to.emit(validator, "UpdateValidators").withArgs(blockNum+2, [node1.address, node2.address, node3.address])
+            expect(await validator.validators(0)).to.eq(node1.address)
+            expect(await validator.validators(1)).to.eq(node2.address)
+            expect(await validator.validators(2)).to.eq(node3.address)
+            expect(await validator.getValidatorCount()).to.eq(3)
         })
     })
 
@@ -160,6 +173,7 @@ describe("Token Bridge Test", () => {
             const bridgeOwner = new TokenBridge__factory(deployer).attach(bridgeAddress)
             const bridge = new TokenBridge__factory(user).attach(bridgeAddress)
             const validatorAdmin = new Validator__factory(admin).attach(validatorAddress)
+            const migration = new Migration__factory(admin).attach(migrationAddress)
             const toDeposit = ethers.utils.parseEther("100")
             const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
@@ -271,10 +285,8 @@ describe("Token Bridge Test", () => {
                                     wrongNetworkIdExtraDataMerkleRoot
                 )
 
-                // update to add new validator at height of 30
-                await validatorAdmin.addValidator(30, validator1.address)
-                await validatorAdmin.addValidator(30, validator2.address)
-                await validatorAdmin.addValidator(30, validator3.address)
+                // update to new validator list
+                await validatorAdmin.updateValidators([validator1.address, validator2.address, validator3.address])
 
                 let sig1 = await validator1.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
                 let sig2 = await validator2.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
@@ -437,12 +449,21 @@ describe("Token Bridge Test", () => {
 
                 await expect(bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid)))
                 .to.emit(bridgeOwner, "SetBlockchainRid")
+
+                await validatorAdmin.updateValidators([validator1.address, validator2.address])
+                await validatorAdmin.transferOwnership(migrationAddress)
+                await migration.acceptValidatorOwnership()
                 let blockNum = await ethers.provider.getBlockNumber()
-                await expect(bridge.withdrawRequest(data, eventProof,
-                    DecodeHexStringToByteArray(blockHeader), sigs, validators,
-                    extraProof)
-                ).to.emit(bridge, "WithdrawRequest")
-                .withArgs(user.address, tokenAddress, toDeposit, blockNum+1)
+                await expect(migration.withdrawRequest(
+                    validators, [validator1.address, validator2.address], 
+                    data, eventProof, DecodeHexStringToByteArray(blockHeader), sigs, validators, extraProof)
+                ).to.be.emit(bridge, "WithdrawRequest").withArgs(user.address, tokenAddress, toDeposit, blockNum+1)
+
+                await migration.transferValidatorOwnership(admin.address)
+                validatorAdmin.acceptOwnership()
+                expect(await validatorAdmin.getValidatorCount()).to.eq(2)
+                await validatorAdmin.updateValidators(validators)
+                expect(await validatorAdmin.getValidatorCount()).to.eq(3)
 
                 await expect(bridge.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
@@ -596,10 +617,8 @@ describe("Token Bridge Test", () => {
                                     extraDataMerkleRoot
                 )
 
-                // update to add new validator at height of 30
-                await validatorAdmin.addValidator(30, validator1.address)
-                await validatorAdmin.addValidator(30, validator2.address)
-                await validatorAdmin.addValidator(30, validator3.address)
+                // update to add new validator list
+                await validatorAdmin.updateValidators([validator1.address, validator2.address, validator3.address])
 
                 let sig1 = await validator1.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
                 let sig2 = await validator2.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
