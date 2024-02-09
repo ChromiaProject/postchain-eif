@@ -13,8 +13,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./Postchain.sol";
 
 interface IValidator {
-    function getValidatorHeight(uint _height) external view returns (uint);
-    function isValidSignatures(uint height, bytes32 hash, bytes[] memory signatures, address[] memory signers) external view returns (bool);
+    function isValidSignatures(bytes32 hash, bytes[] memory signatures, address[] memory signers) external view returns (bool);
 }
 
 // This contract is upgradeable. This imposes restrictions on how storage layout can be modified once it is deployed
@@ -230,7 +229,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
             if (isMassExit) {
                 require(height <= massExitBlock.height, "TokenBridge: cannot withdraw request after the mass exit block height");
             }
-            if (!validator.isValidSignatures(validator.getValidatorHeight(height), blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
+            if (!validator.isValidSignatures(blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
             if (!MerkleProof.verify(eventProof.merkleProofs, eventProof.leaf, eventProof.position, eventRoot)) revert("TokenBridge: invalid merkle proof");
         }
         return;
@@ -299,7 +298,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         require(stateProof.leaf == keccak256(snapshot), "TokenBridge: snapshot data is not correct");
         (uint height, bytes32 blockRid, , bytes32 stateRoot) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
         require(blockRid == massExitBlock.blockRid && height == massExitBlock.height, "TokenBridge: snapshot block should be the same with mass exit block");
-        if (!validator.isValidSignatures(validator.getValidatorHeight(height), blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
+        if (!validator.isValidSignatures(blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
         if (!MerkleProof.verify(stateProof.merkleProofs, stateProof.leaf, stateProof.position, stateRoot)) revert("TokenBridge: invalid merkle proof");
 
         address beneficiary = abi.decode(snapshot[:32], (address));
