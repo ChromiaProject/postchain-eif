@@ -10,9 +10,10 @@ import org.web3j.abi.datatypes.Function
 import org.web3j.protocol.core.methods.response.EthSendTransaction
 import org.web3j.protocol.exceptions.ClientConnectionException
 import org.web3j.tx.TransactionManager
+import org.web3j.tx.gas.ContractGasProvider
 import java.math.BigInteger
 
-class TransactionSubmitter(private val transactionManager: TransactionManager) {
+class TransactionSubmitter(private val transactionManager: TransactionManager, private val gasProvider: ContractGasProvider) {
 
     fun sendTransaction(contractAddress: String, functionName: String, parameterTypes: List<String>, parameterValues: List<Gtv>): EthSendTransaction {
 
@@ -22,7 +23,10 @@ class TransactionSubmitter(private val transactionManager: TransactionManager) {
                 emptyList<TypeReference<*>>()
         )
         val response = try {
-            transactionManager.sendTransaction(BigInteger.valueOf(1), BigInteger.valueOf(2), contractAddress, FunctionEncoder.encode(function), BigInteger.valueOf(0))
+            val functionData = FunctionEncoder.encode(function)
+            val gasPrice = gasProvider.getGasPrice(functionData)
+            val gasLimit = gasProvider.getGasLimit(functionData)
+            transactionManager.sendTransaction(gasPrice, gasLimit, contractAddress, functionData, BigInteger.valueOf(0))
         } catch (e: ClientConnectionException) {
             Web3jRequestHandler.logger.error("Web3j request failed: ${e.message}")
             // TODO investigate - fine to move on to next request?

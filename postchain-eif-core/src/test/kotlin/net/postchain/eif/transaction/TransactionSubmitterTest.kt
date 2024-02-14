@@ -76,12 +76,11 @@ class TransactionSubmitterTest {
         // Deploy validator contract
         val postchainValidator = "659e4a3726275edFD125F52338ECe0d54d15BD99"
         val encodedConstructor = FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(postchainValidator))))
-        val validator = Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedConstructor).send()
+        Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedConstructor).send()
 
+        val transaction = TransactionSubmitter(transactionManager, gasProvider).sendTransaction(postchainValidator, "addValidator", listOf("uint", "address"), listOf(GtvInteger(1), GtvByteArray(ByteArray(20))))
 
-        val transaction = TransactionSubmitter(transactionManager).sendTransaction(postchainValidator, "addValidator", listOf("uint", "address"), listOf(GtvInteger(1), GtvByteArray(ByteArray(20))))
-
-        print(transaction)
+        print(transaction.transactionHash)
     }
 
 }
