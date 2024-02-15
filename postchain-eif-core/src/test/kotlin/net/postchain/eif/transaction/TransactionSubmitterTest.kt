@@ -2,6 +2,7 @@ package net.postchain.eif.transaction
 
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
+import net.postchain.core.Storage
 import net.postchain.eif.GethContainer
 import net.postchain.eif.Web3jRequestHandler
 import net.postchain.eif.contracts.Validator
@@ -9,6 +10,7 @@ import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvInteger
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.mock
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.FunctionEncoder
@@ -77,8 +79,9 @@ class TransactionSubmitterTest {
         val postchainValidator = "659e4a3726275edFD125F52338ECe0d54d15BD99"
         val encodedConstructor = FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(postchainValidator))))
         Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedConstructor).send()
+        val storage: Storage = mock();
 
-        val transaction = TransactionSubmitter(web3jRequestHandler, transactionManager, gasProvider).sendTransaction(1L, postchainValidator, "addValidator", listOf("uint", "address"), listOf(GtvInteger(1), GtvByteArray(ByteArray(20))))
+        val transaction = TransactionSubmitter(web3jRequestHandler, transactionManager, gasProvider,TransactionSubmitterDatabaseOperationsImpl(),storage,1L, 1L).sendTransaction(postchainValidator, "addValidator", listOf("uint", "address"), listOf(GtvInteger(1), GtvByteArray(ByteArray(20))))
 
         print(transaction.transactionHash)
     }

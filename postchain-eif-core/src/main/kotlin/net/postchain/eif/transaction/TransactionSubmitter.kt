@@ -23,10 +23,11 @@ class TransactionSubmitter(
         private val gasProvider: ContractGasProvider,
         private val databaseOperations: TransactionSubmitterDatabaseOperations,
         private val storage: Storage,
-        private val chainId: Long
+        private val chainId: Long,
+        private val networkId: Long
 ) {
 
-    fun sendTransaction(networkId: Long, contractAddress: String, functionName: String, parameterTypes: List<String>, parameterValues: List<Gtv>): EthSendTransaction {
+    fun sendTransaction(contractAddress: String, functionName: String, parameterTypes: List<String>, parameterValues: List<Gtv>): EthSendTransaction {
         val walletBalance = web3jRequestHandler.sendWeb3jRequest { it.ethGetBalance(transactionManager.fromAddress, DefaultBlockParameterName.LATEST) }
 
         val function = Function(
