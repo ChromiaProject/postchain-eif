@@ -26,7 +26,7 @@ class Web3jRequestHandler(
         const val DELAY_POWER_BASE = 1.2
     }
 
-    suspend fun <T : Response<*>> sendWeb3jRequest(
+    fun <T : Response<*>> sendWeb3jRequest(
         requestFactory: (Web3j) -> Request<*, T>
     ): T {
         val requests = web3jServices.map(requestFactory)

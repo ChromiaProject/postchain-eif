@@ -88,6 +88,12 @@
             <artifactId>clikt-jvm</artifactId>
         </dependency>
 
+        <!-- Jooq -->
+        <dependency>
+            <groupId>org.jooq</groupId>
+            <artifactId>jooq</artifactId>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
