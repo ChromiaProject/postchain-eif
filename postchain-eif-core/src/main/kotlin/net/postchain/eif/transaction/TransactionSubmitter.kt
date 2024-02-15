@@ -26,7 +26,7 @@ class TransactionSubmitter(
         private val chainId: Long
 ) {
 
-    fun sendTransaction(contractAddress: String, functionName: String, parameterTypes: List<String>, parameterValues: List<Gtv>): EthSendTransaction {
+    fun sendTransaction(networkId: Long, contractAddress: String, functionName: String, parameterTypes: List<String>, parameterValues: List<Gtv>): EthSendTransaction {
         val walletBalance = web3jRequestHandler.sendWeb3jRequest { it.ethGetBalance(transactionManager.fromAddress, DefaultBlockParameterName.LATEST) }
 
         val function = Function(
@@ -65,7 +65,7 @@ class TransactionSubmitter(
                     throw ProgrammerMistake(errorMessage)
                 } else {
                     withWriteConnection(storage, chainId) {
-                        databaseOperations.recordTransaction(it, contractAddress, functionName, parameterTypes, parameterValues, gasPrice, gasLimit, response.transactionHash)
+                        databaseOperations.recordTransaction(it, contractAddress, functionName, parameterTypes, parameterValues, gasPrice, gasLimit, response.transactionHash, networkId)
                         true
                     }
                     return response
@@ -75,7 +75,7 @@ class TransactionSubmitter(
         } catch (e: Exception) {
             withWriteConnection(storage, chainId) {
                 databaseOperations.recordFailedTransaction(it, contractAddress, functionName, parameterTypes, parameterValues, gasPrice, gasLimit, e.message
-                        ?: "Unknown error")
+                        ?: "Unknown error", networkId)
                 true
             }
             throw e

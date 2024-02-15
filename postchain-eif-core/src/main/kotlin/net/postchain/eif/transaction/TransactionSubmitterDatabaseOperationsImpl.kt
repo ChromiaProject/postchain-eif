@@ -32,6 +32,7 @@ class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterDatabaseO
         val COLUMN_ERROR_MESSAGE: Field<String> = field("error_message", PostgresDataType.TEXT)
         val COLUMN_STATUS: Field<String> = field("status", PostgresDataType.TEXT.nullable(false))
         val COLUMN_TIMESTAMP: Field<Timestamp> = field("timestamp", PostgresDataType.TIMESTAMP.nullable(false))
+        val COLUMN_NETWORK_ID: Field<Long> = field("network_id", PostgresDataType.BIGINT.nullable(false))
     }
 
     private fun DatabaseAccess.tableEvmTransaction(ctx: EContext) = tableName(ctx, "${PREFIX}.transactions")
@@ -52,11 +53,12 @@ class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterDatabaseO
                     .column(COLUMN_ERROR_MESSAGE)
                     .column(COLUMN_STATUS)
                     .column(COLUMN_TIMESTAMP)
+                    .column(COLUMN_NETWORK_ID)
                     .execute()
         }
     }
 
-    override fun recordTransaction(ctx: EContext, contractAddress: String, functionName: String, parameterTypes: List<String>, parameterValues: List<Gtv>, gasPrice: BigInteger, gasLimit: BigInteger, txHash: String) {
+    override fun recordTransaction(ctx: EContext, contractAddress: String, functionName: String, parameterTypes: List<String>, parameterValues: List<Gtv>, gasPrice: BigInteger, gasLimit: BigInteger, txHash: String, networkId: Long) {
         DatabaseAccess.of(ctx).apply {
             val jooq = createJooq(ctx)
             
@@ -70,11 +72,12 @@ class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterDatabaseO
                     .set(COLUMN_TX_HASH, txHash)
                     .set(COLUMN_STATUS, TransactionStatus.SUCCESS.name)
                     .set(COLUMN_TIMESTAMP, currentTimestamp())
+                    .set(COLUMN_NETWORK_ID, networkId)
                     .execute()
         }
     }
 
-    override fun recordFailedTransaction(ctx: EContext, contractAddress: String, functionName: String, parameterTypes: List<String>, parameterValues: List<Gtv>, gasPrice: BigInteger, gasLimit: BigInteger, errorMessage: String) {
+    override fun recordFailedTransaction(ctx: EContext, contractAddress: String, functionName: String, parameterTypes: List<String>, parameterValues: List<Gtv>, gasPrice: BigInteger, gasLimit: BigInteger, errorMessage: String, networkId: Long) {
         DatabaseAccess.of(ctx).apply {
             val jooq = createJooq(ctx)
 
@@ -88,6 +91,7 @@ class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterDatabaseO
                     .set(COLUMN_ERROR_MESSAGE, errorMessage)
                     .set(COLUMN_STATUS, TransactionStatus.FAILURE.name)
                     .set(COLUMN_TIMESTAMP, currentTimestamp())
+                    .set(COLUMN_NETWORK_ID, networkId)
                     .execute()
         }
     }

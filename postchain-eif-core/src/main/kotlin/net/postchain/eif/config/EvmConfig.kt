@@ -45,7 +45,7 @@ data class EvmConfig(
     }
 
     fun toEnvironmentKeyValueMap(chain: String): Map<String, String> = buildMap{
-        put("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_URLS", urls)
+        put("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_URLS", urls.joinToString(","))
         put("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_LAST_EVM_BLOCK_HEIGHT", lastEvmBlockHeight.toString())
         put(EVM_CONNECT_TIMEOUT, connectTimeout.toString())
         put(EVM_READ_TIMEOUT, readTimeout.toString())

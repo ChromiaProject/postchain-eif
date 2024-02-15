@@ -8,7 +8,7 @@ interface TransactionSubmitterDatabaseOperations {
 
     fun initialize(ctx: EContext)
 
-    fun recordTransaction(ctx: EContext, contractAddress: String, functionName: String, parameterTypes: List<String>, parameterValues: List<Gtv>, gasPrice: BigInteger, gasLimit: BigInteger, txHash: String)
+    fun recordTransaction(ctx: EContext, contractAddress: String, functionName: String, parameterTypes: List<String>, parameterValues: List<Gtv>, gasPrice: BigInteger, gasLimit: BigInteger, txHash: String, networkId: Long)
 
-    fun recordFailedTransaction(ctx: EContext, contractAddress: String, functionName: String, parameterTypes: List<String>, parameterValues: List<Gtv>, gasPrice: BigInteger, gasLimit: BigInteger, errorMessage: String)
+    fun recordFailedTransaction(ctx: EContext, contractAddress: String, functionName: String, parameterTypes: List<String>, parameterValues: List<Gtv>, gasPrice: BigInteger, gasLimit: BigInteger, errorMessage: String, networkId: Long)
 }
