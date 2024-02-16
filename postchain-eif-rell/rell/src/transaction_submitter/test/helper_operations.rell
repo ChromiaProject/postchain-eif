@@ -1,0 +1,8 @@
+module;
+
+import ^^.*;
+
+
+operation create_evm_submit_transaction_message_entity_operation(evm_submit_transaction_message: evm_submit_transaction_message, sender: byte_array){
+    create_evm_submit_transaction_message_entity(evm_submit_transaction_message, sender);
+}

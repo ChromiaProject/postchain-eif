@@ -1,0 +1,82 @@
+operation __icmf_message(sender: byte_array, topic: text, body: gtv) {
+    create_evm_submit_transaction_message_entity(evm_submit_transaction_message.from_gtv(body), sender);
+}
+
+operation __update_evm_transaction_state(row_id: integer, status: transaction_status) {
+    update evm_submit_transaction_message_entity @ { .row_id == rowid(row_id)} (status = status);
+}
+
+
+struct evm_submit_transaction_message {
+    contract_address: text;
+    function_name: text;
+    parameter_types: list<text>;
+    parameter_values: list<gtv>;
+    network_id: integer;
+}
+
+entity evm_submit_transaction_message_entity {
+    contract_address: text;
+    function_name: text;
+    parameter_types: text;
+    parameter_values: byte_array;
+    network_id: integer;
+    sender: byte_array;
+    status: transaction_status;
+}
+
+struct evm_submit_transaction_message_data {
+    row_id: integer;
+    contract_address: text;
+    function_name: text;
+    parameter_types: list<text>;
+    parameter_values: list<gtv>;
+    network_id: integer;
+    sender: byte_array;
+    status: transaction_status;
+}
+
+enum transaction_status {
+    SUCCESS,
+    QUEUED,
+    FAILURE,
+    TAKEN
+}
+
+function create_evm_submit_transaction_message_entity(evm_submit_transaction_message: evm_submit_transaction_message, sender: byte_array) {
+    create evm_submit_transaction_message_entity(
+        contract_address = evm_submit_transaction_message.contract_address,
+        function_name = evm_submit_transaction_message.function_name,
+        parameter_types = join_text_list(evm_submit_transaction_message.parameter_types),
+        parameter_values = evm_submit_transaction_message.parameter_values.to_gtv().to_bytes(),
+        network_id = evm_submit_transaction_message.network_id,
+        sender = sender,
+        status = transaction_status.QUEUED
+    );
+}
+
+query fetch_queued_evm_transaction() {
+    return evm_submit_transaction_message_entity @* { .status == transaction_status.QUEUED } (evm_submit_transaction_message_data(
+        row_id = .row_id,
+        contract_address = .contract_address,
+        function_name = .function_name,
+        parameter_types = .parameter_types.split("."),
+        parameter_values = list<gtv>.from_gtv(gtv.from_bytes(.parameter_values)),
+        network_id = .network_id,
+        sender = .sender,
+        status = .status));
+}
+
+
+function join_text_list(components: list<text>) {
+    if(components.empty()) {
+        return "";
+    }
+    var result = components[0];
+    if(components.size() > 1){
+        for (i in range(1, components.size() - 1)) {
+            result = result + "." + components[i];
+        }
+    }
+    return result;
+}

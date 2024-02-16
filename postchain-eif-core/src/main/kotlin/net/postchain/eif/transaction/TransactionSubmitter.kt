@@ -16,6 +16,8 @@ import org.web3j.protocol.exceptions.ClientConnectionException
 import org.web3j.tx.TransactionManager
 import org.web3j.tx.gas.ContractGasProvider
 import java.math.BigInteger
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.LinkedBlockingQueue
 
 class TransactionSubmitter(
         private val web3jRequestHandler: Web3jRequestHandler,
@@ -81,5 +83,18 @@ class TransactionSubmitter(
             }
             throw e
         }
+    }
+    private val queue = LinkedBlockingQueue<EvmSubmitTransactionRequest>();
+    fun enqueue(it: EvmSubmitTransactionRequest) {
+        queue.offer(it)
+    }
+
+    private val completedTransactions = ConcurrentHashMap<Long, TRANSACTION_STATUS>();
+    fun fetchCompletedTransactions() : Map<Long, TRANSACTION_STATUS> {
+        return completedTransactions;
+    }
+
+    fun removeCompletedTransaction(rowId: Long) {
+        completedTransactions.remove(rowId)
     }
 }

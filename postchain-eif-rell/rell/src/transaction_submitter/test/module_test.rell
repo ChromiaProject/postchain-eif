@@ -1,0 +1,18 @@
+@test module;
+
+import ^^.*;
+import ^.helper_operations.*;
+
+function test_create_evm_submit_transaction_message_entity(){
+
+    rell.test.tx().op(create_evm_submit_transaction_message_entity_operation(evm_submit_transaction_message(
+        contract_address = "address",
+        function_name = "myFunction",
+        parameter_types = list(),
+        parameter_values = list(),
+        network_id = 1), x"")).run();
+
+    val evm_submit_transaction_message_entity = evm_submit_transaction_message_entity @? {};
+
+    assert_not_null(evm_submit_transaction_message_entity);
+}
