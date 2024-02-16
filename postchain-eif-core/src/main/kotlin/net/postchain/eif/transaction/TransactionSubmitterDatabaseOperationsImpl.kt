@@ -58,15 +58,15 @@ class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterDatabaseO
         }
     }
 
-    override fun recordTransaction(ctx: EContext, contractAddress: String, functionName: String, parameterTypes: List<String>, parameterValues: List<Gtv>, gasPrice: BigInteger, gasLimit: BigInteger, txHash: String, networkId: Long) {
+    override fun recordTransaction(ctx: EContext, transactionRequest: EvmSubmitTransactionRequest, gasPrice: BigInteger, gasLimit: BigInteger, txHash: String, networkId: Long) {
         DatabaseAccess.of(ctx).apply {
             val jooq = createJooq(ctx)
             
             jooq.insertInto(table(tableEvmTransaction(ctx)))
-                    .set(COLUMN_CONTRACT, contractAddress)
-                    .set(COLUMN_FUNCTION, functionName)
-                    .set(COLUMN_PARAMETER_TYPES, parameterTypes.joinToString(","))
-                    .set(COLUMN_PARAMETER_VALUES, parameterValues.joinToString(","))
+                    .set(COLUMN_CONTRACT, transactionRequest.contractAddress)
+                    .set(COLUMN_FUNCTION, transactionRequest.functionName)
+                    .set(COLUMN_PARAMETER_TYPES, transactionRequest.parameterTypes.joinToString(","))
+                    .set(COLUMN_PARAMETER_VALUES, transactionRequest.parameterValues.joinToString(","))
                     .set(COLUMN_GAS_PRICE, gasPrice.longValueExact())
                     .set(COLUMN_GAS_LIMIT, gasLimit.longValueExact())
                     .set(COLUMN_TX_HASH, txHash)
@@ -77,15 +77,15 @@ class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterDatabaseO
         }
     }
 
-    override fun recordFailedTransaction(ctx: EContext, contractAddress: String, functionName: String, parameterTypes: List<String>, parameterValues: List<Gtv>, gasPrice: BigInteger, gasLimit: BigInteger, errorMessage: String, networkId: Long) {
+    override fun recordFailedTransaction(ctx: EContext, transactionRequest: EvmSubmitTransactionRequest, gasPrice: BigInteger, gasLimit: BigInteger, errorMessage: String, networkId: Long) {
         DatabaseAccess.of(ctx).apply {
             val jooq = createJooq(ctx)
 
             jooq.insertInto(table(tableEvmTransaction(ctx)))
-                    .set(COLUMN_CONTRACT, contractAddress)
-                    .set(COLUMN_FUNCTION, functionName)
-                    .set(COLUMN_PARAMETER_TYPES, parameterTypes.joinToString(","))
-                    .set(COLUMN_PARAMETER_VALUES, parameterValues.joinToString(","))
+                    .set(COLUMN_CONTRACT, transactionRequest.contractAddress)
+                    .set(COLUMN_FUNCTION, transactionRequest.functionName)
+                    .set(COLUMN_PARAMETER_TYPES, transactionRequest.parameterTypes.joinToString(","))
+                    .set(COLUMN_PARAMETER_VALUES, transactionRequest.parameterValues.joinToString(","))
                     .set(COLUMN_GAS_PRICE, gasPrice.longValueExact())
                     .set(COLUMN_GAS_LIMIT, gasLimit.longValueExact())
                     .set(COLUMN_ERROR_MESSAGE, errorMessage)

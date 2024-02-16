@@ -18,7 +18,7 @@ import org.web3j.tx.gas.DefaultGasProvider
 
 class TransactionSubmitterSynchronizationInfrastructureExtension(private val postchainContext: PostchainContext) : SynchronizationInfrastructureExtension {
 
-    val transactionSubmitters = mutableMapOf<Long, TransactionSubmitter>()
+    private val transactionSubmitters = mutableMapOf<Long, TransactionSubmitter>()
 
     override fun connectProcess(process: BlockchainProcess) {
         val databaseOperations = TransactionSubmitterDatabaseOperationsImpl()
@@ -69,10 +69,10 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
     }
 
     override fun disconnectProcess(process: BlockchainProcess) {
-        // TODO Maybe we need to shutdown something?
+        transactionSubmitters.values.forEach { it.shutdown() }
     }
 
     override fun shutdown() {
-        // TODO Maybe we need to shutdown something?
+        transactionSubmitters.values.forEach { it.shutdown() }
     }
 }
