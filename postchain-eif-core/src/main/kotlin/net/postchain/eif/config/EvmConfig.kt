@@ -4,7 +4,7 @@ import net.postchain.config.app.AppConfig
 
 data class EvmConfig(
         // Can be HTTP address or socket file path for IPC
-        val urls: String,
+        val urls: List<String>,
         val lastEvmBlockHeight: Long,
         val connectTimeout: Long,
         val readTimeout: Long,
@@ -29,7 +29,7 @@ data class EvmConfig(
         @JvmStatic
         fun fromAppConfig(chain: String, config: AppConfig): EvmConfig {
             return EvmConfig(
-                    config.getEnvOrString("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_URLS", "$chain.urls", ""),
+                    config.getEnvOrListProperty("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_URLS", "$chain.urls", listOf()),
                     config.getEnvOrLong("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_LAST_EVM_BLOCK_HEIGHT", "$chain.lastEvmBlockHeight", 0),
                     config.getEnvOrLong(EVM_CONNECT_TIMEOUT, "evm.connectTimeout", 300),
                     config.getEnvOrLong(EVM_READ_TIMEOUT, "evm.readTimeout", 300),

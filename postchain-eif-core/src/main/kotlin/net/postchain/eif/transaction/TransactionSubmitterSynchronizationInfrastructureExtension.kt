@@ -69,10 +69,10 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
     }
 
     override fun disconnectProcess(process: BlockchainProcess) {
-        TODO("Not yet implemented")
+        // TODO Maybe we need to shutdown something?
     }
 
     override fun shutdown() {
-        TODO("Not yet implemented")
+        // TODO Maybe we need to shutdown something?
     }
 }
