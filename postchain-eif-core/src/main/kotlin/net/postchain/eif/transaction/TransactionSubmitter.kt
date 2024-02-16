@@ -28,7 +28,6 @@ import java.math.BigInteger
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.time.Duration
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
 
@@ -55,7 +54,7 @@ class TransactionSubmitter(
         txSubmitJob = CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-transaction-submitter") + MDCContext()) {
             while (isActive) {
                 try {
-                    val txToSubmit = queue.poll()
+                    val txToSubmit = queue.take()
                     try {
                         sendTransaction(txToSubmit)
                     } catch (e: Exception) {
@@ -67,7 +66,7 @@ class TransactionSubmitter(
                 }
             }
         }
-        txStatusPollJob = CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-transaction-submitter") + MDCContext()) {
+        txStatusPollJob = CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-transaction-status-poller") + MDCContext()) {
             while (isActive) {
                 try {
                     pollPendingTransactions()
@@ -83,9 +82,23 @@ class TransactionSubmitter(
     }
 
     private fun pollPendingTransactions() {
-        pendingTransactions.forEach { txHash, txRequest ->
+        val successfulTxs = mutableListOf<String>()
+        pendingTransactions.forEach { (txHash, txRequest) ->
             val txReceipt = web3jRequestHandler.sendWeb3jRequest { it.ethGetTransactionReceipt(txHash) }
+            if (txReceipt.transactionReceipt.isPresent) {
+                txReceipt.transactionReceipt.get() //TODO add to db?
+
+                logger.info { "Got transaction receipt: $txReceipt" }
+                withWriteConnection(storage, chainId) {
+                    databaseOperations.updateTransactionStatus(it, txRequest.rowId, TransactionStatus.SUCCESS)
+                    true
+                }
+                completedTransactions[txRequest.rowId] = TRANSACTION_STATUS.SUCCESS
+                successfulTxs.add(txHash)
+            }
         }
+
+        successfulTxs.forEach(pendingTransactions::remove)
     }
 
     fun sendTransaction(transactionRequest: EvmSubmitTransactionRequest): EthSendTransaction {
@@ -131,6 +144,7 @@ class TransactionSubmitter(
                         true
                     }
                     pendingTransactions[response.transactionHash] = transactionRequest
+                    return response
                 }
             }
             throw ProgrammerMistake("Failed to send web3j request")
@@ -148,9 +162,7 @@ class TransactionSubmitter(
         queue.offer(it)
     }
 
-    fun fetchCompletedTransactions() : Map<Long, TRANSACTION_STATUS> {
-        return completedTransactions;
-    }
+    fun fetchCompletedTransactions(): Map<Long, TRANSACTION_STATUS> = completedTransactions
 
     fun removeCompletedTransaction(rowId: Long) {
         completedTransactions.remove(rowId)

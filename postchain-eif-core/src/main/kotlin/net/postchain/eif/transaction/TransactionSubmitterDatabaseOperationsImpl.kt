@@ -2,7 +2,6 @@ package net.postchain.eif.transaction
 
 import net.postchain.base.data.DatabaseAccess
 import net.postchain.core.EContext
-import net.postchain.gtv.Gtv
 import org.jooq.Field
 import org.jooq.SQLDialect
 import org.jooq.impl.DSL.currentTimestamp
@@ -14,7 +13,7 @@ import java.math.BigInteger
 import java.sql.Timestamp
 
 enum class TransactionStatus {
-    SUCCESS, FAILURE
+    SUCCESS, FAILURE, PENDING
 }
 
 class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterDatabaseOperations {
@@ -22,6 +21,7 @@ class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterDatabaseO
     companion object {
         const val PREFIX: String = "sys.x.evm_tx" // This name should not clash with Rell
 
+        val COLUMN_REQUEST_ID: Field<Long> = field("request_id", PostgresDataType.BIGINT.nullable(false))
         val COLUMN_CONTRACT: Field<String> = field("contract", PostgresDataType.TEXT.nullable(false))
         val COLUMN_FUNCTION: Field<String> = field("function", PostgresDataType.TEXT.nullable(false))
         val COLUMN_PARAMETER_TYPES: Field<String> = field("parameter_types", PostgresDataType.TEXT.nullable(false))
@@ -43,6 +43,7 @@ class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterDatabaseO
 
             val transactionTable = table(tableEvmTransaction(ctx))
             jooq.createTableIfNotExists(transactionTable)
+                    .column(COLUMN_REQUEST_ID)
                     .column(COLUMN_CONTRACT)
                     .column(COLUMN_FUNCTION)
                     .column(COLUMN_PARAMETER_TYPES)
@@ -61,8 +62,9 @@ class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterDatabaseO
     override fun recordTransaction(ctx: EContext, transactionRequest: EvmSubmitTransactionRequest, gasPrice: BigInteger, gasLimit: BigInteger, txHash: String, networkId: Long) {
         DatabaseAccess.of(ctx).apply {
             val jooq = createJooq(ctx)
-            
+
             jooq.insertInto(table(tableEvmTransaction(ctx)))
+                    .set(COLUMN_REQUEST_ID, transactionRequest.rowId)
                     .set(COLUMN_CONTRACT, transactionRequest.contractAddress)
                     .set(COLUMN_FUNCTION, transactionRequest.functionName)
                     .set(COLUMN_PARAMETER_TYPES, transactionRequest.parameterTypes.joinToString(","))
@@ -70,7 +72,7 @@ class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterDatabaseO
                     .set(COLUMN_GAS_PRICE, gasPrice.longValueExact())
                     .set(COLUMN_GAS_LIMIT, gasLimit.longValueExact())
                     .set(COLUMN_TX_HASH, txHash)
-                    .set(COLUMN_STATUS, TransactionStatus.SUCCESS.name)
+                    .set(COLUMN_STATUS, TransactionStatus.PENDING.name)
                     .set(COLUMN_TIMESTAMP, currentTimestamp())
                     .set(COLUMN_NETWORK_ID, networkId)
                     .execute()
@@ -82,6 +84,7 @@ class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterDatabaseO
             val jooq = createJooq(ctx)
 
             jooq.insertInto(table(tableEvmTransaction(ctx)))
+                    .set(COLUMN_REQUEST_ID, transactionRequest.rowId)
                     .set(COLUMN_CONTRACT, transactionRequest.contractAddress)
                     .set(COLUMN_FUNCTION, transactionRequest.functionName)
                     .set(COLUMN_PARAMETER_TYPES, transactionRequest.parameterTypes.joinToString(","))
@@ -92,6 +95,17 @@ class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterDatabaseO
                     .set(COLUMN_STATUS, TransactionStatus.FAILURE.name)
                     .set(COLUMN_TIMESTAMP, currentTimestamp())
                     .set(COLUMN_NETWORK_ID, networkId)
+                    .execute()
+        }
+    }
+
+    override fun updateTransactionStatus(ctx: EContext, requestId: Long, status: TransactionStatus) {
+        DatabaseAccess.of(ctx).apply {
+            val jooq = createJooq(ctx)
+
+            jooq.update(table(tableEvmTransaction(ctx)))
+                    .set(COLUMN_STATUS, status.name)
+                    .where(COLUMN_REQUEST_ID.eq(requestId))
                     .execute()
         }
     }

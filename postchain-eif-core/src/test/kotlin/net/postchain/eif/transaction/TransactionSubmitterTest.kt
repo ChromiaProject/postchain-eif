@@ -2,6 +2,7 @@ package net.postchain.eif.transaction
 
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
+import net.postchain.common.BlockchainRid
 import net.postchain.core.Storage
 import net.postchain.eif.GethContainer
 import net.postchain.eif.Web3jRequestHandler
@@ -10,6 +11,8 @@ import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvInteger
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.any
+import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.junit.jupiter.Testcontainers
@@ -74,14 +77,28 @@ class TransactionSubmitterTest {
     }
 
     @Test
-    fun `submit transaction`(){
+    fun `submit transaction`() {
         // Deploy validator contract
         val postchainValidator = "659e4a3726275edFD125F52338ECe0d54d15BD99"
         val encodedConstructor = FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(postchainValidator))))
         Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedConstructor).send()
-        val storage: Storage = mock();
+        val storage: Storage = mock {
+            on { openWriteConnection(any()) } doReturn mock()
+        }
+        val dbOps: TransactionSubmitterDatabaseOperations = mock()
 
-        val transaction = TransactionSubmitter(web3jRequestHandler, transactionManager, gasProvider,TransactionSubmitterDatabaseOperationsImpl(),storage,1L, 1L).sendTransaction(postchainValidator, "addValidator", listOf("uint", "address"), listOf(GtvInteger(1), GtvByteArray(ByteArray(20))))
+        val evmSubmitTransactionRequest = EvmSubmitTransactionRequest(
+                0,
+                postchainValidator,
+                "addValidator",
+                listOf("uint", "address"),
+                listOf(GtvInteger(1), GtvByteArray(ByteArray(20))),
+                1,
+                BlockchainRid.ZERO_RID.data,
+                TRANSACTION_STATUS.QUEUED
+        )
+        val transaction = TransactionSubmitter(web3jRequestHandler, transactionManager, gasProvider, dbOps, storage, 1L, 1L)
+                .sendTransaction(evmSubmitTransactionRequest)
 
         print(transaction.transactionHash)
     }

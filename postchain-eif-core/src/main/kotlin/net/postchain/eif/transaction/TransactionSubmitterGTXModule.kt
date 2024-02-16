@@ -5,7 +5,7 @@ import net.postchain.gtx.SimpleGTXModule
 import net.postchain.gtx.special.GTXSpecialTxExtension
 
 class TransactionSubmitterGTXModule : SimpleGTXModule<Unit>(
-    Unit, mapOf(), mapOf()
+        Unit, mapOf(), mapOf()
 ) {
     override fun initializeDB(ctx: EContext) {
 

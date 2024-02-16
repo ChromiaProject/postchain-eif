@@ -4,7 +4,6 @@ import net.postchain.PostchainContext
 import net.postchain.common.exception.UserMistake
 import net.postchain.core.BlockchainProcess
 import net.postchain.core.SynchronizationInfrastructureExtension
-import net.postchain.eif.EifSpecialTxExtension
 import net.postchain.eif.Web3jRequestHandler
 import net.postchain.eif.Web3jServiceFactory
 import net.postchain.eif.metrics.RpcUsageMetrics
@@ -24,7 +23,7 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
         val databaseOperations = TransactionSubmitterDatabaseOperationsImpl()
         val blockchainConfig = process.blockchainEngine.getConfiguration()
         val transactionSubmitterBlockchainConfig = blockchainConfig.rawConfig["transaction_submitter"]?.toObject<TransactionSubmitterBlockchainConfig>()
-            ?: throw UserMistake("No EIF config present")
+                ?: throw UserMistake("No EIF config present")
 
         if (blockchainConfig is GTXModuleAware) {
             val exs = blockchainConfig.module.getSpecialTxExtensions()
@@ -32,34 +31,34 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
             if (ext is TransactionSubmitterSpecialTxExtension) {
                 for ((evmBlockchainName, chainConfig) in transactionSubmitterBlockchainConfig.chains) {
                     val appConfig =
-                        EvmTransactionSubmitterConfig.fromAppConfig(evmBlockchainName, postchainContext.appConfig)
+                            EvmTransactionSubmitterConfig.fromAppConfig(evmBlockchainName, postchainContext.appConfig)
                     val web3jServices = Web3jServiceFactory.buildServices(
-                        appConfig.urls,
-                        appConfig.connectTimeout,
-                        appConfig.readTimeout,
-                        appConfig.writeTimeout
+                            appConfig.urls,
+                            appConfig.connectTimeout,
+                            appConfig.readTimeout,
+                            appConfig.writeTimeout
                     )
                     val metrics =
-                        RpcUsageMetrics(blockchainConfig.chainID, blockchainConfig.blockchainRid, chainConfig.networkId)
+                            RpcUsageMetrics(blockchainConfig.chainID, blockchainConfig.blockchainRid, chainConfig.networkId)
                     val web3jRequestHandler = Web3jRequestHandler(
-                        appConfig.minRetryDelay,
-                        appConfig.maxRetryDelay,
-                        appConfig.maxTryErrors,
-                        appConfig.urls,
-                        web3jServices,
-                        metrics
+                            appConfig.minRetryDelay,
+                            appConfig.maxRetryDelay,
+                            appConfig.maxTryErrors,
+                            appConfig.urls,
+                            web3jServices,
+                            metrics
                     )
                     val transactionManager =
-                        RawTransactionManager(web3jServices.first(), Credentials.create(appConfig.privateKey))
+                            RawTransactionManager(web3jServices.first(), Credentials.create(appConfig.privateKey))
                     val gasProvider = DefaultGasProvider()
                     val transactionSubmitter = TransactionSubmitter(
-                        web3jRequestHandler,
-                        transactionManager,
-                        gasProvider,
-                        databaseOperations,
-                        postchainContext.sharedStorage,
-                        process.blockchainEngine.chainID,
-                        chainConfig.networkId
+                            web3jRequestHandler,
+                            transactionManager,
+                            gasProvider,
+                            databaseOperations,
+                            postchainContext.sharedStorage,
+                            process.blockchainEngine.chainID,
+                            chainConfig.networkId
                     )
                     transactionSubmitters[chainConfig.networkId] = transactionSubmitter
                     ext.addTransactionSubmitter(transactionSubmitter, chainConfig.networkId)

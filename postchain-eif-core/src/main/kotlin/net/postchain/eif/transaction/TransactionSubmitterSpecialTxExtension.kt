@@ -11,14 +11,13 @@ import net.postchain.gtx.GTXModule
 import net.postchain.gtx.data.OpData
 import net.postchain.gtx.special.GTXSpecialTxExtension
 
-
 class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     companion object : KLogging() {
         const val UPDATE_EVM_TRANSACTION_STATE = "__update_evm_transaction_state"
     }
 
     private val transactionSubmitters = mutableMapOf<Long, TransactionSubmitter>()
-    private lateinit var module : GTXModule
+    private lateinit var module: GTXModule
 
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
         val entities = module.query(bctx, "fetch_queued_evm_transaction", gtv(listOf()))
@@ -31,13 +30,13 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
             if (submitter == null) {
                 logger.warn("There is no submitter for ${it.networkId} .")
             } else {
-                bctx.addAfterCommitHook { submitter.enqueue(it) };
+                bctx.addAfterCommitHook { submitter.enqueue(it) }
                 operations.add(OpData(UPDATE_EVM_TRANSACTION_STATE, arrayOf(gtv(it.rowId), gtv(TRANSACTION_STATUS.TAKEN.ordinal.toLong()))))
             }
         }
 
-        transactionSubmitters.forEach {submitter ->
-            submitter.value.fetchCompletedTransactions().forEach{rowId , status ->
+        transactionSubmitters.forEach { submitter ->
+            submitter.value.fetchCompletedTransactions().forEach { (rowId, status) ->
                 operations.add(OpData(UPDATE_EVM_TRANSACTION_STATE, arrayOf(gtv(rowId), gtv(status.ordinal.toLong()))))
                 bctx.addAfterCommitHook { submitter.value.removeCompletedTransaction(rowId) }
             }
@@ -62,12 +61,10 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     }
 
     override fun validateSpecialOperations(
-        position: SpecialTransactionPosition,
-        bctx: BlockEContext,
-        ops: List<OpData>
-    ): Boolean {
-        return true
-    }
+            position: SpecialTransactionPosition,
+            bctx: BlockEContext,
+            ops: List<OpData>
+    ) = true
 
     fun addTransactionSubmitter(transactionSubmitter: TransactionSubmitter, networkId: Long) {
 
