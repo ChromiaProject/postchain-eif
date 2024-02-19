@@ -307,12 +307,12 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
         // Bridge some ft token to evm
         val gtvAuthDescriptorId = blockQuery.query(
                 "ft4.get_account_auth_descriptors",
-                gtv("id" to accountId, "page_size" to gtv(1L), "page_cursor" to GtvNull)
-        ).get()["data"]!![0]["id"]!!
+                gtv("id" to accountId)
+        ).get()[0]["id"]!!
 
         val auth = gtv(
                 gtv(AuthType.S.ordinal.toLong()),
-                gtv(GtvArray(arrayOf(gtv("T"))), gtv(userPubkey)),
+                gtv(GtvArray(arrayOf(gtv("A"), gtv("T"))), gtv(userPubkey)),
                 GtvNull
         )
 
@@ -735,7 +735,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
     private fun registerAccount(userPubkey: ByteArray, userPriKey: ByteArray, userEVMAddress: ByteArray, sig: GtvArray, bcRid: BlockchainRid): ByteArray {
         val auth = gtv(
                 gtv(AuthType.S.ordinal.toLong()),
-                gtv(GtvArray(arrayOf(gtv("T"))), gtv(userPubkey)),
+                gtv(GtvArray(arrayOf(gtv("A"), gtv("T"))), gtv(userPubkey)),
                 GtvNull
         )
 
