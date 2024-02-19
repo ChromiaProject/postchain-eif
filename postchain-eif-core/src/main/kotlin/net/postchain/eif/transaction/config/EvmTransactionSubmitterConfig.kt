@@ -13,7 +13,8 @@ data class EvmTransactionSubmitterConfig(
         val minRetryDelay: Long,
         val maxRetryDelay: Long,
         val maxTryErrors: Long,
-        val privateKey: String
+        val privateKey: String,
+        val txPollInterval: Long
 ) {
     companion object {
         const val EIF_CONFIG_ENV_PREFIX = "POSTCHAIN_TRANSACTION_SUBMITTER_"
@@ -24,6 +25,7 @@ data class EvmTransactionSubmitterConfig(
         private const val EVM_MAX_RETRY_DELAY = "${EIF_CONFIG_ENV_PREFIX}EVM_MAX_RETRY_DELAY"
         private const val EVM_MAX_TRY_ERRORS = "${EIF_CONFIG_ENV_PREFIX}EVM_MAX_TRY_ERRORS"
         private const val EVM_PRIVATE_KEY = "${EIF_CONFIG_ENV_PREFIX}EVM_PRIVATE_KEY"
+        private const val EVM_TX_POLL_INTERVAL = "${EIF_CONFIG_ENV_PREFIX}EVM_TX_POLL_INTERVAL"
 
         @JvmStatic
         fun fromAppConfig(chain: String, config: AppConfig): EvmTransactionSubmitterConfig {
@@ -36,7 +38,8 @@ data class EvmTransactionSubmitterConfig(
                     config.getEnvOrLong(EVM_MAX_RETRY_DELAY, "evm.maxRetryDelay", 60_000L),
                     config.getEnvOrLong(EVM_MIN_RETRY_DELAY, "evm.minRetryDelay", 500L),
                     config.getEnvOrLong(EVM_MAX_TRY_ERRORS,"evm.maxTryErrors", 10L),
-                    config.getEnvOrString(EVM_PRIVATE_KEY,"evm.privateKey") ?: throw UserMistake("Missing private key")
+                    config.getEnvOrString(EVM_PRIVATE_KEY,"evm.privateKey") ?: throw UserMistake("Missing private key"),
+                    config.getEnvOrLong(EVM_TX_POLL_INTERVAL,"evm.txPollInterval", 10_000L)
             )
         }
     }

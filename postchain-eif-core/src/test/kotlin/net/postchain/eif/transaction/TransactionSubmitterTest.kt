@@ -3,17 +3,17 @@ package net.postchain.eif.transaction
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import net.postchain.common.BlockchainRid
-import net.postchain.core.Storage
+import net.postchain.devtools.IntegrationTestSetup
+import net.postchain.devtools.getModules
 import net.postchain.eif.GethContainer
 import net.postchain.eif.Web3jRequestHandler
 import net.postchain.eif.contracts.Validator
-import net.postchain.gtv.GtvByteArray
-import net.postchain.gtv.GtvInteger
+import net.postchain.gtv.GtvFactory.gtv
+import org.awaitility.Awaitility
+import org.awaitility.Duration
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.mockito.kotlin.any
-import org.mockito.kotlin.doReturn
-import org.mockito.kotlin.mock
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.FunctionEncoder
@@ -29,7 +29,7 @@ import org.web3j.tx.gas.DefaultGasProvider
 import org.web3j.tx.response.PollingTransactionReceiptProcessor
 
 @Testcontainers(disabledWithoutDocker = true)
-class TransactionSubmitterTest {
+class TransactionSubmitterTest : IntegrationTestSetup() {
 
     private val evmContainer = GethContainer().withExposedService(
             "geth", 8545,
@@ -74,6 +74,12 @@ class TransactionSubmitterTest {
         )
 
         web3jRequestHandler = Web3jRequestHandler(500, 60_000, 2, mutableListOf(gethUrl), listOf(web3j))
+
+        with(configOverrides) {
+            setProperty("ethereum.urls", "http://$evmHost:$evmPort")
+            setProperty("evm.privateKey", "0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
+            setProperty("evm.txPollInterval", 1000)
+        }
     }
 
     @Test
@@ -82,25 +88,31 @@ class TransactionSubmitterTest {
         val postchainValidator = "659e4a3726275edFD125F52338ECe0d54d15BD99"
         val encodedConstructor = FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(postchainValidator))))
         Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedConstructor).send()
-        val storage: Storage = mock {
-            on { openWriteConnection(any()) } doReturn mock()
-        }
-        val dbOps: TransactionSubmitterDatabaseOperations = mock()
+
+        val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config.xml")
+        val node = nodes[0]
+
+        val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
 
         val evmSubmitTransactionRequest = EvmSubmitTransactionRequest(
                 0,
                 postchainValidator,
                 "addValidator",
                 listOf("uint", "address"),
-                listOf(GtvInteger(1), GtvByteArray(ByteArray(20))),
-                1,
+                gtv(listOf(gtv(1), gtv(ByteArray(20)))),
+                1337,
                 BlockchainRid.ZERO_RID.data,
                 TRANSACTION_STATUS.QUEUED
         )
-        val transaction = TransactionSubmitter(web3jRequestHandler, transactionManager, gasProvider, dbOps, storage, 1L, 1L)
-                .sendTransaction(evmSubmitTransactionRequest)
+        txSubmitterTestModule.addTxToQueue(evmSubmitTransactionRequest)
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            buildBlock(1L)
+            assertTrue(txSubmitterTestModule.conf.queue.isEmpty())
+        }
 
-        print(transaction.transactionHash)
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            buildBlock(1L)
+            assertTrue(txSubmitterTestModule.conf.completedTxs.contains(0))
+        }
     }
-
 }

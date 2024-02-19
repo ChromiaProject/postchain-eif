@@ -28,8 +28,6 @@ import java.math.BigInteger
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.time.DurationUnit
-import kotlin.time.toDuration
 
 class TransactionSubmitter(
         private val web3jRequestHandler: Web3jRequestHandler,
@@ -38,7 +36,8 @@ class TransactionSubmitter(
         private val databaseOperations: TransactionSubmitterDatabaseOperations,
         private val storage: Storage,
         private val chainId: Long,
-        private val networkId: Long
+        private val networkId: Long,
+        private val txPollInterval: Long
 ) : Shutdownable {
 
     companion object : KLogging()
@@ -70,8 +69,8 @@ class TransactionSubmitter(
             while (isActive) {
                 try {
                     pollPendingTransactions()
-                    // TODO make this configurable
-                    delay(30.toDuration(DurationUnit.SECONDS))
+
+                    delay(txPollInterval)
                 } catch (e: CancellationException) {
                     break
                 } catch (e: Exception) {
@@ -101,12 +100,12 @@ class TransactionSubmitter(
         successfulTxs.forEach(pendingTransactions::remove)
     }
 
-    fun sendTransaction(transactionRequest: EvmSubmitTransactionRequest): EthSendTransaction {
+    private fun sendTransaction(transactionRequest: EvmSubmitTransactionRequest): EthSendTransaction {
         val walletBalance = web3jRequestHandler.sendWeb3jRequest { it.ethGetBalance(transactionManager.fromAddress, DefaultBlockParameterName.LATEST) }
 
         val function = Function(
                 transactionRequest.functionName,
-                transactionRequest.parameterValues.mapIndexed { index, value -> GtvToTypeMapper.map(value, transactionRequest.parameterTypes[index]) },
+                transactionRequest.parameterValues.asArray().mapIndexed { index, value -> GtvToTypeMapper.map(value, transactionRequest.parameterTypes[index]) },
                 emptyList<TypeReference<*>>()
         )
         val functionData = FunctionEncoder.encode(function)

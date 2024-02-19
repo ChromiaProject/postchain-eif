@@ -58,7 +58,8 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                             databaseOperations,
                             postchainContext.sharedStorage,
                             process.blockchainEngine.chainID,
-                            chainConfig.networkId
+                            chainConfig.networkId,
+                            appConfig.txPollInterval
                     )
                     transactionSubmitters[chainConfig.networkId] = transactionSubmitter
                     ext.addTransactionSubmitter(transactionSubmitter, chainConfig.networkId)

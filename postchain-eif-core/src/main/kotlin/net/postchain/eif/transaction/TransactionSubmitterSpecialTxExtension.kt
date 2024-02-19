@@ -14,13 +14,15 @@ import net.postchain.gtx.special.GTXSpecialTxExtension
 class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     companion object : KLogging() {
         const val UPDATE_EVM_TRANSACTION_STATE = "__update_evm_transaction_state"
+
+        const val FETCH_QUEUED_TXS_QUERY = "fetch_queued_evm_transaction"
     }
 
     private val transactionSubmitters = mutableMapOf<Long, TransactionSubmitter>()
     private lateinit var module: GTXModule
 
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
-        val entities = module.query(bctx, "fetch_queued_evm_transaction", gtv(listOf()))
+        val entities = module.query(bctx, FETCH_QUEUED_TXS_QUERY, gtv(listOf()))
         val queuedTransactions = entities.asArray().map {
             it.toObject<EvmSubmitTransactionRequest>()
         }
