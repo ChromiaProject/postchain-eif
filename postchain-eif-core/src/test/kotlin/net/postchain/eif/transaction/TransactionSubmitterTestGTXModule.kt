@@ -19,7 +19,7 @@ class TransactionSubmitterTestGTXModule : SimpleGTXModule<TransactionSubmitterTe
         mapOf(UPDATE_EVM_TRANSACTION_STATE to { conf, opData ->
             ModifyTxStateOperation(conf, opData)
         }),
-        mapOf(FETCH_QUEUED_TXS_QUERY to { conf, ctxt, args ->
+        mapOf(FETCH_QUEUED_TXS_QUERY to { conf, _, _ ->
             // TODO Return mocked queued txs
             gtv(conf.queue.filter { it.status == TRANSACTION_STATUS.QUEUED }.map { GtvObjectMapper.toGtvDictionary(it) })
         })
