@@ -33,7 +33,7 @@ function test_evm_block() {
     val auth = auth_descriptor(
         auth_type.S,
         [
-            ["T"].to_gtv(),
+            ["A", "T"].to_gtv(),
             user_pubkey.to_gtv()
         ],
         null.to_gtv()

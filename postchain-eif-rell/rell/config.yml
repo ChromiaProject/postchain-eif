@@ -14,14 +14,11 @@ definitions:
         max_points: 200
         recovery_time: 5000
         points_at_account_creation: 100
-      max_auth_descriptor_rules: 8
   - &rell_test_args
     lib.ft4.admin:
       admin_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
     lib.access.admin:
       admin_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
-    lib.originals.marketplace:
-      oracle_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
 
 test:
   modules:
@@ -52,43 +49,13 @@ libs:
   ft4:
     registry: https://bitbucket.org/chromawallet/ft3-lib
     path: rell/src/lib/ft4
-    tagOrBranch: v0.2.0r
-    rid: x"4B3DA349B20558F5700E28C110D43E07CCA7160C42D2B5C0A53E1554ACD0971D"
+    tagOrBranch: v0.4.0r
+    rid: x"090F6B6ED8BFEB73CF67D8D671F3B72E8232C5E540449EB0A609A01F6901CE80"
     insecure: false
   iccf:
     registry: https://gitlab.com/chromaway/core/directory-chain
     path: src/iccf
-    tagOrBranch: 1.9.1
-    rid: x"593D6EBA650BAC473E105C047B2C43A099164870304B3E5E324F714FF2F3F82F"
+    tagOrBranch: 1.32.2
+    rid: x"1D567580C717B91D2F188A4D786DB1D41501086B155A68303661D25364314A4D"
     insecure: false
-  pagination:
-    registry: https://bitbucket.org/chromawallet/lib-pagination-utils
-    path: rell/src/core/pagination
-    tagOrBranch: master
-    insecure: true
-  access:
-    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
-    path: rell/src/access
-    tagOrBranch: dev
-    insecure: true
-  dip:
-    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
-    path: rell/src/dip
-    tagOrBranch: dev
-    insecure: true
-  evm_accounts:
-    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
-    path: rell/src/evm_accounts
-    tagOrBranch: dev
-    insecure: true
-  originals:
-    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
-    path: rell/src/originals
-    tagOrBranch: dev
-    insecure: true
-  ft_helper:
-    registry: ${ORIGINALS_REPO:-git@bitbucket.org:chromawallet/originals-dip.git}
-    path: rell/src/ft_helper
-    tagOrBranch: dev
-    insecure: true
     
