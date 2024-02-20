@@ -1,11 +1,14 @@
 operation __icmf_message(sender: byte_array, topic: text, body: gtv) {
-    create_evm_submit_transaction_message_entity(evm_submit_transaction_message.from_gtv(body), sender);
+    create_evm_submit_transaction_entity(evm_submit_transaction_message.from_gtv(body), sender);
 }
 
 operation __update_evm_transaction_state(row_id: integer, status: transaction_status) {
-    update evm_submit_transaction_message_entity @ { .row_id == rowid(row_id)} (status = status);
+    update evm_submit_transaction_entity @ { .rowid == rowid(row_id)} (status = status);
 }
 
+operation __update_evm_transaction_receipt(row_id: integer, block_hash: text, effective_gas_price: big_integer, gas_usage: big_integer) {
+    update evm_submit_transaction_entity @ { .rowid == rowid(row_id)} (.block_hash = block_hash, .effective_gas_price = effective_gas_price, .gas_usage = gas_usage);
+}
 
 struct evm_submit_transaction_message {
     contract_address: text;
@@ -15,17 +18,20 @@ struct evm_submit_transaction_message {
     network_id: integer;
 }
 
-entity evm_submit_transaction_message_entity {
+entity evm_submit_transaction_entity {
     contract_address: text;
     function_name: text;
     parameter_types: text;
     parameter_values: byte_array;
     network_id: integer;
     sender: byte_array;
-    status: transaction_status;
+    mutable status: transaction_status;
+    mutable block_hash: text = "";
+    mutable effective_gas_price: big_integer = -1;
+    mutable gas_usage: big_integer = -1;
 }
 
-struct evm_submit_transaction_message_data {
+struct evm_submit_transaction {
     row_id: integer;
     contract_address: text;
     function_name: text;
@@ -43,8 +49,8 @@ enum transaction_status {
     TAKEN
 }
 
-function create_evm_submit_transaction_message_entity(evm_submit_transaction_message: evm_submit_transaction_message, sender: byte_array) {
-    create evm_submit_transaction_message_entity(
+function create_evm_submit_transaction_entity(evm_submit_transaction_message: evm_submit_transaction_message, sender: byte_array) {
+    create evm_submit_transaction_entity(
         contract_address = evm_submit_transaction_message.contract_address,
         function_name = evm_submit_transaction_message.function_name,
         parameter_types = join_text_list(evm_submit_transaction_message.parameter_types),
@@ -56,8 +62,8 @@ function create_evm_submit_transaction_message_entity(evm_submit_transaction_mes
 }
 
 query fetch_queued_evm_transaction() {
-    return evm_submit_transaction_message_entity @* { .status == transaction_status.QUEUED } (evm_submit_transaction_message_data(
-        row_id = .row_id,
+    return evm_submit_transaction_entity @* { .status == transaction_status.QUEUED } (evm_submit_transaction(
+        row_id = .rowid.to_integer(),
         contract_address = .contract_address,
         function_name = .function_name,
         parameter_types = .parameter_types.split("."),

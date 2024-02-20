@@ -16,10 +16,15 @@ enum class TransactionStatus {
     SUCCESS, FAILURE, PENDING
 }
 
+fun DatabaseAccess.tableEvmTransaction(ctx: EContext) = tableName(ctx,
+    TransactionSubmitterDatabaseOperationsImpl.EVM_TX_TRANSACTIONS_TABLE_NAME
+)
+
 class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterDatabaseOperations {
 
     companion object {
         const val PREFIX: String = "sys.x.evm_tx" // This name should not clash with Rell
+        const val EVM_TX_TRANSACTIONS_TABLE_NAME: String = "${PREFIX}.transactions"
 
         val COLUMN_REQUEST_ID: Field<Long> = field("request_id", PostgresDataType.BIGINT.nullable(false))
         val COLUMN_CONTRACT: Field<String> = field("contract", PostgresDataType.TEXT.nullable(false))
@@ -33,9 +38,10 @@ class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterDatabaseO
         val COLUMN_STATUS: Field<String> = field("status", PostgresDataType.TEXT.nullable(false))
         val COLUMN_TIMESTAMP: Field<Timestamp> = field("timestamp", PostgresDataType.TIMESTAMP.nullable(false))
         val COLUMN_NETWORK_ID: Field<Long> = field("network_id", PostgresDataType.BIGINT.nullable(false))
+        val COLUMN_BLOCK_HASH: Field<String> = field("receipt_block_hash", PostgresDataType.VARCHAR.length(2 + 64).nullable(true))
+        val COLUMN_EFFECTIVE_GAS_PRICE: Field<Long> = field("receipt_effective_gas_price", PostgresDataType.BIGINT.nullable(true))
+        val COLUMN_GAS_USAGE: Field<Long> = field("receipt_gas_usage", PostgresDataType.BIGINT.nullable(true))
     }
-
-    private fun DatabaseAccess.tableEvmTransaction(ctx: EContext) = tableName(ctx, "${PREFIX}.transactions")
 
     override fun initialize(ctx: EContext) {
         DatabaseAccess.of(ctx).apply {
@@ -55,6 +61,9 @@ class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterDatabaseO
                     .column(COLUMN_STATUS)
                     .column(COLUMN_TIMESTAMP)
                     .column(COLUMN_NETWORK_ID)
+                    .column(COLUMN_BLOCK_HASH)
+                    .column(COLUMN_EFFECTIVE_GAS_PRICE)
+                    .column(COLUMN_GAS_USAGE)
                     .execute()
         }
     }
@@ -107,6 +116,26 @@ class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterDatabaseO
                     .set(COLUMN_STATUS, status.name)
                     .where(COLUMN_REQUEST_ID.eq(requestId))
                     .execute()
+        }
+    }
+
+    override fun updateSuccessfulTransactionReceipt(
+        ctx: EContext,
+        requestId: Long,
+        blockHash: String,
+        effectiveGasPrice: BigInteger,
+        gasUsed: BigInteger
+    ) {
+        DatabaseAccess.of(ctx).apply {
+            val jooq = createJooq(ctx)
+
+            jooq.update(table(tableEvmTransaction(ctx)))
+                .set(COLUMN_STATUS, TransactionStatus.SUCCESS.name)
+                .set(COLUMN_BLOCK_HASH, blockHash)
+                .set(COLUMN_EFFECTIVE_GAS_PRICE, effectiveGasPrice.longValueExact())
+                .set(COLUMN_GAS_USAGE, gasUsed.longValueExact())
+                .where(COLUMN_REQUEST_ID.eq(requestId))
+                .execute()
         }
     }
 

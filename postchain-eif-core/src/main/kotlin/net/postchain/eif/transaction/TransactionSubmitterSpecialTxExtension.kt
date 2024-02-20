@@ -14,6 +14,7 @@ import net.postchain.gtx.special.GTXSpecialTxExtension
 class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     companion object : KLogging() {
         const val UPDATE_EVM_TRANSACTION_STATE = "__update_evm_transaction_state"
+        const val UPDATE_EVM_TRANSACTION_RECEIPT = "__update_evm_transaction_receipt"
 
         const val FETCH_QUEUED_TXS_QUERY = "fetch_queued_evm_transaction"
     }
@@ -33,13 +34,26 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                 logger.warn("There is no submitter for ${it.networkId} .")
             } else {
                 bctx.addAfterCommitHook { submitter.enqueue(it) }
-                operations.add(OpData(UPDATE_EVM_TRANSACTION_STATE, arrayOf(gtv(it.rowId), gtv(TRANSACTION_STATUS.TAKEN.ordinal.toLong()))))
+                operations.add(OpData(UPDATE_EVM_TRANSACTION_STATE, arrayOf(gtv(it.rowId), gtv(RellTransactionStatus.TAKEN.ordinal.toLong()))))
             }
         }
 
         transactionSubmitters.forEach { submitter ->
-            submitter.value.fetchCompletedTransactions().forEach { (rowId, status) ->
-                operations.add(OpData(UPDATE_EVM_TRANSACTION_STATE, arrayOf(gtv(rowId), gtv(status.ordinal.toLong()))))
+            submitter.value.fetchCompletedTransactions().forEach { (rowId, result) ->
+                operations.add(OpData(UPDATE_EVM_TRANSACTION_STATE, arrayOf(gtv(rowId), gtv(result.status.ordinal.toLong()))))
+                if (result.status == RellTransactionStatus.SUCCESS) {
+                    if (result.blockHash == null || result.effectiveGasPrice == null || result.gasUsage == null) {
+                        logger.error { "Transaction $rowId is SUCCESS but has not a full receipt. Blockchain: ${result.blockHash}, effectiveGasPrice: ${result.effectiveGasPrice}, gasUsage: ${result.gasUsage}" }
+                    } else {
+                        operations.add(OpData(
+                                UPDATE_EVM_TRANSACTION_RECEIPT, arrayOf(
+                                    gtv(rowId),
+                                    gtv(result.blockHash),
+                                    gtv(result.effectiveGasPrice),
+                                    gtv(result.gasUsage),
+                                )))
+                    }
+                }
                 bctx.addAfterCommitHook { submitter.value.removeCompletedTransaction(rowId) }
             }
         }
@@ -48,7 +62,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     }
 
     override fun getRelevantOps(): Set<String> {
-        return setOf(UPDATE_EVM_TRANSACTION_STATE)
+        return setOf(UPDATE_EVM_TRANSACTION_STATE, UPDATE_EVM_TRANSACTION_RECEIPT)
     }
 
     override fun init(module: GTXModule, chainID: Long, blockchainRID: BlockchainRid, cs: CryptoSystem) {
