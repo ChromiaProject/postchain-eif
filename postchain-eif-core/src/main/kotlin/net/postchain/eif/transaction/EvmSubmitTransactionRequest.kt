@@ -13,7 +13,7 @@ data class EvmSubmitTransactionRequest(
         @Name("parameter_types")
         val parameterTypes: List<String>,
         @Name("parameter_values")
-        val parameterValues: Gtv, // TODO change to List<Gtv> when bug is fixed
+        val parameterValues: List<Gtv>,
         @Name("network_id")
         val networkId: Long,
         @Name("sender")
