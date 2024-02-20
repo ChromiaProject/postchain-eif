@@ -322,9 +322,6 @@
                         <dict>
                             <entry key="lib.ft4.accounts">
                                 <dict>
-                                    <entry key="max_auth_descriptor_rules">
-                                        <int>8</int>
-                                    </entry>
                                     <entry key="rate_limit">
                                         <dict>
                                             <entry key="active">
@@ -359,7 +356,7 @@
                     </entry>
                     <entry key="sources">
                         <dict>
-                            <entry key="lib/common/module.rell">
+                            <entry key="lib/eif/common/module.rell">
                                 <string>@mount('eif.data')
 module;
 
@@ -463,7 +460,73 @@ function build_account_state_fn(
 ): map&lt;integer, list&lt;gtv&gt;&gt;;
 </string>
                             </entry>
-                            <entry key="lib/eif_ft4/module.rell">
+                            <entry key="lib/eif/evm/module.rell">
+                                <string>@mount('eif.evm')
+module;
+
+import accounts: lib.ft4.accounts;
+import auth: lib.ft4.auth;
+
+entity evm_account {
+  key accounts.account;
+  key address: byte_array;
+  mutable nonce: integer;
+}
+
+query get_login_message() = "Add key:\n{1}\n\nTo account:\n{2}\n\nWith permission:\nTransfer\n\nNonce: {3}";
+query get_register_message() = "Create account for EVM wallet:\n{1}\n\nDisposable key:\n{2}";
+query get_evm_signature_nonce(acc: byte_array) = require(evm_account @? { .address == acc }( .nonce ), "No account found for the provided pubkey");
+query get_account_by_evm_address(acc: byte_array) = evm_account @? { .address == acc }( .account );
+query get_account_id_by_evm_address(acc: byte_array) = evm_account @? { .address == acc }( .account.id );
+
+operation register_account(evm_addr: byte_array, accounts.auth_descriptor, auth.signature) {
+  require(op_context.get_signers().size() &gt; 0, "Transaction needs to be signed with disposable key");
+  require(auth_descriptor.auth_type == accounts.auth_type.S, "Only single sig is supported");
+  
+  val pubkey = op_context.get_signers()[0];
+  val account = accounts.create_account_with_auth(auth_descriptor);
+  val register_msg = _create_register_message(pubkey, evm_addr);
+  val recovered_address = auth._recover_evm_address(register_msg, signature);
+  require(recovered_address == evm_addr, "Signature not valid for the provided key");
+
+  create evm_account(account, evm_addr, 0);
+}
+
+operation add_auth_descriptor(account_id: byte_array, accounts.auth_descriptor, auth.signature) {
+  require(op_context.get_signers().size() &gt; 0, "Transaction needs to be signed with disposable key");
+  val participants = accounts.get_signers(auth_descriptor.auth_type, auth_descriptor.args.to_gtv().to_bytes());
+  require(op_context.get_signers().contains_all(participants), "Transaction not signed by auth descriptor key");
+  require(_extract_single_sig_args(auth_descriptor).flags == set(["T"]), "Only Transfer permission is allowed");
+  
+  val account = accounts.account @ { .id == account_id };
+  val login_msg = _create_login_message(participants[0], account.id);
+  val recovered_address = auth._recover_evm_address(login_msg, signature);
+  val evm_account = evm_account @? { .address == recovered_address };
+  require(evm_account, "Signature not valid for the selected account");
+  
+  accounts.add_auth_descriptor_to_account(account, auth_descriptor, true);
+  evm_account.nonce += 1;
+}
+
+function _extract_single_sig_args(accounts.auth_descriptor): accounts.single_sig_args {
+  return accounts.single_sig_args.from_bytes(auth_descriptor.args.to_gtv().to_bytes());
+}
+
+function _create_register_message(pubkey, evm_addr: byte_array): text {
+  return get_register_message()
+                .replace("{1}", evm_addr.to_hex().lower_case())
+                .replace("{2}", pubkey.to_hex().lower_case());
+}
+
+function _create_login_message(pubkey, account_id: byte_array): text {
+  return get_login_message()
+                .replace("{1}", pubkey.to_hex().lower_case())
+                .replace("{2}", account_id.to_hex().lower_case())
+                .replace("{3}", evm_account @ { .account.id == account_id}( .nonce ).to_text());
+}
+</string>
+                            </entry>
+                            <entry key="lib/eif/ft4/module.rell">
                                 <string>@mount('eif.ft4')
 module;
 
@@ -626,12 +689,7 @@ function(
         return;
     }
 
-    // ignore event if ft asset does not exist
-    val ft_asset = assets.asset @? { .id == token_mapping.asset.id };
-    if (empty(ft_asset)) {
-        log("ignore event if ft asset does not exist: " + token_mapping.asset.id);
-        return;
-    }
+    val ft_asset = token_mapping.asset;
     val amount = big_integer.from_gtv(event.non_indexed_values[1]);
     val evm_event = create c.evm_event(
         evm_block,
@@ -663,7 +721,7 @@ function(
         // mint postchain token for ft account
         val ft_account = evm_account.account;
         log("mint postchain token for ft account: " + ft_account.id);
-        val ft_balance = assets.increase_balance(ft_account, ft_asset, amount);
+        assets.Unsafe.mint(ft_account, ft_asset, amount);
         val ft_beneficiary = evm.evm_account @ { .account == ft_account } ( .address );
         val account_link = c.get_or_create_evm_account_link(token_mapping.token.network_id, ft_beneficiary);
         val state = c.build_account_state(network_id, ft_beneficiary, ft_account);
@@ -751,10 +809,7 @@ operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiar
         token_mapping @? { .token == token },
         "no token mapping"
     );
-    val ft_asset = require(
-        assets.asset @? { .id == token_mapping.asset.id },
-        "ft asset does not exist: " + token_mapping.asset.id
-    );
+    val ft_asset = token_mapping.asset;
     val balance = evm_erc20_balance @? { network_id, token, beneficiary };
     require_not_empty(balance, "No balance for this token");
     require(balance.amount &gt;= amount, "Balance is too low");
@@ -782,7 +837,7 @@ operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiar
     ];
 
     val account = accounts.account @ { account_id };
-    val ft_balance = assets.increase_balance(account, ft_asset, amount);
+    assets.Unsafe.mint(account, ft_asset, amount);
     emit_withdraw(network_id, beneficiary, account, withdraw_info);
 }
 
@@ -892,71 +947,87 @@ function update_account_state(account_id: byte_array, asset_id: byte_array) {
     op_context.emit_event("eif_state", state_data.to_gtv());
 }</string>
                             </entry>
-                            <entry key="lib/evm/module.rell">
-                                <string>@mount('eif.evm')
+                            <entry key="lib/eif/main/module.rell">
+                                <string>import c: ^.common;
+import ^.evm;
+
+query get_last_evm_block(network_id: integer) {
+    return c.evm_block @? { network_id } ( @sort_desc .evm_block_height, .evm_block_hash ) limit 1;
+}
+
+operation __evm_block(
+    network_id: integer,
+    evm_block_height: integer,
+    evm_block_hash: byte_array,
+    events: list&lt;c.event_data&gt;
+) {
+    _evm_block(network_id, evm_block_height, evm_block_hash, events);
+}
+
+function _evm_block(
+    network_id: integer,
+    evm_block_height: integer,
+    evm_block_hash: byte_array,
+    events: list&lt;c.event_data&gt;
+) {
+    val evm_block = create c.evm_block (
+        network_id,
+        evm_block_height,
+        evm_block_hash
+    );
+
+    for (event in events) {
+        var indexed_values_bytes = x"";
+        for (value in event.indexed_values) {
+            indexed_values_bytes += value.to_bytes();
+        }
+        var non_indexed_values_bytes = x"";
+        for (value in event.non_indexed_values) {
+            non_indexed_values_bytes += value.to_bytes();
+        }
+
+        // ignore invalid events' network id
+        val net_id = integer.from_gtv(event.non_indexed_values[0]);
+        if (net_id != network_id) {
+            log("ignore invalid events' network id: " + net_id + " : " + network_id);
+            continue;
+        }
+
+        val beneficiary = byte_array.from_gtv(event.indexed_values[0]);
+        val token_address = byte_array.from_gtv(event.indexed_values[1]);
+        val evm_account = evm.evm_account @? { .address == beneficiary };
+
+        evm_block_fn(
+            evm_block,
+            network_id,
+            token_address,
+            beneficiary,
+            evm_account,
+            event,
+            indexed_values_bytes,
+            non_indexed_values_bytes
+        );
+    }
+}
+
+@extendable
+function evm_block_fn(
+    c.evm_block,
+    network_id: integer,
+    token_address: byte_array,
+    beneficiary: byte_array,
+    evm.evm_account?,
+    event: c.event_data,
+    indexed_values_bytes: byte_array,
+    non_indexed_values_bytes: byte_array
+);
+</string>
+                            </entry>
+                            <entry key="lib/eif/utils/module.rell">
+                                <string>@mount('eif.utils')
 module;
 
-import accounts: lib.ft4.accounts;
-import auth: lib.ft4.auth;
-
-entity evm_account {
-  key accounts.account;
-  key address: byte_array;
-  mutable nonce: integer;
-}
-
-query get_login_message() = "Add key:\n{1}\n\nTo account:\n{2}\n\nWith permission:\nTransfer\n\nNonce: {3}";
-query get_register_message() = "Create account for EVM wallet:\n{1}\n\nDisposable key:\n{2}";
-query get_evm_signature_nonce(acc: byte_array) = require(evm_account @? { .address == acc }( .nonce ), "No account found for the provided pubkey");
-query get_account_by_evm_address(acc: byte_array) = evm_account @? { .address == acc }( .account );
-query get_account_id_by_evm_address(acc: byte_array) = evm_account @? { .address == acc }( .account.id );
-
-operation register_account(evm_addr: byte_array, accounts.auth_descriptor, auth.signature) {
-  require(op_context.get_signers().size() &gt; 0, "Transaction needs to be signed with disposable key");
-  require(auth_descriptor.auth_type == accounts.auth_type.S, "Only single sig is supported");
-  require(_extract_single_sig_args(auth_descriptor).flags == set(["T"]), "Only Transfer permission is allowed");
-
-  val pubkey = op_context.get_signers()[0];
-  val account = accounts.create_account_with_auth(auth_descriptor);
-  val register_msg = _create_register_message(pubkey, evm_addr);
-  val recovered_address = auth._recover_evm_address(register_msg, signature);
-  require(recovered_address == evm_addr, "Signature not valid for the provided key");
-
-  create evm_account(account, evm_addr, 0);
-}
-
-operation add_auth_descriptor(account_id: byte_array, accounts.auth_descriptor, auth.signature) {
-  require(op_context.get_signers().size() &gt; 0, "Transaction needs to be signed with disposable key");
-  val participants = accounts.get_signers(auth_descriptor.auth_type, auth_descriptor.args.to_gtv().to_bytes());
-  require(op_context.get_signers().contains_all(participants), "Transaction not signed by auth descriptor key");
-  require(_extract_single_sig_args(auth_descriptor).flags == set(["T"]), "Only Transfer permission is allowed");
-  
-  val account = accounts.account @ { .id == account_id };
-  val login_msg = _create_login_message(participants[0], account.id);
-  val recovered_address = auth._recover_evm_address(login_msg, signature);
-  val evm_account = evm_account @? { .address == recovered_address };
-  require(evm_account, "Signature not valid for the selected account");
-  
-  accounts.add_auth_descriptor_to_account(account, auth_descriptor, true);
-  evm_account.nonce += 1;
-}
-
-function _extract_single_sig_args(accounts.auth_descriptor): accounts.single_sig_args {
-  return accounts.single_sig_args.from_bytes(auth_descriptor.args.to_gtv().to_bytes());
-}
-
-function _create_register_message(pubkey, evm_addr: byte_array): text {
-  return get_register_message()
-                .replace("{1}", evm_addr.to_hex().lower_case())
-                .replace("{2}", pubkey.to_hex().lower_case());
-}
-
-function _create_login_message(pubkey, account_id: byte_array): text {
-  return get_login_message()
-                .replace("{1}", pubkey.to_hex().lower_case())
-                .replace("{2}", account_id.to_hex().lower_case())
-                .replace("{3}", evm_account @ { .account.id == account_id}( .nonce ).to_text());
-}
+function to_zero_padded_hex(array: byte_array) = "000000000000000000000000" + array.to_hex();
 </string>
                             </entry>
                             <entry key="lib/ft4/accounts/auth_basic.rell">
@@ -1026,18 +1097,10 @@ function check_required_flags(flags: set&lt;text&gt;, required_flags: list&lt;te
  * Returns the set of flags found in the "args" parameter.
  */
 function get_flags_from_args(a_t: auth_type, args: byte_array): set&lt;text&gt; {
-    when (a_t) {
-        S -&gt; {
-            return single_sig_args.from_bytes(args).flags;
-        }
-        M -&gt; {
-            return multi_sig_args.from_bytes(args).flags;
-        }
-        else -&gt; {
-            val f = set&lt;text&gt;();
-            return f;
-        }
-    }
+    return when (a_t) {
+        S -&gt; single_sig_args.from_bytes(args).flags;
+        M -&gt; multi_sig_args.from_bytes(args).flags;
+    };
 }
 
 /*
@@ -1047,16 +1110,15 @@ function check_auth_args(a_t: auth_type, args: byte_array, signers: list&lt;byte
     return when (a_t) {
         S -&gt; check_single_sig_auth(args, signers, required_flags);
         M -&gt; check_multi_sig_auth(args, signers, required_flags);
-        else -&gt; utils.invalid("Don't recognize authentication type %s, valid options are: S or M.".format(a_t));
     };
 }
 
 function get_signers(a_t: auth_type, args: byte_array): list&lt;byte_array&gt;{
     var signers: list&lt;byte_array&gt;? = null;
-    if (a_t == auth_type.S or a_t == auth_type.ES){
+    if (a_t == auth_type.S){
         signers = [single_sig_args.from_bytes(args).signer];
     }
-    if (a_t == auth_type.M or a_t == auth_type.EM) {
+    if (a_t == auth_type.M) {
         signers = multi_sig_args.from_bytes(args).signers;
     }
     //TODO: add extendable callback for custom types
@@ -1354,8 +1416,7 @@ function validate_auth_descriptor_rules(rules: gtv) {
 	if (rules_gtv[0] != "and".to_gtv()) {
 		validate_rule(rule_expression_from_gtv(rules_gtv.to_gtv()));
 	} else {
-		require(rules_gtv[0] == "and".to_gtv(), "First element in rules list must be 'and'");
-		require(rules_gtv.size() &lt;= chain_context.args.max_auth_descriptor_rules, "Too many rules");
+		require(rules_gtv.size() &lt;= chain_context.args.auth_descriptor.max_rules, "Too many rules");
 
 		for (gtv_rule in rules_gtv.sub(1)) {
 			validate_rule(rule_expression_from_gtv(gtv_rule));
@@ -1497,20 +1558,30 @@ function delete_auth_descriptor_message(gtv) {
     return "Please sign the message\nto delete auth descriptor:\n%s\n\nfrom account\n{account_id}".format(params.auth_descriptor_id);
 }
 
+function delete_auth_descriptor_resolver(args: gtv, account_id: byte_array, auth_descriptor_ids: list&lt;byte_array&gt;) {
+    val params = struct&lt;delete_auth_descriptor&gt;.from_gtv(args);
+    if (params.auth_descriptor_id in auth_descriptor_ids) return params.auth_descriptor_id;
+
+    for (ad in accounts.account_auth_descriptor @* { .account.id == account_id, .id in auth_descriptor_ids }) {
+        if (accounts.has_flags(ad, ["A"])) return ad.id;
+    }
+
+    return null;
+}
+
 @extend(auth.auth_handler)
-function () = auth.add_auth_handler(
+function () = auth.add_overridable_auth_handler(
     scope = rell.meta(delete_auth_descriptor).mount_name,
-    flags = ["A"],
-    message = delete_auth_descriptor_message(*)
+    flags = [],
+    message = delete_auth_descriptor_message(*),
+    resolver = delete_auth_descriptor_resolver(*)
 );
 
 operation delete_auth_descriptor(auth_descriptor_id: byte_array) {
-    // val flags = if (auth_descriptor_id == delete_descriptor_id) list&lt;text&gt;() else ["A"];
     val account = auth.authenticate();
-
     accounts._delete_auth_descriptor(
         accounts.auth_descriptor_by_id(account, auth_descriptor_id)
-    );    
+    );
 }
 
 function delete_all_auth_descriptors_exclude_message(gtv) {
@@ -1518,11 +1589,24 @@ function delete_all_auth_descriptors_exclude_message(gtv) {
     return "Please sign the message\nto delete all auth descriptors excluding:\n%s\n\n from account:\n{account_id}".format(params.auth_descriptor_id);
 }
 
+function delete_all_auth_descriptors_exclude_resolver(args: gtv, account_id: byte_array, auth_descriptor_ids: list&lt;byte_array&gt;) {
+    val params = struct&lt;delete_all_auth_descriptors_exclude&gt;.from_gtv(args);
+    if (not (params.auth_descriptor_id in auth_descriptor_ids)) return null;
+    val auth_descriptor = accounts.account_auth_descriptor @? {
+        .account.id == account_id,
+        .id == params.auth_descriptor_id
+    };
+
+    if (empty(auth_descriptor)) return null;
+    return if (accounts.has_flags(auth_descriptor, ["A"])) auth_descriptor.id else null;
+}
+
 @extend(auth.auth_handler)
-function () = auth.add_auth_handler(
+function () = auth.add_overridable_auth_handler(
     scope = rell.meta(delete_all_auth_descriptors_exclude).mount_name,
     flags = ["A"],
-    message = delete_all_auth_descriptors_exclude_message(*)
+    message = delete_all_auth_descriptors_exclude_message(*),
+    resolver = delete_all_auth_descriptors_exclude_resolver(*)
 );
 
 operation delete_all_auth_descriptors_exclude(account_id: byte_array, auth_descriptor_id: byte_array) {
@@ -1541,7 +1625,7 @@ function add_auth_descriptor_message(gtv) {
 }
 
 @extend(auth.auth_handler)
-function () = auth.add_auth_handler(
+function () = auth.add_overridable_auth_handler(
     scope = rell.meta(add_auth_descriptor).mount_name,
     flags = ["A"],
     message = add_auth_descriptor_message(*)
@@ -1579,18 +1663,12 @@ query is_auth_descriptor_valid(account_id: byte_array, auth_descriptor_id: byte_
     });
 }
 
-query get_account_auth_descriptors(id: byte_array, page_size: integer, page_cursor: text?) {
-    return utils.make_page(
-        accounts.get_paginated_auth_descriptors(id, page_size, page_cursor), 
-        page_size
-    );
+query get_account_auth_descriptors(id: byte_array) {
+    return accounts.get_auth_descriptors(id);
 }
 
-query get_account_auth_descriptors_by_signer(account_id: byte_array, signer: byte_array, page_size: integer, page_cursor: text?) {
-    return utils.make_page(
-        accounts.get_paginated_auth_descriptors_by_signer(account_id, signer, page_size, page_cursor),
-        page_size
-    );
+query get_account_auth_descriptors_by_signer(account_id: byte_array, signer: byte_array) {
+    return accounts.get_auth_descriptors_by_signer(account_id, signer);
 }
 
 query get_account_auth_descriptor_by_id(account_id: byte_array, id: byte_array) {
@@ -1608,14 +1686,14 @@ query get_account_by_auth_descriptor(accounts.auth_descriptor) {
     return accounts.account @? { .id == auth_descriptor.hash() } ( .id );
 }
 
-query get_accounts_by_signer(id: byte_array, page_size: integer, page_cursor: text?) {
+query get_accounts_by_signer(id: byte_array, page_size: integer?, page_cursor: text?) {
     return utils.make_page(
         accounts.get_paginated_accounts_by_signer(id, page_size, page_cursor),
         page_size
     );
 }
 
-query get_accounts_by_auth_descriptor_id(id: byte_array, page_size: integer, page_cursor: text?) {
+query get_accounts_by_auth_descriptor_id(id: byte_array, page_size: integer?, page_cursor: text?) {
     return utils.make_page(
         accounts.get_paginated_accounts_by_ad_id(id, page_size, page_cursor),
         page_size
@@ -1625,7 +1703,7 @@ query get_accounts_by_auth_descriptor_id(id: byte_array, page_size: integer, pag
 query get_auth_descriptor_nonce(
     account_id: byte_array, 
     auth_descriptor_id: byte_array
-) = accounts.account_auth_descriptor @ { 
+) = accounts.account_auth_descriptor @? { 
         .account.id == account_id, 
         .id == auth_descriptor_id 
     } ( .ctr );
@@ -1642,10 +1720,20 @@ struct rate_limit_config {
     points_at_account_creation: integer = 1;
 }
 
+struct auth_descriptor_config {
+    max_rules: integer = 8;
+    max_number_per_account: integer = 10;
+}
+
 struct module_args {
 	rate_limit: rate_limit_config = rate_limit_config();
-    max_auth_descriptor_rules: integer = 8;
+    auth_descriptor: auth_descriptor_config = auth_descriptor_config();
 }
+
+val AUTH_DESCRIPTORS_PER_ACCOUNT_UPPER_BOUND = min(
+    200,
+    chain_context.args.auth_descriptor.max_number_per_account
+);
 
 import ^.auth;
 import ^.utils;
@@ -1653,7 +1741,7 @@ import ^.version;
 import .external;
 
 enum auth_type {
-    S, M, ES, EM,
+    S, M,
 }
 
 struct auth_descriptor {
@@ -1690,7 +1778,18 @@ entity rl_state {
 }
 
 
-function add_auth_descriptor_to_account(account, auth_descriptor, safe: boolean = true): account_auth_descriptor {
+function add_auth_descriptor_to_account(
+    account,
+    auth_descriptor,
+    safe: boolean = true
+): account_auth_descriptor {
+    require(
+        (account_auth_descriptor @* { account }).size() &lt;
+            AUTH_DESCRIPTORS_PER_ACCOUNT_UPPER_BOUND,
+        "Max &lt;%d&gt; auth descriptor count reached. Delete some before adding new ones."
+            .format(AUTH_DESCRIPTORS_PER_ACCOUNT_UPPER_BOUND)
+    );
+    
     val id = auth_descriptor.hash();
 
     validate_auth_descriptor_args(auth_descriptor);
@@ -1734,20 +1833,32 @@ function create_account_with_auth(auth_descriptor): account = _create_account_wi
 function _create_account_with_auth(auth_descriptor, safe: boolean = true): account {
     require(auth_descriptor.rules == GTV_NULL, "Cannot create an account with a restricted auth descriptor");
     
+    var flags = get_flags(auth_descriptor);
+    require("A" in flags, "The auth descriptor used to create an account must always have the 'A' flag");
+
     val id = auth_descriptor.hash();
     val acc = create account (id);
 
     add_auth_descriptor_to_account(acc, auth_descriptor, safe);
 
-    val rl_config = get_rate_limit_config_for_account(acc);
-
-    val max_points = rl_config.max_points;
-    val recovery_time = rl_config.recovery_time;
-    val points_at_start = rl_config.points_at_account_creation;
-    
-    create rl_state(acc, .points = points_at_start, .last_update = latest_time(), recovery_time);
+    create_rate_limiter_state_for_account(acc);
     
     return acc;
+}
+
+function get_flags(auth_descriptor) {
+    return when (auth_descriptor.auth_type) {
+        S -&gt; single_sig_args.from_gtv(auth_descriptor.args.to_gtv()).flags;
+        M -&gt; multi_sig_args.from_gtv(auth_descriptor.args.to_gtv()).flags;
+    };
+}
+
+/**
+* Checks if an `account_auth_descriptor` has all the specified flags
+*/
+function has_flags(account_auth_descriptor, required_flags: list&lt;text&gt;): boolean {
+    val flags = get_flags_from_args(account_auth_descriptor.auth_type, account_auth_descriptor.args);
+    return flags.contains_all(required_flags);
 }
 
 function _add_signer(account, auth_descriptor, account_auth_descriptor, safe: boolean = true) {
@@ -1784,36 +1895,27 @@ function single_sig_auth_descriptor(pubkey, flags: set&lt;text&gt;) = auth_descr
     GTV_NULL
 );
 
-function get_paginated_auth_descriptors(id: byte_array, page_size: integer, page_cursor: text?) {
-    val before_rowid = utils.before_rowid(page_cursor);
+function get_auth_descriptors(id: byte_array) {
     return account_auth_descriptor @* {
-        .account.id == id,
-        .rowid &gt; (before_rowid ?: rowid(0))
+        .account.id == id
     } (
-        utils.pagination_result(
-            data = get_auth_descriptor_data($.to_struct()).to_gtv_pretty(),
-            rowid = .rowid
-        )
-    ) limit utils.fetch_data_size(page_size);
+        get_auth_descriptor_data($.to_struct())
+    );
 }
 
-function get_paginated_auth_descriptors_by_signer(account_id: byte_array, signer: byte_array, page_size: integer, page_cursor: text?) {
-    val before_rowid = utils.before_rowid(page_cursor);
+function get_auth_descriptors_by_signer(account_id: byte_array, signer: byte_array) {
     return auth_descriptor_signer @* {
         .account_auth_descriptor.account.id == account_id,
-        .id == signer,
-        .rowid &gt; (before_rowid ?: rowid(0))
+        .id == signer
     } (
-        utils.pagination_result(
-            data = get_auth_descriptor_data(.account_auth_descriptor.to_struct()).to_gtv_pretty(),
-            rowid = .rowid
-        )
-    ) limit utils.fetch_data_size(page_size);
+        get_auth_descriptor_data(.account_auth_descriptor.to_struct())
+    );
 }
 
 function get_auth_descriptor_data(ad: struct&lt;account_auth_descriptor&gt;) {
     return (
         id = ad.id,
+        account_id = ad.account.id,
         auth_type = ad.auth_type,
         args = gtv.from_bytes(ad.args),
         rules = gtv.from_bytes(ad.rules),
@@ -1821,7 +1923,7 @@ function get_auth_descriptor_data(ad: struct&lt;account_auth_descriptor&gt;) {
     );
 }
 
-function get_paginated_accounts_by_signer(id: byte_array, page_size: integer, page_cursor: text?) {
+function get_paginated_accounts_by_signer(id: byte_array, page_size: integer?, page_cursor: text?) {
     val before_rowid = utils.before_rowid(page_cursor);
     return auth_descriptor_signer @* {
         id,
@@ -1834,7 +1936,7 @@ function get_paginated_accounts_by_signer(id: byte_array, page_size: integer, pa
     ) limit utils.fetch_data_size(page_size); 
 }
 
-function get_paginated_accounts_by_ad_id(id: byte_array, page_size: integer, page_cursor: text?) {
+function get_paginated_accounts_by_ad_id(id: byte_array, page_size: integer?, page_cursor: text?) {
     val before_rowid = utils.before_rowid(page_cursor);
     return account_auth_descriptor @* {
         .id == id,
@@ -1849,8 +1951,8 @@ function get_paginated_accounts_by_ad_id(id: byte_array, page_size: integer, pag
 
 function validate_auth_descriptor_args(auth_descriptor) {
     when (auth_descriptor.auth_type) {
-        S, ES -&gt; single_sig_args.from_gtv(auth_descriptor.args.to_gtv());
-        M, EM -&gt; multi_sig_args.from_gtv(auth_descriptor.args.to_gtv());
+        S -&gt; single_sig_args.from_gtv(auth_descriptor.args.to_gtv());
+        M -&gt; multi_sig_args.from_gtv(auth_descriptor.args.to_gtv());
     }
 }
 
@@ -1865,7 +1967,7 @@ function latest_time() =
     else
         block @ {} (@max .timestamp) ?: 0;
 
-function get_max_allowed_auth_descriptor_rules() = chain_context.args.max_auth_descriptor_rules;
+function get_max_allowed_auth_descriptor_rules() = chain_context.args.auth_descriptor.max_rules;
 </string>
                             </entry>
                             <entry key="lib/ft4/accounts/rate_limit.rell">
@@ -1935,7 +2037,16 @@ function get_rate_limit_config_for_account(account): rate_limit_config =
         chain_context.args.rate_limit
     else
         account_rate_limit_config(account) ?: chain_context.args.rate_limit;
-</string>
+
+function create_rate_limiter_state_for_account(account) {
+    val rl_config = get_rate_limit_config_for_account(account);
+
+    val max_points = rl_config.max_points;
+    val recovery_time = rl_config.recovery_time;
+    val points_at_start = rl_config.points_at_account_creation;
+    
+    create rl_state(account, .points = points_at_start, .last_update = latest_time(), recovery_time);
+}</string>
                             </entry>
                             <entry key="lib/ft4/admin/module.rell">
                                 <string>@mount("ft4.admin")
@@ -2054,7 +2165,7 @@ function map_asset(asset: asset) {
     );
 }
 
-function get_paginated_asset_balances(account_id: byte_array, page_size: integer, page_cursor: text?): list&lt;utils.pagination_result&gt; {
+function get_paginated_asset_balances(account_id: byte_array, page_size: integer?, page_cursor: text?): list&lt;utils.pagination_result&gt; {
     val before_rowid = utils.before_rowid(page_cursor);
     return balance @* {
         .account.id == account_id,
@@ -2070,7 +2181,7 @@ function get_paginated_asset_balances(account_id: byte_array, page_size: integer
     ) limit utils.fetch_data_size(page_size);
 }
 
-function get_all_assets(page_size: integer, page_cursor: text?) {
+function get_all_assets(page_size: integer?, page_cursor: text?) {
     val before_rowid = utils.before_rowid(page_cursor);
     return assets.asset @* {
         .rowid &gt; (before_rowid ?: rowid(0))
@@ -2102,7 +2213,7 @@ function format_amount_with_decimals(amount: big_integer, decimals: integer): te
     return amt;
 }
 
-function get_paginated_asset_balances_by_name(name, page_size: integer, page_cursor: text?) {
+function get_paginated_asset_balances_by_name(name, page_size: integer?, page_cursor: text?) {
     val before_rowid = utils.before_rowid(page_cursor);
     return assets.asset @* {
         .name == name,
@@ -2181,6 +2292,7 @@ namespace Unsafe {
         decimals: integer,
         blockchain_rid: byte_array,
         icon_url: text): asset {
+
         require(decimals &gt;= 0 and decimals &lt; 79, "Decimals must be between 0 and 78 (included)");
 
         val trimmed_icon_url = icon_url.trim();
@@ -2188,6 +2300,8 @@ namespace Unsafe {
             (trimmed_icon_url == "") or (trimmed_icon_url.size() &lt;= 2048 and trimmed_icon_url.matches('^\\S+:\\/\\/[^\\s$.?#].[^\\s]*$')),
             "Invalid URL for icon"
         );
+
+        require(blockchain_rid.size() &gt; 0, "blockchain_rid cannot be empty");
 
         val id = (name, blockchain_rid).hash();
         return create asset (
@@ -2244,19 +2358,20 @@ function transfer_message(gtv) {
 }
 
 @extend(auth.auth_handler)
-function () = auth.add_auth_handler(
+function () = auth.add_overridable_auth_handler(
     scope = rell.meta(transfer).mount_name,
     flags = ["T"],
     message = transfer_message(*)
 );
 
 operation transfer(receiver_id: byte_array, asset_id: byte_array, amount: big_integer) {
-    val account = auth.authenticate();
-    assets.Unsafe.transfer(account, accounts.Account(receiver_id), assets.Asset(asset_id), amount);
+    val sender = auth.authenticate();
+    val asset = assets.Asset(asset_id);
+    assets.Unsafe.transfer_to_recipient_id(sender, receiver_id, asset, amount);
 }
 
 @extend(auth.auth_handler)
-function () = auth.add_auth_handler(
+function () = auth.add_overridable_auth_handler(
     scope = rell.meta(burn).mount_name,
     flags = ["T"],
     message = burn_message(*)
@@ -2281,7 +2396,7 @@ operation burn(asset_id: byte_array, amount: big_integer) {
                             </entry>
                             <entry key="lib/ft4/assets/external/queries.rell">
                                 <string>
-query get_asset_balances(account_id: byte_array, page_size: integer, page_cursor: text?) {
+query get_asset_balances(account_id: byte_array, page_size: integer?, page_cursor: text?) {
     return utils.make_page(
         assets.get_paginated_asset_balances(account_id, page_size, page_cursor),
         page_size
@@ -2298,7 +2413,7 @@ query get_asset_balance(account_id: byte_array, asset_id: byte_array) {
     );
 }
 
-query get_assets_by_name(name, page_size: integer, page_cursor: text?) {
+query get_assets_by_name(name, page_size: integer?, page_cursor: text?) {
     return utils.make_page(
         assets.get_paginated_asset_balances_by_name(name, page_size, page_cursor),
         page_size
@@ -2313,14 +2428,14 @@ query get_asset_by_symbol(symbol: text) {
     return assets.asset @? { .symbol == symbol } ( assets.map_asset($) );
 } 
 
-query get_all_assets(page_size: integer, page_cursor: text?) {
+query get_all_assets(page_size: integer?, page_cursor: text?) {
     return utils.make_page(
         assets.get_all_assets(page_size, page_cursor),
         page_size
     );
 }
 
-query get_transfer_history(account_id: byte_array, filter: assets.filter, page_size: integer, page_cursor: text?) {
+query get_transfer_history(account_id: byte_array, filter: assets.filter, page_size: integer?, page_cursor: text?) {
     val account = accounts.account @? { account_id };
     if (empty(account)) return null;
 
@@ -2334,7 +2449,7 @@ query get_transfer_history(account_id: byte_array, filter: assets.filter, page_s
     return utils.make_page(paginated_transfers, page_size);
 }
 
-query get_transfer_history_from_height(height: integer, asset_id: byte_array?, page_size: integer, page_cursor: text?) {
+query get_transfer_history_from_height(height: integer, asset_id: byte_array?, page_size: integer?, page_cursor: text?) {
     val asset = if (asset_id != null) assets.Asset(asset_id) else null;
 
     val paginated_transfers = assets.get_paginated_transfers(
@@ -2399,19 +2514,18 @@ function extract_data_from_transfer_history_entry(entry: transfer_history_entry)
         id = entry.rowid,
         delta = entry.delta,
         decimals = entry.asset.decimals,
-        asset = entry.asset.name,
-        asset_id = entry.asset.id,
-        asset_data = map_asset(entry.asset),
+        asset = map_asset(entry.asset),
         is_input = entry.is_input,
         timestamp = entry.transaction.block.timestamp,
         block_height = entry.transaction.block.block_height,
         tx_rid = entry.transaction.tx_rid,
         tx_data = entry.transaction.tx_data,
-        operation_name = extract_operation_name(entry)
+        operation_name = extract_operation_name(entry),
+        op_index = entry.op_index
     );
 }
 
-function get_paginated_transfers(accounts.account?, asset?, filter, height: integer?, page_size: integer, page_cursor: text?) {
+function get_paginated_transfers(accounts.account?, asset?, filter, height: integer?, page_size: integer?, page_cursor: text?) {
     var before_rowid: rowid? = null;
     if (page_cursor??) {
         val cursor = utils.decode_cursor(page_cursor);
@@ -2472,9 +2586,30 @@ import ^.version;
 </string>
                             </entry>
                             <entry key="lib/ft4/assets/transfer.rell">
-                                <string>
+                                <string>@extendable
+function is_create_on_internal_transfer_enabled(): boolean = false;
+
+@extendable
+function create_on_internal_transfer(
+   sender: accounts.account,
+   recipient_id: byte_array,
+   asset,
+   amount: big_integer
+);
+
 namespace Unsafe {
-   
+
+   function transfer_to_recipient_id(sender: accounts.account, recipient_id: byte_array, assets.asset, amount: big_integer) {
+      val recipient = accounts.account @? { .id == recipient_id };
+      if (recipient != null) {
+          transfer(sender, recipient, asset, amount);
+      } else {
+          require(is_create_on_internal_transfer_enabled(),
+              "Account &lt;%s&gt; does not exist and creating accounts on transfer is not enabled".format(recipient_id));
+          create_on_internal_transfer(sender, recipient_id, asset, amount);
+      }
+   }
+
    function transfer(from: accounts.account, to: accounts.account, assets.asset, amount: big_integer) {
       require_zero_exclusive_asset_amount_limits(amount, "Parameter amount");
       require(from != to, "Sender and receiver have to be different");
@@ -2526,15 +2661,18 @@ function authenticate(is_strict: boolean = true) {
 
     val previous_op = op_context.get_all_operations()[op_context.op_index - 1];
     require(
-        previous_op.name in [EVM_AUTH_OP, FT_AUTH_OP],
+        is_auth_op(previous_op),
         "Error authenticating operation. Incorrect auth operation %s".format(previous_op.name)
     );
 
     val (account, auth_descriptor) = fetch_account_and_auth_descriptor(previous_op.args);
+    require(
+        get_first_allowed_auth_descriptor(op.name, op.args.to_gtv(), account.id, [auth_descriptor.id], is_strict),
+        "The provided auth descriptor is not valid for this operation"
+    );
+    before_authenticate(account, auth_descriptor);
 
     accounts.rate_limit(account);
-
-    before_authenticate(account, auth_descriptor);
 
     require(not accounts.have_violating_rules(auth_descriptor), "The rules for this auth descriptor have been violated");
 
@@ -2552,6 +2690,28 @@ function authenticate(is_strict: boolean = true) {
     after_authenticate(account, if (auth_desc_after in deleted_descriptors) null else auth_desc_after);
 
     return account;
+}
+
+function get_first_allowed_auth_descriptor_by_signers(op_name: name, args: gtv, account_id: byte_array, signers: list&lt;byte_array&gt;, is_strict: boolean) {
+    val ads = accounts.auth_descriptor_signer @* {
+        .account_auth_descriptor.account.id == account_id,
+        .id in signers
+    } (.account_auth_descriptor);
+
+    val flags = get_auth_flags(op_name, is_strict);
+
+    val valid_ad_ids = ads @* { accounts.has_flags($, flags) } (.id);
+
+    return get_first_allowed_auth_descriptor(op_name, args, account_id, valid_ad_ids, is_strict);
+}
+
+function get_first_allowed_auth_descriptor(op_name: name, args: gtv, account_id: byte_array, ad_ids: list&lt;byte_array&gt;, is_strict: boolean) {
+    if (ad_ids.size() == 0) return null;
+
+    val resolver = get_auth_handler(op_name, is_strict=false).resolver;
+    if (resolver == null) return ad_ids[0];
+  
+    return resolver(args, account_id, ad_ids);
 }
 
 function _ft_auth(required_flags: list&lt;text&gt;, account: accounts.account, auth_descriptor: accounts.account_auth_descriptor) {
@@ -2608,7 +2768,7 @@ function _validate_evm_signature(
         auth_descriptor.ctr
     );
 
-    if (auth_descriptor.auth_type in [accounts.auth_type.S, accounts.auth_type.ES])
+    if (auth_descriptor.auth_type == accounts.auth_type.S)
         _validate_evm_address(message, validated_args.signatures[0], auth_descriptor);
     else
         _validate_multiple_evm_addresses(message, validated_args.signatures, auth_descriptor);
@@ -2641,10 +2801,7 @@ function _validate_evm_arguments(
 
     val signatures = list&lt;signature&gt;.from_gtv(auth_args[2]);
 
-    val has_all_flags = when (auth_descriptor.auth_type) {
-        S, ES -&gt; accounts.single_sig_args.from_bytes(auth_descriptor.args).flags.contains_all(required_flags);
-        M, EM -&gt; accounts.multi_sig_args.from_bytes(auth_descriptor.args).flags.contains_all(required_flags);
-    };
+    val has_all_flags = accounts.has_flags(auth_descriptor, list(required_flags));
     
     require(has_all_flags, "The auth descriptor does not have the required permissions");
 
@@ -2711,6 +2868,14 @@ function _validate_multiple_evm_addresses(message: text, signatures: list&lt;sig
     );
     return recovered_keys;
 }
+
+function extract_account_id(auth_op: gtx_operation): byte_array {
+    require(is_auth_op(auth_op), "Operation %s is not an auth operation".format(auth_op.name));
+    require(auth_op.args.size() &gt;= 1, "Invalid auth op, insufficient number of args: %s".format(auth_op.args.size()));
+    return byte_array.from_gtv(auth_op.args[0]);
+}
+
+function is_auth_op(op: gtx_operation) = op.name in [EVM_AUTH_OP, FT_AUTH_OP];
 </string>
                             </entry>
                             <entry key="lib/ft4/auth/external/module.rell">
@@ -2735,22 +2900,22 @@ operation ft_auth(
 </string>
                             </entry>
                             <entry key="lib/ft4/auth/external/queries.rell">
-                                <string>
+                                <string>struct _auth_handler_client {
+    name: text;
+    flags: list&lt;text&gt;;
+    dynamic: boolean;
+}
+
 query get_auth_flags(op_name: name) = auth.get_auth_handler(op_name, is_strict=false).flags;
 
 query get_auth_message_template(op_name: name, op_args: gtv) = auth.get_auth_message_template(op_name, op_args, is_strict=false);
-</string>
-                            </entry>
-                            <entry key="lib/ft4/auth/login.rell">
-                                <string>
-val DEFAULT_LOGIN_CONFIG_NAME = "default";
 
 query get_login_config(name? = null) {
-    val configs = login_config();
-    val config_name = name ?: DEFAULT_LOGIN_CONFIG_NAME;
+    val configs = auth.login_config();
+    val config_name = name ?: auth.DEFAULT_LOGIN_CONFIG_NAME;
 
-    if (config_name == DEFAULT_LOGIN_CONFIG_NAME) {
-        return if (config_name in configs) configs[config_name] else _login_config(flags = []);
+    if (config_name == auth.DEFAULT_LOGIN_CONFIG_NAME) {
+        return if (config_name in configs) configs[config_name] else auth._login_config(flags = []);
     }
     
     return require(
@@ -2759,17 +2924,184 @@ query get_login_config(name? = null) {
     );
 }
 
+query get_auth_handler_for_operation(op_name: name) {
+  val handler = auth.get_auth_handler(op_name, is_strict=false);
+  return _auth_handler_client(
+    name=op_name,
+    flags=handler.flags,
+    dynamic=handler.resolver != null
+  );
+}
+
+query get_first_allowed_auth_descriptor_by_signers(
+  op_name: name,
+  args: gtv,
+  account_id: byte_array,
+  signers: list&lt;byte_array&gt;
+): byte_array? = auth.get_first_allowed_auth_descriptor_by_signers(op_name, args, account_id, signers, is_strict=false);
+
+query get_first_allowed_auth_descriptor(
+  op_name: name,
+  args: gtv,
+  account_id: byte_array,
+  ad_ids: list&lt;byte_array&gt;
+): byte_array? = auth.get_first_allowed_auth_descriptor(op_name, args, account_id, ad_ids, is_strict=false);
+
+query get_all_auth_handlers() {
+  val auth_handlers = auth.auth_handler();
+  return auth_handlers @* {}(
+    _auth_handler_client(
+      name=$[0],
+      flags=$[1].flags,
+      dynamic=$[1].resolver != null
+    )
+  );
+}
+</string>
+                            </entry>
+                            <entry key="lib/ft4/auth/login.rell">
+                                <string>
+val DEFAULT_LOGIN_CONFIG_NAME = "default";
+
 struct _login_config {
     flags: list&lt;text&gt;;
+    rules: gtv? = null;
 }
 
 @extendable
 function login_config(): map&lt;name, _login_config&gt;;
 
-function add_login_config(name = DEFAULT_LOGIN_CONFIG_NAME, flags: list&lt;text&gt;) {
-    return [name: _login_config(flags)];
+function add_login_config(
+    name = DEFAULT_LOGIN_CONFIG_NAME,
+    flags: list&lt;text&gt;,
+    rules: gtv? = null
+) {
+    return [name: _login_config(flags, rules)];
 }
 
+function map_rule(rule: rule_expression): gtv {
+    return [
+        rule.operator.name.to_gtv(),
+        rule.variable.name.to_gtv(),
+        rule.value.to_gtv()
+    ].to_gtv();
+}
+
+function login_simple_rule(rule: rule_expression) = map_rule(rule);
+
+function login_rules(rules_list: list&lt;rule_expression&gt;): gtv {
+    require(rules_list.size() &gt; 0, "Empty login rules list");
+
+    if (rules_list.size() == 1) return map_rule(rules_list[0]);
+    
+    val rules = ["and".to_gtv()];
+    for (rule in rules_list) {
+        rules.add(map_rule(rule));
+    }
+    return rules.to_gtv();
+}
+
+function ttl(millis: integer): gtv {
+    return map_rule(
+        rule_expression(
+            rule_operator.lt,
+            rule_variable.relative_block_time,
+            millis
+        )
+    );
+}
+
+enum rule_variable {
+    block_height,
+    block_time,
+    op_count,
+    relative_block_height,
+    relative_block_time
+}
+
+enum rule_operator {
+    lt,
+    le,
+    eq,
+    ge,
+    gt
+}
+
+struct rule_expression {
+	operator: rule_operator;
+	variable: rule_variable;
+	value: integer;
+}
+
+struct rule_parameters {
+	variable: rule_variable;
+	value: integer;
+}
+
+/*
+ * Operator functions
+ */
+
+function greater_than(rule_parameters) = rule_expression(
+    rule_parameters.variable,
+    rule_operator.gt,
+    rule_parameters.value
+);
+
+function greater_or_equal(rule_parameters) = rule_expression(
+    rule_parameters.variable,
+    rule_operator.ge,
+    rule_parameters.value
+);
+
+function equals(rule_parameters): rule_expression {
+    return rule_expression(
+        rule_parameters.variable,
+        rule_operator.eq,
+        rule_parameters.value
+    );
+}
+
+function less_than(rule_parameters) = rule_expression(
+    rule_parameters.variable,
+    rule_operator.lt,
+    rule_parameters.value
+);
+
+function less_or_equal(rule_parameters) = rule_expression(
+    rule_parameters.variable,
+    rule_operator.le,
+    rule_parameters.value
+);
+
+/*
+ * Rule variable functions
+ */
+
+function block_height(integer) = rule_parameters(
+    rule_variable.block_height,
+    integer
+);
+
+function block_time(integer) = rule_parameters(
+    rule_variable.block_time,
+    integer
+);
+
+function op_count(integer) = rule_parameters(
+    rule_variable.op_count,
+    integer
+);
+
+function relative_block_height(integer) = rule_parameters(
+    rule_variable.relative_block_height,
+    integer
+);
+
+function relative_block_time(integer) = rule_parameters(
+    rule_variable.relative_block_time,
+    integer
+);
 </string>
                             </entry>
                             <entry key="lib/ft4/auth/module.rell">
@@ -2789,6 +3121,7 @@ struct auth_data {
 struct _auth_handler {
     flags: list&lt;text&gt;;
     message_formatter: ((gtv) -&gt; text)? = null;
+    resolver: ((gtv, byte_array, list&lt;byte_array&gt;) -&gt; byte_array?)? = null;
 }
 
 /*
@@ -2815,22 +3148,39 @@ function get_auth_handler(op_name: name, is_strict: boolean) {
     require_valid_scope_name(op_name);
     val auth_handlers = auth_handler();
     if (op_name in auth_handlers) return auth_handlers[op_name];
+    val override_name = "__override__" + op_name;
+    if (override_name in auth_handlers) return auth_handlers[override_name];
 
     require(not is_strict, "Strict mode is used and no auth handler matches exactly &lt;%s&gt;".format(op_name));
 
     val handler = get_mount_scope_auth_handler(auth_handlers, op_name);
     if (handler??) return handler;
 
-    return require(
-        auth_handlers.get_or_null(APP_SCOPE), 
+    require(
+        auth_handlers.get_or_null(APP_SCOPE),
         "Cannot find auth handler for operation &lt;%s&gt;".format(op_name)
     );
+    return auth_handlers[APP_SCOPE];
 }
 
-function add_auth_handler(scope: text = APP_SCOPE, flags: list&lt;text&gt;, message: ((gtv) -&gt; text)? = null) {
+function add_auth_handler(
+    scope: text = APP_SCOPE, 
+    flags: list&lt;text&gt;,
+    message: ((gtv) -&gt; text)? = null,
+    resolver: ((gtv, byte_array, list&lt;byte_array&gt;) -&gt; byte_array?)? = null
+) = [valid_scope_name(scope): _auth_handler(flags, message, resolver)];
+
+function add_overridable_auth_handler(
+    scope: text = APP_SCOPE,
+    flags: list&lt;text&gt;,
+    message: ((gtv) -&gt; text)? = null,
+    resolver: ((gtv, byte_array, list&lt;byte_array&gt;) -&gt; byte_array?)? = null
+) = ["__override__" + valid_scope_name(scope): _auth_handler(flags, message, resolver)];
+
+function valid_scope_name(scope: text) {
     val scope_name = scope.trim();
     require_valid_scope_name(scope_name);
-    return [scope_name: _auth_handler(flags, message)];
+    return scope_name;
 }
 
 function args() = op_context.get_all_operations()[op_context.op_index].args.to_gtv();
@@ -2889,8 +3239,20 @@ function require_valid_scope_name(name) =
     );
 </string>
                             </entry>
+                            <entry key="lib/ft4/module.rell">
+                                <string>struct module_args {
+    query_max_page_size: integer = 100;
+}
+
+function get_module_args() {
+    return chain_context.args;
+}
+</string>
+                            </entry>
                             <entry key="lib/ft4/utils/pagination.rell">
-                                <string>struct page_cursor {
+                                <string>import ^.{ get_module_args };
+
+struct page_cursor {
     before_rowid: rowid? = null;
 }
 
@@ -2898,8 +3260,6 @@ struct pagination_result {
     data: gtv;
     rowid: rowid;
 }
-
-val MAX_PAGE_SIZE: integer = 100;
 
 function encode_cursor(page_cursor) = page_cursor.to_bytes().to_base64();
 
@@ -2915,7 +3275,8 @@ function null_page() = paged_result(
     data = list&lt;gtv&gt;()
 );
 
-function fetch_data_size(page_size: integer) = min(MAX_PAGE_SIZE, page_size) + 1;
+function fetch_data_size(page_size: integer? = get_module_args().query_max_page_size) = 
+    min(get_module_args().query_max_page_size, page_size ?: get_module_args().query_max_page_size) + 1;
 
 function before_rowid(page_cursor: text?) {
     var before_rowid: rowid? = null;
@@ -2927,8 +3288,10 @@ function before_rowid(page_cursor: text?) {
 }
 
 
-function make_page(pagination_results: list&lt;pagination_result&gt;, page_size: integer): paged_result {
-    require(page_size &gt; 0, "Must return at least one item");
+function make_page(pagination_results: list&lt;pagination_result&gt;, page_size: integer?): paged_result {
+    if (page_size != null) {
+        require(page_size &gt; 0, "Must return at least one item");
+    }
     if (empty(pagination_results)) {
          return null_page();
     }
@@ -2975,98 +3338,15 @@ function make_auth_message(message: text) {
                                 <string>@mount('ft4')
 module;
 
-query get_version(): text = "0.2.0";
-</string>
-                            </entry>
-                            <entry key="lib/main/module.rell">
-                                <string>import c: ^.common;
-import ^.evm;
-
-query get_last_evm_block(network_id: integer) {
-    return c.evm_block @? { network_id } ( @sort_desc .evm_block_height, .evm_block_hash ) limit 1;
-}
-
-operation __evm_block(
-    network_id: integer,
-    evm_block_height: integer,
-    evm_block_hash: byte_array,
-    events: list&lt;c.event_data&gt;
-) {
-    _evm_block(network_id, evm_block_height, evm_block_hash, events);
-}
-
-function _evm_block(
-    network_id: integer,
-    evm_block_height: integer,
-    evm_block_hash: byte_array,
-    events: list&lt;c.event_data&gt;
-) {
-    val evm_block = create c.evm_block (
-        network_id,
-        evm_block_height,
-        evm_block_hash
-    );
-
-    for (event in events) {
-        var indexed_values_bytes = x"";
-        for (value in event.indexed_values) {
-            indexed_values_bytes += value.to_bytes();
-        }
-        var non_indexed_values_bytes = x"";
-        for (value in event.non_indexed_values) {
-            non_indexed_values_bytes += value.to_bytes();
-        }
-
-        // ignore invalid events' network id
-        val net_id = integer.from_gtv(event.non_indexed_values[0]);
-        if (net_id != network_id) {
-            log("ignore invalid events' network id: " + net_id + " : " + network_id);
-            continue;
-        }
-
-        val beneficiary = byte_array.from_gtv(event.indexed_values[0]);
-        val token_address = byte_array.from_gtv(event.indexed_values[1]);
-        val evm_account = evm.evm_account @? { .address == beneficiary };
-
-        evm_block_fn(
-            evm_block,
-            network_id,
-            token_address,
-            beneficiary,
-            evm_account,
-            event,
-            indexed_values_bytes,
-            non_indexed_values_bytes
-        );
-    }
-}
-
-@extendable
-function evm_block_fn(
-    c.evm_block,
-    network_id: integer,
-    token_address: byte_array,
-    beneficiary: byte_array,
-    evm.evm_account?,
-    event: c.event_data,
-    indexed_values_bytes: byte_array,
-    non_indexed_values_bytes: byte_array
-);
-</string>
-                            </entry>
-                            <entry key="lib/utils/module.rell">
-                                <string>@mount('eif.utils')
-module;
-
-function to_zero_padded_hex(array: byte_array) = "000000000000000000000000" + array.to_hex();
+query get_version(): text = "0.4.0";
 </string>
                             </entry>
                             <entry key="main.rell">
                                 <string>module;
 
-import ^.lib.eif_ft4;
-import ^.lib.evm;
-import ^.lib.main;
+import ^.lib.eif.ft4;
+import ^.lib.eif.evm;
+import ^.lib.eif.main;
 </string>
                             </entry>
                         </dict>

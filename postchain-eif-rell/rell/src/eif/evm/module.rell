@@ -19,8 +19,7 @@ query get_account_id_by_evm_address(acc: byte_array) = evm_account @? { .address
 operation register_account(evm_addr: byte_array, accounts.auth_descriptor, auth.signature) {
   require(op_context.get_signers().size() > 0, "Transaction needs to be signed with disposable key");
   require(auth_descriptor.auth_type == accounts.auth_type.S, "Only single sig is supported");
-  require(_extract_single_sig_args(auth_descriptor).flags == set(["T"]), "Only Transfer permission is allowed");
-
+  
   val pubkey = op_context.get_signers()[0];
   val account = accounts.create_account_with_auth(auth_descriptor);
   val register_msg = _create_register_message(pubkey, evm_addr);
