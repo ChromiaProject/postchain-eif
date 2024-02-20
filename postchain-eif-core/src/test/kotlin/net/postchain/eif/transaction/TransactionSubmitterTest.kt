@@ -64,7 +64,7 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
             postchainValidator,
             "addValidator",
             listOf("uint", "address"),
-            gtv(listOf(gtv(1), gtv(ByteArray(20)))),
+            listOf(gtv(1), gtv(ByteArray(20))),
             1337,
             BlockchainRid.ZERO_RID.data,
             RellTransactionStatus.QUEUED

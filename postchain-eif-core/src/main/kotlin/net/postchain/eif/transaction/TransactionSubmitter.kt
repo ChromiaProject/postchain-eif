@@ -113,7 +113,7 @@ class TransactionSubmitter(
 
         val function = Function(
                 transactionRequest.functionName,
-                transactionRequest.parameterValues.asArray().mapIndexed { index, value -> GtvToTypeMapper.map(value, transactionRequest.parameterTypes[index]) },
+                transactionRequest.parameterValues.mapIndexed { index, value -> GtvToTypeMapper.map(value, transactionRequest.parameterTypes[index]) },
                 emptyList<TypeReference<*>>()
         )
         val functionData = FunctionEncoder.encode(function)
