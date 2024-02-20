@@ -39,7 +39,10 @@ import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 
-abstract class EifIntegrationTest(evmType: EvmType) : EifBaseIntegrationTest(evmType, true) {
+abstract class EifIntegrationTest(evmType: EvmType) : EifBaseIntegrationTest(
+    evmType,
+    prependUrls = listOf("http://127.0.0.1:8888", "http://127.0.0.1:9999")
+) {
 
     @BeforeEach
     override fun setup() {

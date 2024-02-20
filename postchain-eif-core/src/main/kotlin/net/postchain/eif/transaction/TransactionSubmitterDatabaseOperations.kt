@@ -9,9 +9,24 @@ interface TransactionSubmitterDatabaseOperations {
 
     fun queueTransaction(ctx: EContext, transactionRequest: EvmSubmitTransactionRequest, networkId: Long)
 
-    fun pendTransaction(ctx: EContext, requestId: Long, gasPrice: BigInteger, gasLimit: BigInteger, transactionHash: String)
+    fun pendTransaction(ctx: EContext, requestId: Long, transactionHash: String)
 
-    fun failTransaction(ctx: EContext, requestId: Long, gasPrice: BigInteger, gasLimit: BigInteger,  errorMessage: String)
+    fun failTransaction(ctx: EContext, requestId: Long)
+
+    fun recordTransactionGas(
+        ctx: EContext,
+        requestId: Long,
+        gasPrice: BigInteger,
+        gasLimit: BigInteger,
+    )
+
+    fun recordTransactionFailure(
+        ctx: EContext,
+        requestId: Long,
+        serviceUrl: String?,
+        errorMessage: String,
+        stackTrace: String?
+    )
 
     fun succeedTransaction(ctx: EContext, requestId: Long, effectiveGasPrice: BigInteger, gasUsed: BigInteger, blockHash: String)
 
@@ -22,5 +37,4 @@ interface TransactionSubmitterDatabaseOperations {
     fun getPendingTransactions(ctx: EContext, networkId: Long): MutableMap<String, EvmSubmitTransactionRequest>
 
     fun getCompletedTransactions(ctx: EContext, networkId: Long): MutableMap<Long, EvmSubmitTransactionResult>
-
 }
