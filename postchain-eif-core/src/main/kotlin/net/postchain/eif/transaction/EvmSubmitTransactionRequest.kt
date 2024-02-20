@@ -19,12 +19,10 @@ data class EvmSubmitTransactionRequest(
         @Name("sender")
         val sender: ByteArray,
         @Name("status")
-        val status: TRANSACTION_STATUS
+        val status: RellTransactionStatus
 )
 
-data class EvmSubmitTransactionResult(val rowId: Long, val status: TRANSACTION_STATUS)
-
-enum class TRANSACTION_STATUS {
+enum class RellTransactionStatus {
     SUCCESS,
     QUEUED,
     FAILURE,

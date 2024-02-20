@@ -1,82 +1,47 @@
 package net.postchain.eif.transaction
 
-import com.google.gson.GsonBuilder
-import com.google.gson.JsonObject
+import assertk.assertThat
+import assertk.assertions.isEqualTo
+import assertk.assertions.isGreaterThan
+import assertk.assertions.isNotNull
+import assertk.assertions.isNull
+import net.postchain.base.data.DatabaseAccess
+import net.postchain.base.withReadConnection
 import net.postchain.common.BlockchainRid
-import net.postchain.devtools.IntegrationTestSetup
+import net.postchain.devtools.PostchainTestNode
+import net.postchain.devtools.PostchainTestNode.Companion.DEFAULT_CHAIN_IID
 import net.postchain.devtools.getModules
-import net.postchain.eif.GethContainer
-import net.postchain.eif.Web3jRequestHandler
+import net.postchain.eif.EifBaseIntegrationTest
+import net.postchain.eif.EvmType
 import net.postchain.eif.contracts.Validator
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_BLOCK_HASH
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_EFFECTIVE_GAS_PRICE
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_GAS_USAGE
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_REQUEST_ID
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_RECEIPT
 import net.postchain.gtv.GtvFactory.gtv
+import net.postchain.gtx.data.ExtOpData
 import org.awaitility.Awaitility
 import org.awaitility.Duration
+import org.jooq.SQLDialect
+import org.jooq.impl.DSL
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.DynamicArray
-import org.web3j.crypto.Credentials
-import org.web3j.protocol.Web3j
-import org.web3j.protocol.http.HttpService
 import org.web3j.tx.Contract
-import org.web3j.tx.FastRawTransactionManager
-import org.web3j.tx.TransactionManager
-import org.web3j.tx.gas.DefaultGasProvider
-import org.web3j.tx.response.PollingTransactionReceiptProcessor
 
 @Testcontainers(disabledWithoutDocker = true)
-class TransactionSubmitterTest : IntegrationTestSetup() {
-
-    private val evmContainer = GethContainer().withExposedService(
-            "geth", 8545,
-            Wait.forLogMessage(".*HTTP server started.*\\s", 1))
-
-    private lateinit var web3j: Web3j
-    private lateinit var transactionManager: TransactionManager
-    private lateinit var web3jRequestHandler: Web3jRequestHandler
-    private val credentials = Credentials
-            .create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
-    private val gasProvider = DefaultGasProvider()
-    private val validatorBinary = getBinaryFromArtifactResource("/artifacts/contracts/Validator.sol/Validator.json")
-
-    private fun getBinaryFromArtifactResource(resourcePath: String): String {
-        val artifactFile = javaClass.getResource(resourcePath)?.readText()
-        val artifactJson = GsonBuilder().create().fromJson(artifactFile, JsonObject::class.java)
-        return artifactJson.get("bytecode").asString
-    }
-
+class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
 
     @BeforeEach
-    fun setup() {
-        evmContainer.start()
-
-        val evmHost = evmContainer.getServiceHost("geth", 8545)
-        val evmPort = evmContainer.getServicePort("geth", 8545)
-        val gethUrl = "http://$evmHost:$evmPort"
-        web3j = Web3j.build(
-                HttpService(
-                        gethUrl
-                )
-        )
-
-        transactionManager = FastRawTransactionManager(
-                web3j,
-                credentials,
-                PollingTransactionReceiptProcessor(
-                        web3j,
-                        1000,
-                        30
-                )
-        )
-
-        web3jRequestHandler = Web3jRequestHandler(500, 60_000, 2, mutableListOf(gethUrl), listOf(web3j))
+    override fun setup() {
+        super.setup()
 
         with(configOverrides) {
-            setProperty("ethereum.urls", "http://$evmHost:$evmPort")
             setProperty("evm.privateKey", "0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
             setProperty("evm.txPollInterval", 1000)
         }
@@ -95,14 +60,14 @@ class TransactionSubmitterTest : IntegrationTestSetup() {
         val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
 
         val evmSubmitTransactionRequest = EvmSubmitTransactionRequest(
-                0,
-                postchainValidator,
-                "addValidator",
-                listOf("uint", "address"),
-                gtv(listOf(gtv(1), gtv(ByteArray(20)))),
-                1337,
-                BlockchainRid.ZERO_RID.data,
-                TRANSACTION_STATUS.QUEUED
+            0,
+            postchainValidator,
+            "addValidator",
+            listOf("uint", "address"),
+            gtv(listOf(gtv(1), gtv(ByteArray(20)))),
+            1337,
+            BlockchainRid.ZERO_RID.data,
+            RellTransactionStatus.QUEUED
         )
         txSubmitterTestModule.addTxToQueue(evmSubmitTransactionRequest)
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
@@ -110,9 +75,91 @@ class TransactionSubmitterTest : IntegrationTestSetup() {
             assertTrue(txSubmitterTestModule.conf.queue.isEmpty())
         }
 
+        // No receipt values set yet in DB
+        withDbTransaction(node, evmSubmitTransactionRequest.rowId) {
+            assertThat(it.get(COLUMN_BLOCK_HASH)).isNull()
+            assertThat(it.get(COLUMN_EFFECTIVE_GAS_PRICE)).isNull()
+            assertThat(it.get(COLUMN_GAS_USAGE)).isNull()
+        }
+
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
             assertTrue(txSubmitterTestModule.conf.completedTxs.contains(0))
         }
+
+        // Status set to operation
+        assertStatusOperation(txSubmitterTestModule, evmSubmitTransactionRequest.rowId, RellTransactionStatus.SUCCESS)
+
+        // Receipt values set in DB
+        withDbTransaction(node, evmSubmitTransactionRequest.rowId) {
+            assertThat(it.get(COLUMN_BLOCK_HASH)).isNotNull()
+            assertThat(it.get(COLUMN_EFFECTIVE_GAS_PRICE)).isNotNull()
+            assertThat(it.get(COLUMN_GAS_USAGE)).isGreaterThan(0)
+        }
+
+        // Update receipt operation called
+        withUpdateEvmTransactionReceipt(txSubmitterTestModule, evmSubmitTransactionRequest.rowId) {
+            assertThat(it.size).isEqualTo(1)
+            assertThat(it[0].blockHash).isNotNull()
+            assertThat(it[0].effectiveGasPrice).isNotNull()
+            assertThat(it[0].gasUsage!!).isGreaterThan(0)
+        }
+    }
+}
+
+// Evaluate sent receipt operations
+fun withUpdateEvmTransactionReceipt(txSubmitterTestModule: TransactionSubmitterTestGTXModule, rowId: Long, op: (List<EvmSubmitTransactionResult>) -> Unit) {
+    withTxOperations(txSubmitterTestModule, UPDATE_EVM_TRANSACTION_RECEIPT) { operations ->
+        val receiptOperations = operations
+            .filter { it.args[0].asInteger() == rowId }
+            .map {
+                val blockHash = it.args[1].asString()
+                val effectiveGasPrice = it.args[2].asInteger()
+                val gasUsage = it.args[3].asInteger()
+                EvmSubmitTransactionResult(RellTransactionStatus.SUCCESS, blockHash, effectiveGasPrice, gasUsage)
+            }
+
+        op(receiptOperations)
+    }
+}
+
+// Evaluate sent transaction status
+fun assertStatusOperation(txSubmitterTestModule: TransactionSubmitterTestGTXModule, rowId: Long, expectedStatus: RellTransactionStatus) {
+    withTxOperations(txSubmitterTestModule,
+        TransactionSubmitterSpecialTxExtension.UPDATE_EVM_TRANSACTION_STATE
+    ) { operations ->
+        val statusOperation = operations
+            .filter { it.args[0].asInteger() == rowId }
+            .map { RellTransactionStatus.values()[it.args[1].asInteger().toInt()] }
+            .first()
+
+        assertThat(statusOperation).isEqualTo(expectedStatus)
+    }
+}
+
+// Evaluate sent operations
+fun withTxOperations(txSubmitterTestModule: TransactionSubmitterTestGTXModule, operationName: String, op: (List<ExtOpData>) -> Unit) {
+
+    val operations = txSubmitterTestModule.conf.operations
+        .filter { it.opName == operationName }
+
+    op(operations)
+}
+
+// Evaluate transactions in DB
+fun withDbTransaction(node: PostchainTestNode, rowId: Long, op: (org.jooq.Record) -> Unit) {
+
+    withReadConnection(node.getBlockchainInstance().blockchainEngine.sharedStorage, DEFAULT_CHAIN_IID) {
+        val jooq = DSL.using(it.conn, SQLDialect.POSTGRES)
+
+        val tableName = DatabaseAccess.of(it).tableEvmTransaction(it)
+
+        val fetch = jooq
+            .select()
+            .from(tableName)
+            .where(COLUMN_REQUEST_ID.eq(rowId))
+            .fetchOne()
+
+        op(fetch)
     }
 }

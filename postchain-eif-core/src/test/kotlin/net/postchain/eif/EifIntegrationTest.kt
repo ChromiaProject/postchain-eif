@@ -1,40 +1,29 @@
 package net.postchain.eif
 
-import com.google.gson.GsonBuilder
-import com.google.gson.JsonObject
 import net.postchain.base.snapshot.SimpleDigestSystem
-import net.postchain.common.BlockchainRid
-import net.postchain.common.data.Hash
 import net.postchain.common.data.KECCAK256
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
 import net.postchain.concurrent.util.get
 import net.postchain.core.Transaction
 import net.postchain.crypto.KeyPair
-import net.postchain.crypto.SigMaker
 import net.postchain.crypto.devtools.KeyPairHelper
-import net.postchain.devtools.IntegrationTestSetup
 import net.postchain.devtools.testinfra.BaseTestInfrastructureFactory
 import net.postchain.eif.contracts.TestToken
 import net.postchain.eif.contracts.TokenBridge
 import net.postchain.eif.contracts.Validator
-import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvFactory.gtv
-import net.postchain.gtv.GtvInteger
 import net.postchain.gtv.GtvNull
 import net.postchain.gtv.merkle.GtvMerkleHashCalculator
 import net.postchain.gtv.merkleHash
-import net.postchain.gtx.GtxBuilder
 import org.awaitility.Awaitility
 import org.awaitility.Duration
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import org.testcontainers.containers.wait.strategy.Wait
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.DynamicArray
@@ -43,99 +32,25 @@ import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.Sign
-import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.exceptions.TransactionException
-import org.web3j.protocol.http.HttpService
 import org.web3j.tx.Contract
-import org.web3j.tx.FastRawTransactionManager
-import org.web3j.tx.TransactionManager
-import org.web3j.tx.gas.DefaultGasProvider
-import org.web3j.tx.response.PollingTransactionReceiptProcessor
 import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 
-enum class EvmType {
-    GETH, BSC
-}
-
-data class AccountRegister(
-        var accountId: ByteArray = ByteArray(32),
-        val privKey: ByteArray,
-        val pubkey: ByteArray,
-        val evmAddress: ByteArray,
-        val balance: Long
-)
-
-abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
-
-    private val networkId = 1337L
-    private val gasProvider = DefaultGasProvider()
-    private val evmContainer = when (evmType) {
-        EvmType.GETH -> {
-            GethContainer().withExposedService(
-                    "geth", 8545,
-                    Wait.forLogMessage(".*HTTP server started.*\\s", 1))
-        }
-
-        EvmType.BSC -> {
-            BscContainer().withExposedService(
-                    "geth", 8545,
-                    Wait.forLogMessage(".*HTTP server started.*\\s", 1))
-        }
-    }
-    private val credentials = Credentials
-            .create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
-    private val registerAccounts = mutableListOf<AccountRegister>()
-    private val snapshotHeights = mutableListOf<Long>()
-    private val tokenBridgeBinary = getBinaryFromArtifactResource("/artifacts/contracts/TokenBridge.sol/TokenBridge.json")
-    private val testTokenBinary = getBinaryFromArtifactResource("/artifacts/contracts/token/TestToken.sol/TestToken.json")
-    private val validatorBinary = getBinaryFromArtifactResource("/artifacts/contracts/Validator.sol/Validator.json")
-
-    private enum class AuthType {
-        S, M
-    }
-
-    private lateinit var web3j: Web3j
-    private lateinit var transactionManager: TransactionManager
+abstract class EifIntegrationTest(evmType: EvmType) : EifBaseIntegrationTest(evmType, true) {
 
     @BeforeEach
-    fun setup() {
-        evmContainer.start()
-
-        val evmHost = evmContainer.getServiceHost("geth", 8545)
-        val evmPort = evmContainer.getServicePort("geth", 8545)
-        web3j = Web3j.build(
-                HttpService(
-                        "http://$evmHost:$evmPort"
-                )
-        )
-
-        transactionManager = FastRawTransactionManager(
-                web3j,
-                credentials,
-                PollingTransactionReceiptProcessor(
-                        web3j,
-                        1000,
-                        30
-                )
-        )
+    override fun setup() {
+        super.setup()
 
         with(configOverrides) {
             setProperty("infrastructure", BaseTestInfrastructureFactory::class.qualifiedName)
-            setProperty("ethereum.urls", "http://127.0.0.1:8888,http://127.0.0.1:9999,http://$evmHost:$evmPort")
             setProperty("ethereum.maxReadAhead", 200)
             setProperty("ethereum.maxQueueSize", 100)
             setProperty("evm.maxTryErrors", 1)
         }
-    }
-
-    @AfterEach
-    override fun tearDown() {
-        super.tearDown()
-        web3j.shutdown()
-        evmContainer.stop()
     }
 
     @Test
@@ -686,97 +601,4 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
             assertNotNull(latestState)
         }
     }
-
-    // get smart contract binary from resource
-    private fun getBinaryFromArtifactResource(resourcePath: String): String {
-        val artifactFile = javaClass.getResource(resourcePath)?.readText()
-        val artifactJson = GsonBuilder().create().fromJson(artifactFile, JsonObject::class.java)
-        return artifactJson.get("bytecode").asString
-    }
-
-    /**
-     * convert evm address to 32 bytes to compliance with EIF simple gtv encoder
-     * @see SimpleGtvEncoder.encodeGtv
-     */
-    private fun to32Bytes(address: String) = "000000000000000000000000$address".hexStringToByteArray()
-
-    // Register asset on postchain
-    private fun registerAsset(tokenName: String, tokenSymbol: String, tokenDecimal: Long, tokenIconUrl: String, bcRid: BlockchainRid, sigMaker: SigMaker): ByteArray {
-        val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
-        b.addOperation("ft4.admin.register_asset",
-                gtv(tokenName), gtv(tokenSymbol), gtv(tokenDecimal), gtv(tokenIconUrl))
-        return b.finish()
-                .sign(sigMaker)
-                .buildGtx()
-                .encode()
-    }
-
-    // Add new evm erc20 token
-    private fun addNewEvmErc20(tokenAddress: ByteArray, name: String, symbol: String, decimal: Long, bcRid: BlockchainRid, sigMaker: SigMaker): ByteArray {
-        val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
-        b.addOperation("eif.ft4.add_new_evm_erc20", gtv(networkId), gtv(tokenAddress), gtv(name), gtv(symbol), gtv(decimal))
-        return b.finish()
-                .sign(sigMaker)
-                .buildGtx()
-                .encode()
-    }
-
-    // Add new token mapping
-    private fun addTokenMapping(tokenAddress: ByteArray, assetId: Gtv, bcRid: BlockchainRid, sigMaker: SigMaker): ByteArray {
-        val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
-        b.addOperation("eif.ft4.add_new_token_mapping", gtv(networkId), gtv(tokenAddress), assetId)
-        return b.finish()
-                .sign(sigMaker)
-                .buildGtx()
-                .encode()
-    }
-
-    // Register account on postchain
-    private fun registerAccount(userPubkey: ByteArray, userPriKey: ByteArray, userEVMAddress: ByteArray, sig: GtvArray, bcRid: BlockchainRid): ByteArray {
-        val auth = gtv(
-                gtv(AuthType.S.ordinal.toLong()),
-                gtv(GtvArray(arrayOf(gtv("A"), gtv("T"))), gtv(userPubkey)),
-                GtvNull
-        )
-
-        val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
-        b.addOperation("eif.evm.register_account", gtv(userEVMAddress), auth, sig)
-
-        val signer = cryptoSystem.buildSigMaker(KeyPair(userPubkey, userPriKey))
-        return b.finish()
-                .sign(signer)
-                .buildGtx()
-                .encode()
-    }
-
-    // Withdraw ft3 token on postchain
-    private fun withdrawOnPostchain(userPubkey: ByteArray, userPriKey: ByteArray,
-                                    authId: Gtv, tokenAddress: ByteArray,
-                                    userEvmAddress: ByteArray, withdrawAmount: BigInteger, bcRid: BlockchainRid): ByteArray {
-        val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
-        b.addOperation("eif.ft4.bridge_ft_token_to_evm", authId, gtv(networkId), gtv(tokenAddress), gtv(userEvmAddress), gtv(withdrawAmount))
-        b.addOperation("nop", GtvInteger(System.currentTimeMillis()))
-        val signer = cryptoSystem.buildSigMaker(KeyPair(userPubkey, userPriKey))
-        return b.finish()
-                .sign(signer)
-                .buildGtx()
-                .encode()
-    }
-
-    // Transfer ft3 token to another account
-    private fun transfer(userPubkey: ByteArray, userPriKey: ByteArray,
-                         accountId: Gtv, authDescriptorId: Hash, otherAccountId: Gtv,
-                         assetId: Gtv, transferAmount: BigInteger, bcRid: BlockchainRid): ByteArray {
-        val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
-        b.addOperation("ft4.ft_auth", accountId, gtv(authDescriptorId))
-        b.addOperation("ft4.transfer", otherAccountId, assetId, gtv(transferAmount))
-
-        val signer = cryptoSystem.buildSigMaker(KeyPair(userPubkey, userPriKey))
-        return b.finish()
-                .sign(signer)
-                .buildGtx()
-                .encode()
-    }
-
-    private fun getRegisterMessage(evmAddress: String, disposableKey: String) = "Create account for EVM wallet:\n${evmAddress}\n\nDisposable key:\n${disposableKey}"
 }

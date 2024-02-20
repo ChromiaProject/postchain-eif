@@ -12,4 +12,6 @@ interface TransactionSubmitterDatabaseOperations {
     fun recordFailedTransaction(ctx: EContext, transactionRequest: EvmSubmitTransactionRequest, gasPrice: BigInteger, gasLimit: BigInteger, errorMessage: String, networkId: Long)
 
     fun updateTransactionStatus(ctx: EContext, requestId: Long, status: TransactionStatus)
+
+    fun updateSuccessfulTransactionReceipt(ctx: EContext, requestId: Long, blockHash: String, effectiveGasPrice: BigInteger, gasUsed: BigInteger)
 }

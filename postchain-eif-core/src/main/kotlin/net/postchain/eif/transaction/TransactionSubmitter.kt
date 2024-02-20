@@ -24,6 +24,7 @@ import org.web3j.protocol.core.methods.response.EthSendTransaction
 import org.web3j.protocol.exceptions.ClientConnectionException
 import org.web3j.tx.TransactionManager
 import org.web3j.tx.gas.ContractGasProvider
+import org.web3j.utils.Numeric
 import java.math.BigInteger
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
@@ -47,7 +48,7 @@ class TransactionSubmitter(
 
     private val queue = LinkedBlockingQueue<EvmSubmitTransactionRequest>()
     private val pendingTransactions = mutableMapOf<String, EvmSubmitTransactionRequest>()
-    private val completedTransactions = ConcurrentHashMap<Long, TRANSACTION_STATUS>()
+    private val completedTransactions = ConcurrentHashMap<Long, EvmSubmitTransactionResult>()
 
     init {
         txSubmitJob = CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-transaction-submitter") + MDCContext()) {
@@ -58,7 +59,7 @@ class TransactionSubmitter(
                         sendTransaction(txToSubmit)
                     } catch (e: Exception) {
                         logger.error("Failed to submit EVM transaction: ${e.message}", e)
-                        completedTransactions[txToSubmit.rowId] = TRANSACTION_STATUS.FAILURE
+                        completedTransactions[txToSubmit.rowId] = EvmSubmitTransactionResult(RellTransactionStatus.FAILURE)
                     }
                 } catch (e: CancellationException) {
                     break
@@ -83,16 +84,23 @@ class TransactionSubmitter(
     private fun pollPendingTransactions() {
         val successfulTxs = mutableListOf<String>()
         pendingTransactions.forEach { (txHash, txRequest) ->
-            val txReceipt = web3jRequestHandler.sendWeb3jRequest { it.ethGetTransactionReceipt(txHash) }
-            if (txReceipt.transactionReceipt.isPresent) {
-                txReceipt.transactionReceipt.get() //TODO add to db?
+            val txReceiptOpt = web3jRequestHandler.sendWeb3jRequest { it.ethGetTransactionReceipt(txHash) }
+            txReceiptOpt.transactionReceipt.ifPresent { txReceipt ->
 
                 logger.info { "Got transaction receipt: $txReceipt" }
+                val effectiveGasPrice = Numeric.decodeQuantity(txReceipt.effectiveGasPrice)
+
                 withWriteConnection(storage, chainId) {
-                    databaseOperations.updateTransactionStatus(it, txRequest.rowId, TransactionStatus.SUCCESS)
+                    databaseOperations.updateSuccessfulTransactionReceipt(it, txRequest.rowId, txReceipt.blockHash,
+                        effectiveGasPrice, txReceipt.gasUsed)
                     true
                 }
-                completedTransactions[txRequest.rowId] = TRANSACTION_STATUS.SUCCESS
+                completedTransactions[txRequest.rowId] = EvmSubmitTransactionResult(
+                    RellTransactionStatus.SUCCESS,
+                    txReceipt.blockHash,
+                    effectiveGasPrice.longValueExact(),
+                    txReceipt.gasUsed.longValueExact()
+                )
                 successfulTxs.add(txHash)
             }
         }
@@ -161,7 +169,7 @@ class TransactionSubmitter(
         queue.offer(it)
     }
 
-    fun fetchCompletedTransactions(): Map<Long, TRANSACTION_STATUS> = completedTransactions
+    fun fetchCompletedTransactions(): Map<Long, EvmSubmitTransactionResult> = completedTransactions
 
     fun removeCompletedTransaction(rowId: Long) {
         completedTransactions.remove(rowId)
