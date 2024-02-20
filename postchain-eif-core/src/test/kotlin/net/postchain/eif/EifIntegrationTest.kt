@@ -124,7 +124,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
 
         with(configOverrides) {
             setProperty("infrastructure", BaseTestInfrastructureFactory::class.qualifiedName)
-            setProperty("ethereum.urls", "http://127.0.0.1:8888, http://127.0.0.1:9999, http://$evmHost:$evmPort")
+            setProperty("ethereum.urls", "http://127.0.0.1:8888,http://127.0.0.1:9999,http://$evmHost:$evmPort")
             setProperty("ethereum.maxReadAhead", 200)
             setProperty("ethereum.maxQueueSize", 100)
             setProperty("evm.maxTryErrors", 1)
