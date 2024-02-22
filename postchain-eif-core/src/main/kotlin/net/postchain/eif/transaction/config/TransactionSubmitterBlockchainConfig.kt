@@ -4,5 +4,5 @@ import net.postchain.gtv.mapper.Name
 
 data class TransactionSubmitterBlockchainConfig(
         @Name("chains")
-        val chains: Map<String, EvmTransactionSubmitterBlockchainConfig>
+        val chains: Map<String, Long>
 )

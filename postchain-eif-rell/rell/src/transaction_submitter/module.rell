@@ -1,3 +1,5 @@
+import .messaging.*;
+
 operation __icmf_message(sender: byte_array, topic: text, body: gtv) {
     create_evm_submit_transaction_entity(evm_submit_transaction_message.from_gtv(body), sender);
 }
@@ -8,14 +10,6 @@ operation __update_evm_transaction_state(row_id: integer, status: transaction_st
 
 operation __update_evm_transaction_receipt(row_id: integer, block_hash: text, effective_gas_price: big_integer, gas_usage: big_integer) {
     update evm_submit_transaction_entity @ { .rowid == rowid(row_id)} (.block_hash = block_hash, .effective_gas_price = effective_gas_price, .gas_usage = gas_usage);
-}
-
-struct evm_submit_transaction_message {
-    contract_address: text;
-    function_name: text;
-    parameter_types: list<text>;
-    parameter_values: list<gtv>;
-    network_id: integer;
 }
 
 entity evm_submit_transaction_entity {

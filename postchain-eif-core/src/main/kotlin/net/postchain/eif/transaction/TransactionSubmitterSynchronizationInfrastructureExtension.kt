@@ -32,7 +32,7 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
             val exs = blockchainConfig.module.getSpecialTxExtensions()
             val ext = exs.find { it is TransactionSubmitterSpecialTxExtension }
             if (ext is TransactionSubmitterSpecialTxExtension) {
-                for ((evmBlockchainName, chainConfig) in transactionSubmitterBlockchainConfig.chains) {
+                for ((evmBlockchainName, networkId) in transactionSubmitterBlockchainConfig.chains) {
                     val appConfig =
                             EvmTransactionSubmitterConfig.fromAppConfig(evmBlockchainName, postchainContext.appConfig)
                     val web3jServices = Web3jServiceFactory.buildServices(
@@ -42,7 +42,7 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                             appConfig.writeTimeout
                     )
                     val metrics =
-                            RpcUsageMetrics(blockchainConfig.chainID, blockchainConfig.blockchainRid, chainConfig.networkId)
+                            RpcUsageMetrics(blockchainConfig.chainID, blockchainConfig.blockchainRid, networkId)
                     val web3jRequestHandler = Web3jRequestHandler(
                             appConfig.minRetryDelay,
                             appConfig.maxRetryDelay,
@@ -58,9 +58,9 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                     val pendingTransactions = mutableMapOf<String, EvmSubmitTransactionRequest>()
                     val completedTransactions = ConcurrentHashMap<Long, EvmSubmitTransactionResult>()
                     withReadConnection(postchainContext.sharedStorage, process.blockchainEngine.chainID) {
-                        queue.addAll(databaseOperations.getQueuedTransactions(it, chainConfig.networkId))
-                        pendingTransactions.putAll(databaseOperations.getPendingTransactions(it, chainConfig.networkId))
-                        completedTransactions.putAll(databaseOperations.getCompletedTransactions(it, chainConfig.networkId))
+                        queue.addAll(databaseOperations.getQueuedTransactions(it, networkId))
+                        pendingTransactions.putAll(databaseOperations.getPendingTransactions(it, networkId))
+                        completedTransactions.putAll(databaseOperations.getCompletedTransactions(it, networkId))
                     }
                     val transactionSubmitter = TransactionSubmitter(
                             web3jRequestHandler,
@@ -69,14 +69,14 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                             databaseOperations,
                             postchainContext.sharedStorage,
                             process.blockchainEngine.chainID,
-                            chainConfig.networkId,
+                            networkId,
                             appConfig.txPollInterval,
                             queue,
                             pendingTransactions,
                             completedTransactions
                     )
-                    transactionSubmitters[chainConfig.networkId] = transactionSubmitter
-                    ext.addTransactionSubmitter(transactionSubmitter, chainConfig.networkId)
+                    transactionSubmitters[networkId] = transactionSubmitter
+                    ext.addTransactionSubmitter(transactionSubmitter, networkId)
                 }
             }
         }
