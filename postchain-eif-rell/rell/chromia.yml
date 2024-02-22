@@ -49,7 +49,8 @@ blockchains:
           - "net.postchain.eif.transaction.TransactionSubmitterGTXModule"
           - "net.postchain.d1.icmf.IcmfReceiverGTXModule"
       transaction_submitter:
-        <<: *eif_test
+        chains:
+          goerli: 5
       sync_ext:
         - "net.postchain.eif.transaction.TransactionSubmitterSynchronizationInfrastructureExtension"
         - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"

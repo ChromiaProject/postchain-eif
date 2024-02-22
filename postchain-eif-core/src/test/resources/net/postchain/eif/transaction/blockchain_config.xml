@@ -39,11 +39,7 @@
             <entry key="chains">
                 <dict>
                     <entry key="ethereum">
-                        <dict>
-                            <entry key="network_id">
-                                <int>1337</int>
-                            </entry>
-                        </dict>
+                        <int>1337</int>
                     </entry>
                 </dict>
             </entry>
