@@ -7,11 +7,20 @@ interface TransactionSubmitterDatabaseOperations {
 
     fun initialize(ctx: EContext)
 
-    fun recordTransaction(ctx: EContext, transactionRequest: EvmSubmitTransactionRequest, gasPrice: BigInteger, gasLimit: BigInteger, txHash: String, networkId: Long)
+    fun queueTransaction(ctx: EContext, transactionRequest: EvmSubmitTransactionRequest, networkId: Long)
 
-    fun recordFailedTransaction(ctx: EContext, transactionRequest: EvmSubmitTransactionRequest, gasPrice: BigInteger, gasLimit: BigInteger, errorMessage: String, networkId: Long)
+    fun pendTransaction(ctx: EContext, requestId: Long, gasPrice: BigInteger, gasLimit: BigInteger, transactionHash: String)
 
-    fun updateTransactionStatus(ctx: EContext, requestId: Long, status: TransactionStatus)
+    fun failTransaction(ctx: EContext, requestId: Long, gasPrice: BigInteger, gasLimit: BigInteger,  errorMessage: String)
 
-    fun updateSuccessfulTransactionReceipt(ctx: EContext, requestId: Long, blockHash: String, effectiveGasPrice: BigInteger, gasUsed: BigInteger)
+    fun succeedTransaction(ctx: EContext, requestId: Long, effectiveGasPrice: BigInteger, gasUsed: BigInteger, blockHash: String)
+
+    fun deactivateTransaction(ctx: EContext, requestId: Long)
+
+    fun getQueuedTransactions(ctx: EContext, networkId: Long): List<EvmSubmitTransactionRequest>
+
+    fun getPendingTransactions(ctx: EContext, networkId: Long): MutableMap<String, EvmSubmitTransactionRequest>
+
+    fun getCompletedTransactions(ctx: EContext, networkId: Long): MutableMap<Long, EvmSubmitTransactionResult>
+
 }

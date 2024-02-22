@@ -1,6 +1,7 @@
 package net.postchain.eif.transaction
 
 import net.postchain.PostchainContext
+import net.postchain.base.withReadConnection
 import net.postchain.common.exception.UserMistake
 import net.postchain.core.BlockchainProcess
 import net.postchain.core.SynchronizationInfrastructureExtension
@@ -14,6 +15,8 @@ import net.postchain.gtx.GTXModuleAware
 import org.web3j.crypto.Credentials
 import org.web3j.tx.RawTransactionManager
 import org.web3j.tx.gas.DefaultGasProvider
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.LinkedBlockingQueue
 
 class TransactionSubmitterSynchronizationInfrastructureExtension(private val postchainContext: PostchainContext) : SynchronizationInfrastructureExtension {
 
@@ -51,6 +54,14 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                     val transactionManager =
                             RawTransactionManager(web3jServices.first(), Credentials.create(appConfig.privateKey))
                     val gasProvider = DefaultGasProvider()
+                    val queue = LinkedBlockingQueue<EvmSubmitTransactionRequest>()
+                    val pendingTransactions = mutableMapOf<String, EvmSubmitTransactionRequest>()
+                    val completedTransactions = ConcurrentHashMap<Long, EvmSubmitTransactionResult>()
+                    withReadConnection(postchainContext.sharedStorage, process.blockchainEngine.chainID) {
+                        queue.addAll(databaseOperations.getQueuedTransactions(it, chainConfig.networkId))
+                        pendingTransactions.putAll(databaseOperations.getPendingTransactions(it, chainConfig.networkId))
+                        completedTransactions.putAll(databaseOperations.getCompletedTransactions(it, chainConfig.networkId))
+                    }
                     val transactionSubmitter = TransactionSubmitter(
                             web3jRequestHandler,
                             transactionManager,
@@ -59,7 +70,10 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                             postchainContext.sharedStorage,
                             process.blockchainEngine.chainID,
                             chainConfig.networkId,
-                            appConfig.txPollInterval
+                            appConfig.txPollInterval,
+                            queue,
+                            pendingTransactions,
+                            completedTransactions
                     )
                     transactionSubmitters[chainConfig.networkId] = transactionSubmitter
                     ext.addTransactionSubmitter(transactionSubmitter, chainConfig.networkId)

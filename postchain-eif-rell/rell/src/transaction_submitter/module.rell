@@ -43,10 +43,11 @@ struct evm_submit_transaction {
 }
 
 enum transaction_status {
-    SUCCESS,
     QUEUED,
+    TAKEN,
+    PENDING,
+    SUCCESS,
     FAILURE,
-    TAKEN
 }
 
 function create_evm_submit_transaction_entity(evm_submit_transaction_message: evm_submit_transaction_message, sender: byte_array) {

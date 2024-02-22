@@ -16,6 +16,8 @@ import net.postchain.core.Shutdownable
 import net.postchain.core.Storage
 import net.postchain.eif.GtvToTypeMapper
 import net.postchain.eif.Web3jRequestHandler
+import net.postchain.gtv.Gtv
+import net.postchain.gtv.mapper.toList
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.TypeReference
 import org.web3j.abi.datatypes.Function
@@ -38,17 +40,16 @@ class TransactionSubmitter(
         private val storage: Storage,
         private val chainId: Long,
         private val networkId: Long,
-        private val txPollInterval: Long
+        private val txPollInterval: Long,
+        private val queue : LinkedBlockingQueue<EvmSubmitTransactionRequest>,
+        private val pendingTransactions : MutableMap<String, EvmSubmitTransactionRequest>,
+        private val completedTransactions : ConcurrentHashMap<Long, EvmSubmitTransactionResult>,
 ) : Shutdownable {
 
     companion object : KLogging()
 
     private val txSubmitJob: Job
     private val txStatusPollJob: Job
-
-    private val queue = LinkedBlockingQueue<EvmSubmitTransactionRequest>()
-    private val pendingTransactions = mutableMapOf<String, EvmSubmitTransactionRequest>()
-    private val completedTransactions = ConcurrentHashMap<Long, EvmSubmitTransactionResult>()
 
     init {
         txSubmitJob = CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-transaction-submitter") + MDCContext()) {
@@ -91,8 +92,7 @@ class TransactionSubmitter(
                 val effectiveGasPrice = Numeric.decodeQuantity(txReceipt.effectiveGasPrice)
 
                 withWriteConnection(storage, chainId) {
-                    databaseOperations.updateSuccessfulTransactionReceipt(it, txRequest.rowId, txReceipt.blockHash,
-                        effectiveGasPrice, txReceipt.gasUsed)
+                    databaseOperations.succeedTransaction(it, txRequest.rowId, effectiveGasPrice, txReceipt.gasUsed, txReceipt.blockHash)
                     true
                 }
                 completedTransactions[txRequest.rowId] = EvmSubmitTransactionResult(
@@ -147,7 +147,7 @@ class TransactionSubmitter(
                     throw ProgrammerMistake(errorMessage)
                 } else {
                     withWriteConnection(storage, chainId) {
-                        databaseOperations.recordTransaction(it, transactionRequest, gasPrice, gasLimit, response.transactionHash, networkId)
+                        databaseOperations.pendTransaction(it, transactionRequest.rowId, gasPrice, gasLimit, response.transactionHash)
                         true
                     }
                     pendingTransactions[response.transactionHash] = transactionRequest
@@ -157,21 +157,28 @@ class TransactionSubmitter(
             throw ProgrammerMistake("Failed to send web3j request")
         } catch (e: Exception) {
             withWriteConnection(storage, chainId) {
-                databaseOperations.recordFailedTransaction(it, transactionRequest, gasPrice, gasLimit, e.message
-                        ?: "Unknown error", networkId)
+                databaseOperations.failTransaction(it, transactionRequest.rowId, gasPrice, gasLimit, e.message ?: "Unknown error")
                 true
             }
             throw e
         }
     }
 
-    fun enqueue(it: EvmSubmitTransactionRequest) {
-        queue.offer(it)
+    fun enqueue(evmSubmitTransactionRequest: EvmSubmitTransactionRequest) {
+        withWriteConnection(storage, chainId) {
+            databaseOperations.queueTransaction(it, evmSubmitTransactionRequest, networkId)
+            true
+        }
+        queue.offer(evmSubmitTransactionRequest)
     }
 
     fun fetchCompletedTransactions(): Map<Long, EvmSubmitTransactionResult> = completedTransactions
 
-    fun removeCompletedTransaction(rowId: Long) {
+    fun deactivateTransaction(rowId: Long) {
+        withWriteConnection(storage, chainId) {
+            databaseOperations.deactivateTransaction(it, rowId)
+            true
+        }
         completedTransactions.remove(rowId)
     }
 

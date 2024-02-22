@@ -14,11 +14,17 @@ import net.postchain.devtools.getModules
 import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.EvmType
 import net.postchain.eif.contracts.Validator
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_ACTIVE
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_BLOCK_HASH
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_EFFECTIVE_GAS_PRICE
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_GAS_LIMIT
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_GAS_PRICE
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_GAS_USAGE
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_REQUEST_ID
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_STATUS
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_TX_HASH
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_RECEIPT
+import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtx.data.ExtOpData
 import org.awaitility.Awaitility
@@ -33,6 +39,7 @@ import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.DynamicArray
 import org.web3j.tx.Contract
+import java.math.BigInteger
 
 @Testcontainers(disabledWithoutDocker = true)
 class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
@@ -45,14 +52,16 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
             setProperty("evm.privateKey", "0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
             setProperty("evm.txPollInterval", 1000)
         }
-    }
 
-    @Test
-    fun `submit transaction`() {
         // Deploy validator contract
         val postchainValidator = "659e4a3726275edFD125F52338ECe0d54d15BD99"
         val encodedConstructor = FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(postchainValidator))))
         Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedConstructor).send()
+
+    }
+
+    @Test
+    fun `submit transaction`() {
 
         val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config.xml")
         val node = nodes[0]
@@ -61,10 +70,10 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
 
         val evmSubmitTransactionRequest = EvmSubmitTransactionRequest(
             0,
-            postchainValidator,
+                "659e4a3726275edFD125F52338ECe0d54d15BD99",
             "addValidator",
             listOf("uint", "address"),
-            listOf(gtv(1), gtv(ByteArray(20))),
+            listOf( gtv(1), gtv(ByteArray(20))),
             1337,
             BlockchainRid.ZERO_RID.data,
             RellTransactionStatus.QUEUED
@@ -103,6 +112,92 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
             assertThat(it[0].blockHash).isNotNull()
             assertThat(it[0].effectiveGasPrice).isNotNull()
             assertThat(it[0].gasUsage!!).isGreaterThan(0)
+        }
+    }
+
+    @Test
+    fun `db queued transaction goes to pending after build block`() {
+        val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config_queue.xml")
+        val node = nodes[0]
+
+        val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterQueuedTransactionTestGTXModule>().first()
+
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            buildBlock(1L)
+            assertTrue(txSubmitterTestModule.conf.queue.isEmpty())
+        }
+
+        withDbTransaction(node, 0) {
+            assertThat(it.get(COLUMN_STATUS).equals(TransactionStatus.PENDING.name))
+            assertThat(it.get(COLUMN_GAS_PRICE)).isNotNull()
+            assertThat(it.get(COLUMN_GAS_LIMIT)).isNotNull()
+            assertThat(it.get(COLUMN_TX_HASH)).isNotNull()
+            assertThat(it.get(COLUMN_ACTIVE).equals(true))
+
+        }
+    }
+
+    @Test
+    fun `db pending transaction goes to success after build block`() {
+        val sendTransaction = transactionManager.sendTransaction(BigInteger.valueOf(4100000000), BigInteger.valueOf(9000000), "659e4a3726275edFD125F52338ECe0d54d15BD99", "0x4b56175300000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000", BigInteger.valueOf(0))
+
+        TransactionSubmitterPendingTransactionTestGTXModule.TRANSACTION_HASH = sendTransaction.transactionHash
+        val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config_pending.xml")
+        val node = nodes[0]
+
+        val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterPendingTransactionTestGTXModule>().first()
+
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            buildBlock(1L)
+            assertTrue(txSubmitterTestModule.conf.completedTxs.contains(0))
+        }
+
+        withDbTransaction(node, 0) {
+            assertThat(it.get(COLUMN_STATUS).equals(TransactionStatus.SUCCESS.name))
+            assertThat(it.get(COLUMN_BLOCK_HASH).isNotEmpty())
+            assertThat(it.get(COLUMN_EFFECTIVE_GAS_PRICE)).isGreaterThan(0)
+            assertThat(it.get(COLUMN_GAS_USAGE)).isGreaterThan(0)
+            assertThat(it.get(COLUMN_ACTIVE).equals(true))
+        }
+    }
+
+    @Test
+    fun `db success transaction goes to inactive after build block`() {
+        val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config_success.xml")
+        val node = nodes[0]
+
+        val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterSuccessfulTransactionTestGTXModule>().first()
+
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            buildBlock(1L)
+            assertTrue(txSubmitterTestModule.conf.completedTxs.size == 0)
+        }
+
+        withDbTransaction(node, 0) {
+            assertThat(it.get(COLUMN_STATUS).equals(TransactionStatus.SUCCESS.name))
+            assertThat(it.get(COLUMN_ACTIVE).equals(false))
+        }
+    }
+
+    @Test
+    fun `db failed transaction`() {
+        // Deploy validator contract
+        val postchainValidator = "659e4a3726275edFD125F52338ECe0d54d15BD99"
+        val encodedConstructor = FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(postchainValidator))))
+        Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedConstructor).send()
+
+        var nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config_fail.xml")
+        var node = nodes[0]
+
+        val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterFailTransactionTestGTXModule>().first()
+
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            buildBlock(1L)
+            assertTrue(txSubmitterTestModule.conf.completedTxs.contains(0))
+        }
+
+        withDbTransaction(node, 0) {
+            assertThat(it.get(COLUMN_STATUS).equals(TransactionStatus.FAILURE.name))
         }
     }
 }
@@ -163,3 +258,4 @@ fun withDbTransaction(node: PostchainTestNode, rowId: Long, op: (org.jooq.Record
         op(fetch)
     }
 }
+
