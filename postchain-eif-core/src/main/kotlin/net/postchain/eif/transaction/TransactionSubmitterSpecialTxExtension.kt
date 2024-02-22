@@ -54,7 +54,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                                 )))
                     }
                 }
-                bctx.addAfterCommitHook { submitter.value.removeCompletedTransaction(rowId) }
+                bctx.addAfterCommitHook { submitter.value.deactivateTransaction(rowId) }
             }
         }
 
