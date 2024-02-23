@@ -44,9 +44,20 @@ enum transaction_status {
     FAILURE,
 }
 
+struct module_args {
+    contract_whitelist: text;
+}
+
 function create_evm_submit_transaction_entity(evm_submit_transaction_message: evm_submit_transaction_message, sender: byte_array) {
+    val contract_whitelist = get_contract_whitelist();
+    val contract_address = evm_submit_transaction_message.contract_address;
+    if (not contract_whitelist.contains(contract_address)) {
+        log("Contract %s is not included in whitelist. Ignoring tx request.".format(contract_address));
+        return;
+    }
+
     create evm_submit_transaction_entity(
-        contract_address = evm_submit_transaction_message.contract_address,
+        contract_address = contract_address,
         function_name = evm_submit_transaction_message.function_name,
         parameter_types = join_text_list(evm_submit_transaction_message.parameter_types),
         parameter_values = evm_submit_transaction_message.parameter_values.to_gtv().to_bytes(),
@@ -81,3 +92,5 @@ function join_text_list(components: list<text>) {
     }
     return result;
 }
+
+function get_contract_whitelist() = chain_context.args.contract_whitelist.split(",");

@@ -16,3 +16,17 @@ function test_create_evm_submit_transaction_entity(){
 
     assert_not_null(evm_submit_transaction_entity);
 }
+
+function test_not_whitelisted_contracts_are_ignored(){
+
+    rell.test.tx().op(create_evm_submit_transaction_entity_operation(evm_submit_transaction_message(
+        contract_address = "invalid_address",
+        function_name = "myFunction",
+        parameter_types = list(),
+        parameter_values = list(),
+        network_id = 1), x"")).run();
+
+    val evm_submit_transaction_entity = evm_submit_transaction_entity @? {};
+
+    assert_null(evm_submit_transaction_entity);
+}
