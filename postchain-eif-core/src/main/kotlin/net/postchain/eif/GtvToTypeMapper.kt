@@ -6,9 +6,16 @@ import net.postchain.common.toHex
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvInteger
 import org.web3j.abi.TypeReference
-import org.web3j.abi.datatypes.*
+import org.web3j.abi.datatypes.Address
+import org.web3j.abi.datatypes.Bool
+import org.web3j.abi.datatypes.DynamicBytes
+import org.web3j.abi.datatypes.DynamicArray
 import org.web3j.abi.datatypes.Int
+import org.web3j.abi.datatypes.Type
+import org.web3j.abi.datatypes.Uint
+import org.web3j.abi.datatypes.Utf8String
 import org.web3j.abi.datatypes.generated.Bytes32
+import java.lang.reflect.ParameterizedType
 import java.math.BigInteger
 
 object GtvToTypeMapper {
@@ -42,11 +49,17 @@ object GtvToTypeMapper {
             Bytes32::class.java -> Bytes32(value.asByteArray())
             DynamicBytes::class.java -> DynamicBytes(value.asByteArray())
             Utf8String::class.java -> Utf8String(value.asString())
-            /*DynamicArray::class.java -> {
-                val actualTypeArgument = (typeReference as ParameterizedType).actualTypeArguments[0]
-                DynamicArray(value.asArray().map {mapTypeReference(actualTypeArgument, it)}.toMutableList())
-            }*/
-            else -> throw ProgrammerMistake("Unexpected  typeReference : ${typeReference}")
+            is ParameterizedType -> {
+                if (typeReference.rawType == DynamicArray::class.java) {
+                    return DynamicArray(Type::class.java, value.asArray().map { gtv ->
+                        mapTypeReference(typeReference.actualTypeArguments[0], gtv)
+                    })
+                } else {
+                    throw ProgrammerMistake("Unexpected parameterized typeReference: ${typeReference.rawType}")
+                }
+            }
+
+            else -> throw ProgrammerMistake("Unexpected typeReference: $typeReference")
         }
     }
 }
