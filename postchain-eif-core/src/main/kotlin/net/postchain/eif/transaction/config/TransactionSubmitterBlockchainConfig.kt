@@ -4,5 +4,7 @@ import net.postchain.gtv.mapper.Name
 
 data class TransactionSubmitterBlockchainConfig(
         @Name("chains")
-        val chains: Map<String, Long>
+        val chains: Map<String, NetworkBlockchainConfig>,
+        @Name("gas_limit")
+        val gasLimit: Long
 )

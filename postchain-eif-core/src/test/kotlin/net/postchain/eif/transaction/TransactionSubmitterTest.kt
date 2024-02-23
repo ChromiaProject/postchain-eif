@@ -2,6 +2,7 @@ package net.postchain.eif.transaction
 
 import assertk.assertThat
 import assertk.assertions.isEqualTo
+import assertk.assertions.isFalse
 import assertk.assertions.isGreaterThan
 import assertk.assertions.isNotNull
 import assertk.assertions.isNull
@@ -24,7 +25,6 @@ import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_STATUS
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_TX_HASH
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_RECEIPT
-import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtx.data.ExtOpData
 import org.awaitility.Awaitility
@@ -186,8 +186,8 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
         val encodedConstructor = FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(postchainValidator))))
         Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedConstructor).send()
 
-        var nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config_fail.xml")
-        var node = nodes[0]
+        val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config_fail.xml")
+        val node = nodes[0]
 
         val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterFailTransactionTestGTXModule>().first()
 
@@ -198,6 +198,47 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
 
         withDbTransaction(node, 0) {
             assertThat(it.get(COLUMN_STATUS).equals(TransactionStatus.FAILURE.name))
+        }
+    }
+
+    @Test
+    fun `Assert that tx submitter becomes unhealthy when RPC nodes are unreachable`() {
+        with(configOverrides) {
+            setProperty("evm.healthCheckInterval", 1000)
+            setProperty("ethereum.urls", listOf("http://localhost:9000"))
+        }
+
+        val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config.xml")
+        val node = nodes[0]
+
+        val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
+        val txExtension = txSubmitterTestModule.getSpecialTxExtensions().filterIsInstance<TransactionSubmitterSpecialTxExtension>().first()
+
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            val txSubmitter = txExtension.getTransactionSubmitter(1337)
+            assertThat(txSubmitter).isNotNull()
+            assertThat(txSubmitter!!.isHealthy()).isFalse()
+        }
+    }
+
+    @Test
+    fun `Assert that tx submitter becomes unhealthy when wallet balance is too low`() {
+        with(configOverrides) {
+            // Random key with no balance
+            setProperty("evm.privateKey", "0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f611")
+            setProperty("evm.healthCheckInterval", 1000)
+        }
+
+        val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config.xml")
+        val node = nodes[0]
+
+        val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
+        val txExtension = txSubmitterTestModule.getSpecialTxExtensions().filterIsInstance<TransactionSubmitterSpecialTxExtension>().first()
+
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            val txSubmitter = txExtension.getTransactionSubmitter(1337)
+            assertThat(txSubmitter).isNotNull()
+            assertThat(txSubmitter!!.isHealthy()).isFalse()
         }
     }
 }
