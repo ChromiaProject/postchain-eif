@@ -16,9 +16,10 @@ import java.math.BigInteger
 import java.util.concurrent.LinkedBlockingQueue
 
 data class TransactionSubmitterTestContext(
-    val queue: LinkedBlockingQueue<EvmSubmitTransactionRequest>,
-    val completedTxs: MutableSet<Long>,
-    val operations: MutableList<ExtOpData>
+        val queue: LinkedBlockingQueue<EvmSubmitTransactionRequest>,
+        val successfulTxs: MutableSet<Long>,
+        val failedTxs: MutableSet<Long>,
+        val operations: MutableList<ExtOpData>
 )
 
 class TransactionSubmitterQueuedTransactionTestGTXModule : TransactionSubmitterTestGTXModule(){
@@ -100,7 +101,7 @@ class TransactionSubmitterFailTransactionTestGTXModule : TransactionSubmitterTes
 }
 
 open class TransactionSubmitterTestGTXModule : SimpleGTXModule<TransactionSubmitterTestContext>(
-        TransactionSubmitterTestContext(LinkedBlockingQueue(), mutableSetOf(), mutableListOf()),
+        TransactionSubmitterTestContext(LinkedBlockingQueue(), mutableSetOf(), mutableSetOf(), mutableListOf()),
         mapOf(UPDATE_EVM_TRANSACTION_STATE to { conf, opData ->
             ModifyTxStateOperation(conf, opData)
         }, UPDATE_EVM_TRANSACTION_RECEIPT to { conf, opData ->
@@ -134,10 +135,11 @@ class ModifyTxStateOperation(private val conf: TransactionSubmitterTestContext, 
         val rowId = extOpData.args[0].asInteger()
         val status = RellTransactionStatus.values()[extOpData.args[1].asInteger().toInt()]
 
-        if (status == RellTransactionStatus.TAKEN) {
-            return conf.queue.removeIf { it.rowId == rowId }
-        } else if (status == RellTransactionStatus.SUCCESS) {
-            conf.completedTxs.add(rowId)
+        when (status) {
+            RellTransactionStatus.TAKEN -> conf.queue.removeIf { it.rowId == rowId }
+            RellTransactionStatus.SUCCESS -> conf.successfulTxs.add(rowId)
+            RellTransactionStatus.FAILURE -> conf.failedTxs.add(rowId)
+            else -> {}
         }
 
         conf.operations.add(extOpData)
