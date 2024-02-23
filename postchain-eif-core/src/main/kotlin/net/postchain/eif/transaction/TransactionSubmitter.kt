@@ -20,6 +20,7 @@ import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.TypeReference
 import org.web3j.abi.datatypes.Function
 import org.web3j.protocol.core.DefaultBlockParameterName
+import org.web3j.protocol.core.methods.request.Transaction
 import org.web3j.protocol.core.methods.response.EthSendTransaction
 import org.web3j.protocol.exceptions.ClientConnectionException
 import org.web3j.tx.TransactionManager
@@ -163,12 +164,17 @@ class TransactionSubmitter(
 
         // TODO validate that this is the correct way to check balance and write a test
         try {
+            val estimatedGasUsage = getEstimatedGasUsage(gasPrice, gasLimit, transactionRequest.contractAddress, functionData)
+            if (estimatedGasUsage > gasLimit) {
+                throw UserMistake("Estimated gas usage $estimatedGasUsage for tx exceeds limit of $gasLimit")
+            }
+
             if (walletBalance.balance < gasPrice * gasLimit) {
                 throw UserMistake("Insufficient wallet balance")
             }
 
             val response = try {
-                transactionManager.sendTransaction(gasPrice, gasLimit, transactionRequest.contractAddress, functionData, BigInteger.valueOf(0))
+                transactionManager.sendTransaction(gasPrice, gasLimit, transactionRequest.contractAddress, functionData, BigInteger.ZERO)
             } catch (e: ClientConnectionException) {
                 logger.error("Web3j request failed: ${e.message}")
                 // TODO investigate - fine to move on to next request?
@@ -204,6 +210,13 @@ class TransactionSubmitter(
             }
             throw e
         }
+    }
+
+    private fun getEstimatedGasUsage(gasPrice: BigInteger, gasLimit: BigInteger, contractAddress: String, functionData: String): BigInteger {
+        val transaction = Transaction(transactionManager.fromAddress, BigInteger.ZERO, gasPrice, gasLimit, "0x$contractAddress", BigInteger.ZERO, functionData)
+        return web3jRequestHandler.sendWeb3jRequest {
+            it.ethEstimateGas(transaction)
+        }.amountUsed
     }
 
     fun enqueue(evmSubmitTransactionRequest: EvmSubmitTransactionRequest) {

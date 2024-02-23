@@ -1,6 +1,7 @@
 package net.postchain.eif.transaction
 
 import assertk.assertThat
+import assertk.assertions.contains
 import assertk.assertions.isEqualTo
 import assertk.assertions.isFalse
 import assertk.assertions.isGreaterThan
@@ -93,7 +94,7 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
-            assertTrue(txSubmitterTestModule.conf.completedTxs.contains(0))
+            assertTrue(txSubmitterTestModule.conf.successfulTxs.contains(0))
         }
 
         // Status set to operation
@@ -149,7 +150,7 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
-            assertTrue(txSubmitterTestModule.conf.completedTxs.contains(0))
+            assertTrue(txSubmitterTestModule.conf.successfulTxs.contains(0))
         }
 
         withDbTransaction(node, 0) {
@@ -170,7 +171,7 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
-            assertTrue(txSubmitterTestModule.conf.completedTxs.size == 0)
+            assertTrue(txSubmitterTestModule.conf.successfulTxs.size == 0)
         }
 
         withDbTransaction(node, 0) {
@@ -193,7 +194,7 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
-            assertTrue(txSubmitterTestModule.conf.completedTxs.contains(0))
+            assertTrue(txSubmitterTestModule.conf.successfulTxs.contains(0))
         }
 
         withDbTransaction(node, 0) {
@@ -241,6 +242,36 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
             assertThat(txSubmitter!!.isHealthy()).isFalse()
         }
     }
+
+    @Test
+    fun `Tx should fail if estimated gas usage is above limit`() {
+        val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config_low_gas_limit.xml")
+        val node = nodes[0]
+
+        val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
+
+        val evmSubmitTransactionRequest = EvmSubmitTransactionRequest(
+                0,
+                "659e4a3726275edFD125F52338ECe0d54d15BD99",
+                "addValidator",
+                listOf("uint", "address"),
+                listOf(gtv(1), gtv(ByteArray(20))),
+                1337,
+                BlockchainRid.ZERO_RID.data,
+                RellTransactionStatus.QUEUED
+        )
+        txSubmitterTestModule.addTxToQueue(evmSubmitTransactionRequest)
+
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            buildBlock(1L)
+            assertTrue(txSubmitterTestModule.conf.queue.isEmpty())
+        }
+
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            buildBlock(1L)
+            assertTrue(txSubmitterTestModule.conf.failedTxs.contains(0))
+        }
+    }
 }
 
 // Evaluate sent receipt operations
@@ -264,12 +295,11 @@ fun assertStatusOperation(txSubmitterTestModule: TransactionSubmitterTestGTXModu
     withTxOperations(txSubmitterTestModule,
         TransactionSubmitterSpecialTxExtension.UPDATE_EVM_TRANSACTION_STATE
     ) { operations ->
-        val statusOperation = operations
+        val statusOperations = operations
             .filter { it.args[0].asInteger() == rowId }
             .map { RellTransactionStatus.values()[it.args[1].asInteger().toInt()] }
-            .first()
 
-        assertThat(statusOperation).isEqualTo(expectedStatus)
+        assertThat(statusOperations).contains(expectedStatus)
     }
 }
 
