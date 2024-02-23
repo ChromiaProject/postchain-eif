@@ -4,7 +4,9 @@ import net.postchain.common.toHex
 import net.postchain.gtv.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.Address
+import org.web3j.abi.datatypes.DynamicArray
 import org.web3j.abi.datatypes.DynamicBytes
 import org.web3j.abi.datatypes.generated.Bytes32
 import java.math.BigInteger
@@ -15,11 +17,11 @@ class GtvToTypeMapperTest {
     fun `basic tests`() {
         val address = GtvToTypeMapper.map(GtvByteArray(ByteArray(20)), "address")
         assertTrue(address is Address)
-        assertEquals("0x" + ByteArray(20).toHex(), (address as org.web3j.abi.datatypes.Address).value)
+        assertEquals("0x" + ByteArray(20).toHex(), (address as Address).value)
 
         val bytesMap = GtvToTypeMapper.map(GtvByteArray("hello".toByteArray()), "bytes")
         assertTrue(bytesMap is DynamicBytes)
-        assertArrayEquals("hello".toByteArray(), (bytesMap as org.web3j.abi.datatypes.DynamicBytes).value)
+        assertArrayEquals("hello".toByteArray(), (bytesMap as DynamicBytes).value)
 
         val intMap = GtvToTypeMapper.map(GtvBigInteger(BigInteger.valueOf(123)), "int")
         assertTrue(intMap is org.web3j.abi.datatypes.Int)
@@ -45,15 +47,25 @@ class GtvToTypeMapperTest {
         assertTrue(stringMap is org.web3j.abi.datatypes.Utf8String)
         assertEquals("hello", (stringMap as org.web3j.abi.datatypes.Utf8String).value.toString())
 
-       /* val arrayMap = GtvToTypeMapper.map(GtvArray(arrayOf(GtvInteger(0),GtvInteger(1),GtvInteger(2))),"int[]")
-        assertTrue(arrayMap is DynamicArray<*>)
-        assertEquals(listOf(
+        val gtvArrayValues = GtvArray(arrayOf(GtvInteger(0), GtvInteger(1), GtvInteger(2)))
+        val arrayValues = listOf(
                 org.web3j.abi.datatypes.Int(BigInteger.valueOf(0)),
                 org.web3j.abi.datatypes.Int(BigInteger.valueOf(1)),
-                org.web3j.abi.datatypes.Int(BigInteger.valueOf(2))),
-                (arrayMap as  DynamicArray<org.web3j.abi.datatypes.Int>).value)
-*/
+                org.web3j.abi.datatypes.Int(BigInteger.valueOf(2))
+        )
+        val arrayMap = GtvToTypeMapper.map(gtvArrayValues, "int[]")
+        assertTrue(arrayMap is DynamicArray<*>)
+        assertEquals(arrayValues, (arrayMap as DynamicArray<*>).value)
 
+        // Extra check to see that we get correct encoding
+        val encodedMapped = FunctionEncoder.encode("dummy", listOf(arrayMap))
+        val encodedExpected = FunctionEncoder.encode("dummy", listOf(DynamicArray(org.web3j.abi.datatypes.Int::class.java, arrayValues)))
+        assertEquals(encodedExpected, encodedMapped)
 
+        // array of arrays
+        val arrayOfArrayMap = GtvToTypeMapper.map(GtvArray(arrayOf(gtvArrayValues)), "int[][]")
+        assertTrue(arrayOfArrayMap is DynamicArray<*>)
+        val outerArray = (arrayOfArrayMap as DynamicArray<*>).value
+        assertEquals(arrayValues, (outerArray[0] as DynamicArray<*>).value)
     }
 }
