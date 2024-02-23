@@ -31,7 +31,9 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         queuedTransactions.forEach {
             val submitter = transactionSubmitters[it.networkId]
             if (submitter == null) {
-                logger.warn("There is no submitter for ${it.networkId} .")
+                logger.warn("Ignoring tx since there is no submitter for ${it.networkId}")
+            } else if (!submitter.isHealthy()) {
+                logger.warn("Ignoring tx since the submitter for ${it.networkId} is unhealthy")
             } else {
                 bctx.addAfterCommitHook { submitter.enqueue(it) }
                 operations.add(OpData(UPDATE_EVM_TRANSACTION_STATE, arrayOf(gtv(it.rowId), gtv(RellTransactionStatus.TAKEN.ordinal.toLong()))))
@@ -86,4 +88,6 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
         transactionSubmitters[networkId] = transactionSubmitter
     }
+
+    fun getTransactionSubmitter(networkId: Long) = transactionSubmitters[networkId]
 }

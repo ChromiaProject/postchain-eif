@@ -16,8 +16,6 @@ import net.postchain.core.Shutdownable
 import net.postchain.core.Storage
 import net.postchain.eif.GtvToTypeMapper
 import net.postchain.eif.Web3jRequestHandler
-import net.postchain.gtv.Gtv
-import net.postchain.gtv.mapper.toList
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.TypeReference
 import org.web3j.abi.datatypes.Function
@@ -30,6 +28,7 @@ import org.web3j.utils.Numeric
 import java.math.BigInteger
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.cancellation.CancellationException
 
 class TransactionSubmitter(
@@ -41,15 +40,19 @@ class TransactionSubmitter(
         private val chainId: Long,
         private val networkId: Long,
         private val txPollInterval: Long,
-        private val queue : LinkedBlockingQueue<EvmSubmitTransactionRequest>,
-        private val pendingTransactions : MutableMap<String, EvmSubmitTransactionRequest>,
-        private val completedTransactions : ConcurrentHashMap<Long, EvmSubmitTransactionResult>,
+        private val queue: LinkedBlockingQueue<EvmSubmitTransactionRequest>,
+        private val pendingTransactions: MutableMap<String, EvmSubmitTransactionRequest>,
+        private val completedTransactions: ConcurrentHashMap<Long, EvmSubmitTransactionResult>,
+        private val minWalletBalance: BigInteger,
+        private val healthCheckInterval: Long
 ) : Shutdownable {
 
     companion object : KLogging()
 
     private val txSubmitJob: Job
     private val txStatusPollJob: Job
+    private val healthCheckJob: Job
+    private val healthy = AtomicBoolean(true)
 
     init {
         txSubmitJob = CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-transaction-submitter") + MDCContext()) {
@@ -80,6 +83,44 @@ class TransactionSubmitter(
                 }
             }
         }
+        healthCheckJob = CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-transaction-status-poller") + MDCContext()) {
+            while (isActive) {
+                try {
+                    healthCheck()
+
+                    delay(healthCheckInterval)
+                } catch (e: CancellationException) {
+                    break
+                }
+            }
+        }
+    }
+
+    fun isHealthy() = healthy.get()
+
+    private fun healthCheck() {
+        val walletBalance = try {
+            // This will implicitly test our RPC connections
+            web3jRequestHandler.sendWeb3jRequest { it.ethGetBalance(transactionManager.fromAddress, DefaultBlockParameterName.LATEST) }
+        } catch (e: Exception) {
+            val previouslyHealthy = healthy.getAndSet(false)
+            if (previouslyHealthy) {
+                logger.warn("Unable to check wallet balance. Marking tx submitter for network id $networkId as unhealthy")
+            }
+            return
+        }
+
+        if (walletBalance.balance >= minWalletBalance) {
+            val previouslyHealthy = healthy.getAndSet(true)
+            if (!previouslyHealthy) {
+                logger.info("Marking tx submitter for network id $networkId as healthy")
+            }
+        } else {
+            val previouslyHealthy = healthy.getAndSet(false)
+            if (previouslyHealthy) {
+                logger.warn("Wallet balance is below minimum balance. Marking tx submitter for network id $networkId as unhealthy")
+            }
+        }
     }
 
     private fun pollPendingTransactions() {
@@ -96,10 +137,10 @@ class TransactionSubmitter(
                     true
                 }
                 completedTransactions[txRequest.rowId] = EvmSubmitTransactionResult(
-                    RellTransactionStatus.SUCCESS,
-                    txReceipt.blockHash,
-                    effectiveGasPrice.longValueExact(),
-                    txReceipt.gasUsed.longValueExact()
+                        RellTransactionStatus.SUCCESS,
+                        txReceipt.blockHash,
+                        effectiveGasPrice.longValueExact(),
+                        txReceipt.gasUsed.longValueExact()
                 )
                 successfulTxs.add(txHash)
             }
@@ -157,7 +198,8 @@ class TransactionSubmitter(
             throw ProgrammerMistake("Failed to send web3j request")
         } catch (e: Exception) {
             withWriteConnection(storage, chainId) {
-                databaseOperations.failTransaction(it, transactionRequest.rowId, gasPrice, gasLimit, e.message ?: "Unknown error")
+                databaseOperations.failTransaction(it, transactionRequest.rowId, gasPrice, gasLimit, e.message
+                        ?: "Unknown error")
                 true
             }
             throw e
@@ -185,6 +227,7 @@ class TransactionSubmitter(
     override fun shutdown() {
         txSubmitJob.cancel()
         txStatusPollJob.cancel()
+        healthCheckJob.cancel()
         web3jRequestHandler.close()
     }
 }

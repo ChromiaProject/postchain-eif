@@ -6,7 +6,6 @@ import net.postchain.core.TxEContext
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.FETCH_QUEUED_TXS_QUERY
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_RECEIPT
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_STATE
-import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.mapper.GtvObjectMapper
 import net.postchain.gtx.GTXOperation
@@ -111,6 +110,9 @@ open class TransactionSubmitterTestGTXModule : SimpleGTXModule<TransactionSubmit
             gtv(conf.queue.filter { it.status == RellTransactionStatus.QUEUED }.map { GtvObjectMapper.toGtvDictionary(it) })
         })
 ) {
+
+    private val specialTxExtensions = listOf(TransactionSubmitterSpecialTxExtension())
+
     override fun initializeDB(ctx: EContext) {
 
         val transactionSubmitterDatabaseOperations = TransactionSubmitterDatabaseOperationsImpl()
@@ -118,8 +120,7 @@ open class TransactionSubmitterTestGTXModule : SimpleGTXModule<TransactionSubmit
     }
 
     override fun getSpecialTxExtensions(): List<GTXSpecialTxExtension> {
-
-        return listOf(TransactionSubmitterSpecialTxExtension())
+        return specialTxExtensions
     }
 
     fun addTxToQueue(tx: EvmSubmitTransactionRequest) {
