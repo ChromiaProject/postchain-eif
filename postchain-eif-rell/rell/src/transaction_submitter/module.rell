@@ -1,4 +1,5 @@
-import .messaging.*;
+import .utils.messaging.*;
+import .utils.*;
 
 operation __icmf_message(sender: byte_array, topic: text, body: gtv) {
     create_evm_submit_transaction_entity(evm_submit_transaction_message.from_gtv(body), sender);
@@ -13,6 +14,7 @@ operation __update_evm_transaction_receipt(row_id: integer, block_hash: text, ef
 }
 
 entity evm_submit_transaction_entity {
+    key id: byte_array;
     contract_address: text;
     function_name: text;
     parameter_types: text;
@@ -56,7 +58,16 @@ function create_evm_submit_transaction_entity(evm_submit_transaction_message: ev
         return;
     }
 
+    val evm_transaction_id = get_evm_transaction_id(
+        contract_address,
+        evm_submit_transaction_message.function_name,
+        evm_submit_transaction_message.parameter_types,
+        evm_submit_transaction_message.parameter_values,
+        evm_submit_transaction_message.network_id
+    );
+
     create evm_submit_transaction_entity(
+        id = evm_transaction_id,
         contract_address = contract_address,
         function_name = evm_submit_transaction_message.function_name,
         parameter_types = join_text_list(evm_submit_transaction_message.parameter_types),
