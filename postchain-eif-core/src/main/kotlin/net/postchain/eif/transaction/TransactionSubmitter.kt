@@ -22,7 +22,6 @@ import org.web3j.abi.datatypes.Function
 import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.methods.request.Transaction
 import org.web3j.protocol.core.methods.response.EthSendTransaction
-import org.web3j.protocol.exceptions.ClientConnectionException
 import org.web3j.tx.TransactionManager
 import org.web3j.tx.gas.ContractGasProvider
 import org.web3j.utils.Numeric
@@ -33,19 +32,19 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.cancellation.CancellationException
 
 class TransactionSubmitter(
-        private val web3jRequestHandler: Web3jRequestHandler,
-        private val transactionManager: TransactionManager,
-        private val gasProvider: ContractGasProvider,
-        private val databaseOperations: TransactionSubmitterDatabaseOperations,
-        private val storage: Storage,
-        private val chainId: Long,
-        private val networkId: Long,
-        private val txPollInterval: Long,
-        private val queue: LinkedBlockingQueue<EvmSubmitTransactionRequest>,
-        private val pendingTransactions: MutableMap<String, EvmSubmitTransactionRequest>,
-        private val completedTransactions: ConcurrentHashMap<Long, EvmSubmitTransactionResult>,
-        private val minWalletBalance: BigInteger,
-        private val healthCheckInterval: Long
+    private val web3jRequestHandler: Web3jRequestHandler,
+    private val transactionManagers: Map<String, TransactionManager>,
+    private val gasProvider: ContractGasProvider,
+    private val databaseOperations: TransactionSubmitterDatabaseOperations,
+    private val storage: Storage,
+    private val chainId: Long,
+    private val networkId: Long,
+    private val txPollInterval: Long,
+    initQueue: Collection<EvmSubmitTransactionRequest>,
+    initPendingTransactions: Map<String, EvmSubmitTransactionRequest>,
+    initCompletedTransactions: Map<Long, EvmSubmitTransactionResult>,
+    private val minWalletBalance: BigInteger,
+    private val healthCheckInterval: Long
 ) : Shutdownable {
 
     companion object : KLogging()
@@ -54,14 +53,22 @@ class TransactionSubmitter(
     private val txStatusPollJob: Job
     private val healthCheckJob: Job
     private val healthy = AtomicBoolean(true)
+    private val queue = LinkedBlockingQueue<EvmSubmitTransactionRequest>()
+    private val pendingTransactions = mutableMapOf<String, EvmSubmitTransactionRequest>()
+    private val completedTransactions = ConcurrentHashMap<Long, EvmSubmitTransactionResult>()
 
     init {
+
+        this.queue.addAll(initQueue)
+        this.pendingTransactions.putAll(initPendingTransactions)
+        this.completedTransactions.putAll(initCompletedTransactions)
+
         txSubmitJob = CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-transaction-submitter") + MDCContext()) {
             while (isActive) {
                 try {
                     val txToSubmit = queue.take()
                     try {
-                        sendTransaction(txToSubmit)
+                        submitTransaction(txToSubmit)
                     } catch (e: Exception) {
                         logger.error("Failed to submit EVM transaction: ${e.message}", e)
                         completedTransactions[txToSubmit.rowId] = EvmSubmitTransactionResult(RellTransactionStatus.FAILURE)
@@ -102,7 +109,7 @@ class TransactionSubmitter(
     private fun healthCheck() {
         val walletBalance = try {
             // This will implicitly test our RPC connections
-            web3jRequestHandler.sendWeb3jRequest { it.ethGetBalance(transactionManager.fromAddress, DefaultBlockParameterName.LATEST) }
+            web3jRequestHandler.sendWeb3jRequest { it.ethGetBalance(transactionManagers.values.first().fromAddress, DefaultBlockParameterName.LATEST) }
         } catch (e: Exception) {
             val previouslyHealthy = healthy.getAndSet(false)
             if (previouslyHealthy) {
@@ -127,8 +134,25 @@ class TransactionSubmitter(
     private fun pollPendingTransactions() {
         val successfulTxs = mutableListOf<String>()
         pendingTransactions.forEach { (txHash, txRequest) ->
-            val txReceiptOpt = web3jRequestHandler.sendWeb3jRequest { it.ethGetTransactionReceipt(txHash) }
-            txReceiptOpt.transactionReceipt.ifPresent { txReceipt ->
+            val txReceiptOpt = try {
+                web3jRequestHandler.sendWeb3jRequest { it.ethGetTransactionReceipt(txHash) }
+            } catch (e: Exception) {
+                val errorMessage = "Failed to poll for receipt for request id ${txRequest.rowId}"
+                logger.error(e) { errorMessage }
+                withWriteConnection(storage, chainId) {
+                    databaseOperations.recordTransactionFailure(
+                        it,
+                        txRequest.rowId,
+                        null,
+                        errorMessage,
+                        e.stackTraceToString()
+                    )
+                    true
+                }
+                null
+            }
+
+            txReceiptOpt?.transactionReceipt?.ifPresent { txReceipt ->
 
                 logger.info { "Got transaction receipt: $txReceipt" }
                 val effectiveGasPrice = Numeric.decodeQuantity(txReceipt.effectiveGasPrice)
@@ -150,8 +174,33 @@ class TransactionSubmitter(
         successfulTxs.forEach(pendingTransactions::remove)
     }
 
+    internal fun submitTransaction(transactionRequest: EvmSubmitTransactionRequest): EthSendTransaction {
+        try {
+            return sendTransaction(transactionRequest)
+        } catch (e: Exception) {
+
+            val errorMessage = e.message ?: "Unknown error"
+            logger.error(e) { errorMessage }
+
+            withWriteConnection(storage, chainId) {
+                databaseOperations.failTransaction(it, transactionRequest.rowId)
+                databaseOperations.recordTransactionFailure(it, transactionRequest.rowId, null, errorMessage, e.stackTraceToString())
+                true
+            }
+            throw e
+        }
+    }
+
     private fun sendTransaction(transactionRequest: EvmSubmitTransactionRequest): EthSendTransaction {
-        val walletBalance = web3jRequestHandler.sendWeb3jRequest { it.ethGetBalance(transactionManager.fromAddress, DefaultBlockParameterName.LATEST) }
+
+        val fromAddress = transactionManagers.values.first().fromAddress
+        val walletBalance = try {
+            web3jRequestHandler.sendWeb3jRequest { it.ethGetBalance(fromAddress, DefaultBlockParameterName.LATEST) }
+        } catch (e: Exception) {
+            val errorMessage = "Failed to get balance for request id ${transactionRequest.rowId}: ${e.message}"
+            logger.error(e) { errorMessage }
+            throw ProgrammerMistake(errorMessage, e)
+        }
 
         val function = Function(
                 transactionRequest.functionName,
@@ -162,58 +211,85 @@ class TransactionSubmitter(
         val gasPrice = gasProvider.getGasPrice(functionData)
         val gasLimit = gasProvider.getGasLimit(functionData)
 
-        // TODO validate that this is the correct way to check balance and write a test
-        try {
-            val estimatedGasUsage = getEstimatedGasUsage(gasPrice, gasLimit, transactionRequest.contractAddress, functionData)
-            if (estimatedGasUsage > gasLimit) {
-                throw UserMistake("Estimated gas usage $estimatedGasUsage for tx exceeds limit of $gasLimit")
-            }
+        withWriteConnection(storage, chainId) {
+            databaseOperations.recordTransactionGas(it, transactionRequest.rowId, gasPrice, gasLimit)
+            true
+        }
 
-            if (walletBalance.balance < gasPrice * gasLimit) {
-                throw UserMistake("Insufficient wallet balance")
-            }
-
-            val response = try {
-                transactionManager.sendTransaction(gasPrice, gasLimit, transactionRequest.contractAddress, functionData, BigInteger.ZERO)
-            } catch (e: ClientConnectionException) {
-                logger.error("Web3j request failed: ${e.message}")
-                // TODO investigate - fine to move on to next request?
-                null
+        val estimatedGasUsage =
+            try {
+                getEstimatedGasUsage(gasPrice, gasLimit, transactionRequest.contractAddress, functionData, fromAddress)
             } catch (e: Exception) {
-                logger.error("Web3j request failed unexpectedly", e)
-                // TODO investigate - fine to move on to next request?
-                null
+                val errorMessage = "Failed to get estimated gas usage for request id ${transactionRequest.rowId}: ${e.message}"
+                logger.error(e) { errorMessage }
+                throw ProgrammerMistake(errorMessage, e)
             }
+        if (estimatedGasUsage > gasLimit) {
+            throw UserMistake("Estimated gas usage $estimatedGasUsage for tx exceeds limit of $gasLimit")
+        }
 
-            if (response != null) {
+        if (walletBalance.balance < gasPrice * gasLimit) {
+            throw UserMistake("Insufficient wallet balance")
+        }
+
+        for ((serviceUrl, transactionManager) in transactionManagers) {
+            try {
+
+                val response = transactionManager.sendTransaction(
+                    gasPrice,
+                    gasLimit,
+                    transactionRequest.contractAddress,
+                    functionData,
+                    BigInteger.ZERO
+                )
+
                 if (response.hasError()) {
-                    // TODO investigate
+                    // abort on any of the codes? https://www.quicknode.com/docs/ethereum/error-references
                     val errorMessage =
-                            "Web3j request failed with error code: ${response.error.code} and message: ${response.error.message}"
+                        "Web3j request failed with error code: ${response.error.code} and message: ${response.error.message}"
                     logger.error(errorMessage)
                     throw ProgrammerMistake(errorMessage)
-                } else {
-                    withWriteConnection(storage, chainId) {
-                        databaseOperations.pendTransaction(it, transactionRequest.rowId, gasPrice, gasLimit, response.transactionHash)
-                        true
-                    }
-                    pendingTransactions[response.transactionHash] = transactionRequest
-                    return response
+                }
+
+                withWriteConnection(storage, chainId) {
+                    databaseOperations.pendTransaction(
+                        it,
+                        transactionRequest.rowId,
+                        response.transactionHash
+                    )
+                    true
+                }
+                pendingTransactions[response.transactionHash] = transactionRequest
+                return response
+
+            } catch (e: Exception) {
+
+                val error = "Failed to send transaction ${transactionRequest.rowId}: ${e.message}"
+                logger.error { error }
+
+                withWriteConnection(storage, chainId) {
+                    databaseOperations.recordTransactionFailure(it, transactionRequest.rowId, serviceUrl, error, e.stackTraceToString())
+                    true
+                }
+
+                if (e is UserMistake) {
+                    break
                 }
             }
-            throw ProgrammerMistake("Failed to send web3j request")
-        } catch (e: Exception) {
-            withWriteConnection(storage, chainId) {
-                databaseOperations.failTransaction(it, transactionRequest.rowId, gasPrice, gasLimit, e.message
-                        ?: "Unknown error")
-                true
-            }
-            throw e
         }
+
+        val errorMessage = "Failed to send transaction to all ${transactionManagers.size} nodes"
+        throw ProgrammerMistake(errorMessage)
     }
 
-    private fun getEstimatedGasUsage(gasPrice: BigInteger, gasLimit: BigInteger, contractAddress: String, functionData: String): BigInteger {
-        val transaction = Transaction(transactionManager.fromAddress, BigInteger.ZERO, gasPrice, gasLimit, "0x$contractAddress", BigInteger.ZERO, functionData)
+    private fun getEstimatedGasUsage(
+        gasPrice: BigInteger,
+        gasLimit: BigInteger,
+        contractAddress: String,
+        functionData: String,
+        fromAddress: String
+    ): BigInteger {
+        val transaction = Transaction(fromAddress, BigInteger.ZERO, gasPrice, gasLimit, "0x$contractAddress", BigInteger.ZERO, functionData)
         return web3jRequestHandler.sendWeb3jRequest {
             it.ethEstimateGas(transaction)
         }.amountUsed

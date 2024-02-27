@@ -16,15 +16,16 @@ import net.postchain.devtools.getModules
 import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.EvmType
 import net.postchain.eif.contracts.Validator
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_ACTIVE
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_BLOCK_HASH
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_EFFECTIVE_GAS_PRICE
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_GAS_LIMIT
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_GAS_PRICE
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_GAS_USAGE
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_REQUEST_ID
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_STATUS
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.COLUMN_TX_HASH
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.ERRORS_COLUMN_REQUEST_ID
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.TRANSACTIONS_COLUMN_ACTIVE
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.TRANSACTIONS_COLUMN_BLOCK_HASH
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.TRANSACTIONS_COLUMN_EFFECTIVE_GAS_PRICE
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.TRANSACTIONS_COLUMN_GAS_LIMIT
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.TRANSACTIONS_COLUMN_GAS_PRICE
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.TRANSACTIONS_COLUMN_GAS_USAGE
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.TRANSACTIONS_COLUMN_REQUEST_ID
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.TRANSACTIONS_COLUMN_STATUS
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.TRANSACTIONS_COLUMN_TX_HASH
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_RECEIPT
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtx.data.ExtOpData
@@ -43,7 +44,9 @@ import org.web3j.tx.Contract
 import java.math.BigInteger
 
 @Testcontainers(disabledWithoutDocker = true)
-class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
+class TransactionSubmitterTest : EifBaseIntegrationTest(
+    EvmType.GETH
+) {
 
     @BeforeEach
     override fun setup() {
@@ -87,9 +90,9 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
 
         // No receipt values set yet in DB
         withDbTransaction(node, evmSubmitTransactionRequest.rowId) {
-            assertThat(it.get(COLUMN_BLOCK_HASH)).isNull()
-            assertThat(it.get(COLUMN_EFFECTIVE_GAS_PRICE)).isNull()
-            assertThat(it.get(COLUMN_GAS_USAGE)).isNull()
+            assertThat(it.get(TRANSACTIONS_COLUMN_BLOCK_HASH)).isNull()
+            assertThat(it.get(TRANSACTIONS_COLUMN_EFFECTIVE_GAS_PRICE)).isNull()
+            assertThat(it.get(TRANSACTIONS_COLUMN_GAS_USAGE)).isNull()
         }
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
@@ -102,9 +105,10 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
 
         // Receipt values set in DB
         withDbTransaction(node, evmSubmitTransactionRequest.rowId) {
-            assertThat(it.get(COLUMN_BLOCK_HASH)).isNotNull()
-            assertThat(it.get(COLUMN_EFFECTIVE_GAS_PRICE)).isNotNull()
-            assertThat(it.get(COLUMN_GAS_USAGE)).isGreaterThan(0)
+            assertThat(it.get(TRANSACTIONS_COLUMN_STATUS)).isEqualTo(TransactionStatus.SUCCESS.name)
+            assertThat(it.get(TRANSACTIONS_COLUMN_BLOCK_HASH)).isNotNull()
+            assertThat(it.get(TRANSACTIONS_COLUMN_EFFECTIVE_GAS_PRICE)).isNotNull()
+            assertThat(it.get(TRANSACTIONS_COLUMN_GAS_USAGE)).isGreaterThan(0)
         }
 
         // Update receipt operation called
@@ -129,11 +133,11 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
         }
 
         withDbTransaction(node, 0) {
-            assertThat(it.get(COLUMN_STATUS).equals(TransactionStatus.PENDING.name))
-            assertThat(it.get(COLUMN_GAS_PRICE)).isNotNull()
-            assertThat(it.get(COLUMN_GAS_LIMIT)).isNotNull()
-            assertThat(it.get(COLUMN_TX_HASH)).isNotNull()
-            assertThat(it.get(COLUMN_ACTIVE).equals(true))
+            assertThat(it.get(TRANSACTIONS_COLUMN_STATUS).equals(TransactionStatus.PENDING.name))
+            assertThat(it.get(TRANSACTIONS_COLUMN_GAS_PRICE)).isNotNull()
+            assertThat(it.get(TRANSACTIONS_COLUMN_GAS_LIMIT)).isNotNull()
+            assertThat(it.get(TRANSACTIONS_COLUMN_TX_HASH)).isNotNull()
+            assertThat(it.get(TRANSACTIONS_COLUMN_ACTIVE).equals(true))
 
         }
     }
@@ -154,11 +158,11 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
         }
 
         withDbTransaction(node, 0) {
-            assertThat(it.get(COLUMN_STATUS).equals(TransactionStatus.SUCCESS.name))
-            assertThat(it.get(COLUMN_BLOCK_HASH).isNotEmpty())
-            assertThat(it.get(COLUMN_EFFECTIVE_GAS_PRICE)).isGreaterThan(0)
-            assertThat(it.get(COLUMN_GAS_USAGE)).isGreaterThan(0)
-            assertThat(it.get(COLUMN_ACTIVE).equals(true))
+            assertThat(it.get(TRANSACTIONS_COLUMN_STATUS).equals(TransactionStatus.SUCCESS.name))
+            assertThat(it.get(TRANSACTIONS_COLUMN_BLOCK_HASH).isNotEmpty())
+            assertThat(it.get(TRANSACTIONS_COLUMN_EFFECTIVE_GAS_PRICE)).isGreaterThan(0)
+            assertThat(it.get(TRANSACTIONS_COLUMN_GAS_USAGE)).isGreaterThan(0)
+            assertThat(it.get(TRANSACTIONS_COLUMN_ACTIVE).equals(true))
         }
     }
 
@@ -175,8 +179,8 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
         }
 
         withDbTransaction(node, 0) {
-            assertThat(it.get(COLUMN_STATUS).equals(TransactionStatus.SUCCESS.name))
-            assertThat(it.get(COLUMN_ACTIVE).equals(false))
+            assertThat(it.get(TRANSACTIONS_COLUMN_STATUS).equals(TransactionStatus.SUCCESS.name))
+            assertThat(it.get(TRANSACTIONS_COLUMN_ACTIVE).equals(false))
         }
     }
 
@@ -198,7 +202,7 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(EvmType.GETH, false) {
         }
 
         withDbTransaction(node, 0) {
-            assertThat(it.get(COLUMN_STATUS).equals(TransactionStatus.FAILURE.name))
+            assertThat(it.get(TRANSACTIONS_COLUMN_STATUS).equals(TransactionStatus.FAILURE.name))
         }
     }
 
@@ -323,10 +327,27 @@ fun withDbTransaction(node: PostchainTestNode, rowId: Long, op: (org.jooq.Record
         val fetch = jooq
             .select()
             .from(tableName)
-            .where(COLUMN_REQUEST_ID.eq(rowId))
+            .where(TRANSACTIONS_COLUMN_REQUEST_ID.eq(rowId))
             .fetchOne()
 
         op(fetch)
     }
 }
 
+// Evaluate errors in DB
+fun withDbErrors(node: PostchainTestNode, rowId: Long, op: (List<org.jooq.Record>) -> Unit) {
+
+    withReadConnection(node.getBlockchainInstance().blockchainEngine.sharedStorage, DEFAULT_CHAIN_IID) {
+        val jooq = DSL.using(it.conn, SQLDialect.POSTGRES)
+
+        val tableName = DatabaseAccess.of(it).tableEvmErrors(it)
+
+        val fetch = jooq
+            .select()
+            .from(tableName)
+            .where(ERRORS_COLUMN_REQUEST_ID.eq(rowId))
+            .fetch()
+
+        op(fetch)
+    }
+}

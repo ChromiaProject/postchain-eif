@@ -44,7 +44,7 @@ enum class AuthType {
     S, M
 }
 
-abstract class EifBaseIntegrationTest(evmType: EvmType, private val localEvmNodes: Boolean = false) : IntegrationTestSetup() {
+abstract class EifBaseIntegrationTest(evmType: EvmType, private val prependUrls: List<String> = listOf()) : IntegrationTestSetup() {
 
     val networkId = 1337L
     val gasProvider = DefaultGasProvider()
@@ -98,8 +98,8 @@ abstract class EifBaseIntegrationTest(evmType: EvmType, private val localEvmNode
         )
 
         var urls = "http://$evmHost:$evmPort"
-        if (localEvmNodes) {
-            urls = "http://127.0.0.1:8888,http://127.0.0.1:9999,$urls"
+        if (prependUrls.isNotEmpty()) {
+            urls = "${prependUrls.joinToString(",")},$urls"
         }
 
         with(configOverrides) {

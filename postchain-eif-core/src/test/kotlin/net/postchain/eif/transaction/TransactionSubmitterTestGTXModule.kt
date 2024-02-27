@@ -57,7 +57,8 @@ class TransactionSubmitterPendingTransactionTestGTXModule : TransactionSubmitter
                 BlockchainRid.ZERO_RID.data,
                 RellTransactionStatus.QUEUED
         ), 1337L)
-        transactionSubmitterDatabaseOperations.pendTransaction(ctx,0, BigInteger.ONE, BigInteger.TEN, TRANSACTION_HASH)
+        transactionSubmitterDatabaseOperations.recordTransactionGas(ctx, 0, BigInteger.ONE, BigInteger.TEN)
+        transactionSubmitterDatabaseOperations.pendTransaction(ctx,0, TRANSACTION_HASH)
     }
 }
 
@@ -77,7 +78,7 @@ class TransactionSubmitterSuccessfulTransactionTestGTXModule : TransactionSubmit
                 BlockchainRid.ZERO_RID.data,
                 RellTransactionStatus.QUEUED
         ), 1337L)
-        transactionSubmitterDatabaseOperations.pendTransaction(ctx,0, BigInteger.ONE, BigInteger.TEN, "")
+        transactionSubmitterDatabaseOperations.recordTransactionGas(ctx, 0, BigInteger.ONE, BigInteger.TEN)
         transactionSubmitterDatabaseOperations.succeedTransaction(ctx,0,BigInteger.valueOf(4100000000),BigInteger.valueOf(21332),"0x499450bc3d3a1028d7c86cfaf04ccc4e8080bbf1b32c95bab819cb8abe9abfb3")
         transactionSubmitterDatabaseOperations.deactivateTransaction(ctx, 0)
     }

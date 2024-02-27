@@ -14,7 +14,7 @@ import kotlin.coroutines.coroutineContext
 import kotlin.math.min
 import kotlin.random.Random
 
-class Web3jRequestHandler(
+open class Web3jRequestHandler(
     private val baseTimeout: Long,
     private val maxTimeout: Long,
     private val maxTryErrors: Long,
@@ -26,38 +26,30 @@ class Web3jRequestHandler(
         const val DELAY_POWER_BASE = 1.2
     }
 
-    fun <T : Response<*>> sendWeb3jRequest(
+    open fun <T : Response<*>> sendWeb3jRequest(
         requestFactory: (Web3j) -> Request<*, T>
     ): T {
         val requests = web3jServices.map(requestFactory)
         for (request in requests) {
 
-            val response = try {
-                request.send()
-            } catch (e: ClientConnectionException) {
-                logger.error("Web3j request failed: ${e.message}")
-                // TODO investigate - fine to move on to next request?
-                null
-            } catch (e: Exception) {
-                logger.error("Web3j request failed unexpectedly", e)
-                // TODO investigate - fine to move on to next request?
-                null
-            }
+            try {
+                val response = request.send()
 
-            if (response != null) {
                 if (response.hasError()) {
-                    // TODO investigate
+                    // abort on any of the codes? https://www.quicknode.com/docs/ethereum/error-references
                     val errorMessage =
                         "Web3j request failed with error code: ${response.error.code} and message: ${response.error.message}"
                     logger.error(errorMessage)
                     throw ProgrammerMistake(errorMessage)
-                } else {
-                    return response
                 }
+
+                return response
+            } catch (e: Exception) {
+                logger.error("Web3j request failed: ${e.message}", e)
             }
         }
 
-        throw ProgrammerMistake("Failed to send web3j request")
+        throw ProgrammerMistake("Failed to send web3j request to all ${web3jServices.size} nodes")
     }
 
     suspend fun <T : Response<*>> sendWeb3jRequestWithRetry(
