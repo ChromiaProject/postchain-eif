@@ -21,7 +21,8 @@ entity evm_submit_transaction_entity {
     parameter_values: byte_array;
     network_id: integer;
     sender: byte_array;
-    mutable status: transaction_status;
+    index mutable status: transaction_status;
+    index mutable queued_timestamp: timestamp;
     mutable block_hash: text = "";
     mutable effective_gas_price: big_integer = -1;
     mutable gas_usage: big_integer = -1;
@@ -36,6 +37,7 @@ struct evm_submit_transaction {
     network_id: integer;
     sender: byte_array;
     status: transaction_status;
+    queued_timestamp: timestamp;
 }
 
 enum transaction_status {
@@ -48,6 +50,7 @@ enum transaction_status {
 
 struct module_args {
     contract_whitelist: text;
+    contract_tx_rate_limit: big_integer;
 }
 
 function create_evm_submit_transaction_entity(evm_submit_transaction_message: evm_submit_transaction_message, sender: byte_array) {
@@ -74,20 +77,34 @@ function create_evm_submit_transaction_entity(evm_submit_transaction_message: ev
         parameter_values = evm_submit_transaction_message.parameter_values.to_gtv().to_bytes(),
         network_id = evm_submit_transaction_message.network_id,
         sender = sender,
-        status = transaction_status.QUEUED
+        status = transaction_status.QUEUED,
+        queued_timestamp = op_context.last_block_time
     );
 }
 
-query fetch_queued_evm_transaction() {
-    return evm_submit_transaction_entity @* { .status == transaction_status.QUEUED } (evm_submit_transaction(
-        row_id = .rowid.to_integer(),
-        contract_address = .contract_address,
-        function_name = .function_name,
-        parameter_types = .parameter_types.split("."),
-        parameter_values = list<gtv>.from_gtv(gtv.from_bytes(.parameter_values)),
-        network_id = .network_id,
-        sender = .sender,
-        status = .status));
+query fetch_oldest_queued_transactions_per_contract() {
+    val result = list<evm_submit_transaction>();
+    var oldest_queued_transactions_per_contract = evm_submit_transaction_entity @* { .status == transaction_status.QUEUED }(@group .contract_address, @min .queued_timestamp);
+    for(transaction in oldest_queued_transactions_per_contract) {
+        val contract_address = transaction[0];
+        val queued_timestamp = transaction[1];
+        if (get_last_blocktime() - queued_timestamp > chain_context.args.contract_tx_rate_limit) {
+            val evm_submit_transaction_entity = evm_submit_transaction_entity @ { .status == transaction_status.QUEUED and .contract_address == contract_address and .queued_timestamp == queued_timestamp} (
+                evm_submit_transaction(
+                row_id = .rowid.to_integer(),
+                contract_address = .contract_address,
+                function_name = .function_name,
+                parameter_types = .parameter_types.split("."),
+                parameter_values = list<gtv>.from_gtv(gtv.from_bytes(.parameter_values)),
+                network_id = .network_id,
+                sender = .sender,
+                status = .status,
+                queued_timestamp = .queued_timestamp))
+                limit 1;
+            result.add(evm_submit_transaction_entity);
+        }
+    }
+    return result;
 }
 
 
@@ -105,3 +122,7 @@ function join_text_list(components: list<text>) {
 }
 
 function get_contract_whitelist() = chain_context.args.contract_whitelist.split(",");
+
+function get_last_blocktime(){
+    return block @ {} (@max .timestamp) ?: 0;
+}

@@ -30,3 +30,28 @@ function test_not_whitelisted_contracts_are_ignored(){
 
     assert_null(evm_submit_transaction_entity);
 }
+
+function test_fetch_oldest_queued_transactions_per_contract(){
+    rell.test.tx().op(
+        create_evm_submit_transaction_entity_op("address","myFunction1"),
+        create_evm_submit_transaction_entity_op("address","myFunction2"),
+        create_evm_submit_transaction_entity_op("address","myFunction3"),
+        create_evm_submit_transaction_entity_op("address1","myFunction4"),
+        create_evm_submit_transaction_entity_op("address1","myFunction5"),
+        create_evm_submit_transaction_entity_op("address1","myFunction6")
+    ).run();
+
+    rell.test.tx().op(
+        update_evm_submit_transaction_entity_queued_timestamp_op("address","myFunction1"),
+        update_evm_submit_transaction_entity_queued_timestamp_op("address","myFunction2"),
+        update_evm_submit_transaction_entity_queued_timestamp_op("address1","myFunction4"),
+        update_evm_submit_transaction_entity_queued_timestamp_op("address1","myFunction5")
+    ).run();
+
+    val evm_submit_transaction_entity = fetch_oldest_queued_transactions_per_contract();
+
+    assert_true(evm_submit_transaction_entity.size() == 2);
+    assert_true(evm_submit_transaction_entity[0].contract_address == "address");
+    assert_true(evm_submit_transaction_entity[1].contract_address == "address1");
+}
+

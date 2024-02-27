@@ -3,7 +3,7 @@ package net.postchain.eif.transaction
 import net.postchain.common.BlockchainRid
 import net.postchain.core.EContext
 import net.postchain.core.TxEContext
-import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.FETCH_QUEUED_TXS_QUERY
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_RECEIPT
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_STATE
 import net.postchain.gtv.GtvFactory.gtv
@@ -107,7 +107,7 @@ open class TransactionSubmitterTestGTXModule : SimpleGTXModule<TransactionSubmit
         }, UPDATE_EVM_TRANSACTION_RECEIPT to { conf, opData ->
             CaptureTxOperation(conf, opData)
         }),
-        mapOf(FETCH_QUEUED_TXS_QUERY to { conf, _, _ ->
+        mapOf(FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT to { conf, _, _ ->
             gtv(conf.queue.filter { it.status == RellTransactionStatus.QUEUED }.map { GtvObjectMapper.toGtvDictionary(it) })
         })
 ) {
