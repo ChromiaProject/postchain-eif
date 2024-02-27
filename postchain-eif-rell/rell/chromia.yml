@@ -30,6 +30,7 @@ test:
     <<: *rell_test_args
     transaction_submitter:
       contract_whitelist: "address,address1"
+      contract_tx_rate_limit: 60000
 
 blockchains:
   eif:
@@ -49,6 +50,7 @@ blockchains:
       transaction_submitter:
         # TODO add addresses
         contract_whitelist: "" # Comma separated list since Rell does not support list type as module arg
+        contract_tx_rate_limit: 60000
     config:
       gtx:
         modules:

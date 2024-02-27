@@ -6,6 +6,20 @@ operation create_evm_submit_transaction_entity_operation(evm_submit_transaction_
     create_evm_submit_transaction_entity(evm_submit_transaction_message, sender);
 }
 
+operation create_evm_submit_transaction_entity_op(contract_address: text, function_name: text){
+    create_evm_submit_transaction_entity(evm_submit_transaction_message(
+        contract_address = contract_address,
+        function_name = function_name,
+        parameter_types = list(),
+        parameter_values = list(),
+        network_id = 1), x"");
+}
+
+operation update_evm_submit_transaction_entity_queued_timestamp_op(contract_address: text, function_name: text){
+    val id = get_evm_transaction_id(contract_address, function_name, list(), list(), 1);
+    update evm_submit_transaction_entity @ { .id == id} (queued_timestamp = op_context.last_block_time);
+}
+
 operation update_evm_transaction_status_helper_op(row_id: rowid, status: transaction_status) {
     update evm_submit_transaction_entity @ { .rowid == row_id } (.status = status);
 }
