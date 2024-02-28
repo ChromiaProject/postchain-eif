@@ -7,6 +7,7 @@ import assertk.assertions.isFalse
 import assertk.assertions.isGreaterThan
 import assertk.assertions.isNotNull
 import assertk.assertions.isNull
+import assertk.assertions.isTrue
 import net.postchain.base.data.DatabaseAccess
 import net.postchain.base.withReadConnection
 import net.postchain.common.BlockchainRid
@@ -45,8 +46,10 @@ import java.math.BigInteger
 
 @Testcontainers(disabledWithoutDocker = true)
 class TransactionSubmitterTest : EifBaseIntegrationTest(
-    EvmType.GETH
+        EvmType.GETH
 ) {
+
+    private lateinit var contractAddress: String
 
     @BeforeEach
     override fun setup() {
@@ -58,10 +61,9 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(
         }
 
         // Deploy validator contract
-        val postchainValidator = "659e4a3726275edFD125F52338ECe0d54d15BD99"
-        val encodedConstructor = FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(postchainValidator))))
-        Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedConstructor).send()
-
+        val encodedConstructor = FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(BigInteger.ONE))))
+        val contract = Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedConstructor).send()
+        contractAddress = contract.contractAddress.substring(2)
     }
 
     @Test
@@ -73,14 +75,14 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(
         val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
 
         val evmSubmitTransactionRequest = EvmSubmitTransactionRequest(
-            0,
-                "659e4a3726275edFD125F52338ECe0d54d15BD99",
-            "addValidator",
-            listOf("uint", "address"),
-            listOf( gtv(1), gtv(ByteArray(20))),
-            1337,
-            BlockchainRid.ZERO_RID.data,
-            RellTransactionStatus.QUEUED
+                0,
+                contractAddress,
+                "updateValidators",
+                listOf("address[]"),
+                listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
+                1337,
+                BlockchainRid.ZERO_RID.data,
+                RellTransactionStatus.QUEUED
         )
         txSubmitterTestModule.addTxToQueue(evmSubmitTransactionRequest)
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
@@ -133,18 +135,18 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(
         }
 
         withDbTransaction(node, 0) {
-            assertThat(it.get(TRANSACTIONS_COLUMN_STATUS).equals(TransactionStatus.PENDING.name))
+            assertThat(it.get(TRANSACTIONS_COLUMN_STATUS)).isEqualTo(TransactionStatus.PENDING.name)
             assertThat(it.get(TRANSACTIONS_COLUMN_GAS_PRICE)).isNotNull()
             assertThat(it.get(TRANSACTIONS_COLUMN_GAS_LIMIT)).isNotNull()
             assertThat(it.get(TRANSACTIONS_COLUMN_TX_HASH)).isNotNull()
-            assertThat(it.get(TRANSACTIONS_COLUMN_ACTIVE).equals(true))
+            assertThat(it.get(TRANSACTIONS_COLUMN_ACTIVE)).isTrue()
 
         }
     }
 
     @Test
     fun `db pending transaction goes to success after build block`() {
-        val sendTransaction = transactionManager.sendTransaction(BigInteger.valueOf(4100000000), BigInteger.valueOf(9000000), "659e4a3726275edFD125F52338ECe0d54d15BD99", "0x4b56175300000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000", BigInteger.valueOf(0))
+        val sendTransaction = transactionManager.sendTransaction(BigInteger.valueOf(4100000000), BigInteger.valueOf(9000000), contractAddress, "0x4b56175300000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000", BigInteger.valueOf(0))
 
         TransactionSubmitterPendingTransactionTestGTXModule.TRANSACTION_HASH = sendTransaction.transactionHash
         val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config_pending.xml")
@@ -158,11 +160,11 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(
         }
 
         withDbTransaction(node, 0) {
-            assertThat(it.get(TRANSACTIONS_COLUMN_STATUS).equals(TransactionStatus.SUCCESS.name))
+            assertThat(it.get(TRANSACTIONS_COLUMN_STATUS)).isEqualTo(TransactionStatus.SUCCESS.name)
             assertThat(it.get(TRANSACTIONS_COLUMN_BLOCK_HASH).isNotEmpty())
             assertThat(it.get(TRANSACTIONS_COLUMN_EFFECTIVE_GAS_PRICE)).isGreaterThan(0)
             assertThat(it.get(TRANSACTIONS_COLUMN_GAS_USAGE)).isGreaterThan(0)
-            assertThat(it.get(TRANSACTIONS_COLUMN_ACTIVE).equals(true))
+            assertThat(it.get(TRANSACTIONS_COLUMN_ACTIVE)).isFalse()
         }
     }
 
@@ -179,18 +181,13 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(
         }
 
         withDbTransaction(node, 0) {
-            assertThat(it.get(TRANSACTIONS_COLUMN_STATUS).equals(TransactionStatus.SUCCESS.name))
-            assertThat(it.get(TRANSACTIONS_COLUMN_ACTIVE).equals(false))
+            assertThat(it.get(TRANSACTIONS_COLUMN_STATUS)).isEqualTo(TransactionStatus.SUCCESS.name)
+            assertThat(it.get(TRANSACTIONS_COLUMN_ACTIVE)).isFalse()
         }
     }
 
     @Test
     fun `db failed transaction`() {
-        // Deploy validator contract
-        val postchainValidator = "659e4a3726275edFD125F52338ECe0d54d15BD99"
-        val encodedConstructor = FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(postchainValidator))))
-        Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedConstructor).send()
-
         val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config_fail.xml")
         val node = nodes[0]
 
@@ -198,11 +195,11 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
-            assertTrue(txSubmitterTestModule.conf.successfulTxs.contains(0))
+            assertTrue(txSubmitterTestModule.conf.failedTxs.contains(0))
         }
 
         withDbTransaction(node, 0) {
-            assertThat(it.get(TRANSACTIONS_COLUMN_STATUS).equals(TransactionStatus.FAILURE.name))
+            assertThat(it.get(TRANSACTIONS_COLUMN_STATUS)).isEqualTo(TransactionStatus.FAILURE.name)
         }
     }
 
@@ -256,10 +253,10 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(
 
         val evmSubmitTransactionRequest = EvmSubmitTransactionRequest(
                 0,
-                "659e4a3726275edFD125F52338ECe0d54d15BD99",
-                "addValidator",
-                listOf("uint", "address"),
-                listOf(gtv(1), gtv(ByteArray(20))),
+                contractAddress,
+                "updateValidators",
+                listOf("address[]"),
+                listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
                 1337,
                 BlockchainRid.ZERO_RID.data,
                 RellTransactionStatus.QUEUED
@@ -325,10 +322,10 @@ fun withDbTransaction(node: PostchainTestNode, rowId: Long, op: (org.jooq.Record
         val tableName = DatabaseAccess.of(it).tableEvmTransaction(it)
 
         val fetch = jooq
-            .select()
-            .from(tableName)
-            .where(TRANSACTIONS_COLUMN_REQUEST_ID.eq(rowId))
-            .fetchOne()
+                .select()
+                .from(tableName)
+                .where(TRANSACTIONS_COLUMN_REQUEST_ID.eq(rowId))
+                .fetchOne()
 
         op(fetch)
     }

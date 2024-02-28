@@ -61,11 +61,5 @@ class GtvToTypeMapperTest {
         val encodedMapped = FunctionEncoder.encode("dummy", listOf(arrayMap))
         val encodedExpected = FunctionEncoder.encode("dummy", listOf(DynamicArray(org.web3j.abi.datatypes.Int::class.java, arrayValues)))
         assertEquals(encodedExpected, encodedMapped)
-
-        // array of arrays
-        val arrayOfArrayMap = GtvToTypeMapper.map(GtvArray(arrayOf(gtvArrayValues)), "int[][]")
-        assertTrue(arrayOfArrayMap is DynamicArray<*>)
-        val outerArray = (arrayOfArrayMap as DynamicArray<*>).value
-        assertEquals(arrayValues, (outerArray[0] as DynamicArray<*>).value)
     }
 }

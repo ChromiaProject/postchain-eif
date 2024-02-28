@@ -25,6 +25,7 @@ import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.DynamicArray
 import org.web3j.tx.Contract
+import java.math.BigInteger
 
 @Testcontainers(disabledWithoutDocker = true)
 class TransactionSubmitterRetryTest : EifBaseIntegrationTest(
@@ -46,10 +47,9 @@ class TransactionSubmitterRetryTest : EifBaseIntegrationTest(
     fun `submit transaction fails 2 times and then succeeds`() {
 
         // Deploy validator contract
-        val postchainValidator = "659e4a3726275edFD125F52338ECe0d54d15BD99"
         val encodedConstructor =
-            FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(postchainValidator))))
-        Contract.deployRemoteCall(
+                FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(BigInteger.ONE))))
+        val contract = Contract.deployRemoteCall(
             Validator::class.java,
             web3j,
             transactionManager,
@@ -57,6 +57,7 @@ class TransactionSubmitterRetryTest : EifBaseIntegrationTest(
             validatorBinary,
             encodedConstructor
         ).send()
+        val contractAddress = contract.contractAddress.substring(2)
 
         val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config.xml")
         val node = nodes[0]
@@ -65,10 +66,10 @@ class TransactionSubmitterRetryTest : EifBaseIntegrationTest(
 
         val evmSubmitTransactionRequest = EvmSubmitTransactionRequest(
             0,
-            postchainValidator,
-            "addValidator",
-            listOf("uint", "address"),
-            listOf( gtv(1), gtv(ByteArray(20))),
+                contractAddress,
+                "updateValidators",
+                listOf("address[]"),
+                listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
             1337,
             BlockchainRid.ZERO_RID.data,
             RellTransactionStatus.QUEUED

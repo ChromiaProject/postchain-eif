@@ -28,10 +28,10 @@ class TransactionSubmitterQueuedTransactionTestGTXModule : TransactionSubmitterT
         transactionSubmitterDatabaseOperations.initialize(ctx)
         transactionSubmitterDatabaseOperations.queueTransaction(ctx, EvmSubmitTransactionRequest(
                 0,
-                "659e4a3726275edFD125F52338ECe0d54d15BD99",
-        "addValidator",
-        listOf("uint", "address"),
-        listOf(gtv(1), gtv(ByteArray(20))),
+                "6936b1761eafc2116650b6593bbc86bd79a339a5", // TODO: Fetch contract address instead of hardcoding
+                "updateValidators",
+                listOf("address[]"),
+                listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
         1337,
         BlockchainRid.ZERO_RID.data,
         RellTransactionStatus.QUEUED
@@ -49,10 +49,10 @@ class TransactionSubmitterPendingTransactionTestGTXModule : TransactionSubmitter
         transactionSubmitterDatabaseOperations.initialize(ctx)
         transactionSubmitterDatabaseOperations.queueTransaction(ctx, EvmSubmitTransactionRequest(
                 0,
-                "659e4a3726275edFD125F52338ECe0d54d15BD99",
-                "addValidator",
-                listOf("uint", "address"),
-                listOf( gtv(1), gtv(ByteArray(20))),
+                "6936b1761eafc2116650b6593bbc86bd79a339a5",
+                "updateValidators",
+                listOf("address[]"),
+                listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
                 1337,
                 BlockchainRid.ZERO_RID.data,
                 RellTransactionStatus.QUEUED
@@ -70,10 +70,10 @@ class TransactionSubmitterSuccessfulTransactionTestGTXModule : TransactionSubmit
         transactionSubmitterDatabaseOperations.initialize(ctx)
         transactionSubmitterDatabaseOperations.queueTransaction(ctx, EvmSubmitTransactionRequest(
                 0,
-                "659e4a3726275edFD125F52338ECe0d54d15BD99",
-                "addValidator",
-                listOf("uint", "address"),
-                listOf( gtv(1), gtv(ByteArray(20))),
+                "6936b1761eafc2116650b6593bbc86bd79a339a5",
+                "updateValidators",
+                listOf("address[]"),
+                listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
                 1337,
                 BlockchainRid.ZERO_RID.data,
                 RellTransactionStatus.QUEUED
@@ -90,10 +90,10 @@ class TransactionSubmitterFailTransactionTestGTXModule : TransactionSubmitterTes
         transactionSubmitterDatabaseOperations.initialize(ctx)
         transactionSubmitterDatabaseOperations.queueTransaction(ctx, EvmSubmitTransactionRequest(
                 0,
-                "659e4a3726275edFD125F52338ECe0d54d15BD99",
-                "addValidator",
-                listOf("uint", "address"),
-                listOf( gtv(1000000000), gtv(ByteArray(20))),
+                "6936b1761eafc2116650b6593bbc86bd79a339a5",
+                "updateValidators",
+                listOf("uint"),
+                listOf(gtv(1)), // wrong type
                 1337,
                 BlockchainRid.ZERO_RID.data,
                 RellTransactionStatus.QUEUED

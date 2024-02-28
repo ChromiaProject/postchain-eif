@@ -51,9 +51,11 @@ object GtvToTypeMapper {
             Utf8String::class.java -> Utf8String(value.asString())
             is ParameterizedType -> {
                 if (typeReference.rawType == DynamicArray::class.java) {
-                    return DynamicArray(Type::class.java, value.asArray().map { gtv ->
+                    val values = value.asArray().map { gtv ->
                         mapTypeReference(typeReference.actualTypeArguments[0], gtv)
-                    })
+                    }
+                    // Have to use deprecated constructor here, does not work in any other way
+                    return DynamicArray(values)
                 } else {
                     throw ProgrammerMistake("Unexpected parameterized typeReference: ${typeReference.rawType}")
                 }
