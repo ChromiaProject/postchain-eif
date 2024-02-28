@@ -32,6 +32,9 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
             val exs = blockchainConfig.module.getSpecialTxExtensions()
             val ext = exs.find { it is TransactionSubmitterSpecialTxExtension }
             if (ext is TransactionSubmitterSpecialTxExtension) {
+
+                ext.setPubKey(postchainContext.appConfig.pubKeyByteArray)
+
                 for ((evmBlockchainName, networkBlockchainConfig) in transactionSubmitterBlockchainConfig.chains) {
                     val networkId = networkBlockchainConfig.networkId
                     val appConfig =

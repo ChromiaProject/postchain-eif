@@ -27,7 +27,9 @@ import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.TRANSACTIONS_COLUMN_REQUEST_ID
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.TRANSACTIONS_COLUMN_STATUS
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.TRANSACTIONS_COLUMN_TX_HASH
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.ADD_EVM_TRANSACTION_ERRORS
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_RECEIPT
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_STATE
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtx.data.ExtOpData
 import org.awaitility.Awaitility
@@ -43,6 +45,7 @@ import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.DynamicArray
 import org.web3j.tx.Contract
 import java.math.BigInteger
+import java.sql.Timestamp
 
 @Testcontainers(disabledWithoutDocker = true)
 class TransactionSubmitterTest : EifBaseIntegrationTest(
@@ -195,7 +198,7 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
-            assertTrue(txSubmitterTestModule.conf.failedTxs.contains(0))
+            assertTrue(txSubmitterTestModule.conf.queuedTxs.contains(0))
         }
 
         withDbTransaction(node, 0) {
@@ -270,7 +273,7 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
-            assertTrue(txSubmitterTestModule.conf.failedTxs.contains(0))
+            assertTrue(txSubmitterTestModule.conf.queuedTxs.contains(0))
         }
     }
 }
@@ -291,10 +294,30 @@ fun withUpdateEvmTransactionReceipt(txSubmitterTestModule: TransactionSubmitterT
     }
 }
 
+// Evaluate sent error operations
+fun withAddEvmTransactionError(txSubmitterTestModule: TransactionSubmitterTestGTXModule, rowId: Long, op: (List<List<EvmSubmitTransactionError>>) -> Unit) {
+    withTxOperations(txSubmitterTestModule, ADD_EVM_TRANSACTION_ERRORS) { operations ->
+        val addErrorOperations = operations
+            .filter { it.args[0].asInteger() == rowId }
+            .map {op ->
+                op.args[1].asArray()
+                    .map {
+                        val timestamp = it[0].asInteger()
+                        val serviceUrl = it[2].asString()
+                        val message = it[3].asString()
+
+                        EvmSubmitTransactionError(rowId, Timestamp(timestamp), serviceUrl, message)
+                    }
+            }
+
+        op(addErrorOperations)
+    }
+}
+
 // Evaluate sent transaction status
 fun assertStatusOperation(txSubmitterTestModule: TransactionSubmitterTestGTXModule, rowId: Long, expectedStatus: RellTransactionStatus) {
     withTxOperations(txSubmitterTestModule,
-        TransactionSubmitterSpecialTxExtension.UPDATE_EVM_TRANSACTION_STATE
+        UPDATE_EVM_TRANSACTION_STATE
     ) { operations ->
         val statusOperations = operations
             .filter { it.args[0].asInteger() == rowId }

@@ -4,6 +4,7 @@ import net.postchain.common.BlockchainRid
 import net.postchain.core.EContext
 import net.postchain.core.TxEContext
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.ADD_EVM_TRANSACTION_ERRORS
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_RECEIPT
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_STATE
 import net.postchain.gtv.GtvFactory.gtv
@@ -18,6 +19,7 @@ import java.util.concurrent.LinkedBlockingQueue
 data class TransactionSubmitterTestContext(
         val queue: LinkedBlockingQueue<EvmSubmitTransactionRequest>,
         val successfulTxs: MutableSet<Long>,
+        val queuedTxs: MutableSet<Long>,
         val failedTxs: MutableSet<Long>,
         val operations: MutableList<ExtOpData>
 )
@@ -102,10 +104,12 @@ class TransactionSubmitterFailTransactionTestGTXModule : TransactionSubmitterTes
 }
 
 open class TransactionSubmitterTestGTXModule : SimpleGTXModule<TransactionSubmitterTestContext>(
-        TransactionSubmitterTestContext(LinkedBlockingQueue(), mutableSetOf(), mutableSetOf(), mutableListOf()),
+        TransactionSubmitterTestContext(LinkedBlockingQueue(), mutableSetOf(), mutableSetOf(), mutableSetOf(), mutableListOf()),
         mapOf(UPDATE_EVM_TRANSACTION_STATE to { conf, opData ->
             ModifyTxStateOperation(conf, opData)
         }, UPDATE_EVM_TRANSACTION_RECEIPT to { conf, opData ->
+            CaptureTxOperation(conf, opData)
+        }, ADD_EVM_TRANSACTION_ERRORS to { conf, opData ->
             CaptureTxOperation(conf, opData)
         }),
         mapOf(FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT to { conf, _, _ ->
@@ -139,6 +143,7 @@ class ModifyTxStateOperation(private val conf: TransactionSubmitterTestContext, 
         when (status) {
             RellTransactionStatus.TAKEN -> conf.queue.removeIf { it.rowId == rowId }
             RellTransactionStatus.SUCCESS -> conf.successfulTxs.add(rowId)
+            RellTransactionStatus.QUEUED -> conf.queuedTxs.add(rowId)
             RellTransactionStatus.FAILURE -> conf.failedTxs.add(rowId)
             else -> {}
         }
@@ -147,7 +152,6 @@ class ModifyTxStateOperation(private val conf: TransactionSubmitterTestContext, 
         return true
     }
 }
-
 
 class CaptureTxOperation(private val conf: TransactionSubmitterTestContext, private val extOpData: ExtOpData) : GTXOperation(extOpData) {
     override fun checkCorrectness() {}

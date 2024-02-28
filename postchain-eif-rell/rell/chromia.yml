@@ -31,6 +31,7 @@ test:
     transaction_submitter:
       contract_whitelist: "address,address1"
       contract_tx_rate_limit: 60000
+      node_retry_strategy: SUPERMAJORITY
 
 blockchains:
   eif:
@@ -51,6 +52,7 @@ blockchains:
         # TODO add addresses
         contract_whitelist: "" # Comma separated list since Rell does not support list type as module arg
         contract_tx_rate_limit: 60000
+        node_retry_strategy: SUPERMAJORITY
     config:
       gtx:
         modules:
