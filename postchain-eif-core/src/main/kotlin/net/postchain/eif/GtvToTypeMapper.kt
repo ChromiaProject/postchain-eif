@@ -55,6 +55,7 @@ object GtvToTypeMapper {
                         mapTypeReference(typeReference.actualTypeArguments[0], gtv)
                     }
                     // Have to use deprecated constructor here, does not work in any other way
+                    @Suppress("DEPRECATION")
                     return DynamicArray(values)
                 } else {
                     throw ProgrammerMistake("Unexpected parameterized typeReference: ${typeReference.rawType}")
