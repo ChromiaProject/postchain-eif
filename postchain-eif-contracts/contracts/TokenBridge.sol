@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.19;
+pragma solidity 0.8.20;
 
 // Upgradeable implementations
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
@@ -13,29 +13,28 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./Postchain.sol";
 
 interface IValidator {
-    function getValidatorHeight(uint _height) external view returns (uint);
-    function isValidSignatures(uint height, bytes32 hash, bytes[] memory signatures, address[] memory signers) external view returns (bool);
+    function isValidSignatures(bytes32 hash, bytes[] memory signatures, address[] memory signers) external view returns (bool);
 }
 
 // This contract is upgradeable. This imposes restrictions on how storage layout can be modified once it is deployed
 // Some instructions are also not allowed. Read more at: https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable
 // Note: To enhance the security & decentralization, we should call transferOwnership() to external multi-sig owner after deploy the smart contract
-contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeable, ReentrancyGuardUpgradeable {
 
     uint8 constant ERC20_ACCOUNT_STATE_BYTE_SIZE = 64;
     uint constant EMERGENCY_DURATION = 90 days;
-    uint constant WITHDRAW_OFFSET = 2; // need to update when deploy contract on production
+
     using Postchain for bytes32;
     using MerkleProof for bytes32[];
     using SafeERC20 for IERC20;
 
     mapping (IERC20 => bool) public _allowedToken;
-    mapping (IERC20 => uint256) public _balances;
     mapping (bytes32 => Withdraw) public _withdraw;
     IValidator public validator;
     uint256 public networkId;
     bool public isMassExit;
     PostchainBlock public massExitBlock;
+    uint256 public withdrawOffset;
     uint256 public emergencyTimestamp;
 
     // Postchain/Chromia blockchain rid
@@ -76,12 +75,19 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
         uint blockHeight;
         uint accountNumber;
     }
-
+    
+    event Initialize(IValidator indexed _validator, uint256 _withdrawOffset);
+    event SetBlockchainRid(bytes32 rid);
+    event AllowToken(IERC20 indexed token);
+    event TriggerMassExit(uint indexed height, bytes32 indexed blockRid);
+    event PostponeMassExit();
+    event UpdatedMassExitBlock(uint indexed height, bytes32 indexed blockRid);
+    event PendingWithdraw(bytes32 indexed hash);
+    event UnpendingWithdraw(bytes32 indexed hash);
     event FundedERC20(address indexed sender, IERC20 indexed token, uint amount);
-    event DepositedERC20(address indexed sender, IERC20 indexed token, bytes32 indexed ft3_account_id, uint networkId, uint amount, string name, string symbol, uint8 decimals);
-    event WithdrawRequest(address indexed beneficiary, IERC20 indexed token, uint256 value);
+    event DepositedERC20(address indexed sender, IERC20 indexed token, uint networkId, uint amount, string name, string symbol, uint8 decimals);
+    event WithdrawRequest(address indexed beneficiary, IERC20 indexed token, uint256 value, uint256 blockNumber);
     event Withdrawal(address indexed beneficiary, IERC20 indexed token, uint256 value);
-    event MassExit(uint indexed height, bytes32 indexed blockRid);
     event WithdrawalBySnapshot(address indexed beneficiary);
 
     modifier isAllowToken(IERC20 token) {
@@ -94,8 +100,11 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
         _;
     }
 
-    function initialize(IValidator _validator) public initializer {
+    function initialize(IValidator _validator, uint256 _withdrawOffset) public initializer {
+        require(address(_validator) != address(0), "TokenBridge: validator address is invalid");
         __Ownable_init(_msgSender());
+        __Pausable_init();
+        __ReentrancyGuard_init();
 
         uint256 id;
         assembly {
@@ -103,11 +112,19 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
         }
         networkId = id;
         validator = _validator;
+        withdrawOffset = _withdrawOffset;
         emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
+        emit Initialize(_validator, _withdrawOffset);
+    }
+
+    function renounceOwnership() public override onlyOwner {
+        revert("TokenBridge: renounce ownership is not allowed");
     }
 
     function setBlockchainRid(bytes32 rid) onlyOwner public {
+        require(rid != bytes32(0), "TokenBridge: blockchain rid is invalid");
         blockchainRid = rid;
+        emit SetBlockchainRid(rid);
     }
 
     function pause() onlyOwner public {
@@ -119,7 +136,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
     }
 
     function allowToken(IERC20 token) onlyOwner public {
+        require(address(token) != address(0), "TokenBridge: token address is invalid");
         _allowedToken[token] = true;
+        emit AllowToken(token);
     }
 
     /**
@@ -130,10 +149,13 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
         require(!isMassExit, "TokenBridge: mass exit already set");
         isMassExit = true;
         massExitBlock = PostchainBlock(height, blockRid);
+        emit TriggerMassExit(height, blockRid);
     }
 
     function postponeMassExit() onlyOwner whenMassExit public {
         isMassExit = false;
+        massExitBlock = PostchainBlock(0, bytes32(0));
+        emit PostponeMassExit();
     }
 
     /**
@@ -142,18 +164,23 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
      */
     function updateMassExitBlock(uint height, bytes32 blockRid) onlyOwner whenMassExit public {
         massExitBlock = PostchainBlock(height, blockRid);
+        emit UpdatedMassExitBlock(height, blockRid);
     }
 
     function pendingWithdraw(bytes32 _hash) onlyOwner public {
+        require(_hash != bytes32(0), "TokenBridge: event hash is invalid");
         Withdraw storage wd = _withdraw[_hash];
         require(wd.status == Status.Withdrawable, "TokenBridge: withdraw request status is not withdrawable");
         wd.status = Status.Pending;
+        emit PendingWithdraw(_hash);
     }
 
     function unpendingWithdraw(bytes32 _hash) onlyOwner public {
+        require(_hash != bytes32(0), "TokenBridge: event hash is invalid");
         Withdraw storage wd = _withdraw[_hash];
         require(wd.status == Status.Pending, "TokenBridge: withdraw request status is not pending");
         wd.status = Status.Withdrawable;
+        emit UnpendingWithdraw(_hash);
     }
 
     /**
@@ -161,17 +188,15 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
      * and they might need to withdraw back to postchain.
      */
     function fund(IERC20 token, uint256 amount) isAllowToken(token) onlyOwner public returns (bool) {
-        token.transferFrom(msg.sender, address(this), amount);
-        _balances[token] += amount;
+        token.safeTransferFrom(msg.sender, address(this), amount);
         emit FundedERC20(msg.sender, token, amount);
         return true;
     }
 
-    function deposit(IERC20 token, uint256 amount, bytes32 ft3_account_id) isAllowToken(token) whenNotPaused public returns (bool) {
+    function deposit(IERC20 token, uint256 amount) isAllowToken(token) whenNotPaused public returns (bool) {
         (string memory name, string memory symbol, uint8 decimals) = _getTokenInfo(token);
         token.safeTransferFrom(msg.sender, address(this), amount);
-        _balances[token] += amount;
-        emit DepositedERC20(msg.sender, token, ft3_account_id, networkId, amount, name, symbol, decimals);
+        emit DepositedERC20(msg.sender, token, networkId, amount, name, symbol, decimals);
         return true;
     }
 
@@ -197,13 +222,14 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
         address[] memory signers,
         Data.ExtraProofData memory extraProof
     ) internal view {
+        require(blockchainRid != bytes32(0), "TokenBridge: blockchain rid is not set");
         require(_events[eventProof.leaf] == false, "TokenBridge: event hash was already used");
         {
             (uint height, bytes32 blockRid, bytes32 eventRoot, ) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
             if (isMassExit) {
                 require(height <= massExitBlock.height, "TokenBridge: cannot withdraw request after the mass exit block height");
             }
-            if (!validator.isValidSignatures(validator.getValidatorHeight(height), blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
+            if (!validator.isValidSignatures(blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
             if (!MerkleProof.verify(eventProof.merkleProofs, eventProof.leaf, eventProof.position, eventRoot)) revert("TokenBridge: invalid merkle proof");
         }
         return;
@@ -213,18 +239,16 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
         Withdraw storage wd = _withdraw[hash];
         {
             (IERC20 token, address beneficiary, uint256 amount, uint256 netId) = hash.verifyEvent(_event);
+            require(_allowedToken[token], "TokenBridge: not allow token");
             require(networkId == netId, "TokenBridge: incorrect network id");
-            // only need to check on `amount <= _balances[token]` on withdraw() function
-            // that will allow user to withdraw the token back to postchain
-            // when the token balance was not fund enough by admin/owner
             require(amount > 0, "TokenBridge: invalid amount to make request withdraw");
             wd.token = token;
             wd.beneficiary = beneficiary;
             wd.amount = amount;
-            wd.block_number = block.number + WITHDRAW_OFFSET;
+            wd.block_number = block.number + withdrawOffset;
             wd.status = Status.Withdrawable;
             _withdraw[hash] = wd;
-            emit WithdrawRequest(beneficiary, token, amount);
+            emit WithdrawRequest(beneficiary, token, amount, block.number);
         }
         return true;
     }
@@ -234,11 +258,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
         require(wd.beneficiary == beneficiary, "TokenBridge: no fund for the beneficiary");
         require(wd.block_number <= block.number, "TokenBridge: not mature enough to withdraw the fund");
         require(wd.status == Status.Withdrawable, "TokenBridge: fund is pending or was already claimed");
-        require(wd.amount <= _balances[wd.token], "TokenBridge: not enough amount to withdraw");
         wd.status = Status.Withdrawn;
         uint value = wd.amount;
         wd.amount = 0;
-        _balances[wd.token] -= value;
         // only support user to withdraw the token that be funded enough on the EVM bridge
         wd.token.safeTransfer(beneficiary, value);
         emit Withdrawal(beneficiary, wd.token, value);
@@ -247,7 +269,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
     /**
      * @dev user can withdraw token back to postchain if they cannot withdraw on EVM chain
      */
-    function withdrawToPostchain(bytes32 _hash, bytes32 ft3_account_id) external whenNotPaused nonReentrant {
+    function withdrawToPostchain(bytes32 _hash) external whenNotPaused nonReentrant {
         Withdraw storage wd = _withdraw[_hash];
         require(wd.beneficiary == msg.sender, "TokenBridge: no fund for the beneficiary");
         require(wd.block_number <= block.number, "TokenBridge: not mature enough to withdraw the fund");
@@ -256,7 +278,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
         uint amount = wd.amount;
         wd.amount = 0;
         (string memory name, string memory symbol, uint8 decimals) = _getTokenInfo(wd.token);
-        emit DepositedERC20(msg.sender, wd.token, ft3_account_id, networkId, amount, name, symbol, decimals);
+        emit DepositedERC20(msg.sender, wd.token, networkId, amount, name, symbol, decimals);
     }
 
     /**
@@ -276,7 +298,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
         require(stateProof.leaf == keccak256(snapshot), "TokenBridge: snapshot data is not correct");
         (uint height, bytes32 blockRid, , bytes32 stateRoot) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
         require(blockRid == massExitBlock.blockRid && height == massExitBlock.height, "TokenBridge: snapshot block should be the same with mass exit block");
-        if (!validator.isValidSignatures(validator.getValidatorHeight(height), blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
+        if (!validator.isValidSignatures(blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
         if (!MerkleProof.verify(stateProof.merkleProofs, stateProof.leaf, stateProof.position, stateRoot)) revert("TokenBridge: invalid merkle proof");
 
         address beneficiary = abi.decode(snapshot[:32], (address));
@@ -286,7 +308,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
         offset += 32;
         for (uint i = offset; i < offset + byteSize; i += ERC20_ACCOUNT_STATE_BYTE_SIZE) {
             ERC20AccountState memory accountState = abi.decode(snapshot[i:i + ERC20_ACCOUNT_STATE_BYTE_SIZE], (ERC20AccountState));
-            if (accountState.amount > 0) {
+            if (accountState.amount > 0 && _allowedToken[accountState.token]) {
                 accountState.token.safeTransfer(beneficiary, accountState.amount);
             }
         }
@@ -320,7 +342,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, OwnableUpgradeable, 
      * by allow admin/owner (multi-sig wallet) to withdraw all the remaining balance after a specific period of time.
      */
     function emergencyWithdraw(IERC20 token, address payable beneficiary) external onlyOwner {
-        require(block.timestamp > emergencyTimestamp, "TokenBridge: cannot do emergency withdrawl before setting timestamp");
+        require(address(token) != address(0), "TokenBridge: token address is invalid");
+        require(beneficiary != address(0), "TokenBridge: beneficiary address is invalid");
+        require(block.timestamp > emergencyTimestamp, "TokenBridge: cannot do emergency withdrawal before setting timestamp");
         uint tokenBalance = token.balanceOf(address(this));
         if (tokenBalance > 0) {
             token.safeTransfer(beneficiary, tokenBalance);

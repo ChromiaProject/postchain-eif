@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.19;
+pragma solidity 0.8.20;
 
 // Interfaces
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -18,8 +18,8 @@ contract TokenBridgeDelegator {
         return token.approve(_spender, _amount);
     }
 
-    function deposit(IERC20 token, uint256 amount, bytes32 ft3_account_id) public returns (bool) {
-        return _bridge.deposit(token, amount, ft3_account_id);
+    function deposit(IERC20 token, uint256 amount) public returns (bool) {
+        return _bridge.deposit(token, amount);
     }
 
     function withdrawRequest(

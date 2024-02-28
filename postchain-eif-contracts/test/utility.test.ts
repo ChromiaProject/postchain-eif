@@ -92,6 +92,10 @@ describe("Utility Test", () => {
             it("hash gtv integer leaf 1234567890", async () => {
                 expect(await testDelegatorInstance.hashGtvIntegerLeaf(1234567890)).to.eq("0x91F23A381089997DF175AF0AE0DD3E44B651C255ABECA1683F15D831B59C236E".toLowerCase());
             })
+
+            it("hash gtv bytes 64 leaf incorrect", async () => {
+                await expect(testDelegatorInstance.hashGtvBytes64Leaf("0x6c5efa1707c93140989e0f95b9a0b8616e0c8ef51392617bf9c917aff96ef769")).to.be.revertedWith("Hash: value must be 64 bytes long");
+            })
         })
 
         describe("Merkle Proof", async () => {

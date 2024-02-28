@@ -58,7 +58,6 @@ function test_evm_block() {
     val non_indexed_values = list<gtv>();
     indexed_values.add(user_evm_address.to_gtv());
     indexed_values.add(token_address.to_gtv());
-    indexed_values.add(account_id.to_gtv());
     non_indexed_values.add((network_id).to_gtv());
     non_indexed_values.add((amount).to_gtv());
     non_indexed_values.add((token_name).to_gtv());
@@ -165,7 +164,6 @@ function test_evm_block() {
     val other_indexed_values = list<gtv>();
     other_indexed_values.add(other_evm_address.to_gtv());
     other_indexed_values.add(token_address.to_gtv());
-    other_indexed_values.add(account_id.to_gtv());
 
     val e1 = c.event_data(
         tnx_hash = x"26b1a0d2c8ed8e32efff45232a106b459aeb23c98d83478eb5f29ca4109be13d",
