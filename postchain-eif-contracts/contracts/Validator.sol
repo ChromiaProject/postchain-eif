@@ -1,96 +1,61 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.19;
+pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "./utils/cryptography/ECDSA.sol";
 
-contract Validator is Ownable {
+contract Validator is Ownable2Step {
     using EC for bytes32;
 
-    mapping (uint => mapping(address => bool)) validatorMap;
-    mapping (uint => address[]) public validators; // postchain block height => validators
-    uint[] public validatorHeights;
+    mapping(address => bool) private validatorMap;
+    address[] public validators;
 
-    event ValidatorAdded(uint height, address indexed _validator);
-    event ValidatorRemoved(uint height, address indexed _validator);
+    event UpdateValidators(uint height, address[] validators);
 
     constructor(address[] memory _validators) Ownable(msg.sender) {
-        validators[0] = _validators;
-        for (uint i = 0; i < validators[0].length; i++) {
-            validatorMap[0][validators[0][i]] = true;
-        }
-        validatorHeights.push(0);
-    }
-
-    function isValidator(uint _height, address _addr) public view returns (bool) {
-        return validatorMap[_height][_addr];
-    }
-    
-    function addValidator(uint _height, address _validator) external onlyOwner {
-        if (_height < validatorHeights[validatorHeights.length-1]) {
-            revert("Validator: cannot update previous heights' validator");
-        } else if (_height > validatorHeights[validatorHeights.length-1]) {
-            validatorHeights.push(_height);
-        }
-        require(!validatorMap[_height][_validator]);
-        validators[_height].push(_validator);
-        validatorMap[_height][_validator] = true;
-        emit ValidatorAdded(_height, _validator);
-    }
-
-    function removeValidator(uint _height, address _validator) external onlyOwner {
-        if (_height < validatorHeights[validatorHeights.length-1]) {
-            revert("Validator: cannot update previous heights' validator");
-        }
-        require(isValidator(_height, _validator));
-        uint index;
-        uint validatorCount = validators[_height].length;
-        for (uint i = 0; i < validatorCount; i++) {
-            if (validators[_height][i] == _validator) {
-                index = i;
-                break;
-            }
-        }
-
-        validatorMap[_height][_validator] = false;
-        validators[_height][index] = validators[_height][validatorCount - 1];
-        validators[_height].pop();
-
-        emit ValidatorRemoved(_height, _validator);
-    }
-
-    function getValidatorHeight(uint _height) external view returns (uint) {
-        return _getValidatorHeight(_height);
-    }
-
-    function _getValidatorHeight(uint _height) internal view returns (uint) {
-        uint lastIndex = validatorHeights.length-1;
-        uint lastHeight = validatorHeights[lastIndex];
-        if (_height >= lastHeight) {
-            return lastHeight;
-        } else {
-            for (uint i = lastIndex; i > 0; i--) {
-                if (_height < validatorHeights[i] && _height >= validatorHeights[i-1]) {
-                    return validatorHeights[i-1];
-                }
-            }
-            return 0;
+        validators = _validators;
+        for (uint i = 0; i < validators.length; i++) {
+            validatorMap[validators[i]] = true;
         }
     }
 
-    function isValidSignatures(uint height, bytes32 hash, bytes[] memory signatures, address[] memory signers) external view returns (bool) {
+    // override renounceOwnership to prevent owner from renouncing ownership
+    function renounceOwnership() public override onlyOwner {
+        revert("Validator: renounceOwnership is not allowed");
+    }
+
+    function isValidator(address _addr) public view returns (bool) {
+        return validatorMap[_addr];
+    }
+
+    // update validator list
+    function updateValidators(address[] memory _validators) public onlyOwner {
+        for (uint i = 0; i < validators.length; i++) {
+            validatorMap[validators[i]] = false;
+        }
+        validators = _validators;
+        for (uint i = 0; i < validators.length; i++) {
+            require(validators[i] != address(0), "Validator: validator address cannot be zero");
+            validatorMap[validators[i]] = true;
+        }
+        emit UpdateValidators(block.number, _validators);
+    }
+
+    function getValidatorCount() public view returns (uint) {
+        return validators.length;
+    }
+
+    function isValidSignatures(bytes32 hash, bytes[] memory signatures, address[] memory signers) external view returns (bool) {
         uint _actualSignature = 0;
-        uint _requiredSignature = _calculateBFTRequiredNum(validators[height].length);
+        uint _requiredSignature = _calculateBFTRequiredNum(getValidatorCount());
+        if (_requiredSignature == 0) return false;
         address _lastSigner = address(0);
         for (uint i = 0; i < signatures.length; i++) {
-            for (uint k = 0; k < signers.length; k++) {
-                require(isValidator(height, signers[k]), "Validator: signer is not validator");
-                if (_isValidSignature(hash, signatures[i], signers[k])) {
-                    _actualSignature++;
-                    require(signers[k] > _lastSigner, "Validator: duplicate signature or signers is out of order");
-                    _lastSigner = signers[k];
-                    break;
-                }
+            require(isValidator(signers[i]), "Validator: signer is not validator");
+            if (_isValidSignature(hash, signatures[i], signers[i])) {
+                _actualSignature++;
+                require(signers[i] > _lastSigner, "Validator: duplicate signature or signers is out of order");
+                _lastSigner = signers[i];
             }
         }
         return (_actualSignature >= _requiredSignature);

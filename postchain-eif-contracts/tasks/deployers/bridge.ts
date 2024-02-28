@@ -4,16 +4,18 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 task("deploy:bridge")
   .addOptionalParam('app', 'app node')
+  .addOptionalParam('offset', 'withdraw offset')
   .addFlag('verify', 'Verify contracts at Etherscan')
-  .setAction(async ({ verify, app}, hre) => {
+  .setAction(async ({ verify, app, offset}, hre) => {
     // deploy validator smart contract
     const validatorFactory: Validator__factory = await hre.ethers.getContractFactory("Validator")
     const validators = app === undefined ? [] : getNodes(app)
+    const withdrawOffset = offset === undefined ? 0 : parseInt(offset)
     const validator: Validator = <Validator>await validatorFactory.deploy(validators)
 
     // deploy token bridge smart contracts
     const factory: TokenBridge__factory = await hre.ethers.getContractFactory("TokenBridge")
-    const bridge: TokenBridge = <TokenBridge>await hre.upgrades.deployProxy(factory, [validator.address])
+    const bridge: TokenBridge = <TokenBridge>await hre.upgrades.deployProxy(factory, [validator.address, withdrawOffset])
     await bridge.deployed()
     console.log("Token bridge deployed to: ", bridge.address)
     const proxyAdmin = await hre.upgrades.erc1967.getAdminAddress(bridge.address)

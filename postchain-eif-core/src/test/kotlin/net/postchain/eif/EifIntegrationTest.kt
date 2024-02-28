@@ -149,7 +149,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
 
         // Deploy token bridge contract
         val bridge = Contract.deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
-            initialize(Address(validator.contractAddress)).send()
+            initialize(Address(validator.contractAddress), Uint256(2)).send()
         }
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contract
@@ -268,7 +268,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
         val depositNum = 5
         val depositAmount = BigInteger("AA".repeat(16), 16)
         for (i in 1..depositNum) {
-            bridge.deposit(Address(testToken.contractAddress), Uint256(depositAmount), Bytes32(accountId.asByteArray())).send()
+            bridge.deposit(Address(testToken.contractAddress), Uint256(depositAmount)).send()
         }
 
         val totalDepositedAmount = depositNum.toBigInteger() * depositAmount
@@ -403,7 +403,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
                     extraProofData
             ).send()
         }
-        assertEquals(exception.message!!.contains("Postchain: invalid blockchain rid"), true)
+        assertEquals(exception.message!!.contains("TokenBridge: blockchain rid is not set"), true)
 
         bridge.setBlockchainRid(Bytes32(bcRid.data)).send()
         var receipt = bridge.withdrawRequest(
