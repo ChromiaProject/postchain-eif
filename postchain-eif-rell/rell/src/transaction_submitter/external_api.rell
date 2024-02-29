@@ -1,5 +1,5 @@
 query get_transaction_status(evm_transaction_id: byte_array) =
-    evm_submit_transaction_entity @? { .id == evm_transaction_id }.status;
+    evm_submit_transaction @? { .id == evm_transaction_id }.status;
 
 query get_transaction_status_by_transaction_data(contract_address: text, function_name: text, parameter_types: list<text>, parameter_values: list<gtv>, network_id: integer): transaction_status? {
     val evm_transaction_id = get_evm_transaction_id(contract_address, function_name, parameter_types, parameter_values, network_id);
@@ -13,9 +13,8 @@ struct transaction_reciept_data {
 }
 
 query get_transaction_receipt_data(evm_transaction_id: byte_array): transaction_reciept_data {
-    val evm_transaction = evm_submit_transaction_entity @? { .id == evm_transaction_id };
+    val evm_transaction = require_transaction(evm_transaction_id);
 
-    require(evm_transaction, "Unknown transaction");
     require(evm_transaction.status == transaction_status.SUCCESS, "Receipt data is not available for transaction since it has status %s".format(evm_transaction.status));
 
     return transaction_reciept_data(
@@ -30,4 +29,18 @@ query get_transaction_receipt_data_by_transaction_data(contract_address: text, f
     return get_transaction_receipt_data(evm_transaction_id);
 }
 
-// TODO: Add queries to fetch error messages for failed txs (and possibly other interesting data)
+query get_transaction_error_data(evm_transaction_id: byte_array): list<transaction_error_data> {
+
+    val transaction = require_transaction(evm_transaction_id);
+
+    val errors = evm_submit_transaction_error @* { .transaction == transaction } (
+        transaction_error_data(timestamp = .timestamp, provider = .provider, rpc_url = .rpc_url, message = .message)
+    );
+
+    return errors;
+}
+
+function require_transaction(evm_transaction_id: byte_array): evm_submit_transaction {
+
+    return require(evm_submit_transaction @? { .id == evm_transaction_id }, "Unknown transaction");
+}

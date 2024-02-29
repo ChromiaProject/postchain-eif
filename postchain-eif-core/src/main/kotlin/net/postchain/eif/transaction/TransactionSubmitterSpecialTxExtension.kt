@@ -5,6 +5,8 @@ import net.postchain.base.SpecialTransactionPosition
 import net.postchain.common.BlockchainRid
 import net.postchain.core.BlockEContext
 import net.postchain.crypto.CryptoSystem
+import net.postchain.gtv.GtvArray
+import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.mapper.toObject
 import net.postchain.gtx.GTXModule
@@ -15,18 +17,22 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     companion object : KLogging() {
         const val UPDATE_EVM_TRANSACTION_STATE = "__update_evm_transaction_state"
         const val UPDATE_EVM_TRANSACTION_RECEIPT = "__update_evm_transaction_receipt"
+        const val ADD_EVM_TRANSACTION_ERRORS = "__add_evm_transaction_errors"
 
         const val FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT = "fetch_oldest_queued_transactions_per_contract"
     }
 
     private val transactionSubmitters = mutableMapOf<Long, TransactionSubmitter>()
     private lateinit var module: GTXModule
+    private lateinit var pubkey: ByteArray
 
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
-        val entities = module.query(bctx, FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT, gtv(listOf()))
+
+        val entities = module.query(bctx, FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT, gtv(listOf(GtvByteArray(pubkey))))
         val queuedTransactions = entities.asArray().map {
             it.toObject<EvmSubmitTransactionRequest>()
         }
+
         val operations = mutableListOf<OpData>()
         queuedTransactions.forEach {
             val submitter = transactionSubmitters[it.networkId]
@@ -44,18 +50,33 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
             submitter.value.fetchCompletedTransactions().forEach { (rowId, result) ->
                 operations.add(OpData(UPDATE_EVM_TRANSACTION_STATE, arrayOf(gtv(rowId), gtv(result.status.ordinal.toLong()))))
                 if (result.status == RellTransactionStatus.SUCCESS) {
-                    if (result.blockHash == null || result.effectiveGasPrice == null || result.gasUsage == null) {
-                        logger.error { "Transaction $rowId is SUCCESS but has not a full receipt. Blockchain: ${result.blockHash}, effectiveGasPrice: ${result.effectiveGasPrice}, gasUsage: ${result.gasUsage}" }
-                    } else {
-                        operations.add(OpData(
+                        if (result.blockHash == null || result.effectiveGasPrice == null || result.gasUsage == null) {
+                            logger.error { "Transaction $rowId is SUCCESS but has not a full receipt. Blockchain: ${result.blockHash}, effectiveGasPrice: ${result.effectiveGasPrice}, gasUsage: ${result.gasUsage}" }
+                        } else {
+                            operations.add(OpData(
                                 UPDATE_EVM_TRANSACTION_RECEIPT, arrayOf(
                                     gtv(rowId),
                                     gtv(result.blockHash),
                                     gtv(result.effectiveGasPrice),
                                     gtv(result.gasUsage),
                                 )))
+                        }
                     }
-                }
+
+                    // Also send any error messages during this transaction
+                    val transactionErrors = submitter.value
+                        .getTransactionErrors(rowId)
+                        .map { GtvArray(arrayOf(
+                            gtv(it.timestamp.time),
+                            gtv(ByteArray(0)),
+                            gtv(it.rpcUrl ?: ""),
+                            gtv(it.message),
+                        )) }
+                    operations.add(OpData(ADD_EVM_TRANSACTION_ERRORS, arrayOf(
+                        gtv(rowId),
+                        gtv(transactionErrors)
+                    )))
+
                 bctx.addAfterCommitHook { submitter.value.deactivateTransaction(rowId) }
             }
         }
@@ -64,7 +85,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     }
 
     override fun getRelevantOps(): Set<String> {
-        return setOf(UPDATE_EVM_TRANSACTION_STATE, UPDATE_EVM_TRANSACTION_RECEIPT)
+        return setOf(UPDATE_EVM_TRANSACTION_STATE, UPDATE_EVM_TRANSACTION_RECEIPT, ADD_EVM_TRANSACTION_ERRORS)
     }
 
     override fun init(module: GTXModule, chainID: Long, blockchainRID: BlockchainRid, cs: CryptoSystem) {
@@ -90,4 +111,8 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     }
 
     fun getTransactionSubmitter(networkId: Long) = transactionSubmitters[networkId]
+
+    fun setPubKey(pubKey: ByteArray) {
+        this.pubkey = pubKey
+    }
 }

@@ -23,8 +23,8 @@ interface TransactionSubmitterDatabaseOperations {
     fun recordTransactionFailure(
         ctx: EContext,
         requestId: Long,
-        serviceUrl: String?,
-        errorMessage: String,
+        rpcUrl: String?,
+        message: String,
         stackTrace: String?
     )
 
@@ -37,4 +37,6 @@ interface TransactionSubmitterDatabaseOperations {
     fun getPendingTransactions(ctx: EContext, networkId: Long): MutableMap<String, EvmSubmitTransactionRequest>
 
     fun getCompletedTransactions(ctx: EContext, networkId: Long): MutableMap<Long, EvmSubmitTransactionResult>
+
+    fun getTransactionErrors(ctx: EContext, requestId: Long): List<EvmSubmitTransactionError>
 }

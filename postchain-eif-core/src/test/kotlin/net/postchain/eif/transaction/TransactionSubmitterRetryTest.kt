@@ -9,9 +9,9 @@ import net.postchain.devtools.getModules
 import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.EvmType
 import net.postchain.eif.contracts.Validator
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.ERRORS_COLUMN_ERROR_MESSAGE
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.ERRORS_COLUMN_MESSAGE
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.ERRORS_COLUMN_REQUEST_ID
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.ERRORS_COLUMN_SERVICE_URL
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.ERRORS_COLUMN_RPC_URL
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.ERRORS_COLUMN_STACK_TRACE
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.ERRORS_COLUMN_TIMESTAMP
 import net.postchain.gtv.GtvFactory.gtv
@@ -92,14 +92,14 @@ class TransactionSubmitterRetryTest : EifBaseIntegrationTest(
 
             assertThat(it[0].get(ERRORS_COLUMN_TIMESTAMP)).isNotNull()
             assertThat(it[0].get(ERRORS_COLUMN_REQUEST_ID)).isEqualTo(0)
-            assertThat(it[0].get(ERRORS_COLUMN_SERVICE_URL)).isEqualTo("http://127.0.0.1:8888")
-            assertThat(it[0].get(ERRORS_COLUMN_ERROR_MESSAGE)).isEqualTo("Failed to send transaction 0: Failed to connect to /127.0.0.1:8888")
+            assertThat(it[0].get(ERRORS_COLUMN_RPC_URL)).isEqualTo("http://127.0.0.1:8888")
+            assertThat(it[0].get(ERRORS_COLUMN_MESSAGE)).isEqualTo("Failed to send transaction 0: Failed to connect to /127.0.0.1:8888")
             assertThat(it[0].get(ERRORS_COLUMN_STACK_TRACE)).isNotNull()
 
             assertThat(it[1].get(ERRORS_COLUMN_TIMESTAMP)).isNotNull()
             assertThat(it[1].get(ERRORS_COLUMN_REQUEST_ID)).isEqualTo(0)
-            assertThat(it[1].get(ERRORS_COLUMN_SERVICE_URL)).isEqualTo("http://127.0.0.1:9999")
-            assertThat(it[1].get(ERRORS_COLUMN_ERROR_MESSAGE)).isEqualTo("Failed to send transaction 0: Failed to connect to /127.0.0.1:9999")
+            assertThat(it[1].get(ERRORS_COLUMN_RPC_URL)).isEqualTo("http://127.0.0.1:9999")
+            assertThat(it[1].get(ERRORS_COLUMN_MESSAGE)).isEqualTo("Failed to send transaction 0: Failed to connect to /127.0.0.1:9999")
             assertThat(it[1].get(ERRORS_COLUMN_STACK_TRACE)).isNotNull()
         }
 
@@ -109,6 +109,22 @@ class TransactionSubmitterRetryTest : EifBaseIntegrationTest(
             assertThat(it.get(TransactionSubmitterDatabaseOperationsImpl.TRANSACTIONS_COLUMN_BLOCK_HASH)).isNotNull()
             assertThat(it.get(TransactionSubmitterDatabaseOperationsImpl.TRANSACTIONS_COLUMN_EFFECTIVE_GAS_PRICE)).isNotNull()
             assertThat(it.get(TransactionSubmitterDatabaseOperationsImpl.TRANSACTIONS_COLUMN_GAS_USAGE)).isGreaterThan(0)
+        }
+
+        withAddEvmTransactionError(txSubmitterTestModule, evmSubmitTransactionRequest.rowId) {
+
+            assertThat(it.size).isEqualTo(1)
+
+            val operation = it[0]
+            assertThat(operation.size).isEqualTo(2)
+
+            assertThat(operation[0].timestamp).isNotNull()
+            assertThat(operation[0].rpcUrl).isEqualTo("http://127.0.0.1:8888")
+            assertThat(operation[0].message).isEqualTo("Failed to send transaction 0: Failed to connect to /127.0.0.1:8888")
+
+            assertThat(operation[1].timestamp).isNotNull()
+            assertThat(operation[1].rpcUrl).isEqualTo("http://127.0.0.1:9999")
+            assertThat(operation[1].message).isEqualTo("Failed to send transaction 0: Failed to connect to /127.0.0.1:9999")
         }
     }
 }

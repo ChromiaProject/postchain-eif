@@ -14,7 +14,7 @@ function test_query_transaction_state() {
 
     assert_null(get_transaction_status(evm_transaction_id));
 
-    rell.test.tx().op(create_evm_submit_transaction_entity_operation(evm_submit_transaction_message(
+    rell.test.tx().op(create_evm_submit_transaction_operation(evm_submit_transaction_message(
         contract_address = contract_address,
         function_name = function_name,
         parameter_types = parameter_types,
@@ -37,19 +37,19 @@ function test_query_transaction_receipt() {
 
     assert_null(get_transaction_status(evm_transaction_id));
 
-    rell.test.tx().op(create_evm_submit_transaction_entity_operation(evm_submit_transaction_message(
+    rell.test.tx().op(create_evm_submit_transaction_operation(evm_submit_transaction_message(
         contract_address = contract_address,
         function_name = function_name,
         parameter_types = parameter_types,
         parameter_values = parameter_values,
         network_id = network_id), x"")).run();
 
-    val evm_submit_transaction_entity_rowid = evm_submit_transaction_entity @ {}.rowid;
+    val evm_submit_transaction_rowid = evm_submit_transaction @ {}.rowid;
 
     rell.test.tx().op(
-        update_evm_transaction_status_helper_op(evm_submit_transaction_entity_rowid, transaction_status.SUCCESS),
+        update_evm_transaction_status_helper_op(evm_submit_transaction_rowid, transaction_status.SUCCESS),
         update_evm_transaction_receipt_helper_op(
-            evm_submit_transaction_entity_rowid,
+            evm_submit_transaction_rowid,
             "hash",
             1L,
             2L
@@ -65,4 +65,40 @@ function test_query_transaction_receipt() {
     assert_equals(get_transaction_receipt_data(evm_transaction_id), expected_receipt);
 
     assert_equals(get_transaction_receipt_data_by_transaction_data(contract_address, function_name, parameter_types, parameter_values, network_id), expected_receipt);
+}
+
+function test_get_transaction_error_data() {
+
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "address", "myFunction-0", transaction_status.FAILURE),
+        create_test_evm_submit_transaction(x"01", "address", "myFunction-1", transaction_status.QUEUED),
+        create_test_evm_submit_transaction(x"02", "address", "myFunction-2", transaction_status.TAKEN)
+    ).run();
+
+    val transaction_0_row_id = evm_submit_transaction @ { .id == x"00" } (.rowid);
+    val transaction_1_row_id = evm_submit_transaction @ { .id == x"01" } (.rowid);
+
+    rell.test.tx().op(
+        add_evm_transaction_errors_op(transaction_0_row_id.to_integer(), [
+            transaction_error_data(123, rpc_url = null, message = "Failed to get balance"),
+            transaction_error_data(150, rpc_url = "http://evm-1:12345", message = "Connection issue")
+        ]),
+        add_evm_transaction_errors_op(transaction_1_row_id.to_integer(), [
+            transaction_error_data(150, rpc_url = "http://evm-1:12345", message = "Connection issue")
+        ])
+    ).sign(rell.test.keypairs.alice).run();
+
+    val transaction_0_errors = get_transaction_error_data(x"00");
+    assert_equals(transaction_0_errors.size(), 2);
+    assert_equals(transaction_0_errors[0].message, "Failed to get balance");
+    assert_equals(transaction_0_errors[1].message, "Connection issue");
+
+    val transaction_1_errors = get_transaction_error_data(x"01");
+    assert_equals(transaction_1_errors.size(), 1);
+    assert_equals(transaction_1_errors[0].rpc_url, "http://evm-1:12345");
+    assert_equals(transaction_1_errors[0].message, "Connection issue");
+    assert_equals(transaction_1_errors[0].provider, rell.test.keypairs.alice.pub);
+
+    val transaction_2_errors = get_transaction_error_data(x"02");
+    assert_equals(transaction_2_errors.size(), 0);
 }

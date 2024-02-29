@@ -9,6 +9,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.slf4j.MDCContext
 import mu.KLogging
+import net.postchain.base.withReadConnection
 import net.postchain.base.withWriteConnection
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.exception.UserMistake
@@ -71,7 +72,7 @@ class TransactionSubmitter(
                         submitTransaction(txToSubmit)
                     } catch (e: Exception) {
                         logger.error("Failed to submit EVM transaction: ${e.message}", e)
-                        completedTransactions[txToSubmit.rowId] = EvmSubmitTransactionResult(RellTransactionStatus.FAILURE)
+                        completedTransactions[txToSubmit.rowId] = EvmSubmitTransactionResult(RellTransactionStatus.QUEUED)
                     }
                 } catch (e: CancellationException) {
                     break
@@ -232,7 +233,7 @@ class TransactionSubmitter(
             throw UserMistake("Insufficient wallet balance")
         }
 
-        for ((serviceUrl, transactionManager) in transactionManagers) {
+        for ((rpcUrl, transactionManager) in transactionManagers) {
             try {
 
                 val response = transactionManager.sendTransaction(
@@ -268,7 +269,7 @@ class TransactionSubmitter(
                 logger.error { error }
 
                 withWriteConnection(storage, chainId) {
-                    databaseOperations.recordTransactionFailure(it, transactionRequest.rowId, serviceUrl, error, e.stackTraceToString())
+                    databaseOperations.recordTransactionFailure(it, transactionRequest.rowId, rpcUrl, error, e.stackTraceToString())
                     true
                 }
 
@@ -318,5 +319,12 @@ class TransactionSubmitter(
         txStatusPollJob.cancel()
         healthCheckJob.cancel()
         web3jRequestHandler.close()
+    }
+
+    fun getTransactionErrors(rowId: Long): List<EvmSubmitTransactionError>{
+
+        return withReadConnection(storage, chainId) {
+            databaseOperations.getTransactionErrors(it, rowId)
+        }
     }
 }

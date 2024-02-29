@@ -56,8 +56,8 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
         val ERRORS_COLUMN_TIMESTAMP: Field<Timestamp> = field("timestamp", PostgresDataType.TIMESTAMP.nullable(false)
             .defaultValue(currentTimestamp()))
         val ERRORS_COLUMN_REQUEST_ID: Field<Long> = field("request_id", PostgresDataType.BIGINT.nullable(false))
-        val ERRORS_COLUMN_SERVICE_URL: Field<String> = field("service_url", PostgresDataType.TEXT.nullable(true))
-        val ERRORS_COLUMN_ERROR_MESSAGE: Field<String> = field("error_message", PostgresDataType.TEXT.nullable(false))
+        val ERRORS_COLUMN_RPC_URL: Field<String> = field("rpc_url", PostgresDataType.TEXT.nullable(true))
+        val ERRORS_COLUMN_MESSAGE: Field<String> = field("message", PostgresDataType.TEXT.nullable(false))
         val ERRORS_COLUMN_STACK_TRACE: Field<String> = field("stack_trace", PostgresDataType.TEXT.nullable(true))
     }
 
@@ -89,8 +89,8 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
             jooq.createTableIfNotExists(errorsTable)
                 .column(ERRORS_COLUMN_TIMESTAMP)
                 .column(ERRORS_COLUMN_REQUEST_ID)
-                .column(ERRORS_COLUMN_SERVICE_URL)
-                .column(ERRORS_COLUMN_ERROR_MESSAGE)
+                .column(ERRORS_COLUMN_RPC_URL)
+                .column(ERRORS_COLUMN_MESSAGE)
                 .column(ERRORS_COLUMN_STACK_TRACE)
                 .execute()
         }
@@ -153,8 +153,8 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
     override fun recordTransactionFailure(
         ctx: EContext,
         requestId: Long,
-        serviceUrl: String?,
-        errorMessage: String,
+        rpcUrl: String?,
+        message: String,
         stackTrace: String?
     ) {
         DatabaseAccess.of(ctx).apply {
@@ -163,8 +163,8 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
             jooq.insertInto(table(tableEvmErrors(ctx)))
                 .set(ERRORS_COLUMN_TIMESTAMP, currentTimestamp())
                 .set(ERRORS_COLUMN_REQUEST_ID, requestId)
-                .set(ERRORS_COLUMN_SERVICE_URL, serviceUrl)
-                .set(ERRORS_COLUMN_ERROR_MESSAGE, errorMessage)
+                .set(ERRORS_COLUMN_RPC_URL, rpcUrl)
+                .set(ERRORS_COLUMN_MESSAGE, message)
                 .set(ERRORS_COLUMN_STACK_TRACE, stackTrace)
                 .execute()
         }
@@ -223,6 +223,21 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
             return jooq.select().from(tableEvmTransaction(ctx))
                     .where(TRANSACTIONS_COLUMN_STATUS.eq(TransactionStatus.SUCCESS.name).or(TRANSACTIONS_COLUMN_STATUS.eq(TransactionStatus.FAILURE.name)).and(TRANSACTIONS_COLUMN_NETWORK_ID.eq(networkId).and(TRANSACTIONS_COLUMN_ACTIVE.eq(true))))
                     .fetchMap(TRANSACTIONS_COLUMN_REQUEST_ID, evmSubmitTransactionResultRecordMapper)
+        }
+    }
+
+    override fun getTransactionErrors(ctx: EContext, requestId: Long): List<EvmSubmitTransactionError> {
+        DatabaseAccess.of(ctx).apply {
+            val jooq = createJooq(ctx)
+
+            return jooq.select().from(tableEvmErrors(ctx))
+                .where(ERRORS_COLUMN_REQUEST_ID.eq(requestId))
+                .fetch { EvmSubmitTransactionError(
+                    it.get(ERRORS_COLUMN_REQUEST_ID),
+                    it.get(ERRORS_COLUMN_TIMESTAMP),
+                    it.get(ERRORS_COLUMN_RPC_URL),
+                    it.get(ERRORS_COLUMN_MESSAGE)
+                ) }
         }
     }
 
