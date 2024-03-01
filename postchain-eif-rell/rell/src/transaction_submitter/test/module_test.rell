@@ -58,20 +58,22 @@ function test_fetch_oldest_queued_transactions_per_contract(){
 function test_fetch_oldest_queued_transactions_per_contract_and_taken_by() {
 
     // Submit 2 transactions
+    rell.test.set_next_block_time(1);
+    rell.test.block().run();
     rell.test.tx().op(
-        create_evm_submit_transaction_operation(evm_submit_transaction_message(
-            contract_address = "address",
-            function_name = "myFunction-1",
-            parameter_types = list(),
-            parameter_values = list(),
-            network_id = 1), x""),
-        create_evm_submit_transaction_operation(evm_submit_transaction_message(
-            contract_address = "address1",
-            function_name = "myFunction-2",
-            parameter_types = list(),
-            parameter_values = list(),
-            network_id = 1), x"")
-        ).run();
+        create_test_evm_submit_transaction(
+            x"00",
+            "address",
+            "myFunction-1",
+            transaction_status.QUEUED,
+            get_last_blocktime()),
+        create_test_evm_submit_transaction(
+            x"01",
+            "address1",
+            "myFunction-2",
+            transaction_status.QUEUED,
+            get_last_blocktime())
+    ).run();
 
     assert_equals(fetch_oldest_queued_transactions_per_contract().size(), 2);
 
@@ -101,12 +103,47 @@ function test_fetch_oldest_queued_transactions_per_contract_and_taken_by() {
     assert_true(empty(evm_submit_transaction_taken_by @* {}));
 }
 
+function test_fetch_oldest_queued_transactions_per_contract_and_rate_limit() {
+
+    // Submit 2 transactions
+    rell.test.set_next_block_time(1);
+    rell.test.block().run();
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(
+            x"00",
+            "address",
+            "myFunction-1",
+            transaction_status.QUEUED,
+            get_last_blocktime()),
+        create_test_evm_submit_transaction(
+            x"01",
+            "address",
+            "myFunction-1",
+            transaction_status.QUEUED,
+            get_last_blocktime())
+    ).run();
+
+    assert_equals(fetch_oldest_queued_transactions_per_contract().size(), 1);
+
+    // Take one
+    rell.test.tx().op(
+        update_evm_transaction_state_op(1, transaction_status.TAKEN)
+    ).sign(rell.test.keypairs.alice).run();
+
+    assert_equals(fetch_oldest_queued_transactions_per_contract().size(), 0);
+
+    rell.test.set_next_block_time(70001);
+    rell.test.block().run();
+
+    assert_equals(fetch_oldest_queued_transactions_per_contract().size(), 1);
+}
+
 function test_fail_transactions_with_enough_retries_strategy_all() {
 
     // Submit 2 transactions - 1 not to be touched, 1 to be failed
     rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "address", "myFunction-0", transaction_status.QUEUED),
-        create_test_evm_submit_transaction(x"01", "address", "myFunction-1", transaction_status.QUEUED),
+        create_test_evm_submit_transaction(x"00", "address", "myFunction-0", transaction_status.QUEUED, 1),
+        create_test_evm_submit_transaction(x"01", "address", "myFunction-1", transaction_status.QUEUED, 1),
         add_transaction_taken_by(x"01", rell.test.keypairs.alice.pub),
         fail_transactions_with_enough_retries_op(node_retry_strategy.ALL)
         ).run();
@@ -121,9 +158,11 @@ function test_fail_transactions_with_enough_retries_strategy_all() {
 function test_fail_transactions_with_enough_retries_strategy_supermajority() {
 
     // Submit 1 transactions - 1 with super majority and 1 without
+    rell.test.set_next_block_time(1);
+    rell.test.block().run();
     rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "address", "myFunction-0", transaction_status.QUEUED),
-        create_test_evm_submit_transaction(x"01", "address", "myFunction-1", transaction_status.QUEUED),
+        create_test_evm_submit_transaction(x"00", "address", "myFunction-0", transaction_status.QUEUED, 1),
+        create_test_evm_submit_transaction(x"01", "address", "myFunction-1", transaction_status.QUEUED, 1),
         add_transaction_taken_by(x"01", rell.test.keypairs.alice.pub)
         ).run();
 
@@ -158,7 +197,7 @@ function test_is_supermajority() {
 function test_add_evm_transaction_errors() {
 
     rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "address", "myFunction-0", transaction_status.FAILURE)
+        create_test_evm_submit_transaction(x"00", "address", "myFunction-0", transaction_status.FAILURE, 0)
     ).run();
 
     val transaction_row_id = evm_submit_transaction @ { .id == x"00" } (.rowid);
@@ -184,4 +223,22 @@ function test_add_evm_transaction_errors() {
     assert_equals(errors[1].provider, rell.test.keypairs.alice.pub);
     assert_equals(errors[1].rpc_url, "http://evm-1:12345");
     assert_equals(errors[1].message, "Connection issue");
+}
+
+function test_timeout_evm_transaction(){
+    rell.test.set_next_block_time(1);
+    rell.test.block().run();
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+    ).run();
+
+    rell.test.set_next_block_time(86400000);
+    rell.test.block().run();
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"01", "address1","myFunction", transaction_status.QUEUED, 86400000)
+    ).run();
+    rell.test.block().run();
+
+    val tx = evm_submit_transaction @ {.status == transaction_status.FAILURE};
+    assert_true(tx.contract_address == "address");
 }

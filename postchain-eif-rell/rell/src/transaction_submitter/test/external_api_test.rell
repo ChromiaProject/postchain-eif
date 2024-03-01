@@ -70,9 +70,9 @@ function test_query_transaction_receipt() {
 function test_get_transaction_error_data() {
 
     rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "address", "myFunction-0", transaction_status.FAILURE),
-        create_test_evm_submit_transaction(x"01", "address", "myFunction-1", transaction_status.QUEUED),
-        create_test_evm_submit_transaction(x"02", "address", "myFunction-2", transaction_status.TAKEN)
+        create_test_evm_submit_transaction(x"00", "address", "myFunction-0", transaction_status.FAILURE, 0),
+        create_test_evm_submit_transaction(x"01", "address", "myFunction-1", transaction_status.QUEUED, 0),
+        create_test_evm_submit_transaction(x"02", "address", "myFunction-2", transaction_status.TAKEN, 0)
     ).run();
 
     val transaction_0_row_id = evm_submit_transaction @ { .id == x"00" } (.rowid);

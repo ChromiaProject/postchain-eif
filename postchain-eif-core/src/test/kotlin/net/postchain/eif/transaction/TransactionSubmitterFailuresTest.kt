@@ -47,7 +47,8 @@ class TransactionSubmitterFailuresTest : MockedBaseTransactionSubmitterTest() {
                     listOf(),
                     0L,
                     "".toByteArray(),
-                    RellTransactionStatus.TAKEN
+                    RellTransactionStatus.TAKEN,
+                    System.currentTimeMillis()
                 )
             )
         }
@@ -88,7 +89,8 @@ class TransactionSubmitterFailuresTest : MockedBaseTransactionSubmitterTest() {
                     listOf(),
                     0L,
                     "".toByteArray(),
-                    RellTransactionStatus.TAKEN
+                    RellTransactionStatus.TAKEN,
+                    System.currentTimeMillis()
                 )
             )
         }
@@ -130,7 +132,8 @@ class TransactionSubmitterFailuresTest : MockedBaseTransactionSubmitterTest() {
                     listOf(),
                     0L,
                     "".toByteArray(),
-                    RellTransactionStatus.TAKEN
+                    RellTransactionStatus.TAKEN,
+                    System.currentTimeMillis()
                 )
             )
         }
@@ -181,7 +184,8 @@ class TransactionSubmitterFailuresTest : MockedBaseTransactionSubmitterTest() {
                     listOf(),
                     0L,
                     "".toByteArray(),
-                    RellTransactionStatus.TAKEN
+                    RellTransactionStatus.TAKEN,
+                    System.currentTimeMillis()
                 )
             )
         }
@@ -231,7 +235,8 @@ class TransactionSubmitterFailuresTest : MockedBaseTransactionSubmitterTest() {
             mutableMapOf(),
             mutableMapOf(),
             BigInteger.valueOf(10),
-            Long.MAX_VALUE
+            Long.MAX_VALUE,
+            24 * 60 * 60000
         )
     }
 }

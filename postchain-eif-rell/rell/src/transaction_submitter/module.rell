@@ -1,6 +1,14 @@
 import .utils.messaging.*;
 import .utils.*;
 
+function timeout_evm_transactions() {
+    val timeout_timestamp = get_last_blocktime() - chain_context.args.tx_timeout;
+    val row_ids = evm_submit_transaction @* { .timestamp < timeout_timestamp } ( .rowid );
+    for (row_id in row_ids) {
+        update evm_submit_transaction @ { row_id } (status = transaction_status.FAILURE);
+    }
+}
+
 operation __icmf_message(sender: byte_array, topic: text, body: gtv) {
     create_evm_submit_transaction(evm_submit_transaction_message.from_gtv(body), sender);
 }
@@ -18,6 +26,7 @@ operation __add_evm_transaction_errors(row_id: integer, errors: list<transaction
 }
 
 operation __begin_block(height: integer) {
+    timeout_evm_transactions();
     fail_transactions_with_enough_retries(chain_context.args.node_retry_strategy);
 }
 
@@ -30,7 +39,8 @@ entity evm_submit_transaction {
     network_id: integer;
     sender: byte_array;
     index mutable status: transaction_status;
-    index mutable queued_timestamp: timestamp;
+    index mutable timestamp: timestamp;
+    index mutable taken_timestamp: timestamp;
     mutable block_hash: text = "";
     mutable effective_gas_price: big_integer = -1;
     mutable gas_usage: big_integer = -1;
@@ -58,7 +68,7 @@ struct evm_submit_transaction_data {
     network_id: integer;
     sender: byte_array;
     status: transaction_status;
-    queued_timestamp: timestamp;
+    timestamp: timestamp;
 }
 
 enum transaction_status {
@@ -66,7 +76,7 @@ enum transaction_status {
     TAKEN,
     PENDING,
     SUCCESS,
-    FAILURE,
+    FAILURE
 }
 
 enum node_retry_strategy {
@@ -77,6 +87,7 @@ enum node_retry_strategy {
 struct module_args {
     contract_whitelist: text;
     contract_tx_rate_limit: big_integer;
+    tx_timeout: big_integer;
     node_retry_strategy;
 }
 
@@ -112,24 +123,31 @@ function create_evm_submit_transaction(evm_submit_transaction_message: evm_submi
         network_id = evm_submit_transaction_message.network_id,
         sender = sender,
         status = transaction_status.QUEUED,
-        queued_timestamp = op_context.last_block_time
+        timestamp = op_context.last_block_time,
+        taken_timestamp = 0
     );
 }
 
 query fetch_oldest_queued_transactions_per_contract(exclude_taken_by_key: pubkey? = null) {
-
     val result = list<evm_submit_transaction_data>();
-    val oldest_queued_transactions_per_contract =
+    val contract_addresses_with_eligible_queued_transaction =
         evm_submit_transaction @* {
             .status == transaction_status.QUEUED,
             .rowid not in evm_submit_transaction_taken_by @* { .provider == exclude_taken_by_key ?: x"" } ( .transaction.rowid )
-    } ( @group .contract_address, @min .queued_timestamp );
+    } ( @group .contract_address, @omit @min .timestamp );
 
-    for (transaction in oldest_queued_transactions_per_contract) {
-        val contract_address = transaction[0];
-        val queued_timestamp = transaction[1];
-        if (get_last_blocktime() - queued_timestamp > chain_context.args.contract_tx_rate_limit) {
-            val evm_submit_transaction = evm_submit_transaction @ { .status == transaction_status.QUEUED and .contract_address == contract_address and .queued_timestamp == queued_timestamp} (
+    val last_blocktime = get_last_blocktime();
+    for (contract_address in contract_addresses_with_eligible_queued_transaction) {
+        val latest_taken_transaction_timestamp = evm_submit_transaction @? {
+            .status == transaction_status.TAKEN,
+            .contract_address == contract_address
+        } ( @max .taken_timestamp ) ?: chain_context.args.contract_tx_rate_limit.to_integer() * -1;
+        if (last_blocktime - latest_taken_transaction_timestamp >= chain_context.args.contract_tx_rate_limit) {
+            val evm_submit_transaction = evm_submit_transaction @ {
+                .status == transaction_status.QUEUED,
+                .contract_address == contract_address,
+                .rowid not in evm_submit_transaction_taken_by @* { .provider == exclude_taken_by_key ?: x"" } ( .transaction.rowid )
+            } (
                 evm_submit_transaction_data(
                     row_id = .rowid.to_integer(),
                     contract_address = .contract_address,
@@ -139,7 +157,7 @@ query fetch_oldest_queued_transactions_per_contract(exclude_taken_by_key: pubkey
                     network_id = .network_id,
                     sender = .sender,
                     status = .status,
-                    queued_timestamp = .queued_timestamp))
+                    timestamp = .timestamp))
             limit 1;
             result.add(evm_submit_transaction);
         }
@@ -213,7 +231,7 @@ function update_evm_transaction_state(row_id: integer, status: transaction_statu
     transaction.status = status;
 
     if (status == transaction_status.TAKEN) {
-
+        transaction.taken_timestamp = get_last_blocktime();
         for (signer in op_context.get_signers()) {
             create evm_submit_transaction_taken_by(transaction, signer);
         }

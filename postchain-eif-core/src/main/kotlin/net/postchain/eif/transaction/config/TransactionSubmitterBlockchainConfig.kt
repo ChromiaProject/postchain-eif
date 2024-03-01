@@ -6,5 +6,7 @@ data class TransactionSubmitterBlockchainConfig(
         @Name("chains")
         val chains: Map<String, NetworkBlockchainConfig>,
         @Name("gas_limit")
-        val gasLimit: Long
+        val gasLimit: Long,
+        @Name("node_tx_timeout")
+        val nodeTxTimeout: Long
 )

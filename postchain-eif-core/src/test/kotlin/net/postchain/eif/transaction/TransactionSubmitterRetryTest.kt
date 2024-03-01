@@ -72,7 +72,8 @@ class TransactionSubmitterRetryTest : EifBaseIntegrationTest(
                 listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
             1337,
             BlockchainRid.ZERO_RID.data,
-            RellTransactionStatus.QUEUED
+            RellTransactionStatus.QUEUED,
+            System.currentTimeMillis()
         )
         txSubmitterTestModule.addTxToQueue(evmSubmitTransactionRequest)
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {

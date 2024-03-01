@@ -31,6 +31,7 @@ test:
     transaction_submitter:
       contract_whitelist: "address,address1"
       contract_tx_rate_limit: 60000
+      tx_timeout: 86400000 #24h
       node_retry_strategy: SUPERMAJORITY
 
 blockchains:
@@ -52,6 +53,7 @@ blockchains:
         # TODO add addresses
         contract_whitelist: "" # Comma separated list since Rell does not support list type as module arg
         contract_tx_rate_limit: 60000
+        tx_timeout: 86400000 #24h
         node_retry_strategy: SUPERMAJORITY
     config:
       gtx:
@@ -61,6 +63,7 @@ blockchains:
       transaction_submitter:
         chains:
           goerli: 5
+        node_tx_timeout: 86400000 #24h
       sync_ext:
         - "net.postchain.eif.transaction.TransactionSubmitterSynchronizationInfrastructureExtension"
         - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"

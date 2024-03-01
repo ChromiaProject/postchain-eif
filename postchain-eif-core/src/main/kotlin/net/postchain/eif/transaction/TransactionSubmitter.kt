@@ -45,7 +45,8 @@ class TransactionSubmitter(
     initPendingTransactions: Map<String, EvmSubmitTransactionRequest>,
     initCompletedTransactions: Map<Long, EvmSubmitTransactionResult>,
     private val minWalletBalance: BigInteger,
-    private val healthCheckInterval: Long
+    private val healthCheckInterval: Long,
+    private val txTimeout: Long
 ) : Shutdownable {
 
     companion object : KLogging()
@@ -133,8 +134,26 @@ class TransactionSubmitter(
     }
 
     private fun pollPendingTransactions() {
-        val successfulTxs = mutableListOf<String>()
+        val processedTransactions = mutableListOf<String>()
         pendingTransactions.forEach { (txHash, txRequest) ->
+            try {
+                isTimeout(txRequest)
+            } catch (e: EvmTransactionTimeoutException){
+                withWriteConnection(storage, chainId) {
+                    databaseOperations.failTransaction(it, txRequest.rowId)
+                    databaseOperations.recordTransactionFailure(
+                            it,
+                            txRequest.rowId,
+                            null,
+                            e.message ?: "Timeout",
+                            e.stackTraceToString()
+                    )
+                    true
+                }
+                processedTransactions.add(txHash)
+                completedTransactions[txRequest.rowId] = EvmSubmitTransactionResult(RellTransactionStatus.QUEUED)
+                return
+            }
             val txReceiptOpt = try {
                 web3jRequestHandler.sendWeb3jRequest { it.ethGetTransactionReceipt(txHash) }
             } catch (e: Exception) {
@@ -168,16 +187,16 @@ class TransactionSubmitter(
                         effectiveGasPrice.longValueExact(),
                         txReceipt.gasUsed.longValueExact()
                 )
-                successfulTxs.add(txHash)
+                processedTransactions.add(txHash)
             }
         }
 
-        successfulTxs.forEach(pendingTransactions::remove)
+        processedTransactions.forEach(pendingTransactions::remove)
     }
 
-    internal fun submitTransaction(transactionRequest: EvmSubmitTransactionRequest): EthSendTransaction {
+    internal fun submitTransaction(transactionRequest: EvmSubmitTransactionRequest) {
         try {
-            return sendTransaction(transactionRequest)
+            sendTransaction(transactionRequest)
         } catch (e: Exception) {
 
             val errorMessage = e.message ?: "Unknown error"
@@ -192,8 +211,8 @@ class TransactionSubmitter(
         }
     }
 
-    private fun sendTransaction(transactionRequest: EvmSubmitTransactionRequest): EthSendTransaction {
-
+    private fun sendTransaction(transactionRequest: EvmSubmitTransactionRequest) {
+        isTimeout(transactionRequest)
         val fromAddress = transactionManagers.values.first().fromAddress
         val walletBalance = try {
             web3jRequestHandler.sendWeb3jRequest { it.ethGetBalance(fromAddress, DefaultBlockParameterName.LATEST) }
@@ -261,8 +280,7 @@ class TransactionSubmitter(
                     true
                 }
                 pendingTransactions[response.transactionHash] = transactionRequest
-                return response
-
+                return
             } catch (e: Exception) {
 
                 val error = "Failed to send transaction ${transactionRequest.rowId}: ${e.message}"
@@ -314,6 +332,13 @@ class TransactionSubmitter(
         completedTransactions.remove(rowId)
     }
 
+    private fun isTimeout(transactionRequest: EvmSubmitTransactionRequest) {
+        if (System.currentTimeMillis() - transactionRequest.timestamp > txTimeout) {
+            logger.warn{"Transaction ${transactionRequest.rowId} with status ${transactionRequest.status} and timestamp: ${transactionRequest.timestamp} is timeout."}
+            throw EvmTransactionTimeoutException(transactionRequest)
+        }
+    }
+
     override fun shutdown() {
         txSubmitJob.cancel()
         txStatusPollJob.cancel()
@@ -328,3 +353,5 @@ class TransactionSubmitter(
         }
     }
 }
+
+class EvmTransactionTimeoutException(evmTransaction: EvmSubmitTransactionRequest) : RuntimeException("${evmTransaction.status} transaction is timeout.")
