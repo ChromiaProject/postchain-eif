@@ -17,7 +17,7 @@ operation create_evm_submit_transaction_op(contract_address: text, function_name
 
 operation update_evm_submit_transaction_queued_timestamp_op(contract_address: text, function_name: text){
     val id = get_evm_transaction_id(contract_address, function_name, list(), list(), 1);
-    update evm_submit_transaction @ { .id == id} (queued_timestamp = op_context.last_block_time);
+    update evm_submit_transaction @ { .id == id} (timestamp = op_context.last_block_time, status = transaction_status.QUEUED);
 }
 
 operation update_evm_transaction_status_helper_op(row_id: rowid, status: transaction_status) {
@@ -48,19 +48,24 @@ operation fail_transactions_with_enough_retries_op(node_retry_strategy) {
     fail_transactions_with_enough_retries(node_retry_strategy);
 }
 
-operation create_test_evm_submit_transaction(id: byte_array, contract_address: text, function_name: text, status: transaction_status) {
+operation create_test_evm_submit_transaction(id: byte_array, contract_address: text, function_name: text, status: transaction_status, timestamp: timestamp) {
     create evm_submit_transaction (
         id = id,
         contract_address = contract_address,
         function_name = function_name,
         parameter_types = "",
-        parameter_values = x"",
+        parameter_values = list<text>().to_gtv().to_bytes(),
         network_id = 1,
         sender = x"",
         status = status,
-        queued_timestamp = 0);
+        timestamp = timestamp,
+        taken_timestamp = 0);
 }
 
 operation add_evm_transaction_errors_op(row_id: integer, errors: list<transaction_error_data>) {
     add_evm_transaction_errors(row_id, errors);
+}
+
+operation timeout_evm_transactions_op(){
+    timeout_evm_transactions();
 }

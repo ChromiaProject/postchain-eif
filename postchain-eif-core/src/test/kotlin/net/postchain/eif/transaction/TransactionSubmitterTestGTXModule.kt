@@ -36,7 +36,8 @@ class TransactionSubmitterQueuedTransactionTestGTXModule : TransactionSubmitterT
                 listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
         1337,
         BlockchainRid.ZERO_RID.data,
-        RellTransactionStatus.QUEUED
+        RellTransactionStatus.QUEUED,
+        System.currentTimeMillis()
         ), 1337L)
     }
 }
@@ -44,6 +45,7 @@ class TransactionSubmitterQueuedTransactionTestGTXModule : TransactionSubmitterT
 class TransactionSubmitterPendingTransactionTestGTXModule : TransactionSubmitterTestGTXModule(){
     companion object {
         var TRANSACTION_HASH = ""
+        var TIMESTAMP = System.currentTimeMillis()
     }
 
     override fun initializeDB(ctx: EContext) {
@@ -57,7 +59,8 @@ class TransactionSubmitterPendingTransactionTestGTXModule : TransactionSubmitter
                 listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
                 1337,
                 BlockchainRid.ZERO_RID.data,
-                RellTransactionStatus.QUEUED
+                RellTransactionStatus.QUEUED,
+                TIMESTAMP
         ), 1337L)
         transactionSubmitterDatabaseOperations.recordTransactionGas(ctx, 0, BigInteger.ONE, BigInteger.TEN)
         transactionSubmitterDatabaseOperations.pendTransaction(ctx,0, TRANSACTION_HASH)
@@ -78,7 +81,8 @@ class TransactionSubmitterSuccessfulTransactionTestGTXModule : TransactionSubmit
                 listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
                 1337,
                 BlockchainRid.ZERO_RID.data,
-                RellTransactionStatus.QUEUED
+                RellTransactionStatus.QUEUED,
+                System.currentTimeMillis()
         ), 1337L)
         transactionSubmitterDatabaseOperations.recordTransactionGas(ctx, 0, BigInteger.ONE, BigInteger.TEN)
         transactionSubmitterDatabaseOperations.succeedTransaction(ctx,0,BigInteger.valueOf(4100000000),BigInteger.valueOf(21332),"0x499450bc3d3a1028d7c86cfaf04ccc4e8080bbf1b32c95bab819cb8abe9abfb3")
@@ -98,7 +102,8 @@ class TransactionSubmitterFailTransactionTestGTXModule : TransactionSubmitterTes
                 listOf(gtv(1)), // wrong type
                 1337,
                 BlockchainRid.ZERO_RID.data,
-                RellTransactionStatus.QUEUED
+                RellTransactionStatus.QUEUED,
+                System.currentTimeMillis()
         ), 1337L)
     }
 }

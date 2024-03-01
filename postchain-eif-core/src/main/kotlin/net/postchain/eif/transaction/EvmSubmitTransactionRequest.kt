@@ -11,6 +11,7 @@ import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.TRANSACTIONS_COLUMN_REQUEST_ID
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.TRANSACTIONS_COLUMN_SENDER
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.TRANSACTIONS_COLUMN_STATUS
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.TRANSACTIONS_COLUMN_TIMESTAMP
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvDecoder
 import net.postchain.gtv.mapper.Name
@@ -33,7 +34,9 @@ data class EvmSubmitTransactionRequest(
         @Name("sender")
         val sender: ByteArray,
         @Name("status")
-        val status: RellTransactionStatus
+        val status: RellTransactionStatus,
+        @Name("timestamp")
+        val timestamp: Long
 )
 
 enum class RellTransactionStatus {
@@ -53,7 +56,8 @@ val evmSubmitTransactionRequestRecordMapper = RecordMapper<Record, EvmSubmitTran
             GtvDecoder.decodeGtv(it.get(TRANSACTIONS_COLUMN_PARAMETER_VALUES)).asArray().toList(),
             it.get(TRANSACTIONS_COLUMN_NETWORK_ID),
             it.get(TRANSACTIONS_COLUMN_SENDER),
-            RellTransactionStatus.valueOf(it.get(TRANSACTIONS_COLUMN_STATUS))
+            RellTransactionStatus.valueOf(it.get(TRANSACTIONS_COLUMN_STATUS)),
+            it.get(TRANSACTIONS_COLUMN_TIMESTAMP)
     )
 }
 

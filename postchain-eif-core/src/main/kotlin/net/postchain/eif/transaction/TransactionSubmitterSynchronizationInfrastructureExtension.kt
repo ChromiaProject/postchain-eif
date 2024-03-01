@@ -61,6 +61,7 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                         web3jServicesMap.map { it.key to RawTransactionManager(it.value, credentials) }
                             .toMap()
                     val gasProvider = StaticGasProvider(BigInteger.valueOf(networkBlockchainConfig.maxGasPrice), BigInteger.valueOf(transactionSubmitterBlockchainConfig.gasLimit))
+                    val nodeTxTimeout = transactionSubmitterBlockchainConfig.nodeTxTimeout
                     val queue = LinkedList<EvmSubmitTransactionRequest>()
                     val pendingTransactions = mutableMapOf<String, EvmSubmitTransactionRequest>()
                     val completedTransactions = mutableMapOf<Long, EvmSubmitTransactionResult>()
@@ -82,7 +83,8 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                             pendingTransactions,
                             completedTransactions,
                             BigInteger.valueOf(networkBlockchainConfig.minWalletBalance),
-                            appConfig.healthCheckInterval
+                            appConfig.healthCheckInterval,
+                            nodeTxTimeout
                     )
                     transactionSubmitters[networkId] = transactionSubmitter
                     ext.addTransactionSubmitter(transactionSubmitter, networkId)

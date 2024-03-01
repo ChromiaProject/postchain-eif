@@ -85,7 +85,8 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(
                 listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
                 1337,
                 BlockchainRid.ZERO_RID.data,
-                RellTransactionStatus.QUEUED
+                RellTransactionStatus.QUEUED,
+                System.currentTimeMillis()
         )
         txSubmitterTestModule.addTxToQueue(evmSubmitTransactionRequest)
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
@@ -262,7 +263,8 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(
                 listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
                 1337,
                 BlockchainRid.ZERO_RID.data,
-                RellTransactionStatus.QUEUED
+                RellTransactionStatus.QUEUED,
+                System.currentTimeMillis()
         )
         txSubmitterTestModule.addTxToQueue(evmSubmitTransactionRequest)
 
@@ -274,6 +276,56 @@ class TransactionSubmitterTest : EifBaseIntegrationTest(
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
             assertTrue(txSubmitterTestModule.conf.queuedTxs.contains(0))
+        }
+    }
+
+    @Test
+    fun `timeout queued transaction`() {
+        val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config.xml")
+        val node = nodes[0]
+
+        val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
+
+        val evmSubmitTransactionRequest = EvmSubmitTransactionRequest(
+                0,
+                contractAddress,
+                "updateValidators",
+                listOf("uint", "address"),
+                listOf(gtv(1), gtv(ByteArray(20))),
+                1337,
+                BlockchainRid.ZERO_RID.data,
+                RellTransactionStatus.QUEUED,
+                System.currentTimeMillis() - 25 * 60 * 60000
+        )
+        txSubmitterTestModule.addTxToQueue(evmSubmitTransactionRequest)
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            buildBlock(1L)
+            assertTrue(txSubmitterTestModule.conf.queuedTxs.contains(0))
+        }
+
+        withDbTransaction(node, evmSubmitTransactionRequest.rowId) {
+            assertThat(it.get(TRANSACTIONS_COLUMN_STATUS)).isEqualTo(TransactionStatus.FAILURE.name)
+        }
+    }
+
+    @Test
+    fun `timeout pending transaction`() {
+        val sendTransaction = transactionManager.sendTransaction(BigInteger.valueOf(4100000000), BigInteger.valueOf(9000000), contractAddress, "0x4b56175300000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000", BigInteger.valueOf(0))
+
+        TransactionSubmitterPendingTransactionTestGTXModule.TRANSACTION_HASH = sendTransaction.transactionHash
+        TransactionSubmitterPendingTransactionTestGTXModule.TIMESTAMP = System.currentTimeMillis() - 25 * 60 * 60000
+        val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config_pending.xml")
+        val node = nodes[0]
+
+        val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterPendingTransactionTestGTXModule>().first()
+
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            buildBlock(1L)
+            assertTrue(txSubmitterTestModule.conf.queuedTxs.contains(0))
+        }
+
+        withDbTransaction(node, 0) {
+            assertThat(it.get(TRANSACTIONS_COLUMN_STATUS)).isEqualTo(TransactionStatus.FAILURE.name)
         }
     }
 }
