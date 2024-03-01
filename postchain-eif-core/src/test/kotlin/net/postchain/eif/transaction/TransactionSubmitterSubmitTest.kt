@@ -15,12 +15,10 @@ import org.mockito.kotlin.verify
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.methods.response.EthGetBalance
-import org.web3j.tx.TransactionManager
 import org.web3j.tx.gas.ContractGasProvider
 import java.math.BigInteger
-import java.util.concurrent.LinkedBlockingQueue
 
-class TransactionSubmitterFailuresTest : MockedBaseTransactionSubmitterTest() {
+class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
 
     @Test
     fun `fail getting balance`() {
@@ -47,16 +45,14 @@ class TransactionSubmitterFailuresTest : MockedBaseTransactionSubmitterTest() {
                     listOf(),
                     0L,
                     "".toByteArray(),
-                    RellTransactionStatus.TAKEN,
                     System.currentTimeMillis()
                 )
             )
         }
         assertThat(exception.message).isEqualTo("Failed to get balance for request id 0: Oh dear")
 
-        assertThat(mockingDetails(databaseOperations).invocations.size).isEqualTo(2)
-        verify(databaseOperations).failTransaction(any(), eq(0L))
-        verify(databaseOperations).recordTransactionFailure(
+        assertThat(mockingDetails(databaseOperations).invocations.size).isEqualTo(1)
+        verify(databaseOperations).recordTransactionError(
             any(),
             eq(0L),
             eq(null),
@@ -89,17 +85,15 @@ class TransactionSubmitterFailuresTest : MockedBaseTransactionSubmitterTest() {
                     listOf(),
                     0L,
                     "".toByteArray(),
-                    RellTransactionStatus.TAKEN,
                     System.currentTimeMillis()
                 )
             )
         }
         assertThat(exception.message).isEqualTo("Failed to get estimated gas usage for request id 0: Failed to get gas estimate")
 
-        assertThat(mockingDetails(databaseOperations).invocations.size).isEqualTo(3)
-        verify(databaseOperations).failTransaction(any(), eq(0L))
+        assertThat(mockingDetails(databaseOperations).invocations.size).isEqualTo(2)
         verify(databaseOperations).recordTransactionGas(any(), eq(0L), eq(BigInteger.valueOf(5)), eq(BigInteger.valueOf(10)))
-        verify(databaseOperations).recordTransactionFailure(
+        verify(databaseOperations).recordTransactionError(
             any(),
             eq(0L),
             eq(null),
@@ -132,24 +126,22 @@ class TransactionSubmitterFailuresTest : MockedBaseTransactionSubmitterTest() {
                     listOf(),
                     0L,
                     "".toByteArray(),
-                    RellTransactionStatus.TAKEN,
                     System.currentTimeMillis()
                 )
             )
         }
         assertThat(exception.message).isEqualTo("Failed to send transaction to all 1 nodes")
 
-        assertThat(mockingDetails(databaseOperations).invocations.size).isEqualTo(4)
-        verify(databaseOperations).failTransaction(any(), eq(0L))
+        assertThat(mockingDetails(databaseOperations).invocations.size).isEqualTo(3)
         verify(databaseOperations).recordTransactionGas(any(), eq(0L), eq(BigInteger.valueOf(5)), eq(BigInteger.valueOf(10)))
-        verify(databaseOperations).recordTransactionFailure(
+        verify(databaseOperations).recordTransactionError(
             any(),
             eq(0L),
             eq("http://127.0.0.1:9999"),
             eq("Failed to send transaction 0: Oh dear"),
             anyString()
         )
-        verify(databaseOperations).recordTransactionFailure(
+        verify(databaseOperations).recordTransactionError(
             any(),
             eq(0L),
             eq(null),
@@ -184,59 +176,34 @@ class TransactionSubmitterFailuresTest : MockedBaseTransactionSubmitterTest() {
                     listOf(),
                     0L,
                     "".toByteArray(),
-                    RellTransactionStatus.TAKEN,
                     System.currentTimeMillis()
                 )
             )
         }
         assertThat(exception.message).isEqualTo("Failed to send transaction to all 2 nodes")
 
-        assertThat(mockingDetails(databaseOperations).invocations.size).isEqualTo(5)
-        verify(databaseOperations).failTransaction(any(), eq(0L))
+        assertThat(mockingDetails(databaseOperations).invocations.size).isEqualTo(4)
         verify(databaseOperations).recordTransactionGas(any(), eq(0L), eq(BigInteger.valueOf(5)), eq(BigInteger.valueOf(10)))
-        verify(databaseOperations).recordTransactionFailure(
+        verify(databaseOperations).recordTransactionError(
             any(),
             eq(0L),
             eq("http://evm-node-1:9999"),
             eq("Failed to send transaction 0: Oh dear"),
             anyString()
         )
-        verify(databaseOperations).recordTransactionFailure(
+        verify(databaseOperations).recordTransactionError(
             any(),
             eq(0L),
             eq("http://evm-node-2:9999"),
             eq("Failed to send transaction 0: Web3j request failed with error code: 404 and message: Not found"),
             anyString()
         )
-        verify(databaseOperations).recordTransactionFailure(
+        verify(databaseOperations).recordTransactionError(
             any(),
             eq(0L),
             eq(null),
             eq("Failed to send transaction to all 2 nodes"),
             anyString()
-        )
-    }
-
-    private fun createTransactionSubmitter(
-        web3jRequestHandler: Web3jRequestHandler,
-        transactionManagers: Map<String, TransactionManager>,
-        gasProvider: ContractGasProvider
-    ): TransactionSubmitter {
-        return TransactionSubmitter(
-            web3jRequestHandler,
-            transactionManagers,
-            gasProvider,
-            databaseOperations,
-            storage,
-            0,
-            0,
-            Long.MAX_VALUE,
-            LinkedBlockingQueue(),
-            mutableMapOf(),
-            mutableMapOf(),
-            BigInteger.valueOf(10),
-            Long.MAX_VALUE,
-            24 * 60 * 60000
         )
     }
 }

@@ -14,13 +14,14 @@ import net.postchain.eif.EvmType
 import net.postchain.eif.contracts.Anchoring
 import net.postchain.eif.contracts.Validator
 import net.postchain.eif.getEthereumAddress
+import net.postchain.eif.transaction.RellTransactionStatus
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl
-import net.postchain.eif.transaction.tableEvmTransaction
+import net.postchain.eif.transaction.assertStatusOperation
+import net.postchain.eif.transaction.tableEvmTxPending
 import org.awaitility.Awaitility
 import org.awaitility.Duration
 import org.jooq.SQLDialect
 import org.jooq.impl.DSL
-import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.FunctionEncoder
@@ -63,20 +64,22 @@ class TransactionSubmitterAnchoringIT : EifBaseIntegrationTest(
 
         val txSubmitterTestModule = node.getModules(txSubmitterChain).filterIsInstance<TransactionSubmitterAnchoringTestGTXModule>().first()
 
+        txSubmitterTestModule.addGetTransactionStatus(0, RellTransactionStatus.QUEUED)
+
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(nodes.toList(), txSubmitterChain)
-            Assertions.assertTrue(txSubmitterTestModule.conf.successfulTxs.contains(0))
+            assertStatusOperation(txSubmitterTestModule, 0, RellTransactionStatus.SUCCESS)
         }
 
         val txHash = withReadConnection(node.getBlockchainInstance(txSubmitterChain).blockchainEngine.sharedStorage, txSubmitterChain) {
             val jooq = DSL.using(it.conn, SQLDialect.POSTGRES)
 
-            val tableName = DatabaseAccess.of(it).tableEvmTransaction(it)
+            val tableName = DatabaseAccess.of(it).tableEvmTxPending(it)
 
             jooq
-                    .select(TransactionSubmitterDatabaseOperationsImpl.TRANSACTIONS_COLUMN_TX_HASH)
+                    .select(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_HASH)
                     .from(tableName)
-                    .where(TransactionSubmitterDatabaseOperationsImpl.TRANSACTIONS_COLUMN_REQUEST_ID.eq(0))
+                    .where(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_REQUEST_ID.eq(0))
                     .fetchOne()
                     .value1()
         }

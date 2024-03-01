@@ -79,28 +79,10 @@ function test_fetch_oldest_queued_transactions_per_contract_and_taken_by() {
 
     // Take one
     rell.test.tx().op(
-        update_evm_transaction_state_op(1, transaction_status.TAKEN)
+        update_evm_transaction_status_op(1, transaction_status.TAKEN)
     ).sign(rell.test.keypairs.alice).run();
 
     assert_equals(fetch_oldest_queued_transactions_per_contract().size(), 1);
-
-    // Change the status back to QUEUED - it is still taken by alice
-    rell.test.tx().op(
-        sete_evm_transaction_status(1, transaction_status.QUEUED)
-    ).sign(rell.test.keypairs.alice).run();
-
-    // We are back to having 2 queued
-    assert_equals(fetch_oldest_queued_transactions_per_contract().size(), 2);
-
-    // But since one is taken we only get 1 back with the exclude_taken_by_key set
-    assert_equals(fetch_oldest_queued_transactions_per_contract(exclude_taken_by_key=rell.test.keypairs.alice.pub).size(), 1);
-
-    // Set transaction taken by alice to success - this should cleanup the taken entities for this transaction
-    rell.test.tx().op(
-        update_evm_transaction_state_op(1, transaction_status.SUCCESS)
-    ).sign(rell.test.keypairs.alice).run();
-
-    assert_true(empty(evm_submit_transaction_taken_by @* {}));
 }
 
 function test_fetch_oldest_queued_transactions_per_contract_and_rate_limit() {
@@ -127,7 +109,7 @@ function test_fetch_oldest_queued_transactions_per_contract_and_rate_limit() {
 
     // Take one
     rell.test.tx().op(
-        update_evm_transaction_state_op(1, transaction_status.TAKEN)
+        update_evm_transaction_status_op(1, transaction_status.TAKEN)
     ).sign(rell.test.keypairs.alice).run();
 
     assert_equals(fetch_oldest_queued_transactions_per_contract().size(), 0);
@@ -146,13 +128,19 @@ function test_fail_transactions_with_enough_retries_strategy_all() {
         create_test_evm_submit_transaction(x"01", "address", "myFunction-1", transaction_status.QUEUED, 1),
         add_transaction_taken_by(x"01", rell.test.keypairs.alice.pub),
         fail_transactions_with_enough_retries_op(node_retry_strategy.ALL)
-        ).run();
+    ).sign(rell.test.keypairs.alice).run();
 
     assert_equals(evm_submit_transaction @ { .id == x"00"} (.status), transaction_status.QUEUED);
 
-    val failed_transaction = evm_submit_transaction @ { .id == x"01"} (.status, .error_message);
+    val failed_transaction = (evm_submit_transaction_error, evm_submit_transaction) @ {
+        evm_submit_transaction.id == x"01",
+        evm_submit_transaction_error.transaction == evm_submit_transaction
+    } (evm_submit_transaction.status, evm_submit_transaction_error.message);
     assert_equals(failed_transaction.status, transaction_status.FAILURE);
-    assert_equals(failed_transaction.error_message, "All available nodes failed to execute transaction");
+    assert_equals(failed_transaction.message, "All available nodes failed to execute transaction");
+
+    // Taken entities cleaned up
+    assert_true(empty(evm_submit_transaction_taken_by @* {}));
 }
 
 function test_fail_transactions_with_enough_retries_strategy_supermajority() {
@@ -163,18 +151,21 @@ function test_fail_transactions_with_enough_retries_strategy_supermajority() {
     rell.test.tx().op(
         create_test_evm_submit_transaction(x"00", "address", "myFunction-0", transaction_status.QUEUED, 1),
         create_test_evm_submit_transaction(x"01", "address", "myFunction-1", transaction_status.QUEUED, 1),
-        add_transaction_taken_by(x"01", rell.test.keypairs.alice.pub)
-        ).run();
-
-    rell.test.tx().op(
+        add_transaction_taken_by(x"01", rell.test.keypairs.alice.pub),
         fail_transactions_with_enough_retries_op(node_retry_strategy.SUPERMAJORITY)
-    ).run();
+    ).sign(rell.test.keypairs.alice).run();
 
     assert_equals(evm_submit_transaction @ { .id == x"00"} (.status), transaction_status.QUEUED);
 
-    var failed_transaction = evm_submit_transaction @ { .id == x"01"} (.status, .error_message);
+    val failed_transaction = (evm_submit_transaction_error, evm_submit_transaction) @ {
+        evm_submit_transaction.id == x"01",
+        evm_submit_transaction_error.transaction == evm_submit_transaction
+    } (evm_submit_transaction.status, evm_submit_transaction_error.message);
     assert_equals(failed_transaction.status, transaction_status.FAILURE);
-    assert_equals(failed_transaction.error_message, "A supermajority of nodes failed to execute transaction");
+    assert_equals(failed_transaction.message, "A supermajority of nodes failed to execute transaction");
+
+    // Taken entities cleaned up
+    assert_true(empty(evm_submit_transaction_taken_by @* {}));
 }
 
 function test_is_supermajority() {

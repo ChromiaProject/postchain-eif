@@ -15,8 +15,8 @@ operation __icmf_message(sender: byte_array, topic: text, body: gtv) {
     create_evm_submit_transaction(evm_submit_transaction_message.from_gtv(body), sender);
 }
 
-operation __update_evm_transaction_state(row_id: integer, status: transaction_status) {
-    update_evm_transaction_state(row_id, status);
+operation __update_evm_transaction_status(row_id: integer, status: transaction_status, tx_hash: text?) {
+    update_evm_transaction_status(row_id, status, tx_hash);
 }
 
 operation __update_evm_transaction_receipt(row_id: integer, block_hash: text, effective_gas_price: big_integer, gas_usage: big_integer) {
@@ -46,7 +46,7 @@ entity evm_submit_transaction {
     mutable block_hash: text = "";
     mutable effective_gas_price: big_integer = -1;
     mutable gas_usage: big_integer = -1;
-    mutable error_message: text = "";
+    mutable tx_hash: text = "";
 }
 
 entity evm_submit_transaction_taken_by {
@@ -71,6 +71,17 @@ struct evm_submit_transaction_data {
     sender: byte_array;
     status: transaction_status;
     timestamp: timestamp;
+    ts_hash: text? = null;
+}
+
+struct evm_pending_transaction_data {
+    row_id: integer;
+    network_id: integer;
+    contract_address: text;
+    function_name: text;
+    parameter_types: list<text>;
+    parameter_values: list<gtv>;
+    tx_hash: text? = null;
 }
 
 enum transaction_status {
@@ -95,7 +106,7 @@ struct module_args {
 
 struct transaction_error_data {
     timestamp;
-    provider: pubkey? = null;
+    provider: pubkey? = null; // TODO used? remove?
     rpc_url: text?;
     message: text;
 }
@@ -179,6 +190,22 @@ query fetch_oldest_queued_transactions_per_contract(exclude_taken_by_key: pubkey
     return result;
 }
 
+query get_pending_transactions(): list<evm_pending_transaction_data> {
+
+    return evm_submit_transaction @* { .status == transaction_status.PENDING } (evm_pending_transaction_data(
+        row_id = .rowid.to_integer(),
+        network_id = .network_id,
+        contract_address = .contract_address,
+        function_name = .function_name,
+        parameter_types = .parameter_types.split("."),
+        parameter_values = list<gtv>.from_gtv(gtv.from_bytes(.parameter_values)),
+        tx_hash = .tx_hash));
+}
+
+query get_evm_transaction_status(row_id: integer): transaction_status? {
+    return evm_submit_transaction @? { rowid(row_id) }.status;
+}
+
 function fail_transactions_with_enough_retries(strategy: node_retry_strategy) {
 
     val signers = extract_number_of_signers_from_current_configuration();
@@ -189,13 +216,18 @@ function fail_transactions_with_enough_retries(strategy: node_retry_strategy) {
     } ( @group evm_submit_transaction.rowid, @sum providers = 1 );
 
     for (transaction in transactions) {
-
         if (strategy == node_retry_strategy.ALL and transaction.providers >= signers) {
-            update_evm_transaction_state(transaction.rowid.to_integer(), transaction_status.FAILURE, "All available nodes failed to execute transaction");
+            update_evm_transaction_status(transaction.rowid.to_integer(), transaction_status.FAILURE);
+            add_evm_transaction_error(transaction.rowid.to_integer(), "All available nodes failed to execute transaction");
         } else if (strategy == node_retry_strategy.SUPERMAJORITY and is_supermajority(transaction.providers, signers)) {
-            update_evm_transaction_state(transaction.rowid.to_integer(), transaction_status.FAILURE, "A supermajority of nodes failed to execute transaction");
+            update_evm_transaction_status(transaction.rowid.to_integer(), transaction_status.FAILURE);
+            add_evm_transaction_error(transaction.rowid.to_integer(), "A supermajority of nodes failed to execute transaction");
         }
     }
+}
+
+function add_evm_transaction_error(row_id: integer, message: text) {
+    add_evm_transaction_errors(row_id, [transaction_error_data(get_last_blocktime(), rpc_url = null, message)]);
 }
 
 function add_evm_transaction_errors(row_id: integer, errors: list<transaction_error_data>) {
@@ -237,11 +269,15 @@ function get_last_blocktime() {
     return block @ {} (@max .timestamp) ?: 0;
 }
 
-function update_evm_transaction_state(row_id: integer, status: transaction_status, error_message: text? = null) {
+function update_evm_transaction_status(row_id: integer, status: transaction_status, tx_hash: text? = null) {
 
     val transaction = evm_submit_transaction @ { .rowid == rowid(row_id) };
 
     transaction.status = status;
+
+    if (tx_hash != null) {
+        transaction.tx_hash = tx_hash;
+    }
 
     if (status == transaction_status.TAKEN) {
         transaction.taken_timestamp = get_last_blocktime();
@@ -250,10 +286,6 @@ function update_evm_transaction_state(row_id: integer, status: transaction_statu
         }
     } else if (status == transaction_status.SUCCESS or status == transaction_status.FAILURE) {
         delete evm_submit_transaction_taken_by @* { .transaction == transaction };
-    }
-
-    if (error_message != null) {
-        transaction.error_message = error_message;
     }
 }
 

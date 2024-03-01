@@ -1,29 +1,44 @@
 package net.postchain.eif.transaction
 
+import net.postchain.base.data.DatabaseAccess
 import net.postchain.common.BlockchainRid
 import net.postchain.core.EContext
 import net.postchain.core.TxEContext
-import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.ADD_EVM_TRANSACTION_ERRORS
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.EVM_TX_NO_OP
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.GET_PENDING_TRANSACTIONS
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.GET_TRANSACTION_STATUS
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_RECEIPT
-import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_STATE
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_STATUS
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension
 import net.postchain.gtv.Gtv
+import net.postchain.gtv.GtvEncoder
+import net.postchain.gtv.GtvFactory
 import net.postchain.gtv.GtvFactory.gtv
+import net.postchain.gtv.GtvInteger
 import net.postchain.gtv.mapper.GtvObjectMapper
 import net.postchain.gtx.GTXOperation
 import net.postchain.gtx.SimpleGTXModule
 import net.postchain.gtx.data.ExtOpData
 import net.postchain.gtx.special.GTXSpecialTxExtension
-import java.math.BigInteger
+import org.jooq.SQLDialect
+import org.jooq.impl.DSL
+import org.jooq.impl.DSL.table
+import java.sql.Timestamp
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.concurrent.LinkedBlockingQueue
 
 data class TransactionSubmitterTestContext(
-        val queue: LinkedBlockingQueue<EvmSubmitTransactionRequest>,
-        val successfulTxs: MutableSet<Long>,
-        val queuedTxs: MutableSet<Long>,
-        val failedTxs: MutableSet<Long>,
-        val operations: MutableList<ExtOpData>
+    val queue: LinkedBlockingQueue<EvmSubmitTransactionRequest>,
+    val pending: LinkedBlockingQueue<EvmPendingRellTx>,
+    val taken: MutableSet<Long>,
+    val successfulTxs: MutableSet<Long>,
+    val queuedTxs: MutableSet<Long>,
+    val failedTxs: MutableSet<Long>,
+    val getTransactionStatus: MutableMap<Long, RellTransactionStatus>, // Used to mock bc statuses returned by get_transaction_status
+    val operations: MutableList<ExtOpData>
 )
 
 class TransactionSubmitterQueuedTransactionTestGTXModule : TransactionSubmitterTestGTXModule(){
@@ -38,75 +53,93 @@ class TransactionSubmitterQueuedTransactionTestGTXModule : TransactionSubmitterT
                 listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
         1337,
         BlockchainRid.ZERO_RID.data,
-        RellTransactionStatus.QUEUED,
         System.currentTimeMillis()
         ), 1337L)
     }
 }
 
 class TransactionSubmitterPendingTransactionTestGTXModule : TransactionSubmitterTestGTXModule(){
-    companion object {
-        var TRANSACTION_HASH = ""
-        var TIMESTAMP = System.currentTimeMillis()
-    }
-
     override fun initializeDB(ctx: EContext) {
         val transactionSubmitterDatabaseOperations = TransactionSubmitterDatabaseOperationsImpl()
         transactionSubmitterDatabaseOperations.initialize(ctx)
         transactionSubmitterDatabaseOperations.queueTransaction(ctx, EvmSubmitTransactionRequest(
-                0,
-                "6936b1761eafc2116650b6593bbc86bd79a339a5",
-                "updateValidators",
-                listOf("address[]"),
-                listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
-                1337,
-                BlockchainRid.ZERO_RID.data,
-                RellTransactionStatus.QUEUED,
-                TIMESTAMP
+            0,
+            "6936b1761eafc2116650b6593bbc86bd79a339a5", // TODO: Fetch contract address instead of hardcoding
+            "updateValidators",
+            listOf("address[]"),
+            listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
+            1337,
+            BlockchainRid.ZERO_RID.data,
+            System.currentTimeMillis()
         ), 1337L)
-        transactionSubmitterDatabaseOperations.recordTransactionGas(ctx, 0, BigInteger.ONE, BigInteger.TEN)
-        transactionSubmitterDatabaseOperations.pendTransaction(ctx,0, TRANSACTION_HASH)
+        transactionSubmitterDatabaseOperations.addPendingTransaction(ctx,  1337, mkEvmPendingDbTx())
     }
 }
 
-
-class TransactionSubmitterSuccessfulTransactionTestGTXModule : TransactionSubmitterTestGTXModule(){
-
+class TransactionSubmitterCleanupTransactionTestGTXModule : TransactionSubmitterTestGTXModule(){
     override fun initializeDB(ctx: EContext) {
         val transactionSubmitterDatabaseOperations = TransactionSubmitterDatabaseOperationsImpl()
         transactionSubmitterDatabaseOperations.initialize(ctx)
-        transactionSubmitterDatabaseOperations.queueTransaction(ctx, EvmSubmitTransactionRequest(
-                0,
-                "6936b1761eafc2116650b6593bbc86bd79a339a5",
-                "updateValidators",
-                listOf("address[]"),
-                listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
-                1337,
-                BlockchainRid.ZERO_RID.data,
-                RellTransactionStatus.QUEUED,
-                System.currentTimeMillis()
-        ), 1337L)
-        transactionSubmitterDatabaseOperations.recordTransactionGas(ctx, 0, BigInteger.ONE, BigInteger.TEN)
-        transactionSubmitterDatabaseOperations.succeedTransaction(ctx,0,BigInteger.valueOf(4100000000),BigInteger.valueOf(21332),"0x499450bc3d3a1028d7c86cfaf04ccc4e8080bbf1b32c95bab819cb8abe9abfb3")
-        transactionSubmitterDatabaseOperations.deactivateTransaction(ctx, 0)
-    }
-}
 
-class TransactionSubmitterFailTransactionTestGTXModule : TransactionSubmitterTestGTXModule(){
-    override fun initializeDB(ctx: EContext) {
-        val transactionSubmitterDatabaseOperations = TransactionSubmitterDatabaseOperationsImpl()
-        transactionSubmitterDatabaseOperations.initialize(ctx)
-        transactionSubmitterDatabaseOperations.queueTransaction(ctx, EvmSubmitTransactionRequest(
-                0,
-                "6936b1761eafc2116650b6593bbc86bd79a339a5",
-                "updateValidators",
-                listOf("uint"),
-                listOf(gtv(1)), // wrong type
-                1337,
-                BlockchainRid.ZERO_RID.data,
-                RellTransactionStatus.QUEUED,
-                System.currentTimeMillis()
-        ), 1337L)
+        val time15DaysAgo = Instant.now().minus(15, ChronoUnit.DAYS).toEpochMilli()
+
+        DatabaseAccess.of(ctx).apply {
+            val jooq = DSL.using(ctx.conn, SQLDialect.POSTGRES)
+
+            // Submit and pending to be removed
+            jooq.insertInto(table(tableEvmTxSubmit(ctx)))
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_REQUEST_ID, 0)
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_CONTRACT, "")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_FUNCTION, "")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_PARAMETER_TYPES, "")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_PARAMETER_VALUES, GtvEncoder.encodeGtv(gtv(listOf())))
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_TIMESTAMP, time15DaysAgo)
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_NETWORK_ID, 1337)
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_SENDER, "".toByteArray())
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_BC_PERSISTED, true)
+                .execute()
+
+            jooq.insertInto(table(tableEvmTxPending(ctx)))
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_REQUEST_ID, 0)
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_NETWORK_ID, 1337)
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_UPDATED, Timestamp(time15DaysAgo))
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_STATUS, PendingTxStatus.NOTHING_VERIFIED.name)
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_CONTRACT, "")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_FUNCTION, "")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_PARAMETER_TYPES, "")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_PARAMETER_VALUES, GtvEncoder.encodeGtv(gtv(listOf())))
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_HASH, "")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_STATUS, PendingTxStatus.SUCCESS.name)
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_BC_PERSISTED, true)
+                .execute()
+
+            // Submit and pending to be kept
+            jooq.insertInto(table(tableEvmTxSubmit(ctx)))
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_REQUEST_ID, 1)
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_CONTRACT, "")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_FUNCTION, "")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_PARAMETER_TYPES, "")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_PARAMETER_VALUES, GtvEncoder.encodeGtv(gtv(listOf())))
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_TIMESTAMP, System.currentTimeMillis())
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_NETWORK_ID, 1337)
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_SENDER, "".toByteArray())
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_BC_PERSISTED, true)
+                .execute()
+
+            jooq.insertInto(table(tableEvmTxPending(ctx)))
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_REQUEST_ID, 1)
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_NETWORK_ID, 1337)
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_UPDATED, Timestamp(System.currentTimeMillis()))
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_STATUS, PendingTxStatus.NOTHING_VERIFIED.name)
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_CONTRACT, "")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_FUNCTION, "")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_PARAMETER_TYPES, "")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_PARAMETER_VALUES, GtvEncoder.encodeGtv(gtv(listOf())))
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_HASH, "")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_STATUS, PendingTxStatus.SUCCESS.name)
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_BC_PERSISTED, true)
+                .execute()
+        }
     }
 }
 
@@ -114,17 +147,26 @@ open class TransactionSubmitterTestGTXModule(
         opOverrides: Map<String, (TransactionSubmitterTestContext, ExtOpData) -> net.postchain.core.Transactor> = mapOf(),
         queryOverrides: Map<String, (TransactionSubmitterTestContext, EContext, Gtv) -> Gtv> = mapOf()
 ) : SimpleGTXModule<TransactionSubmitterTestContext>(
-        TransactionSubmitterTestContext(LinkedBlockingQueue(), mutableSetOf(), mutableSetOf(), mutableSetOf(), mutableListOf()),
-        mapOf(UPDATE_EVM_TRANSACTION_STATE to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
-            ModifyTxStateOperation(conf, opData)
+        TransactionSubmitterTestContext(LinkedBlockingQueue(), LinkedBlockingQueue(), mutableSetOf(), mutableSetOf(), mutableSetOf(), mutableSetOf(), mutableMapOf(), mutableListOf()),
+        mapOf(UPDATE_EVM_TRANSACTION_STATUS to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
+            ModifyTxStatusOperation(conf, opData)
         }, UPDATE_EVM_TRANSACTION_RECEIPT to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
             CaptureTxOperation(conf, opData)
         }, ADD_EVM_TRANSACTION_ERRORS to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
             CaptureTxOperation(conf, opData)
+        }, EVM_TX_NO_OP to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
+            CaptureTxOperation(conf, opData)
         }) + opOverrides,
-        mapOf(FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT to { conf: TransactionSubmitterTestContext, _: EContext, _: Gtv ->
-            gtv(conf.queue.filter { it.status == RellTransactionStatus.QUEUED }.map { GtvObjectMapper.toGtvDictionary(it) })
-        }) + queryOverrides
+        mapOf(
+            FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT to { conf: TransactionSubmitterTestContext, _: EContext, _: Gtv ->
+                gtv(conf.queue.map { GtvObjectMapper.toGtvDictionary(it) }) },
+            GET_PENDING_TRANSACTIONS to { conf: TransactionSubmitterTestContext, _, _ ->
+                gtv(conf.pending.map { GtvObjectMapper.toGtvDictionary(it) }) },
+            GET_TRANSACTION_STATUS to { conf: TransactionSubmitterTestContext, _, args: Gtv ->
+                val rowId = args.get(0).asInteger()
+                GtvInteger(conf.getTransactionStatus[rowId]!!.ordinal.toLong())
+            }
+        ) + queryOverrides
 ) {
 
     private val specialTxExtensions = listOf(TransactionSubmitterSpecialTxExtension(), EvmAnchoringSpecialTxExtension())
@@ -140,25 +182,44 @@ open class TransactionSubmitterTestGTXModule(
     }
 
     fun addTxToQueue(tx: EvmSubmitTransactionRequest) {
+        addGetTransactionStatus(tx.rowId, RellTransactionStatus.QUEUED)
         conf.queue.offer(tx)
+    }
+
+    fun addGetPendingTransactions(tx: EvmPendingRellTx) {
+        addGetTransactionStatus(tx.rowId, RellTransactionStatus.PENDING)
+        conf.pending.offer(tx)
+    }
+
+    fun addGetTransactionStatus(requestId: Long, status: RellTransactionStatus) {
+
+        conf.getTransactionStatus[requestId] = status
     }
 }
 
-class ModifyTxStateOperation(private val conf: TransactionSubmitterTestContext, private val extOpData: ExtOpData) : GTXOperation(extOpData) {
+class ModifyTxStatusOperation(
+    private val conf: TransactionSubmitterTestContext,
+    private val extOpData: ExtOpData,
+) : GTXOperation(extOpData) {
     override fun checkCorrectness() {}
     override fun apply(ctx: TxEContext): Boolean {
         val rowId = extOpData.args[0].asInteger()
         val status = RellTransactionStatus.values()[extOpData.args[1].asInteger().toInt()]
 
         when (status) {
-            RellTransactionStatus.TAKEN -> conf.queue.removeIf { it.rowId == rowId }
+            RellTransactionStatus.TAKEN -> {
+                conf.queue.removeIf { it.rowId == rowId }
+                conf.taken.add(rowId)
+            }
             RellTransactionStatus.SUCCESS -> conf.successfulTxs.add(rowId)
             RellTransactionStatus.QUEUED -> conf.queuedTxs.add(rowId)
             RellTransactionStatus.FAILURE -> conf.failedTxs.add(rowId)
             else -> {}
         }
 
+        conf.getTransactionStatus[rowId] = status
         conf.operations.add(extOpData)
+
         return true
     }
 }

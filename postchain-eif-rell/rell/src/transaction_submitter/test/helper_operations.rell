@@ -28,9 +28,9 @@ operation update_evm_transaction_receipt_helper_op(row_id: rowid, block_hash: te
     update evm_submit_transaction @ { .rowid == row_id } (.block_hash = block_hash, .effective_gas_price = effective_gas_price, .gas_usage = gas_usage);
 }
 
-operation update_evm_transaction_state_op(row_id: integer, status: transaction_status) {
+operation update_evm_transaction_status_op(row_id: integer, status: transaction_status) {
 
-    update_evm_transaction_state(row_id, status);
+    update_evm_transaction_status(row_id, status);
 }
 
 operation sete_evm_transaction_status(row_id: integer, status: transaction_status) {

@@ -36,7 +36,6 @@ open class Web3jRequestHandler(
                 val response = request.send()
 
                 if (response.hasError()) {
-                    // abort on any of the codes? https://www.quicknode.com/docs/ethereum/error-references
                     val errorMessage = "Web3J error code: ${response.error.code} and message: ${response.error.message}"
                     throw ProgrammerMistake(errorMessage)
                 }

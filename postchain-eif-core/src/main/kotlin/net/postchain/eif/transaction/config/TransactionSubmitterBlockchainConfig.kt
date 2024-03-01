@@ -8,8 +8,16 @@ data class TransactionSubmitterBlockchainConfig(
         val chains: Map<String, NetworkBlockchainConfig>,
         @Name("gas_limit")
         val gasLimit: Long,
-        @Name("node_tx_timeout")
+        @Name("node_tx_timeout")                        // Timeout for submitting TX
         val nodeTxTimeout: Long,
+        @Name("node_tx_verification_timeout")           // Timeout for verifying TX
+        val nodeTxVerificationTimeout: Long,
+        @Name("node_tx_verification_evm_blocks")        // Number of EVM blocks to await before verification
+        val nodeTxVerificationEvmBlocks: Long,
+        @Name("tx_verification_time")                   // Elapsed time before verification consensus begins
+        val txVerificationTime: Long,
+        @Name("db_retention_time")                        // Time to keep data in db
+        val dbRetentionTime: Long,
         @Name("system_anchoring_brid")
         @Nullable
         val systemAnchoringBrid: ByteArray?

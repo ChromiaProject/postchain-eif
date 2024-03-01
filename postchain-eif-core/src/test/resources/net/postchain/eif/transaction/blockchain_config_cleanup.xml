@@ -56,10 +56,6 @@
             <entry key="gas_limit">
                 <int>9000000</int>
             </entry>
-            <entry key="system_anchoring_brid">
-                <!-- Change this if you change config of SAC mock -->
-                <bytea>4000A75EF2EC216AAB74B6EC2D2DC8653944C38A1D578B05A88480FD2B83F7F9</bytea>
-            </entry>
             <entry key="node_tx_timeout">
                 <int>86400000</int>
             </entry>
@@ -67,10 +63,10 @@
                 <int>240000</int> <!-- 4 minutes -->
             </entry>
             <entry key="node_tx_verification_evm_blocks">
-                <int>0</int> <!-- disabled for test -->
+                <int>0</int> <!-- disabled for tests -->
             </entry>
             <entry key="tx_verification_time">
-                <int>0</int> <!-- disabled for test -->
+                <int>0</int> <!-- disabled for tests -->
             </entry>
             <entry key="db_retention_time">
                 <int>1296000000</int> <!-- 15 days -->
@@ -88,7 +84,7 @@
             <entry key="modules">
                 <array>
                     <string>net.postchain.gtx.StandardOpsGTXModule</string>
-                    <string>net.postchain.eif.transaction.anchoring.TransactionSubmitterAnchoringTestGTXModule</string>
+                    <string>net.postchain.eif.transaction.TransactionSubmitterCleanupTransactionTestGTXModule</string>
                 </array>
             </entry>
         </dict>

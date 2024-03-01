@@ -47,7 +47,6 @@ class AnchorOperation(private val conf: TransactionSubmitterTestContext, private
                 extOpData.args.toList(),
                 1337,
                 BlockchainRid.ZERO_RID.data, // Don't care
-                RellTransactionStatus.QUEUED,
                 System.currentTimeMillis()
         ))
 

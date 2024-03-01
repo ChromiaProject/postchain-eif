@@ -9,6 +9,7 @@ import net.postchain.crypto.KeyPair
 import net.postchain.crypto.SigMaker
 import net.postchain.crypto.devtools.KeyPairHelper
 import net.postchain.devtools.IntegrationTestSetup
+import net.postchain.eif.transaction.TransactionSubmitter
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvFactory.gtv
@@ -21,6 +22,7 @@ import org.testcontainers.containers.DockerComposeContainer
 import org.testcontainers.containers.wait.strategy.Wait
 import org.web3j.crypto.Credentials
 import org.web3j.protocol.Web3j
+import org.web3j.protocol.core.methods.response.EthSendTransaction
 import org.web3j.protocol.http.HttpService
 import org.web3j.tx.FastRawTransactionManager
 import org.web3j.tx.TransactionManager
@@ -247,4 +249,23 @@ abstract class EifBaseIntegrationTest(evmType: EvmType, private val prependUrls:
 
     fun getRegisterMessage(evmAddress: String, disposableKey: String) =
         "Create account for EVM wallet:\n${evmAddress}\n\nDisposable key:\n${disposableKey}"
+
+    fun sendTransaction(contractAddress: String): EthSendTransaction? {
+        return sendTransaction(contractAddress, "updateValidators", listOf("address[]"), listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))))
+    }
+
+    fun sendTransaction(contractAddress: String, functionName: String, parameterTypes: List<String>, parameterValues: List<Gtv>): EthSendTransaction? {
+
+        val functionData = TransactionSubmitter.encodeFunction(functionName, parameterTypes, parameterValues)
+        val gasPrice = gasProvider.getGasPrice(functionData)
+        val gasLimit = gasProvider.getGasLimit(functionData)
+
+        return transactionManager.sendTransaction(
+            gasPrice,
+            gasLimit,
+            contractAddress,
+            functionData,
+            BigInteger.ZERO
+        )
+    }
 }
