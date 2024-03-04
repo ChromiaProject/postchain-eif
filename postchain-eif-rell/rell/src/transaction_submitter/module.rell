@@ -1,3 +1,5 @@
+import .anchoring.*;
+
 import .utils.messaging.*;
 import .utils.*;
 
@@ -106,21 +108,32 @@ function create_evm_submit_transaction(evm_submit_transaction_message: evm_submi
         return;
     }
 
-    val evm_transaction_id = get_evm_transaction_id(
+    add_transaction_to_queue(
         contract_address,
         evm_submit_transaction_message.function_name,
         evm_submit_transaction_message.parameter_types,
         evm_submit_transaction_message.parameter_values,
-        evm_submit_transaction_message.network_id
+        evm_submit_transaction_message.network_id,
+        sender
+    );
+}
+
+function add_transaction_to_queue(contract_address: text, function_name: text, parameter_types: list<text>, parameter_values: list<gtv>, network_id: integer, sender: byte_array) {
+    val evm_transaction_id = get_evm_transaction_id(
+        contract_address,
+        function_name,
+        parameter_types,
+        parameter_values,
+        network_id
     );
 
     create evm_submit_transaction(
         id = evm_transaction_id,
         contract_address = contract_address,
-        function_name = evm_submit_transaction_message.function_name,
-        parameter_types = join_text_list(evm_submit_transaction_message.parameter_types),
-        parameter_values = evm_submit_transaction_message.parameter_values.to_gtv().to_bytes(),
-        network_id = evm_submit_transaction_message.network_id,
+        function_name = function_name,
+        parameter_types = join_text_list(parameter_types),
+        parameter_values = parameter_values.to_gtv().to_bytes(),
+        network_id = network_id,
         sender = sender,
         status = transaction_status.QUEUED,
         timestamp = op_context.last_block_time,
@@ -211,7 +224,7 @@ function join_text_list(components: list<text>) {
     }
     var result = components[0];
     if(components.size() > 1){
-        for (i in range(1, components.size() - 1)) {
+        for (i in range(1, components.size())) {
             result = result + "." + components[i];
         }
     }
@@ -220,7 +233,7 @@ function join_text_list(components: list<text>) {
 
 function get_contract_whitelist() = chain_context.args.contract_whitelist.split(",");
 
-function get_last_blocktime(){
+function get_last_blocktime() {
     return block @ {} (@max .timestamp) ?: 0;
 }
 

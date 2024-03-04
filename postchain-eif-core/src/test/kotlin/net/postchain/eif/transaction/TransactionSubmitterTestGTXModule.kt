@@ -7,6 +7,8 @@ import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Comp
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.ADD_EVM_TRANSACTION_ERRORS
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_RECEIPT
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_STATE
+import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension
+import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.mapper.GtvObjectMapper
 import net.postchain.gtx.GTXOperation
@@ -108,21 +110,24 @@ class TransactionSubmitterFailTransactionTestGTXModule : TransactionSubmitterTes
     }
 }
 
-open class TransactionSubmitterTestGTXModule : SimpleGTXModule<TransactionSubmitterTestContext>(
+open class TransactionSubmitterTestGTXModule(
+        opOverrides: Map<String, (TransactionSubmitterTestContext, ExtOpData) -> net.postchain.core.Transactor> = mapOf(),
+        queryOverrides: Map<String, (TransactionSubmitterTestContext, EContext, Gtv) -> Gtv> = mapOf()
+) : SimpleGTXModule<TransactionSubmitterTestContext>(
         TransactionSubmitterTestContext(LinkedBlockingQueue(), mutableSetOf(), mutableSetOf(), mutableSetOf(), mutableListOf()),
-        mapOf(UPDATE_EVM_TRANSACTION_STATE to { conf, opData ->
+        mapOf(UPDATE_EVM_TRANSACTION_STATE to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
             ModifyTxStateOperation(conf, opData)
-        }, UPDATE_EVM_TRANSACTION_RECEIPT to { conf, opData ->
+        }, UPDATE_EVM_TRANSACTION_RECEIPT to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
             CaptureTxOperation(conf, opData)
-        }, ADD_EVM_TRANSACTION_ERRORS to { conf, opData ->
+        }, ADD_EVM_TRANSACTION_ERRORS to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
             CaptureTxOperation(conf, opData)
-        }),
-        mapOf(FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT to { conf, _, _ ->
+        }) + opOverrides,
+        mapOf(FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT to { conf: TransactionSubmitterTestContext, _: EContext, _: Gtv ->
             gtv(conf.queue.filter { it.status == RellTransactionStatus.QUEUED }.map { GtvObjectMapper.toGtvDictionary(it) })
-        })
+        }) + queryOverrides
 ) {
 
-    private val specialTxExtensions = listOf(TransactionSubmitterSpecialTxExtension())
+    private val specialTxExtensions = listOf(TransactionSubmitterSpecialTxExtension(), EvmAnchoringSpecialTxExtension())
 
     override fun initializeDB(ctx: EContext) {
 

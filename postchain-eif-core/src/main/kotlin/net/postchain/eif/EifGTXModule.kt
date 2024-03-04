@@ -20,7 +20,6 @@ import net.postchain.eif.config.EifBlockchainConfig
 import net.postchain.eif.merkle.ProofTreeParser.getProofListAndPosition
 import net.postchain.gtv.*
 import net.postchain.gtv.GtvEncoder.encodeGtv
-import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.mapper.GtvObjectMapper
 import net.postchain.gtv.mapper.Name
 import net.postchain.gtv.mapper.Nullable
@@ -119,7 +118,7 @@ fun eventMerkleProof(config: Config, ctx: EContext, eventHash: ByteArray): Event
 
     return EventMerkleProof(
             eventData = eventInfo.data,
-            blockHeader = SimpleGtvEncoder.encodeGtv(blockHeaderData(db, ctx, blockHeight)),
+            blockHeader = blockHeaderData(db, ctx, blockHeight),
             blockWitness = blockWitnessData(db, ctx, blockHeight),
             eventProof = eventProof(ctx, config, blockHeight, eventInfo),
             extraMerkleProof = extraMerkleProof(db, ctx, blockHeight)
@@ -145,7 +144,7 @@ fun accountStateMerkleProof(config: Config, ctx: EContext, blockHeight: Long, ac
 
     return AccountStateMerkleProof(
             stateData = accountState.data,
-            blockHeader = SimpleGtvEncoder.encodeGtv(blockHeaderData(db, ctx, blockHeight)),
+            blockHeader = blockHeaderData(db, ctx, blockHeight),
             blockWitness = blockWitnessData(db, ctx, blockHeight),
             stateProof = stateProof(ctx, config, blockHeight, accountState),
             extraMerkleProof = extraMerkleProof(db, ctx, blockHeight)
@@ -186,20 +185,11 @@ private fun blockHeaderData(
         db: DatabaseAccess,
         ctx: EContext,
         blockHeight: Long
-): GtvArray {
+): ByteArray {
     val merkleHashCalculator = GtvMerkleHashCalculator(Secp256K1CryptoSystem())
     val blockRid = db.getBlockRID(ctx, blockHeight) ?: throw UserMistake("No block at height $blockHeight")
     val bh = BaseBlockHeader(db.getBlockHeader(ctx, blockRid), merkleHashCalculator).blockHeaderRec
-    return gtv(
-            bh.gtvBlockchainRid,
-            gtv(blockRid),
-            bh.gtvPreviousBlockRid,
-            gtv(bh.gtvMerkleRootHash.merkleHash(merkleHashCalculator)),
-            bh.gtvTimestamp,
-            bh.gtvHeight,
-            gtv(bh.gtvDependencies.merkleHash(merkleHashCalculator)),
-            gtv(bh.gtvExtra.merkleHash(merkleHashCalculator)),
-    )
+    return encodeBlockHeaderDataForEVM(blockRid, bh, merkleHashCalculator)
 }
 
 @Suppress("ArrayInDataClass")

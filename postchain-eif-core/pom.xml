@@ -232,6 +232,7 @@
                             <include>TokenBridge</include>
                             <include>TestToken</include>
                             <include>Validator</include>
+                            <include>Anchoring</include>
                         </includes>
                     </contract>
                     <pathPrefixes>
@@ -243,6 +244,7 @@
                             <include>**/TokenBridge.json</include>
                             <include>**/TestToken.json</include>
                             <include>**/Validator.json</include>
+                            <include>**/Anchoring.json</include>
                         </includes>
                     </abiSourceFiles>
                     <outputDirectory>

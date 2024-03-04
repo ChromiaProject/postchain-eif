@@ -25,6 +25,7 @@ test:
     - tests.utils
     - tests.ft4
     - transaction_submitter.test
+    - transaction_submitter.anchoring.test
   moduleArgs:
     <<: *common_args
     <<: *rell_test_args
@@ -33,6 +34,11 @@ test:
       contract_tx_rate_limit: 60000
       tx_timeout: 86400000 #24h
       node_retry_strategy: SUPERMAJORITY
+    transaction_submitter.anchoring:
+      anchoring_interval: 3600000
+      network_configs:
+        - id: 1337
+          contract: "anchoring_contract"
 
 blockchains:
   eif:
@@ -55,6 +61,11 @@ blockchains:
         contract_tx_rate_limit: 60000
         tx_timeout: 86400000 #24h
         node_retry_strategy: SUPERMAJORITY
+      transaction_submitter.anchoring:
+        anchoring_interval: 3600000 # 1 per hour
+        network_configs:
+          - id: 1337
+            contract: "anchoring_contract"
     config:
       gtx:
         modules:

@@ -2,12 +2,14 @@ package net.postchain.eif.transaction
 
 import net.postchain.PostchainContext
 import net.postchain.base.withReadConnection
+import net.postchain.common.BlockchainRid
 import net.postchain.common.exception.UserMistake
 import net.postchain.core.BlockchainProcess
 import net.postchain.core.SynchronizationInfrastructureExtension
 import net.postchain.eif.Web3jRequestHandler
 import net.postchain.eif.Web3jServiceFactory
 import net.postchain.eif.metrics.RpcUsageMetrics
+import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension
 import net.postchain.eif.transaction.config.EvmTransactionSubmitterConfig
 import net.postchain.eif.transaction.config.TransactionSubmitterBlockchainConfig
 import net.postchain.gtv.mapper.toObject
@@ -89,6 +91,12 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                     transactionSubmitters[networkId] = transactionSubmitter
                     ext.addTransactionSubmitter(transactionSubmitter, networkId)
                 }
+            }
+
+            val anchoringExt = exs.find { it is EvmAnchoringSpecialTxExtension }
+            if (anchoringExt is EvmAnchoringSpecialTxExtension) {
+                anchoringExt.blockQueriesProvider = postchainContext.blockQueriesProvider
+                anchoringExt.systemAnchoringBrid = transactionSubmitterBlockchainConfig.systemAnchoringBrid?.let { BlockchainRid(it) }
             }
         }
     }
