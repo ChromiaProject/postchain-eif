@@ -1,0 +1,101 @@
+package net.postchain.eif.transaction.anchoring
+
+import assertk.assertThat
+import assertk.assertions.hasSize
+import assertk.assertions.isEqualTo
+import net.postchain.base.data.DatabaseAccess
+import net.postchain.base.withReadConnection
+import net.postchain.common.toHex
+import net.postchain.concurrent.util.get
+import net.postchain.devtools.addBlockchainAndStart
+import net.postchain.devtools.getModules
+import net.postchain.eif.EifBaseIntegrationTest
+import net.postchain.eif.EvmType
+import net.postchain.eif.contracts.Anchoring
+import net.postchain.eif.contracts.Validator
+import net.postchain.eif.getEthereumAddress
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl
+import net.postchain.eif.transaction.tableEvmTransaction
+import org.awaitility.Awaitility
+import org.awaitility.Duration
+import org.jooq.SQLDialect
+import org.jooq.impl.DSL
+import org.junit.jupiter.api.Assertions
+import org.junit.jupiter.api.Test
+import org.testcontainers.junit.jupiter.Testcontainers
+import org.web3j.abi.FunctionEncoder
+import org.web3j.abi.datatypes.Address
+import org.web3j.abi.datatypes.DynamicArray
+import org.web3j.abi.datatypes.generated.Bytes32
+import org.web3j.tx.Contract
+
+@Testcontainers(disabledWithoutDocker = true)
+class TransactionSubmitterAnchoringIT : EifBaseIntegrationTest(
+        EvmType.GETH
+) {
+
+    @Test
+    fun `Anchoring blocks on EVM`() {
+        with(configOverrides) {
+            setProperty("evm.privateKey", "0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
+            setProperty("evm.txPollInterval", 1000)
+        }
+
+        val nodes = createNodes(1, "/net/postchain/eif/transaction/anchoring/blockchain_config_sac_mock.xml")
+        val node = nodes[0]
+        val systemAnchoringChain = 1L
+        val systemAnchoringMockBrid = node.getBlockchainRid(1)!!
+        buildBlock(systemAnchoringChain, 2) // Build a few blocks
+
+        // Deploy validator contract
+        val encodedValidatorConstructor = FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(getEthereumAddress(node.appConfig.pubKeyByteArray).toHex()))))
+        val validatorContract = Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedValidatorConstructor).send()
+
+        // Deploy anchoring contract
+        val encodedAnchoringConstructor = FunctionEncoder.encodeConstructor(listOf(Address(validatorContract.contractAddress), Bytes32(systemAnchoringMockBrid.data)))
+        val anchoringBinary = getBinaryFromArtifactResource("/artifacts/contracts/anchoring/Anchoring.sol/Anchoring.json")
+        val anchoringContract = Contract.deployRemoteCall(Anchoring::class.java, web3j, transactionManager, gasProvider, anchoringBinary, encodedAnchoringConstructor).send()
+
+        val txSubmitterConfig = readBlockchainConfig("/net/postchain/eif/transaction/anchoring/blockchain_config_with_anchoring.xml")
+
+        val txSubmitterChain = 2L
+        node.addBlockchainAndStart(txSubmitterChain, txSubmitterConfig)
+
+        val txSubmitterTestModule = node.getModules(txSubmitterChain).filterIsInstance<TransactionSubmitterAnchoringTestGTXModule>().first()
+
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            buildBlock(nodes.toList(), txSubmitterChain)
+            Assertions.assertTrue(txSubmitterTestModule.conf.successfulTxs.contains(0))
+        }
+
+        val txHash = withReadConnection(node.getBlockchainInstance(txSubmitterChain).blockchainEngine.sharedStorage, txSubmitterChain) {
+            val jooq = DSL.using(it.conn, SQLDialect.POSTGRES)
+
+            val tableName = DatabaseAccess.of(it).tableEvmTransaction(it)
+
+            jooq
+                    .select(TransactionSubmitterDatabaseOperationsImpl.TRANSACTIONS_COLUMN_TX_HASH)
+                    .from(tableName)
+                    .where(TransactionSubmitterDatabaseOperationsImpl.TRANSACTIONS_COLUMN_REQUEST_ID.eq(0))
+                    .fetchOne()
+                    .value1()
+        }
+
+        // Assert anchoring event was emitted
+        val txReceipt = web3j.ethGetTransactionReceipt(txHash).send().transactionReceipt.get()
+        val events = anchoringContract.getAnchoredBlockEvents(txReceipt)
+
+        assertThat(events).hasSize(1)
+
+        val anchoringEvent = events.first()
+        val height = anchoringEvent.blockHeader.height.value.longValueExact()
+
+        val actualBlockAtHeight = node.blockQueries(systemAnchoringChain).getBlockAtHeight(height).get()!!
+        assertThat(anchoringEvent.blockHeader.blockRid.value).isEqualTo(actualBlockAtHeight.header.blockRID)
+        assertThat(anchoringEvent.blockHeader.previousBlockRid.value).isEqualTo(actualBlockAtHeight.header.prevBlockRID)
+
+        // Verify contract state
+        assertThat(anchoringContract.lastAnchoredHeight().send().value.longValueExact()).isEqualTo(height)
+        assertThat(anchoringContract.lastAnchoredBlockRid().send().value).isEqualTo(actualBlockAtHeight.header.blockRID)
+    }
+}

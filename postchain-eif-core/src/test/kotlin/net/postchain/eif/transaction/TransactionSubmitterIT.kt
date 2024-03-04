@@ -48,7 +48,7 @@ import java.math.BigInteger
 import java.sql.Timestamp
 
 @Testcontainers(disabledWithoutDocker = true)
-class TransactionSubmitterTest : EifBaseIntegrationTest(
+class TransactionSubmitterIT : EifBaseIntegrationTest(
         EvmType.GETH
 ) {
 
