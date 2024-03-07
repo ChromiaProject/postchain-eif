@@ -170,8 +170,8 @@ abstract class EifIntegrationTest {
             with(configOverrides) {
                 setProperty("infrastructure", net.postchain.devtools.testinfra.BaseTestInfrastructureFactory::class.qualifiedName)
                 setProperty("ethereum.urls", listOf(
-//                    "http://127.0.0.1:8888",
-//                    "http://127.0.0.1:9999",
+                        "http://127.0.0.1:8888",
+                        "http://127.0.0.1:9999",
                         evmServiceUrl
                 ).joinToString())
                 setProperty("ethereum.maxReadAhead", 200)
