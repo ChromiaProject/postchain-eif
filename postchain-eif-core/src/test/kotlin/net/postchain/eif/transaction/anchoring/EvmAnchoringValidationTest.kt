@@ -3,15 +3,12 @@ package net.postchain.eif.transaction.anchoring
 import assertk.assertThat
 import assertk.assertions.isFalse
 import assertk.assertions.isTrue
-import net.postchain.base.BaseBlockHeader
 import net.postchain.base.BaseBlockWitness
 import net.postchain.base.SpecialTransactionPosition
 import net.postchain.base.gtv.BlockHeaderData
 import net.postchain.common.BlockchainRid
 import net.postchain.core.BlockEContext
 import net.postchain.core.BlockRid
-import net.postchain.core.block.BlockDataWithWitness
-import net.postchain.core.block.BlockQueries
 import net.postchain.crypto.Secp256K1CryptoSystem
 import net.postchain.eif.encodeBlockHeaderDataForEVM
 import net.postchain.eif.encodeSignatureWithV
@@ -35,7 +32,6 @@ import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import java.security.Security
-import java.util.concurrent.CompletableFuture
 
 class EvmAnchoringValidationTest {
 
@@ -55,7 +51,7 @@ class EvmAnchoringValidationTest {
     private lateinit var blockHeaderData: ByteArray
     private lateinit var signatures: List<GtvByteArray>
     private lateinit var signers: List<GtvByteArray>
-    private lateinit var systemAnchoringQueryMock: BlockQueries
+    private lateinit var rawDummyBlock: ByteArray
 
     @BeforeEach
     fun setup() {
@@ -73,18 +69,7 @@ class EvmAnchoringValidationTest {
         val witness = BaseBlockWitness.fromSignatures(
                 arrayOf(cryptoSystem.buildSigMaker(systemAnchoringSigner).signDigest(dummyBlockRid))
         )
-        val rawDummyBlock = GtvEncoder.encodeGtv(dummyBlock.toGtv())
-
-        val systemAnchoringBlock = BlockDataWithWitness(
-                BaseBlockHeader(rawDummyBlock, hashCalculator), listOf(), witness
-        )
-
-        systemAnchoringQueryMock = mock {
-            on { getBlockAtHeight(0) } doReturn CompletableFuture.completedStage(systemAnchoringBlock)
-        }
-        sut.blockQueriesProvider = mock {
-            on { getBlockQueries(systemAnchoringBrid) } doReturn systemAnchoringQueryMock
-        }
+        rawDummyBlock = GtvEncoder.encodeGtv(dummyBlock.toGtv())
 
         blockHeaderData = encodeBlockHeaderDataForEVM(dummyBlockRid, BlockHeaderData.fromBinary(rawDummyBlock), hashCalculator)
         signatures = witness.getSignatures().map {
@@ -120,21 +105,11 @@ class EvmAnchoringValidationTest {
         val blockWithAnotherPrevBlockRid = makeBlockHeader(systemAnchoringBrid, BlockRid(ByteArray(32) { 2 }), 0)
 
         val newBlockRid = blockWithAnotherPrevBlockRid.toGtv().merkleHash(hashCalculator)
-        val newWitness = BaseBlockWitness.fromSignatures(
-                arrayOf(cryptoSystem.buildSigMaker(systemAnchoringSigner).signDigest(newBlockRid))
-        )
-        val rawDummyBlock = GtvEncoder.encodeGtv(blockWithAnotherPrevBlockRid.toGtv())
 
-        val blockDataWithAnotherPrevBlockRid = BlockDataWithWitness(
-                BaseBlockHeader(rawDummyBlock, hashCalculator), listOf(), newWitness
-        )
-
-        whenever(systemAnchoringQueryMock.getBlockAtHeight(0))
-                .doReturn(CompletableFuture.completedStage(blockDataWithAnotherPrevBlockRid))
-
+        val wrongBlockHeaderData = encodeBlockHeaderDataForEVM(newBlockRid, BlockHeaderData.fromBinary(rawDummyBlock), hashCalculator)
         assertThat(sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
                 ANCHOR_SYSTEM_ANCHORING_BLOCK_OP,
-                arrayOf(gtv(blockHeaderData), gtv(signatures), gtv(signers))
+                arrayOf(gtv(wrongBlockHeaderData), gtv(signatures), gtv(signers))
         )))).isFalse()
     }
 
