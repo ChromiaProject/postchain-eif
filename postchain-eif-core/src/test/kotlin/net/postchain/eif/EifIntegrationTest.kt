@@ -37,6 +37,7 @@ import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.TestMethodOrder
 import org.junit.jupiter.api.assertThrows
 import org.junitpioneer.jupiter.DisableIfTestFails
@@ -78,6 +79,7 @@ data class AccountRegister(
 @Testcontainers(disabledWithoutDocker = true)
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 abstract class EifIntegrationTest {
 
     companion object : IntegrationTestSetup() {
@@ -93,8 +95,6 @@ abstract class EifIntegrationTest {
         protected lateinit var evmServiceUrl: String
         private val credentials = Credentials
                 .create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
-        private val registerAccounts = mutableListOf<AccountRegister>()
-        private val snapshotHeights = mutableListOf<Long>()
         private val tokenBridgeBinary = getBinaryFromArtifactResource("/artifacts/contracts/TokenBridge.sol/TokenBridge.json")
         private val testTokenBinary = getBinaryFromArtifactResource("/artifacts/contracts/token/TestToken.sol/TestToken.json")
         private val validatorBinary = getBinaryFromArtifactResource("/artifacts/contracts/Validator.sol/Validator.json")
@@ -105,43 +105,6 @@ abstract class EifIntegrationTest {
 
         protected lateinit var web3j: Web3j
         protected lateinit var transactionManager: TransactionManager
-        private const val accountNum = 15
-        private const val accountBalance = 1L
-
-        // user
-        private val evmAddress = "e105ba42b66d08ac7ca7fc48c583599044a6dab3"
-        private val userEvmAddress = evmAddress.hexStringToByteArray()
-        private val userPubkey = "038f888dec563b5bc253e87abc90afd26c3287021d10236ea19d248043dc39e0b8".hexStringToByteArray()
-        private val userPriKey = "71b5b7f8de0661af934a5e4612f3d0ba183e639bdf4e7452fb6457ed3cfbc825".hexStringToByteArray()
-
-        // other
-        val otherEvmAddressString = "661683e5d36E83B38B1a20247ba6F5c410dC165d"
-        val otherEvmAddress = otherEvmAddressString.hexStringToByteArray()
-
-        private val initialMint = BigInteger("FF".repeat(32), 16)
-        private val depositNum = 5
-        private val depositAmount = BigInteger("AA".repeat(16), 16)
-        private val totalDepositedAmount = depositNum.toBigInteger() * depositAmount
-        private val totalTransferAmount = BigInteger("1234567890ABCDEF", 16)
-        private lateinit var toRemainingAccount: BigInteger
-        private lateinit var bridge: TokenBridge
-        private lateinit var testToken: TestToken
-        private lateinit var testTokenAddress: ByteArray
-        private lateinit var userBalance: Uint256
-        private lateinit var withdrawAmount: BigInteger
-        private lateinit var accountId: Gtv
-        private lateinit var accountNumber: Gtv
-        private lateinit var authDescriptorId: Hash
-        private lateinit var authId: Gtv
-        private lateinit var otherAccountId: Gtv
-        private lateinit var assetId: Gtv
-        private lateinit var node: PostchainTestNode
-        private lateinit var blockQuery: BlockQueries
-        private lateinit var bcRid: BlockchainRid
-        private var currentBlockHeight = -1L
-        private var lastSnapshotBlockHeight = -1L
-        private lateinit var blockWitness2: Array<out Gtv>
-        private lateinit var withdrawalEvent3: WithdrawalEvent
 
         // get smart contract binary from resource
         private fun getBinaryFromArtifactResource(resourcePath: String): String {
@@ -188,6 +151,46 @@ abstract class EifIntegrationTest {
             if (::evmContainer.isInitialized) evmContainer.stop()
         }
     }
+
+    private val accountNum = 15
+    private val accountBalance = 1L
+    private val registerAccounts = mutableListOf<AccountRegister>()
+    private val snapshotHeights = mutableListOf<Long>()
+
+    // user
+    private val evmAddress = "e105ba42b66d08ac7ca7fc48c583599044a6dab3"
+    private val userEvmAddress = evmAddress.hexStringToByteArray()
+    private val userPubkey = "038f888dec563b5bc253e87abc90afd26c3287021d10236ea19d248043dc39e0b8".hexStringToByteArray()
+    private val userPriKey = "71b5b7f8de0661af934a5e4612f3d0ba183e639bdf4e7452fb6457ed3cfbc825".hexStringToByteArray()
+
+    // other
+    val otherEvmAddressString = "661683e5d36E83B38B1a20247ba6F5c410dC165d"
+    val otherEvmAddress = otherEvmAddressString.hexStringToByteArray()
+
+    private val initialMint = BigInteger("FF".repeat(32), 16)
+    private val depositNum = 5
+    private val depositAmount = BigInteger("AA".repeat(16), 16)
+    private val totalDepositedAmount = depositNum.toBigInteger() * depositAmount
+    private val totalTransferAmount = BigInteger("1234567890ABCDEF", 16)
+    private lateinit var toRemainingAccount: BigInteger
+    private lateinit var bridge: TokenBridge
+    private lateinit var testToken: TestToken
+    private lateinit var testTokenAddress: ByteArray
+    private lateinit var userBalance: Uint256
+    private lateinit var withdrawAmount: BigInteger
+    private lateinit var accountId: Gtv
+    private lateinit var accountNumber: Gtv
+    private lateinit var authDescriptorId: Hash
+    private lateinit var authId: Gtv
+    private lateinit var otherAccountId: Gtv
+    private lateinit var assetId: Gtv
+    private lateinit var node: PostchainTestNode
+    private lateinit var blockQuery: BlockQueries
+    private lateinit var bcRid: BlockchainRid
+    private var currentBlockHeight = -1L
+    private var lastSnapshotBlockHeight = -1L
+    private lateinit var blockWitness2: Array<out Gtv>
+    private lateinit var withdrawalEvent3: WithdrawalEvent
 
     @AfterEach
     fun tearDown() {
@@ -593,8 +596,8 @@ abstract class EifIntegrationTest {
 
     @Test
     @Order(9)
-    fun `withdraw token to evem after mass exit using snapshot`() {
-        logger.info { "withdraw token to evem after mass exit using snapshot" }
+    fun `withdraw token to evm after mass exit using snapshot`() {
+        logger.info { "withdraw token to evm after mass exit using snapshot" }
 
         // Withdraw remaining token of the account by using snapshot state with mass-exit
         val state = blockQuery.query("get_account_state_merkle_proof",
