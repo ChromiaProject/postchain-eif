@@ -27,7 +27,7 @@ Configuration:
         - ref: FileAppender
 
     Logger:
-      - name: TestLogger
+      - name: test_logger
         level: info
         additivity: false
         AppenderRef:

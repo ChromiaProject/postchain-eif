@@ -15,9 +15,12 @@ class GethEifIT : EifIntegrationTest() {
                     .withExposedService(
                             "geth", 8545,
                             Wait.forLogMessage(".*HTTP server started.*\\s", 1)
-                    )
-                    .withLogConsumer("geth", Slf4jLogConsumer(node1Logger.underlyingLogger, true))
-            evmContainer.start()
+                    ).withLogConsumer(
+                            "geth",
+                            Slf4jLogConsumer(node1Logger.underlyingLogger, true)
+                    ).apply {
+                        start()
+                    }
 
             EifIntegrationTest.setup()
         }
