@@ -2,23 +2,19 @@ package net.postchain.eif.transaction.anchoring
 
 import mu.KLogging
 import net.postchain.base.BaseBlockWitness
-import net.postchain.base.BaseBlockWitnessBuilder
 import net.postchain.base.SpecialTransactionPosition
 import net.postchain.base.gtv.BlockHeaderData
 import net.postchain.common.BlockchainRid
 import net.postchain.common.exception.ProgrammerMistake
-import net.postchain.common.exception.UserMistake
-import net.postchain.common.toHex
 import net.postchain.concurrent.util.get
 import net.postchain.core.BlockEContext
-import net.postchain.core.block.BlockHeader
 import net.postchain.core.block.BlockQueriesProvider
 import net.postchain.crypto.CryptoSystem
 import net.postchain.crypto.Signature
+import net.postchain.eif.decodeBlockHeaderDataFromEVM
 import net.postchain.eif.decodeEVMEncodedSignature
 import net.postchain.eif.encodeBlockHeaderDataForEVM
 import net.postchain.eif.encodeSignatureWithV
-import net.postchain.eif.extractHeightFromEVMEncodedHeaderData
 import net.postchain.eif.getEthereumAddress
 import net.postchain.getBFTRequiredSignatureCount
 import net.postchain.gtv.GtvFactory.gtv
@@ -63,10 +59,7 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
 
             // Since signer updates can take a while to be propagated to EVM side we should validate the witness against the current list
             // This should be a temporary issue but should be highlighted in the logs in case it does not resolve itself
-            if (!validateBlockWitness(getCurrentEVMSignerList(bctx), lastBlock.header, blockWitness.getSignatures().asList())) {
-                logger.warn("Unable to verify last block witness with signer list on EVM side. Will not attempt to anchor.")
-                return listOf()
-            }
+            if (!verifySignersAgainstCurrentEVMSignerList(getCurrentEVMSignerList(bctx), blockWitness.getSignatures().toList())) return listOf()
 
             val blockHeaderData = encodeBlockHeaderDataForEVM(lastBlock.header.blockRID, BlockHeaderData.fromBinary(lastBlock.header.rawData), hashCalculator)
             val signatures = blockWitness.getSignatures().map {
@@ -110,31 +103,18 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
             return false
         }
 
-        val systemAnchoringQueries = systemAnchoringBrid?.let { blockQueriesProvider.getBlockQueries(it) }
-        if (systemAnchoringQueries == null) {
-            logger.warn("Unable to query system anchoring chain")
-            return false
-        }
-
         val anchoringOp = ops.first()
 
         val header = anchoringOp.args[0].asByteArray()
-        val height = extractHeightFromEVMEncodedHeaderData(header)
+        val decodedHeader = decodeBlockHeaderDataFromEVM(header)
         val lastAnchoredHeight = module.query(bctx, GET_PREVIOUSLY_ANCHORED_SYSTEM_ANCHORING_BLOCK_HEIGHT_QUERY, gtv(listOf())).asInteger()
-        if (height <= lastAnchoredHeight) {
-            logger.warn("Validation failed. Trying to anchor block at height $height when last anchored height was $lastAnchoredHeight")
+        if (decodedHeader.height <= lastAnchoredHeight) {
+            logger.warn("Validation failed. Trying to anchor block at height ${decodedHeader.height} when last anchored height was $lastAnchoredHeight")
             return false
         }
 
-        val blockAtHeight = systemAnchoringQueries.getBlockAtHeight(height).get()
-        if (blockAtHeight == null) {
-            logger.warn("Validation failed. No block in system anchoring chain found at height $height")
-            return false
-        }
-
-        val expectedEncodedHeaderData = encodeBlockHeaderDataForEVM(blockAtHeight.header.blockRID, BlockHeaderData.fromBinary(blockAtHeight.header.rawData), hashCalculator)
-        if (!expectedEncodedHeaderData.contentEquals(header)) {
-            logger.warn("Validation failed. Expected header data for height $height mismatch, got ${header.toHex()} expected ${expectedEncodedHeaderData.toHex()}")
+        if (!decodedHeader.verifyBlockRid(hashCalculator)) {
+            logger.warn("Validation failed. Invalid block rid.")
             return false
         }
 
@@ -143,19 +123,14 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
         val evmSigners = anchoringOp.args[2].asArray()
         val signatures = try {
             evmSignatures.mapIndexed { index, data ->
-                decodeEVMEncodedSignature(data.asByteArray(), blockAtHeight.header.blockRID, evmSigners[index].asByteArray())
+                decodeEVMEncodedSignature(data.asByteArray(), decodedHeader.blockRid.data, evmSigners[index].asByteArray())
             }
         } catch (e: Exception) {
             logger.warn("Validation failed. Invalid witness data: ${e.message}")
             return false
         }
 
-        if (!validateBlockWitness(getCurrentEVMSignerList(bctx), blockAtHeight.header, signatures)) {
-            logger.warn("Validation failed. Invalid witness data")
-            return false
-        }
-
-        return true
+        return verifySignersAgainstCurrentEVMSignerList(getCurrentEVMSignerList(bctx), signatures)
     }
 
     private fun getCurrentEVMSignerList(bctx: BlockEContext) =
@@ -163,22 +138,18 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
                     .asArray()
                     .map { it.asByteArray() }
 
-    private fun validateBlockWitness(signers: List<ByteArray>, blockHeader: BlockHeader, signatures: List<Signature>): Boolean {
-        val threshold = getBFTRequiredSignatureCount(signers.size)
-        val blockWitnessBuilder = BaseBlockWitnessBuilder(cryptoSystem, object : BlockHeader {
-            override val prevBlockRID = blockHeader.prevBlockRID
-            override val rawData = blockHeader.rawData
-            override val blockRID = blockHeader.blockRID
-        }, signers.toTypedArray(), threshold)
-
-        for (signature in signatures) {
-            try {
-                blockWitnessBuilder.applySignature(signature)
-            } catch (e: UserMistake) {
-                return false
-            }
+    private fun verifySignersAgainstCurrentEVMSignerList(currentEVMSigners: List<ByteArray>, signatures: List<Signature>): Boolean {
+        if (!signatures.map { it.subjectID }.all { signer -> currentEVMSigners.any { signer.contentEquals(it) } }) {
+            logger.warn("All signers are not known on EVM")
+            return false
         }
 
-        return blockWitnessBuilder.isComplete()
+        val currentRequiredSignatureCount = getBFTRequiredSignatureCount(currentEVMSigners.size)
+        if (signatures.size < currentRequiredSignatureCount) {
+            logger.warn("Number of signatures ${signatures.size} is less than required amount $currentRequiredSignatureCount")
+            return false
+        }
+
+        return true
     }
 }
