@@ -17,6 +17,7 @@ class EifContainerConfigProviderTest {
             addProperty("ethereum.lastEvmBlockHeight", 0)
             addProperty("ethereum.maxReadAhead", 1)
             addProperty("ethereum.maxQueueSize", 2)
+            addProperty("database.suppressCollationCheck", true)
         }
         val appConfig = AppConfig(config)
 

@@ -2,6 +2,7 @@ package net.postchain.eif
 
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
+import mu.KotlinLogging
 import net.postchain.base.snapshot.SimpleDigestSystem
 import net.postchain.common.BlockchainRid
 import net.postchain.common.data.Hash
@@ -14,27 +15,21 @@ import net.postchain.crypto.KeyPair
 import net.postchain.crypto.SigMaker
 import net.postchain.crypto.devtools.KeyPairHelper
 import net.postchain.devtools.IntegrationTestSetup
-import net.postchain.devtools.testinfra.BaseTestInfrastructureFactory
 import net.postchain.eif.contracts.TestToken
 import net.postchain.eif.contracts.TokenBridge
 import net.postchain.eif.contracts.Validator
-import net.postchain.gtv.Gtv
-import net.postchain.gtv.GtvArray
+import net.postchain.gtv.*
 import net.postchain.gtv.GtvFactory.gtv
-import net.postchain.gtv.GtvInteger
-import net.postchain.gtv.GtvNull
 import net.postchain.gtv.merkle.GtvMerkleHashCalculator
-import net.postchain.gtv.merkleHash
 import net.postchain.gtx.GtxBuilder
 import org.awaitility.Awaitility
 import org.awaitility.Duration
-import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
-import org.testcontainers.containers.wait.strategy.Wait
+import org.junitpioneer.jupiter.DisableIfTestFails
+import org.testcontainers.containers.DockerComposeContainer
+import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.DynamicArray
@@ -68,74 +63,84 @@ data class AccountRegister(
         val balance: Long
 )
 
-abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
+@Testcontainers(disabledWithoutDocker = true)
+@TestMethodOrder(MethodOrderer.OrderAnnotation::class)
+@DisableIfTestFails
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+abstract class EifIntegrationTest {
 
-    private val networkId = 1337L
-    private val gasProvider = DefaultGasProvider()
-    private val evmContainer = when (evmType) {
-        EvmType.GETH -> {
-            GethContainer().withExposedService(
-                    "geth", 8545,
-                    Wait.forLogMessage(".*HTTP server started.*\\s", 1))
+    companion object : IntegrationTestSetup() {
+        val logger = KotlinLogging.logger("TestLogger")
+        val node1Logger = KotlinLogging.logger("eif_node1_logger")
+
+        private val networkId = 1337L
+        private val gasProvider = DefaultGasProvider()
+
+        @JvmStatic
+        lateinit var evmContainer: DockerComposeContainer<*>
+        protected lateinit var evmServiceUrl: String
+        private val credentials = Credentials
+                .create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
+        private val registerAccounts = mutableListOf<AccountRegister>()
+        private val snapshotHeights = mutableListOf<Long>()
+        private val tokenBridgeBinary = getBinaryFromArtifactResource("/artifacts/contracts/TokenBridge.sol/TokenBridge.json")
+        private val testTokenBinary = getBinaryFromArtifactResource("/artifacts/contracts/token/TestToken.sol/TestToken.json")
+        private val validatorBinary = getBinaryFromArtifactResource("/artifacts/contracts/Validator.sol/Validator.json")
+
+        private enum class AuthType {
+            S, M
         }
 
-        EvmType.BSC -> {
-            BscContainer().withExposedService(
-                    "geth", 8545,
-                    Wait.forLogMessage(".*HTTP server started.*\\s", 1))
+        protected lateinit var web3j: Web3j
+        protected lateinit var transactionManager: TransactionManager
+
+        // get smart contract binary from resource
+        private fun getBinaryFromArtifactResource(resourcePath: String): String {
+            val artifactFile = EifIntegrationTest::class.java.getResource(resourcePath)?.readText()
+            val artifactJson = GsonBuilder().create().fromJson(artifactFile, JsonObject::class.java)
+            return artifactJson.get("bytecode").asString
         }
-    }
-    private val credentials = Credentials
-            .create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
-    private val registerAccounts = mutableListOf<AccountRegister>()
-    private val snapshotHeights = mutableListOf<Long>()
-    private val tokenBridgeBinary = getBinaryFromArtifactResource("/artifacts/contracts/TokenBridge.sol/TokenBridge.json")
-    private val testTokenBinary = getBinaryFromArtifactResource("/artifacts/contracts/token/TestToken.sol/TestToken.json")
-    private val validatorBinary = getBinaryFromArtifactResource("/artifacts/contracts/Validator.sol/Validator.json")
 
-    private enum class AuthType {
-        S, M
-    }
+        fun setup() {
+            assert(::evmContainer.isInitialized) { "evmContainer is not initialized" }
 
-    private lateinit var web3j: Web3j
-    private lateinit var transactionManager: TransactionManager
+            val evmHost = evmContainer.getServiceHost("geth", 8545)
+            val evmPort = evmContainer.getServicePort("geth", 8545)
+            evmServiceUrl = "http://$evmHost:$evmPort"
 
-    @BeforeEach
-    fun setup() {
-        evmContainer.start()
+            web3j = Web3j.build(HttpService(evmServiceUrl))
 
-        val evmHost = evmContainer.getServiceHost("geth", 8545)
-        val evmPort = evmContainer.getServicePort("geth", 8545)
-        web3j = Web3j.build(
-                HttpService(
-                        "http://$evmHost:$evmPort"
-                )
-        )
+            transactionManager = FastRawTransactionManager(
+                    web3j,
+                    credentials,
+                    PollingTransactionReceiptProcessor(web3j, 1000, 30)
+            )
 
-        transactionManager = FastRawTransactionManager(
-                web3j,
-                credentials,
-                PollingTransactionReceiptProcessor(
-                        web3j,
-                        1000,
-                        30
-                )
-        )
+            with(configOverrides) {
+                setProperty("infrastructure", net.postchain.devtools.testinfra.BaseTestInfrastructureFactory::class.qualifiedName)
+                setProperty("ethereum.urls", listOf(
+//                    "http://127.0.0.1:8888",
+//                    "http://127.0.0.1:9999",
+                        evmServiceUrl
+                ).joinToString())
+                setProperty("ethereum.maxReadAhead", 200)
+                setProperty("ethereum.maxQueueSize", 100)
+                setProperty("evm.maxTryErrors", 1)
+            }
+        }
 
-        with(configOverrides) {
-            setProperty("infrastructure", BaseTestInfrastructureFactory::class.qualifiedName)
-            setProperty("ethereum.urls", "http://127.0.0.1:8888, http://127.0.0.1:9999, http://$evmHost:$evmPort")
-            setProperty("ethereum.maxReadAhead", 200)
-            setProperty("ethereum.maxQueueSize", 100)
-            setProperty("evm.maxTryErrors", 1)
+        @JvmStatic
+        @AfterAll
+        fun tearDownAfterAll() {
+            super.tearDown() // Calling @AfterEach IntegrationTestSetup.tearDown()
+            if (::web3j.isInitialized) web3j.shutdown()
+            if (::evmContainer.isInitialized) evmContainer.stop()
         }
     }
 
     @AfterEach
-    override fun tearDown() {
-        super.tearDown()
-        web3j.shutdown()
-        evmContainer.stop()
+    fun tearDown() {
+        // This method blocks @AfterEach IntegrationTestSetup.tearDown()
     }
 
     @Test
@@ -330,7 +335,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
                 gtv(to32Bytes(evmAddress)), // encode gtv array with assumption that the data contains only byte32 and uint256
                 gtv(1 * 2 * 32), // 2 * 32 bytes per entry
                 gtv(to32Bytes(testToken.contractAddress.substring(2))), // encode gtv array with assumption that the data contains only byte32 and uint256
-                gtv(totalDepositedAmount-withdrawAmount)
+                gtv(totalDepositedAmount - withdrawAmount)
         ))
         val arg1 = gtv(
                 "blockHeight" to gtv(currentBlockHeight),
@@ -526,7 +531,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
             }
             bridge.withdraw(Bytes32(eventHash2), Address(evmAddress)).send()
             userBalance = testToken.balanceOf(Address(evmAddress)).send()
-            assertEquals(userBalance.value, initialMint - totalDepositedAmount + (withdrawAmount*BigInteger.TWO))
+            assertEquals(userBalance.value, initialMint - totalDepositedAmount + (withdrawAmount * BigInteger.TWO))
 
             // Withdraw remaining token of the account by using snapshot state with mass-exit
             val state = blockQuery.query("get_account_state_merkle_proof",
@@ -685,13 +690,6 @@ abstract class EifIntegrationTest(evmType: EvmType) : IntegrationTestSetup() {
                     )).get()
             assertNotNull(latestState)
         }
-    }
-
-    // get smart contract binary from resource
-    private fun getBinaryFromArtifactResource(resourcePath: String): String {
-        val artifactFile = javaClass.getResource(resourcePath)?.readText()
-        val artifactJson = GsonBuilder().create().fromJson(artifactFile, JsonObject::class.java)
-        return artifactJson.get("bytecode").asString
     }
 
     /**
