@@ -17,7 +17,7 @@ import net.postchain.eif.getEthereumAddress
 import net.postchain.eif.transaction.RellTransactionStatus
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl
 import net.postchain.eif.transaction.assertStatusOperation
-import net.postchain.eif.transaction.tableEvmTxPending
+import net.postchain.eif.transaction.tableEvmTxSubmit
 import org.awaitility.Awaitility
 import org.awaitility.Duration
 import org.jooq.SQLDialect
@@ -74,12 +74,12 @@ class TransactionSubmitterAnchoringIT : EifBaseIntegrationTest(
         val txHash = withReadConnection(node.getBlockchainInstance(txSubmitterChain).blockchainEngine.sharedStorage, txSubmitterChain) {
             val jooq = DSL.using(it.conn, SQLDialect.POSTGRES)
 
-            val tableName = DatabaseAccess.of(it).tableEvmTxPending(it)
+            val tableName = DatabaseAccess.of(it).tableEvmTxSubmit(it)
 
             jooq
-                    .select(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_HASH)
+                    .select(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_HASH)
                     .from(tableName)
-                    .where(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_REQUEST_ID.eq(0))
+                    .where(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_REQUEST_ID.eq(0))
                     .fetchOne()
                     .value1()
         }

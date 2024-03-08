@@ -67,38 +67,3 @@ function test_query_transaction_receipt() {
     assert_equals(get_transaction_receipt_data_by_transaction_data(contract_address, function_name, parameter_types, parameter_values, network_id), expected_receipt);
 }
 
-function test_get_transaction_error_data() {
-
-    rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "address", "myFunction-0", transaction_status.FAILURE, 0),
-        create_test_evm_submit_transaction(x"01", "address", "myFunction-1", transaction_status.QUEUED, 0),
-        create_test_evm_submit_transaction(x"02", "address", "myFunction-2", transaction_status.TAKEN, 0)
-    ).run();
-
-    val transaction_0_row_id = evm_submit_transaction @ { .id == x"00" } (.rowid);
-    val transaction_1_row_id = evm_submit_transaction @ { .id == x"01" } (.rowid);
-
-    rell.test.tx().op(
-        add_evm_transaction_errors_op(transaction_0_row_id.to_integer(), [
-            transaction_error_data(123, rpc_url = null, message = "Failed to get balance"),
-            transaction_error_data(150, rpc_url = "http://evm-1:12345", message = "Connection issue")
-        ]),
-        add_evm_transaction_errors_op(transaction_1_row_id.to_integer(), [
-            transaction_error_data(150, rpc_url = "http://evm-1:12345", message = "Connection issue")
-        ])
-    ).sign(rell.test.keypairs.alice).run();
-
-    val transaction_0_errors = get_transaction_error_data(x"00");
-    assert_equals(transaction_0_errors.size(), 2);
-    assert_equals(transaction_0_errors[0].message, "Failed to get balance");
-    assert_equals(transaction_0_errors[1].message, "Connection issue");
-
-    val transaction_1_errors = get_transaction_error_data(x"01");
-    assert_equals(transaction_1_errors.size(), 1);
-    assert_equals(transaction_1_errors[0].rpc_url, "http://evm-1:12345");
-    assert_equals(transaction_1_errors[0].message, "Connection issue");
-    assert_equals(transaction_1_errors[0].provider, rell.test.keypairs.alice.pub);
-
-    val transaction_2_errors = get_transaction_error_data(x"02");
-    assert_equals(transaction_2_errors.size(), 0);
-}

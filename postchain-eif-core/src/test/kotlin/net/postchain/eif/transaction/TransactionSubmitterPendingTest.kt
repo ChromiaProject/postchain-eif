@@ -10,8 +10,6 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
-import org.mockito.kotlin.mockingDetails
-import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.Request
@@ -37,15 +35,12 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
             mock<ContractGasProvider>()
         )
 
-
         // Fails on getting receipt
         ts.pollPendingTransaction(
             "tx-hash",
             mkEvmPendingDbTx()
         )
 
-        assertThat(mockingDetails(databaseOperations).invocations.size).isEqualTo(1)
-        verify(databaseOperations, times(0)).setPendingTransactionSuccess(any(), any(), any())
         verify(databaseOperations).recordTransactionError(
             any(),
             eq(0L),
@@ -74,7 +69,6 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
 
         assertThat(txPending.status).isEqualTo(PendingTxStatus.REVERTED)
 
-        verify(databaseOperations).setPendingTransactionSuccess(any(), eq(txPending.rowId), eq(PendingTxStatus.REVERTED))
         verify(databaseOperations).recordTransactionError(
             any(),
             eq(txPending.rowId),
@@ -98,12 +92,14 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         val txPending = mkEvmPendingDbTx(5)
 
         mockWeb3jRequest(web3jRequestHandler, EthGetTransactionReceipt::class, mockTransactionReceiptResponse(10, false))
-        mockWeb3jRequest(web3jRequestHandler, EthTransaction::class, mockEthTransactionResponse("contract-address", "0x4c624ed7"))
+        mockWeb3jRequest(web3jRequestHandler, EthTransaction::class, mockEthTransactionResponse(
+            "contractAddress",
+            "0xe71731e4000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000101010101010101010101010101010101010101"
+        ))
         ts.pollPendingTransaction("tx-hash", txPending)
 
         assertThat(txPending.status).isEqualTo(PendingTxStatus.REVERTED)
 
-        verify(databaseOperations).setPendingTransactionSuccess(any(), eq(txPending.rowId), eq(PendingTxStatus.REVERTED))
         verify(databaseOperations).recordTransactionError(
             any(),
             eq(txPending.rowId),
@@ -131,18 +127,21 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         ts.pollPendingTransaction("tx-hash", txPending)
 
         assertThat(txPending.blockNumber!!.toLong()).isEqualTo(5)
-        assertThat(txPending.status).isEqualTo(PendingTxStatus.NOTHING_VERIFIED)
+        assertThat(txPending.status).isEqualTo(PendingTxStatus.VERIFYING)
 
         // Second poll with block number 6 - nothing has changed since we wait for 5 blocks
         mockWeb3jRequest(web3jRequestHandler, EthGetTransactionReceipt::class, mockTransactionReceiptResponse(6, true))
         ts.pollPendingTransaction("tx-hash", txPending)
 
         assertThat(txPending.blockNumber!!.toLong()).isEqualTo(5)
-        assertThat(txPending.status).isEqualTo(PendingTxStatus.NOTHING_VERIFIED)
+        assertThat(txPending.status).isEqualTo(PendingTxStatus.VERIFYING)
 
         // Third poll with block number 10 - evm has built 5 blocks - lets verify everything
         mockWeb3jRequest(web3jRequestHandler, EthGetTransactionReceipt::class, mockTransactionReceiptResponse(10, true))
-        mockWeb3jRequest(web3jRequestHandler, EthTransaction::class, mockEthTransactionResponse("contract-address", "0x4c624ed7"))
+        mockWeb3jRequest(web3jRequestHandler, EthTransaction::class, mockEthTransactionResponse(
+            "contractAddress",
+            "0xe71731e4000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000101010101010101010101010101010101010101"
+        ))
         ts.pollPendingTransaction("tx-hash", txPending)
 
         assertThat(txPending.blockNumber!!.toLong()).isEqualTo(10)
@@ -150,7 +149,5 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         assertThat(txPending.blockHash).isNotNull()
         assertThat(txPending.effectiveGasPrice).isNotNull()
         assertThat(txPending.gasUsed).isNotNull()
-
-        verify(databaseOperations).setPendingTransactionSuccess(any(), eq(txPending.rowId), eq(PendingTxStatus.SUCCESS))
     }
 }

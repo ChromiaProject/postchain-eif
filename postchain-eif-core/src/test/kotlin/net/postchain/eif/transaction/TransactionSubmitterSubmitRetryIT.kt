@@ -63,7 +63,7 @@ class TransactionSubmitterSubmitRetryIT : EifBaseIntegrationTest(
 
         val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
 
-        val evmSubmitTransactionRequest = EvmSubmitTransactionRequest(
+        val evmSubmitTxRellRequest = EvmSubmitTxRellRequest(
             0,
                 contractAddress,
                 "updateValidators",
@@ -73,7 +73,7 @@ class TransactionSubmitterSubmitRetryIT : EifBaseIntegrationTest(
             BlockchainRid.ZERO_RID.data,
             System.currentTimeMillis()
         )
-        txSubmitterTestModule.addTxToQueue(evmSubmitTransactionRequest)
+        txSubmitterTestModule.addTxToQueue(evmSubmitTxRellRequest)
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
             assertTrue(txSubmitterTestModule.conf.queue.isEmpty())
@@ -85,7 +85,7 @@ class TransactionSubmitterSubmitRetryIT : EifBaseIntegrationTest(
         }
 
         // Verify errors in table
-        withDbErrors(node, evmSubmitTransactionRequest.rowId) {
+        withDbErrors(node, evmSubmitTxRellRequest.rowId) {
 
             assertThat(it.size).isEqualTo(2)
 
@@ -102,25 +102,20 @@ class TransactionSubmitterSubmitRetryIT : EifBaseIntegrationTest(
             assertThat(it[1].get(EVM_TX_ERRORS_COLUMN_STACK_TRACE)).isNotNull()
         }
 
+        withDbErrors(node, evmSubmitTxRellRequest.rowId) {
+
+            assertThat(it.size).isEqualTo(2)
+
+            assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_TIMESTAMP)).isNotNull()
+            assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_RPC_URL)).isEqualTo("http://127.0.0.1:8888")
+            assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_MESSAGE)).isEqualTo("Failed to send transaction 0: Failed to connect to /127.0.0.1:8888")
+
+            assertThat(it[1].get(EVM_TX_ERRORS_COLUMN_TIMESTAMP)).isNotNull()
+            assertThat(it[1].get(EVM_TX_ERRORS_COLUMN_RPC_URL)).isEqualTo("http://127.0.0.1:9999")
+            assertThat(it[1].get(EVM_TX_ERRORS_COLUMN_MESSAGE)).isEqualTo("Failed to send transaction 0: Failed to connect to /127.0.0.1:9999")
+        }
+
         // Operation was successfully on 3rd try
-        withDbPending(node, evmSubmitTransactionRequest.rowId) {
-            assertThat(it.get(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_PENDING_COLUMN_HASH)).isNotNull()
-        }
-
-        withAddEvmTransactionError(txSubmitterTestModule, evmSubmitTransactionRequest.rowId) {
-
-//            assertThat(it.size).isEqualTo(1)
-
-            val operation = it[0]
-            assertThat(operation.size).isEqualTo(2)
-
-            assertThat(operation[0].timestamp).isNotNull()
-            assertThat(operation[0].rpcUrl).isEqualTo("http://127.0.0.1:8888")
-            assertThat(operation[0].message).isEqualTo("Failed to send transaction 0: Failed to connect to /127.0.0.1:8888")
-
-            assertThat(operation[1].timestamp).isNotNull()
-            assertThat(operation[1].rpcUrl).isEqualTo("http://127.0.0.1:9999")
-            assertThat(operation[1].message).isEqualTo("Failed to send transaction 0: Failed to connect to /127.0.0.1:9999")
-        }
+        assertStatusOperation(txSubmitterTestModule, 0, RellTransactionStatus.SUCCESS)
     }
 }

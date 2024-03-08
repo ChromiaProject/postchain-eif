@@ -3,8 +3,7 @@ package net.postchain.eif.transaction.anchoring
 import net.postchain.common.BlockchainRid
 import net.postchain.common.hexStringToByteArray
 import net.postchain.core.TxEContext
-import net.postchain.eif.transaction.EvmSubmitTransactionRequest
-import net.postchain.eif.transaction.RellTransactionStatus
+import net.postchain.eif.transaction.EvmSubmitTxRellRequest
 import net.postchain.eif.transaction.TransactionSubmitterTestContext
 import net.postchain.eif.transaction.TransactionSubmitterTestGTXModule
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.ANCHOR_SYSTEM_ANCHORING_BLOCK_OP
@@ -39,7 +38,7 @@ class AnchorOperation(private val conf: TransactionSubmitterTestContext, private
     override fun checkCorrectness() {}
 
     override fun apply(ctx: TxEContext): Boolean {
-        conf.queue.offer(EvmSubmitTransactionRequest(
+        conf.queue.offer(EvmSubmitTxRellRequest(
                 0,
                 "39615b16b74589919c9ce1ea73f1fc5d53141a78", // TODO: Fetch contract address instead of hardcoding
                 "anchorBlock",

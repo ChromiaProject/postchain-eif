@@ -9,14 +9,7 @@ import net.postchain.devtools.utils.configuration.NodeSeqNumber
 import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.EvmType
 import net.postchain.eif.contracts.Validator
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_PENDING_COLUMN_BC_PERSISTED
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_PENDING_COLUMN_BLOCK_HASH
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_PENDING_COLUMN_EFFECTIVE_GAS_PRICE
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_PENDING_COLUMN_GAS_USAGE
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_PENDING_COLUMN_HASH
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_PENDING_COLUMN_REQUEST_ID
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_PENDING_COLUMN_STATUS
-import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.ADD_EVM_TRANSACTION_ERRORS
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_ERRORS_COLUMN_MESSAGE
 import net.postchain.gtv.GtvFactory.gtv
 import org.apache.commons.configuration2.MapConfiguration
 import org.awaitility.Awaitility
@@ -69,7 +62,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
 
         val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
 
-        val evmSubmitTransactionRequest = EvmSubmitTransactionRequest(
+        val evmSubmitTxRellRequest = EvmSubmitTxRellRequest(
             0,
             contractAddress,
             "updateValidators",
@@ -79,38 +72,26 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
             BlockchainRid.ZERO_RID.data,
             System.currentTimeMillis()
         )
-        txSubmitterTestModule.addTxToQueue(evmSubmitTransactionRequest)
+        txSubmitterTestModule.addTxToQueue(evmSubmitTxRellRequest)
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
             assertTrue(txSubmitterTestModule.conf.queue.isEmpty())
             assertTrue(txSubmitterTestModule.conf.taken.contains(0))
-            assertStatusOperation(txSubmitterTestModule, evmSubmitTransactionRequest.rowId, RellTransactionStatus.TAKEN)
+            assertStatusOperation(txSubmitterTestModule, evmSubmitTxRellRequest.rowId, RellTransactionStatus.TAKEN)
         }
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
             assertStatusOperation(
                 txSubmitterTestModule,
-                evmSubmitTransactionRequest.rowId,
+                evmSubmitTxRellRequest.rowId,
                 RellTransactionStatus.PENDING
             )
         }
 
-        withTxOperations(txSubmitterTestModule, ADD_EVM_TRANSACTION_ERRORS) {
+        withDbErrors(node, evmSubmitTxRellRequest.rowId) {
             assertThat(it.size).isEqualTo(0)
-        }
-
-        // Transaction added to pending table
-        withDbPending(node, evmSubmitTransactionRequest.rowId) {
-
-            val txHash = it.get(EVM_TX_PENDING_COLUMN_HASH)
-
-            assertThat(it.get(EVM_TX_PENDING_COLUMN_REQUEST_ID)).isEqualTo(0)
-            assertThat(it.get(EVM_TX_PENDING_COLUMN_STATUS)).isEqualTo(PendingTxStatus.NOTHING_VERIFIED.name)
-            assertThat(txHash).isNotNull()
-
-            assertThat(web3j.ethGetTransactionByHash(txHash).send().result).isNotNull()
         }
     }
 
@@ -125,38 +106,21 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
         val sendResult =
             sendTransaction(contractAddress)
 
-        val evmSubmitTransactionRequest = EvmPendingRellTx(
-            0,
-            1337,
-            contractAddress,
-            "updateValidators",
-            listOf("address[]"),
-            listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
-            sendResult!!.transactionHash
-        )
+        val evmSubmitTransactionRequest = mkEvmPendingRellTx(sendResult!!.transactionHash, contractAddress)
+
         txSubmitterTestModule.addGetPendingTransactions(evmSubmitTransactionRequest)
 
         // Exists and might have the first receipt - but we don't know since it is asynchronous
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
 
-            withDbPending(node, evmSubmitTransactionRequest.rowId) {
-
-                assertThat(it.get(EVM_TX_PENDING_COLUMN_REQUEST_ID)).isEqualTo(0)
+            val txExistsAsPending: Boolean? = withTxSubmitter(txSubmitterTestModule, 0) { _, _ ->
+                true
             }
+            assertThat(txExistsAsPending).isNotNull().isEqualTo(true)
         }
 
         // After a few evm blocks (0 in this test) verify receipt
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
-            withDbPending(node, evmSubmitTransactionRequest.rowId) {
-                assertThat(it.get(EVM_TX_PENDING_COLUMN_STATUS)).isEqualTo(PendingTxStatus.SUCCESS.name)
-                assertThat(it.get(EVM_TX_PENDING_COLUMN_BLOCK_HASH)).isNotNull()
-                assertThat(it.get(EVM_TX_PENDING_COLUMN_EFFECTIVE_GAS_PRICE)).isNotNull()
-                assertThat(it.get(EVM_TX_PENDING_COLUMN_GAS_USAGE)).isNotNull()
-            }
-        }
-
-        // Write validation result to BC after consensus is reached
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
             assertStatusOperation(
@@ -181,7 +145,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
 
         val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
 
-        val evmSubmitTransactionRequest = EvmSubmitTransactionRequest(
+        val evmSubmitTxRellRequest = EvmSubmitTxRellRequest(
             0,
             contractAddress,
             "updateValidators",
@@ -191,58 +155,36 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
             BlockchainRid.ZERO_RID.data,
             System.currentTimeMillis()
         )
-        txSubmitterTestModule.addTxToQueue(evmSubmitTransactionRequest)
+        txSubmitterTestModule.addTxToQueue(evmSubmitTxRellRequest)
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
             assertTrue(txSubmitterTestModule.conf.queue.isEmpty())
             assertTrue(txSubmitterTestModule.conf.taken.contains(0))
-            assertStatusOperation(txSubmitterTestModule, evmSubmitTransactionRequest.rowId, RellTransactionStatus.TAKEN)
+            assertStatusOperation(txSubmitterTestModule, evmSubmitTxRellRequest.rowId, RellTransactionStatus.TAKEN)
         }
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
             assertStatusOperation(
                 txSubmitterTestModule,
-                evmSubmitTransactionRequest.rowId,
+                evmSubmitTxRellRequest.rowId,
                 RellTransactionStatus.PENDING
             )
         }
 
-        withTxOperations(txSubmitterTestModule, ADD_EVM_TRANSACTION_ERRORS) {
+        withDbErrors(node, evmSubmitTxRellRequest.rowId) {
             assertThat(it.size).isEqualTo(0)
-        }
-
-        // Transaction added to pending table
-        withDbPending(node, evmSubmitTransactionRequest.rowId) {
-
-            val txHash = it.get(EVM_TX_PENDING_COLUMN_HASH)
-
-            assertThat(it.get(EVM_TX_PENDING_COLUMN_REQUEST_ID)).isEqualTo(0)
-            assertThat(it.get(EVM_TX_PENDING_COLUMN_STATUS)).isEqualTo(PendingTxStatus.NOTHING_VERIFIED.name)
-            assertThat(txHash).isNotNull()
-
-            assertThat(web3j.ethGetTransactionByHash(txHash).send().result).isNotNull()
         }
 
         // Exists and might have the first receipt - but we don't know since it is asynchronous
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
 
-            withDbPending(node, evmSubmitTransactionRequest.rowId) {
-
-                assertThat(it.get(EVM_TX_PENDING_COLUMN_REQUEST_ID)).isEqualTo(0)
+            val txExistsAsPending: Boolean? = withTxSubmitter(txSubmitterTestModule, 0) { _, _ ->
+                true
             }
-        }
-
-        // After a few evm blocks (0 in this test) verify receipt
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
-            withDbPending(node, evmSubmitTransactionRequest.rowId) {
-                assertThat(it.get(EVM_TX_PENDING_COLUMN_STATUS)).isEqualTo(PendingTxStatus.SUCCESS.name)
-                assertThat(it.get(EVM_TX_PENDING_COLUMN_BLOCK_HASH)).isNotNull()
-                assertThat(it.get(EVM_TX_PENDING_COLUMN_EFFECTIVE_GAS_PRICE)).isNotNull()
-                assertThat(it.get(EVM_TX_PENDING_COLUMN_GAS_USAGE)).isNotNull()
-            }
+            assertThat(txExistsAsPending).isNotNull().isEqualTo(true)
         }
 
         // Write validation result to BC after consensus is reached
@@ -250,10 +192,10 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
             buildBlock(1L)
             assertStatusOperation(
                 txSubmitterTestModule,
-                evmSubmitTransactionRequest.rowId,
+                evmSubmitTxRellRequest.rowId,
                 RellTransactionStatus.SUCCESS
             )
-            withUpdateEvmTransactionReceipt(txSubmitterTestModule, evmSubmitTransactionRequest.rowId) {
+            withUpdateEvmTransactionReceipt(txSubmitterTestModule, evmSubmitTxRellRequest.rowId) {
                 assertThat(it.size).isEqualTo(1)
                 assertThat(it[0].blockHash).isNotNull()
                 assertThat(it[0].effectiveGasPrice).isEqualTo(4100000000)
@@ -269,7 +211,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
 
         val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
 
-        val evmSubmitTransactionRequest = EvmSubmitTransactionRequest(
+        val evmSubmitTxRellRequest = EvmSubmitTxRellRequest(
             0,
             contractAddress,
             "updateValidators",
@@ -279,7 +221,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
             BlockchainRid.ZERO_RID.data,
             System.currentTimeMillis()
         )
-        txSubmitterTestModule.addTxToQueue(evmSubmitTransactionRequest)
+        txSubmitterTestModule.addTxToQueue(evmSubmitTxRellRequest)
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
@@ -298,37 +240,139 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
         val node = nodes[0]
 
         assertThat(countDbSubmit(node)).isEqualTo(2)
-        assertThat(countDPending(node)).isEqualTo(2)
         assertThat(countDErrors(node)).isEqualTo(2)
 
         buildBlock(1L)
 
         assertThat(countDbSubmit(node)).isEqualTo(1)
-        assertThat(countDPending(node)).isEqualTo(1)
         assertThat(countDErrors(node)).isEqualTo(1)
+    }
+
+    @Test
+    fun `submit transaction in multi node env - successfully`() {
+
+        val nodes = createNodes(4, "/net/postchain/eif/transaction/blockchain_config_4_nodes.xml")
+
+        val allTxSubmitterTestModules =
+            nodes.map { it.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first() }
+
+        val txSubmit = EvmSubmitTxRellRequest(
+            0,
+            contractAddress,
+            "updateValidators",
+            listOf("address[]"),
+            listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
+            1337,
+            BlockchainRid.ZERO_RID.data,
+            System.currentTimeMillis()
+        )
+
+        // Mock rell status for other nodes to be able to verify the operation
+        allTxSubmitterTestModules.forEach { it.addGetTransactionStatus(txSubmit.rowId, RellTransactionStatus.QUEUED) }
+
+        // Make it available for node[0]
+        allTxSubmitterTestModules[0].addTxToQueue(txSubmit)
+
+        // node[0] will give it a try and succeed
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            buildBlock(1L)
+            assertTrue(allTxSubmitterTestModules[0].conf.queue.isEmpty())
+            assertStatusOperation(allTxSubmitterTestModules[0], txSubmit.rowId, RellTransactionStatus.TAKEN)
+        }
+
+        // Mock rell status for other nodes to be able to verify the operation
+        allTxSubmitterTestModules.forEach { it.addGetTransactionStatus(txSubmit.rowId, RellTransactionStatus.TAKEN) }
+
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            buildBlock(1L)
+            assertStatusOperation(allTxSubmitterTestModules[0], txSubmit.rowId, RellTransactionStatus.PENDING)
+        }
+
+        // Mock rell status for other nodes to be able to verify the operation
+        allTxSubmitterTestModules.forEach { it.addGetTransactionStatus(txSubmit.rowId, RellTransactionStatus.PENDING) }
+
+        // Make sure node[1] updates the status to PENDING with a tx hash
+        val txHash: String? = withTxOperations(
+            allTxSubmitterTestModules[0],
+            TransactionSubmitterSpecialTxExtension.UPDATE_EVM_TRANSACTION_STATUS
+        ) { operations ->
+            val statusOperations = operations
+                .filter {
+                    it.args[0].asInteger() == txSubmit.rowId &&
+                            RellTransactionStatus.values()[it.args[1].asInteger()
+                                .toInt()] == RellTransactionStatus.PENDING &&
+                            it.args.size == 3
+                }
+                .map { it.args[2].asString() }
+
+            if (statusOperations.isNotEmpty()) statusOperations[0] else null
+        }
+
+        // Make the pending transaction available for all nodes to verify
+        allTxSubmitterTestModules.forEach {
+            it.addGetPendingTransactions(
+                EvmPendingRellTx(
+                    txSubmit.rowId,
+                    txSubmit.networkId,
+                    txSubmit.contractAddress,
+                    txSubmit.functionName,
+                    txSubmit.parameterTypes,
+                    txSubmit.parameterValues,
+                    txHash!!
+                )
+            )
+        }
+
+//        nodes.forEach { node ->
+//            Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+//
+//                // Let the healthy nodes build the block
+//                buildBlock(1L)
+//
+//                val txExistsAndVerified: Boolean? = withTxSubmitter(allTxSubmitterTestModules, 0) { txSubmitter, pendingTx ->
+//                    // Pending tx found in this txSubmitter - is the verification completed?
+//                    val verifiedTxs = txSubmitter.getVerifiedTransactions(0)
+//                    verifiedTxs.any { it.rowId == 0L }
+//                }
+//                assertThat(txExistsAndVerified).isNotNull().isEqualTo(true)
+//            }
+//        }
+//
+//        // One node got to set the status SUCCESS
+//        assertTrue(allTxSubmitterTestModules.any { it.conf.successfulTxs.contains(0) })
+
+        // One node got to set the status SUCCESS
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            buildBlock(nodes.toList(), 1L)
+            assertTrue(allTxSubmitterTestModules.any { it.conf.successfulTxs.contains(0) })
+        }
     }
 
     // This test brings up 4 nodes for processing an evm transaction.
     // node[0] is configured with a incorrect evm rpc url which will make it fail
     // Once node[0] fails node[1] till retry and succeed.
     @Test
-    fun `submit transaction in multi node env`() {
+    fun `submit transaction in multi node env - successfully but with one failing node`() {
 
         nodeConfigOverrides[NodeSeqNumber(0)] =
-            MapConfiguration(mutableMapOf(
-                "ethereum.urls" to "http://127.0.0.1:1",
-                "evm.healthCheckInterval" to -1
-            ))
+            MapConfiguration(
+                mutableMapOf(
+                    "ethereum.urls" to "http://127.0.0.1:1",
+                    "evm.healthCheckInterval" to -1
+                )
+            )
 
         val nodes = createNodes(4, "/net/postchain/eif/transaction/blockchain_config_4_nodes.xml")
         val nodesExceptFirst = listOf(nodes[1], nodes[2], nodes[3])
 
-        val allTxSubmitterTestModules = nodes.map { it.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first() }
+        val allTxSubmitterTestModules =
+            nodes.map { it.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first() }
         val txSubmitterTestModule0 = allTxSubmitterTestModules[0]
         val txSubmitterTestModule1 = allTxSubmitterTestModules[1]
-        val allTxSubmitterTestModulesExceptFirst = listOf(allTxSubmitterTestModules[0], allTxSubmitterTestModules[1], allTxSubmitterTestModules[2])
+        val allTxSubmitterTestModulesExceptFirst =
+            listOf(allTxSubmitterTestModules[0], allTxSubmitterTestModules[1], allTxSubmitterTestModules[2])
 
-        val txSubmit = EvmSubmitTransactionRequest(
+        val txSubmit = EvmSubmitTxRellRequest(
             0,
             contractAddress,
             "updateValidators",
@@ -359,10 +403,9 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
             assertStatusOperation(txSubmitterTestModule0, txSubmit.rowId, RellTransactionStatus.QUEUED)
-            assertErrorOperation(txSubmitterTestModule0, 0) {
+            withDbErrors(nodes[0], 0) {
                 assertThat(it.size).isEqualTo(1)
-                assertThat(it[0].size).isEqualTo(1)
-                assertThat(it[0][0].message).isEqualTo("Failed to get balance for request id 0: Failed to send web3j request to all 1 nodes")
+                assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_MESSAGE)).isEqualTo("Failed to get balance for request id 0: Failed to send web3j request to all 1 nodes")
             }
         }
 
@@ -388,10 +431,8 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
             assertStatusOperation(txSubmitterTestModule0, txSubmit.rowId, RellTransactionStatus.PENDING)
         }
 
-
         // Mock rell status for other nodes to be able to verify the operation
         allTxSubmitterTestModules.forEach { it.addGetTransactionStatus(txSubmit.rowId, RellTransactionStatus.PENDING) }
-
 
         // Make sure node[1] updates the status to PENDING with a tx hash
         val txHash: String? = withTxOperations(
@@ -425,29 +466,10 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
             )
         }
 
-        // All except frist node should get SUCCESS
-        nodesExceptFirst.forEach { node ->
-            Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
-
-                // Let the healthy nodes build the block
-                buildBlock(nodesExceptFirst, 1L)
-
-                withDbPending(node, txSubmit.rowId) {
-
-                    assertThat(it.get(EVM_TX_PENDING_COLUMN_REQUEST_ID)).isEqualTo(0)
-                    assertThat(it.get(EVM_TX_PENDING_COLUMN_HASH)).isEqualTo(txHash)
-                    assertThat(it.get(EVM_TX_PENDING_COLUMN_STATUS)).isEqualTo(PendingTxStatus.SUCCESS.name)
-                    assertThat(it.get(EVM_TX_PENDING_COLUMN_BC_PERSISTED)).isEqualTo(true)
-                }
-            }
-        }
-
-        // Do nodes agree on transaction result?
-        allTxSubmitterTestModulesExceptFirst.forEach {
-            Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
-                buildBlock(1L)
-                assertStatusOperation(it, txSubmit.rowId, RellTransactionStatus.SUCCESS)
-            }
+        // One node got to set the status SUCCESS
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            buildBlock(nodesExceptFirst, 1L)
+            assertTrue(allTxSubmitterTestModulesExceptFirst.any { it.conf.successfulTxs.contains(0) })
         }
     }
 }

@@ -188,7 +188,6 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
             0,
             Long.MAX_VALUE,
             LinkedBlockingQueue(),
-            mutableMapOf(),
             BigInteger.valueOf(10),
             Long.MAX_VALUE,
             24 * 60 * 60000,

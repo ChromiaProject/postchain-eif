@@ -65,6 +65,10 @@ class TransactionSubmitterStartupIT : EifBaseIntegrationTest(
         val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
 
         txSubmitterTestModule.addGetTransactionStatus(0, RellTransactionStatus.QUEUED)
+        txSubmitterTestModule.addGetPendingTransactions(mkEvmPendingRellTx(
+            "tx-hash",
+            contractAddress,
+        ))
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)

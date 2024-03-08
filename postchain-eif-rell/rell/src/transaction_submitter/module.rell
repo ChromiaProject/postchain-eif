@@ -23,10 +23,6 @@ operation __update_evm_transaction_receipt(row_id: integer, block_hash: text, ef
     update evm_submit_transaction @ { rowid(row_id) } (.block_hash = block_hash, .effective_gas_price = effective_gas_price, .gas_usage = gas_usage);
 }
 
-operation __add_evm_transaction_errors(row_id: integer, errors: list<transaction_error_data>) {
-    add_evm_transaction_errors(row_id, errors);
-}
-
 operation __begin_block(height: integer) {
     timeout_evm_transactions();
     fail_transactions_with_enough_retries(chain_context.args.node_retry_strategy);
@@ -53,14 +49,6 @@ entity evm_submit_transaction_taken_by {
     key transaction: evm_submit_transaction, provider: pubkey;
 }
 
-entity evm_submit_transaction_error {
-    index transaction: evm_submit_transaction;
-    provider: pubkey;
-    timestamp;
-    rpc_url: text = "";
-    message: text;
-}
-
 struct evm_submit_transaction_data {
     row_id: integer;
     contract_address: text;
@@ -71,7 +59,7 @@ struct evm_submit_transaction_data {
     sender: byte_array;
     status: transaction_status;
     timestamp: timestamp;
-    ts_hash: text? = null;
+    tx_hash: text? = null;
 }
 
 struct evm_pending_transaction_data {
@@ -181,7 +169,8 @@ query fetch_oldest_queued_transactions_per_contract(exclude_taken_by_key: pubkey
                     network_id = .network_id,
                     sender = .sender,
                     status = .status,
-                    timestamp = .timestamp))
+                    timestamp = .timestamp,
+                    tx_hash = .tx_hash))
             limit 1;
             result.add(evm_submit_transaction);
         }
@@ -218,30 +207,11 @@ function fail_transactions_with_enough_retries(strategy: node_retry_strategy) {
     for (transaction in transactions) {
         if (strategy == node_retry_strategy.ALL and transaction.providers >= signers) {
             update_evm_transaction_status(transaction.rowid.to_integer(), transaction_status.FAILURE);
-            add_evm_transaction_error(transaction.rowid.to_integer(), "All available nodes failed to execute transaction");
+            log("Transaction %s failed - all available nodes failed to execute transaction".format());
         } else if (strategy == node_retry_strategy.SUPERMAJORITY and is_supermajority(transaction.providers, signers)) {
             update_evm_transaction_status(transaction.rowid.to_integer(), transaction_status.FAILURE);
-            add_evm_transaction_error(transaction.rowid.to_integer(), "A supermajority of nodes failed to execute transaction");
+            log("Transaction %s failed - A supermajority of nodes failed to execute transaction".format());
         }
-    }
-}
-
-function add_evm_transaction_error(row_id: integer, message: text) {
-    add_evm_transaction_errors(row_id, [transaction_error_data(get_last_blocktime(), rpc_url = null, message)]);
-}
-
-function add_evm_transaction_errors(row_id: integer, errors: list<transaction_error_data>) {
-
-    val transaction = evm_submit_transaction @ { rowid(row_id) };
-
-    for (error in errors) {
-
-        create evm_submit_transaction_error(
-            transaction,
-            op_context.get_signers()[0],
-            error.timestamp,
-            rpc_url = error.rpc_url ?: "",
-            message = error.message);
     }
 }
 

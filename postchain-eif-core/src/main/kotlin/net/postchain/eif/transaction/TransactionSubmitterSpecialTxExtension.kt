@@ -5,7 +5,6 @@ import net.postchain.base.SpecialTransactionPosition
 import net.postchain.common.BlockchainRid
 import net.postchain.core.BlockEContext
 import net.postchain.crypto.CryptoSystem
-import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvNull
@@ -19,7 +18,6 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     companion object : KLogging() {
         const val UPDATE_EVM_TRANSACTION_STATUS = "__update_evm_transaction_status"
         const val UPDATE_EVM_TRANSACTION_RECEIPT = "__update_evm_transaction_receipt"
-        const val ADD_EVM_TRANSACTION_ERRORS = "__add_evm_transaction_errors"
         const val EVM_TX_NO_OP = "__evm_tx_no_op"
 
         const val FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT = "fetch_oldest_queued_transactions_per_contract"
@@ -100,7 +98,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                                         (newTxStatus == RellTransactionStatus.FAILURE && txPending.status == PendingTxStatus.REVERTED)
 
                             if (acceptable) {
-                                bctx.addAfterCommitHook { txSubmitter.setPendingBcCPersisted(requestId) }
+                                bctx.addAfterCommitHook { txSubmitter.removePendingTx(requestId) }
                             }
 
                             acceptable
@@ -117,9 +115,15 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
                 val valid = withTxPending(requestId) { _, txPending ->
 
-                    txPending.blockHash != null && txPending.blockHash == blockHash &&
+                    val match = txPending.blockHash != null && txPending.blockHash == blockHash &&
                             txPending.effectiveGasPrice != null && txPending.effectiveGasPrice!! == effectiveGasPrice &&
                             txPending.gasUsed != null && txPending.gasUsed!! == gasUsage
+
+                    if (!match) {
+                        logger.warn { "Validation failed. Receipt for transaction $requestId does not match this nodes receipt. Op receipt: block hash: $blockHash, effective gas price: $effectiveGasPrice, gas usage: $gasUsage. This nodes receipt: block hash: ${txPending.blockHash}, effective gas price: ${txPending.effectiveGasPrice}, gas usage: ${txPending.gasUsed}" }
+                    }
+
+                    match
                 }
 
                 if (valid == false) {
@@ -151,8 +155,6 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                     operations.add(OpData(EVM_TX_NO_OP, arrayOf(gtv(bctx.height))))
                 }
 
-                addTransactionErrors(txSubmitter, rowId, operations)
-
                 // We have processed this TX - cleanup
                 if (result.status != RellTransactionStatus.TAKEN) {
                     bctx.addAfterCommitHook { txSubmitter.setSubmitBCPersisted(rowId) }
@@ -182,44 +184,11 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                             )
                         )
                     )
-                } else {
-
-                    addTransactionErrors(txSubmitter, it.rowId, operations)
                 }
             }
         }
 
         return operations
-    }
-
-    private fun addTransactionErrors(
-        submitter: TransactionSubmitter,
-        rowId: Long,
-        operations: MutableList<OpData>
-    ) {
-        val transactionErrors = submitter
-            .getTransactionErrors(rowId)
-            .map {
-                GtvArray(
-                    arrayOf(
-                        gtv(it.timestamp.time),
-                        gtv(ByteArray(0)),
-                        gtv(it.rpcUrl ?: ""),
-                        gtv(it.message),
-                    )
-                )
-            }
-
-        if (transactionErrors.isNotEmpty()) {
-            operations.add(
-                OpData(
-                    ADD_EVM_TRANSACTION_ERRORS, arrayOf(
-                        gtv(rowId),
-                        gtv(transactionErrors)
-                    )
-                )
-            )
-        }
     }
 
     private fun addNewPendingTransactions(bctx: BlockEContext) {
@@ -234,11 +203,9 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                 it.addPendingTransaction(transaction)
             }
         }
-
-        // TODO cleanup transactions no longer pending on BC?
     }
 
-    private fun <T> withTxPending(requestId: Long, action: (TransactionSubmitter, EvmPendingDbTx) -> T): T? {
+    fun <T> withTxPending(requestId: Long, action: (TransactionSubmitter, EvmPendingTx) -> T): T? {
 
         for (txSubmitter in transactionSubmitters.values) {
 
@@ -269,14 +236,14 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         val entities =
             module.query(bctx, FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT, gtv(listOf(GtvByteArray(pubKey))))
         val queuedTransactions = entities.asArray().map {
-            it.toObject<EvmSubmitTransactionRequest>()
+            it.toObject<EvmSubmitTxRellRequest>()
         }
 
         val operations = mutableListOf<OpData>()
         queuedTransactions.forEach { transaction ->
 
             withTxSubmitter(transaction.networkId) {
-                bctx.addAfterCommitHook { it.enqueue(transaction) }
+                bctx.addAfterCommitHook { it.enqueue(EvmSubmitTxRequest.fromRell(transaction)) }
                 operations.add(
                     OpData(
                         UPDATE_EVM_TRANSACTION_STATUS,
@@ -292,7 +259,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     }
 
     override fun getRelevantOps(): Set<String> {
-        return setOf(UPDATE_EVM_TRANSACTION_STATUS, UPDATE_EVM_TRANSACTION_RECEIPT, ADD_EVM_TRANSACTION_ERRORS, EVM_TX_NO_OP)
+        return setOf(UPDATE_EVM_TRANSACTION_STATUS, UPDATE_EVM_TRANSACTION_RECEIPT, EVM_TX_NO_OP)
     }
 
     override fun init(module: GTXModule, chainID: Long, blockchainRID: BlockchainRid, cs: CryptoSystem) {

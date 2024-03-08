@@ -67,11 +67,9 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                             .toMap()
                     val gasProvider = StaticGasProvider(BigInteger.valueOf(networkBlockchainConfig.maxGasPrice), BigInteger.valueOf(transactionSubmitterBlockchainConfig.gasLimit))
                     val nodeTxTimeout = transactionSubmitterBlockchainConfig.nodeTxTimeout
-                    val queue = LinkedList<EvmSubmitTransactionRequest>()
-                    val pendingTransactions = mutableMapOf<String, EvmPendingDbTx>()
+                    val queue = LinkedList<EvmSubmitTxRequest>()
                     withReadConnection(postchainContext.sharedStorage, process.blockchainEngine.chainID) {
                         queue.addAll(databaseOperations.getQueuedTransactions(it, networkId))
-                        pendingTransactions.putAll(databaseOperations.getPendingTransactions(it, networkId))
                     }
                     val transactionSubmitter = TransactionSubmitter(
                             web3jRequestHandler,
@@ -83,7 +81,6 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                             networkId,
                             appConfig.txPollInterval,
                             queue,
-                            pendingTransactions,
                             BigInteger.valueOf(networkBlockchainConfig.minWalletBalance),
                             appConfig.healthCheckInterval,
                             nodeTxTimeout,

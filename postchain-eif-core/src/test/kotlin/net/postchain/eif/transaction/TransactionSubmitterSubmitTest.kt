@@ -37,16 +37,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
 
         val exception = assertThrows<RuntimeException>("Expected thrown exception") {
             ts.submitTransaction(
-                EvmSubmitTransactionRequest(
-                    0L,
-                    "",
-                    "function_name",
-                    listOf(),
-                    listOf(),
-                    0L,
-                    "".toByteArray(),
-                    System.currentTimeMillis()
-                )
+                mkEvmSubmitTxRequest()
             )
         }
         assertThat(exception.message).isEqualTo("Failed to get balance for request id 0: Oh dear")
@@ -77,22 +68,18 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
 
         val exception = assertThrows<RuntimeException>("Expected thrown exception") {
             ts.submitTransaction(
-                EvmSubmitTransactionRequest(
-                    0L,
-                    "",
-                    "function_name",
-                    listOf(),
-                    listOf(),
-                    0L,
-                    "".toByteArray(),
-                    System.currentTimeMillis()
-                )
+                mkEvmSubmitTxRequest()
             )
         }
         assertThat(exception.message).isEqualTo("Failed to get estimated gas usage for request id 0: Failed to get gas estimate")
 
         assertThat(mockingDetails(databaseOperations).invocations.size).isEqualTo(2)
-        verify(databaseOperations).recordTransactionGas(any(), eq(0L), eq(BigInteger.valueOf(5)), eq(BigInteger.valueOf(10)))
+        verify(databaseOperations).recordTransactionGas(
+            any(),
+            eq(0L),
+            eq(BigInteger.valueOf(5)),
+            eq(BigInteger.valueOf(10))
+        )
         verify(databaseOperations).recordTransactionError(
             any(),
             eq(0L),
@@ -118,22 +105,18 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
 
         val exception = assertThrows<RuntimeException>("Expected thrown exception") {
             ts.submitTransaction(
-                EvmSubmitTransactionRequest(
-                    0L,
-                    "",
-                    "function_name",
-                    listOf(),
-                    listOf(),
-                    0L,
-                    "".toByteArray(),
-                    System.currentTimeMillis()
-                )
+                mkEvmSubmitTxRequest()
             )
         }
         assertThat(exception.message).isEqualTo("Failed to send transaction to all 1 nodes")
 
         assertThat(mockingDetails(databaseOperations).invocations.size).isEqualTo(3)
-        verify(databaseOperations).recordTransactionGas(any(), eq(0L), eq(BigInteger.valueOf(5)), eq(BigInteger.valueOf(10)))
+        verify(databaseOperations).recordTransactionGas(
+            any(),
+            eq(0L),
+            eq(BigInteger.valueOf(5)),
+            eq(BigInteger.valueOf(10))
+        )
         verify(databaseOperations).recordTransactionError(
             any(),
             eq(0L),
@@ -168,22 +151,18 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
 
         val exception = assertThrows<RuntimeException>("Expected thrown exception") {
             ts.submitTransaction(
-                EvmSubmitTransactionRequest(
-                    0L,
-                    "",
-                    "function_name",
-                    listOf(),
-                    listOf(),
-                    0L,
-                    "".toByteArray(),
-                    System.currentTimeMillis()
-                )
+                mkEvmSubmitTxRequest()
             )
         }
         assertThat(exception.message).isEqualTo("Failed to send transaction to all 2 nodes")
 
         assertThat(mockingDetails(databaseOperations).invocations.size).isEqualTo(4)
-        verify(databaseOperations).recordTransactionGas(any(), eq(0L), eq(BigInteger.valueOf(5)), eq(BigInteger.valueOf(10)))
+        verify(databaseOperations).recordTransactionGas(
+            any(),
+            eq(0L),
+            eq(BigInteger.valueOf(5)),
+            eq(BigInteger.valueOf(10))
+        )
         verify(databaseOperations).recordTransactionError(
             any(),
             eq(0L),
@@ -206,4 +185,17 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
             anyString()
         )
     }
+
+    private fun mkEvmSubmitTxRequest() = EvmSubmitTxRequest(
+        EvmSubmitTxRellRequest(
+            0L,
+            "",
+            "function_name",
+            listOf(),
+            listOf(),
+            0L,
+            "".toByteArray(),
+            System.currentTimeMillis()
+        )
+    )
 }

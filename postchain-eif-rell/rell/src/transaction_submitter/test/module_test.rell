@@ -131,13 +131,7 @@ function test_fail_transactions_with_enough_retries_strategy_all() {
     ).sign(rell.test.keypairs.alice).run();
 
     assert_equals(evm_submit_transaction @ { .id == x"00"} (.status), transaction_status.QUEUED);
-
-    val failed_transaction = (evm_submit_transaction_error, evm_submit_transaction) @ {
-        evm_submit_transaction.id == x"01",
-        evm_submit_transaction_error.transaction == evm_submit_transaction
-    } (evm_submit_transaction.status, evm_submit_transaction_error.message);
-    assert_equals(failed_transaction.status, transaction_status.FAILURE);
-    assert_equals(failed_transaction.message, "All available nodes failed to execute transaction");
+    assert_equals(evm_submit_transaction @ { .id == x"01"} (.status), transaction_status.FAILURE);
 
     // Taken entities cleaned up
     assert_true(empty(evm_submit_transaction_taken_by @* {}));
@@ -156,13 +150,7 @@ function test_fail_transactions_with_enough_retries_strategy_supermajority() {
     ).sign(rell.test.keypairs.alice).run();
 
     assert_equals(evm_submit_transaction @ { .id == x"00"} (.status), transaction_status.QUEUED);
-
-    val failed_transaction = (evm_submit_transaction_error, evm_submit_transaction) @ {
-        evm_submit_transaction.id == x"01",
-        evm_submit_transaction_error.transaction == evm_submit_transaction
-    } (evm_submit_transaction.status, evm_submit_transaction_error.message);
-    assert_equals(failed_transaction.status, transaction_status.FAILURE);
-    assert_equals(failed_transaction.message, "A supermajority of nodes failed to execute transaction");
+    assert_equals(evm_submit_transaction @ { .id == x"01"} (.status), transaction_status.FAILURE);
 
     // Taken entities cleaned up
     assert_true(empty(evm_submit_transaction_taken_by @* {}));
@@ -183,37 +171,6 @@ function test_is_supermajority() {
     assert_true(is_supermajority(6, 8));
     assert_false(is_supermajority(40, 60));
     assert_true(is_supermajority(41, 60));
-}
-
-function test_add_evm_transaction_errors() {
-
-    rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "address", "myFunction-0", transaction_status.FAILURE, 0)
-    ).run();
-
-    val transaction_row_id = evm_submit_transaction @ { .id == x"00" } (.rowid);
-
-    rell.test.tx().op(
-        add_evm_transaction_errors_op(transaction_row_id.to_integer(), [
-            transaction_error_data(123, rpc_url = null, message = "Failed to get balance"),
-            transaction_error_data(150, rpc_url = "http://evm-1:12345", message = "Connection issue")
-        ])
-    ).sign(rell.test.keypairs.alice).run();
-
-    val errors = evm_submit_transaction_error @* { .transaction.rowid == transaction_row_id };
-    assert_equals(errors.size(), 2);
-
-    // First error
-    assert_equals(errors[0].timestamp, 123);
-    assert_equals(errors[0].provider, rell.test.keypairs.alice.pub);
-    assert_equals(errors[0].rpc_url, "");
-    assert_equals(errors[0].message, "Failed to get balance");
-
-    // Second error
-    assert_equals(errors[1].timestamp, 150);
-    assert_equals(errors[1].provider, rell.test.keypairs.alice.pub);
-    assert_equals(errors[1].rpc_url, "http://evm-1:12345");
-    assert_equals(errors[1].message, "Connection issue");
 }
 
 function test_timeout_evm_transaction(){
