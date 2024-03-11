@@ -23,7 +23,7 @@
             <plugin>
                 <groupId>net.postchain.rell</groupId>
                 <artifactId>rell-maven-plugin</artifactId>
-                <version>0.11.5</version>
+                <version>0.11.6</version>
                 <executions>
                     <execution>
                         <id>rell test</id>
