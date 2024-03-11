@@ -83,77 +83,29 @@ data class AccountRegister(
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-abstract class EifIntegrationTest {
+abstract class EifIntegrationTest : IntegrationTestSetup() {
 
-    companion object : IntegrationTestSetup() {
-        val logger = KotlinLogging.logger("test_logger")
-        val node1Logger = KotlinLogging.logger("eif_node1_logger")
+    val logger = KotlinLogging.logger("test_logger")
+    val node1Logger = KotlinLogging.logger("eif_node1_logger")
 
-        private val networkId = 1337L
-        private val gasProvider = DefaultGasProvider()
-        private lateinit var ds: SimpleDigestSystem
+    private val networkId = 1337L
+    private val gasProvider = DefaultGasProvider()
+    private lateinit var ds: SimpleDigestSystem
 
-        @JvmStatic
-        lateinit var evmContainer: DockerComposeContainer<*>
-        protected lateinit var evmServiceUrl: String
-        private val credentials = Credentials
-                .create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
-        private val tokenBridgeBinary = getBinaryFromArtifactResource("/artifacts/contracts/TokenBridge.sol/TokenBridge.json")
-        private val testTokenBinary = getBinaryFromArtifactResource("/artifacts/contracts/token/TestToken.sol/TestToken.json")
-        private val validatorBinary = getBinaryFromArtifactResource("/artifacts/contracts/Validator.sol/Validator.json")
+    lateinit var evmContainer: DockerComposeContainer<*>
+    protected lateinit var evmServiceUrl: String
+    private val credentials = Credentials
+            .create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
+    private val tokenBridgeBinary = getBinaryFromArtifactResource("/artifacts/contracts/TokenBridge.sol/TokenBridge.json")
+    private val testTokenBinary = getBinaryFromArtifactResource("/artifacts/contracts/token/TestToken.sol/TestToken.json")
+    private val validatorBinary = getBinaryFromArtifactResource("/artifacts/contracts/Validator.sol/Validator.json")
 
-        private enum class AuthType {
-            S, M
-        }
-
-        protected lateinit var web3j: Web3j
-        protected lateinit var transactionManager: TransactionManager
-
-        // get smart contract binary from resource
-        private fun getBinaryFromArtifactResource(resourcePath: String): String {
-            val artifactFile = EifIntegrationTest::class.java.getResource(resourcePath)?.readText()
-            val artifactJson = GsonBuilder().create().fromJson(artifactFile, JsonObject::class.java)
-            return artifactJson.get("bytecode").asString
-        }
-
-        fun setup() {
-            assert(::evmContainer.isInitialized) { "evmContainer is not initialized" }
-
-            ds = SimpleDigestSystem(MessageDigest.getInstance(KECCAK256))
-
-            val evmHost = evmContainer.getServiceHost("geth", 8545)
-            val evmPort = evmContainer.getServicePort("geth", 8545)
-            evmServiceUrl = "http://$evmHost:$evmPort"
-
-            web3j = Web3j.build(HttpService(evmServiceUrl))
-
-            transactionManager = FastRawTransactionManager(
-                    web3j,
-                    credentials,
-                    PollingTransactionReceiptProcessor(web3j, 1000, 30)
-            )
-
-            with(configOverrides) {
-                setProperty("infrastructure", net.postchain.devtools.testinfra.BaseTestInfrastructureFactory::class.qualifiedName)
-                setProperty("ethereum.urls", listOf(
-                        "http://127.0.0.1:8888",
-                        "http://127.0.0.1:9999",
-                        evmServiceUrl
-                ).joinToString())
-                setProperty("ethereum.maxReadAhead", 200)
-                setProperty("ethereum.maxQueueSize", 100)
-                setProperty("evm.maxTryErrors", 1)
-            }
-        }
-
-        @JvmStatic
-        @AfterAll
-        fun tearDownAfterAll() {
-            super.tearDown() // Calling @AfterEach IntegrationTestSetup.tearDown()
-            if (::web3j.isInitialized) web3j.shutdown()
-            if (::evmContainer.isInitialized) evmContainer.stop()
-        }
+    private enum class AuthType {
+        S, M
     }
+
+    protected lateinit var web3j: Web3j
+    protected lateinit var transactionManager: TransactionManager
 
     private val accountNum = 15
     private val accountBalance = 1L
@@ -193,8 +145,52 @@ abstract class EifIntegrationTest {
     private var currentBlockHeight = -1L
     private var lastSnapshotBlockHeight = -1L
 
+    // get smart contract binary from resource
+    private fun getBinaryFromArtifactResource(resourcePath: String): String {
+        val artifactFile = EifIntegrationTest::class.java.getResource(resourcePath)?.readText()
+        val artifactJson = GsonBuilder().create().fromJson(artifactFile, JsonObject::class.java)
+        return artifactJson.get("bytecode").asString
+    }
+
+    open fun setup() {
+        assert(::evmContainer.isInitialized) { "evmContainer is not initialized" }
+
+        ds = SimpleDigestSystem(MessageDigest.getInstance(KECCAK256))
+
+        val evmHost = evmContainer.getServiceHost("geth", 8545)
+        val evmPort = evmContainer.getServicePort("geth", 8545)
+        evmServiceUrl = "http://$evmHost:$evmPort"
+
+        web3j = Web3j.build(HttpService(evmServiceUrl))
+
+        transactionManager = FastRawTransactionManager(
+                web3j,
+                credentials,
+                PollingTransactionReceiptProcessor(web3j, 1000, 30)
+        )
+
+        with(configOverrides) {
+            setProperty("infrastructure", net.postchain.devtools.testinfra.BaseTestInfrastructureFactory::class.qualifiedName)
+            setProperty("ethereum.urls", listOf(
+                    "http://127.0.0.1:8888",
+                    "http://127.0.0.1:9999",
+                    evmServiceUrl
+            ).joinToString())
+            setProperty("ethereum.maxReadAhead", 200)
+            setProperty("ethereum.maxQueueSize", 100)
+            setProperty("evm.maxTryErrors", 1)
+        }
+    }
+
+    @AfterAll
+    fun tearDownAfterAll() {
+        super.tearDown() // Calling @AfterEach IntegrationTestSetup.tearDown()
+        if (::web3j.isInitialized) web3j.shutdown()
+        if (::evmContainer.isInitialized) evmContainer.stop()
+    }
+
     @AfterEach
-    fun tearDown() {
+    override fun tearDown() {
         // This method blocks @AfterEach IntegrationTestSetup.tearDown()
     }
 

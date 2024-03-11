@@ -6,23 +6,19 @@ import org.testcontainers.containers.wait.strategy.Wait
 
 class BscEifIT : EifIntegrationTest() {
 
-    companion object {
-        @JvmStatic
-        @BeforeAll
-        fun setup() {
-            evmContainer = BscContainer()
-                    .withExposedService(
-                            "geth", 8545,
-                            Wait.forLogMessage(".*HTTP server started.*\\s", 1)
-                    ).withLogConsumer(
-                            "geth",
-                            Slf4jLogConsumer(node1Logger.underlyingLogger, true)
-                    ).apply {
-                        start()
-                    }
+    @BeforeAll
+    override fun setup() {
+        evmContainer = BscContainer()
+                .withExposedService(
+                        "geth", 8545,
+                        Wait.forLogMessage(".*HTTP server started.*\\s", 1)
+                ).withLogConsumer(
+                        "geth",
+                        Slf4jLogConsumer(node1Logger.underlyingLogger, true)
+                ).apply {
+                    start()
+                }
 
-
-            EifIntegrationTest.setup()
-        }
+        super.setup()
     }
 }
