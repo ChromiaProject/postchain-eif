@@ -17,16 +17,19 @@ import net.postchain.core.block.BlockQueries
 import net.postchain.crypto.KeyPair
 import net.postchain.crypto.SigMaker
 import net.postchain.crypto.devtools.KeyPairHelper
-import net.postchain.devtools.IntegrationTestSetup
+import net.postchain.devtools.ManagedModeTest
 import net.postchain.devtools.PostchainTestNode
+import net.postchain.devtools.PostchainTestNode.Companion.DEFAULT_CHAIN_IID
 import net.postchain.eif.contracts.TestToken
 import net.postchain.eif.contracts.TokenBridge
 import net.postchain.eif.contracts.Validator
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvArray
+import net.postchain.gtv.GtvEncoder
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvInteger
 import net.postchain.gtv.GtvNull
+import net.postchain.gtv.gtvml.GtvMLParser
 import net.postchain.gtv.mapper.toObject
 import net.postchain.gtv.merkle.GtvMerkleHashCalculator
 import net.postchain.gtv.merkleHash
@@ -83,7 +86,7 @@ data class AccountRegister(
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-abstract class EifIntegrationTest : IntegrationTestSetup() {
+abstract class EifIntegrationTest : ManagedModeTest() {
 
     val logger = KotlinLogging.logger("test_logger")
     val node1Logger = KotlinLogging.logger("eif_node1_logger")
@@ -142,7 +145,7 @@ abstract class EifIntegrationTest : IntegrationTestSetup() {
     private lateinit var node: PostchainTestNode
     private lateinit var blockQuery: BlockQueries
     private lateinit var bcRid: BlockchainRid
-    private var currentBlockHeight = -1L
+    private var currentBlockHeight = 0L
     private var lastSnapshotBlockHeight = -1L
 
     // get smart contract binary from resource
@@ -223,9 +226,21 @@ abstract class EifIntegrationTest : IntegrationTestSetup() {
     @Order(2)
     fun `start nodes`() {
         logger.info { "start nodes" }
-        createNodes(1, "/net/postchain/eif/blockchain_config_it.xml")
+
+        // c0
+        startManagedSystem(1, 1)
+
+        // c1
+        val chainGtvConfig = GtvMLParser.parseGtvML(
+                javaClass.getResource("/net/postchain/eif/blockchain_config_it.xml")!!.readText()
+        )
+        val chainId = startNewBlockchain(
+                setOf(0), setOf(1), rawBlockchainConfiguration = GtvEncoder.encodeGtv(chainGtvConfig)
+        )
+        buildBlock(chainId)
         node = nodes[0]
-        bcRid = systemSetup.blockchainMap[1]!!.rid // Just assume we have chain 1
+        bcRid = node.getBlockchainInstance(chainId).blockchainEngine.blockchainRid
+        logger.info { "Chain deployed: chainId: $chainId, blockchainRid: $bcRid" }
     }
 
     @Test
@@ -743,15 +758,15 @@ abstract class EifIntegrationTest : IntegrationTestSetup() {
 
     fun sealBlock() {
         currentBlockHeight += 1
-        buildBlockAndCommit(node.getBlockchainInstance().blockchainEngine)
+        buildBlock(DEFAULT_CHAIN_IID)
         assertEquals(currentBlockHeight, getLastHeight(node))
     }
 
     fun enqueueTx(data: ByteArray): Transaction? {
         try {
-            val tx = node.getBlockchainInstance().blockchainEngine.getConfiguration().getTransactionFactory()
-                    .decodeTransaction(data)
-            node.getBlockchainInstance().blockchainEngine.getTransactionQueue().enqueue(tx)
+            val engine = node.getBlockchainInstance(DEFAULT_CHAIN_IID).blockchainEngine
+            val tx = engine.getConfiguration().getTransactionFactory().decodeTransaction(data)
+            engine.getTransactionQueue().enqueue(tx)
             return tx
         } catch (e: Exception) {
             logger.error(e) { "Can't enqueue tx" }
