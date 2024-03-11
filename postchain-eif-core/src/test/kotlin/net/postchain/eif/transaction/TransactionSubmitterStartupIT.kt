@@ -64,7 +64,7 @@ class TransactionSubmitterStartupIT : EifBaseIntegrationTest(
 
         val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
 
-        txSubmitterTestModule.addGetTransactionStatus(0, RellTransactionStatus.QUEUED)
+        txSubmitterTestModule.addGetTransactionStatus(0, RellTransactionStatus.PENDING)
         txSubmitterTestModule.addGetPendingTransactions(mkEvmPendingRellTx(
             "tx-hash",
             contractAddress,
@@ -72,9 +72,6 @@ class TransactionSubmitterStartupIT : EifBaseIntegrationTest(
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
-
-            // The recovered transaction in this test is set the bcPersisted=false which will add this transaction again
-            assertStatusOperation(txSubmitterTestModule, 0, RellTransactionStatus.PENDING)
 
             // It will fail since the transaction is not actually submitted
             withDbErrors(node, 0) {

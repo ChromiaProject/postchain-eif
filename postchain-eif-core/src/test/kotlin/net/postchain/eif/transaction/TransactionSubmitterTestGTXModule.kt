@@ -61,19 +61,24 @@ class TransactionSubmitterPendingTransactionTestGTXModule : TransactionSubmitter
     override fun initializeDB(ctx: EContext) {
         val transactionSubmitterDatabaseOperations = TransactionSubmitterDatabaseOperationsImpl()
         transactionSubmitterDatabaseOperations.initialize(ctx)
-        transactionSubmitterDatabaseOperations.queueTransaction(ctx, EvmSubmitTxRequest(
-            EvmSubmitTxRellRequest(
-            0,
-            "6936b1761eafc2116650b6593bbc86bd79a339a5", // TODO: Fetch contract address instead of hardcoding
-            "updateValidators",
-            listOf("address[]"),
-            listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
-            1337,
-            BlockchainRid.ZERO_RID.data,
-            System.currentTimeMillis(),
-            ),
-            "tx-hash"
-        ), 1337L)
+
+        DatabaseAccess.of(ctx).apply {
+            val jooq = DSL.using(ctx.conn, SQLDialect.POSTGRES)
+
+            // Submit and pending to be removed
+            jooq.insertInto(table(tableEvmTxSubmit(ctx)))
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_REQUEST_ID, 0)
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_CONTRACT, "")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_FUNCTION, "")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_PARAMETER_TYPES, "")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_PARAMETER_VALUES, GtvEncoder.encodeGtv(gtv(listOf())))
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_TIMESTAMP, System.currentTimeMillis())
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_NETWORK_ID, 1337)
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_SENDER, "".toByteArray())
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_HASH, "00")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_BC_PERSISTED, true)
+                .execute()
+        }
     }
 }
 
@@ -97,7 +102,15 @@ class TransactionSubmitterCleanupTransactionTestGTXModule : TransactionSubmitter
                 .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_TIMESTAMP, time15DaysAgo)
                 .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_NETWORK_ID, 1337)
                 .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_SENDER, "".toByteArray())
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_HASH, "00")
                 .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_BC_PERSISTED, true)
+                .execute()
+
+            jooq.insertInto(table(tableEvmTxErrors(ctx)))
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_ERRORS_COLUMN_TIMESTAMP, DSL.currentTimestamp())
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_ERRORS_COLUMN_REQUEST_ID, 0)
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_ERRORS_COLUMN_RPC_URL, "")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_ERRORS_COLUMN_MESSAGE, "")
                 .execute()
 
             // Submit and pending to be kept
@@ -110,7 +123,15 @@ class TransactionSubmitterCleanupTransactionTestGTXModule : TransactionSubmitter
                 .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_TIMESTAMP, System.currentTimeMillis())
                 .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_NETWORK_ID, 1337)
                 .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_SENDER, "".toByteArray())
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_HASH, "00")
                 .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_BC_PERSISTED, true)
+                .execute()
+
+            jooq.insertInto(table(tableEvmTxErrors(ctx)))
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_ERRORS_COLUMN_TIMESTAMP, DSL.currentTimestamp())
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_ERRORS_COLUMN_REQUEST_ID, 1)
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_ERRORS_COLUMN_RPC_URL, "")
+                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_ERRORS_COLUMN_MESSAGE, "")
                 .execute()
         }
     }

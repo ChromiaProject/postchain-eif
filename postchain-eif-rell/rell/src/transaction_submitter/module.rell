@@ -92,13 +92,6 @@ struct module_args {
     node_retry_strategy;
 }
 
-struct transaction_error_data {
-    timestamp;
-    provider: pubkey? = null; // TODO used? remove?
-    rpc_url: text?;
-    message: text;
-}
-
 function create_evm_submit_transaction(evm_submit_transaction_message: evm_submit_transaction_message, sender: byte_array) {
     val contract_whitelist = get_contract_whitelist();
     val contract_address = evm_submit_transaction_message.contract_address;
@@ -207,10 +200,10 @@ function fail_transactions_with_enough_retries(strategy: node_retry_strategy) {
     for (transaction in transactions) {
         if (strategy == node_retry_strategy.ALL and transaction.providers >= signers) {
             update_evm_transaction_status(transaction.rowid.to_integer(), transaction_status.FAILURE);
-            log("Transaction %s failed - all available nodes failed to execute transaction".format());
+            log("Transaction %s failed - all available nodes failed to execute transaction".format(transaction.rowid));
         } else if (strategy == node_retry_strategy.SUPERMAJORITY and is_supermajority(transaction.providers, signers)) {
             update_evm_transaction_status(transaction.rowid.to_integer(), transaction_status.FAILURE);
-            log("Transaction %s failed - A supermajority of nodes failed to execute transaction".format());
+            log("Transaction %s failed - A supermajority of nodes failed to execute transaction".format(transaction.rowid));
         }
     }
 }
@@ -245,15 +238,20 @@ function update_evm_transaction_status(row_id: integer, status: transaction_stat
 
     transaction.status = status;
 
-    if (tx_hash != null) {
-        transaction.tx_hash = tx_hash;
-    }
-
     if (status == transaction_status.TAKEN) {
         transaction.taken_timestamp = get_last_blocktime();
         for (signer in op_context.get_signers()) {
             create evm_submit_transaction_taken_by(transaction, signer);
         }
+    } else if (status == transaction_status.PENDING) {
+
+        require(tx_hash, "Status PENDING requires providing transaction hash");
+
+        if (tx_hash != transaction.tx_hash) {
+            require(transaction.tx_hash == "", "Transaction hash can only be set once");
+            transaction.tx_hash = tx_hash;
+        }
+
     } else if (status == transaction_status.SUCCESS or status == transaction_status.FAILURE) {
         delete evm_submit_transaction_taken_by @* { .transaction == transaction };
     }

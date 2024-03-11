@@ -39,8 +39,6 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         operations.addAll(takeTransactions(bctx))
         operations.addAll(updateTransactionStatuses(bctx))
 
-        transactionSubmitters.values.forEach { txSubmitter -> txSubmitter.cleanupDb() }
-
         return operations
     }
 
@@ -66,10 +64,6 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                 if (currentTxStatus == null) {
                     logger.warn { "Validation failed. Transaction $requestId not found" }
                     return false
-                }
-
-                if (newTxStatus == currentTxStatus) {
-                    return true
                 }
 
                 if (newTxStatus == RellTransactionStatus.TAKEN && currentTxStatus != RellTransactionStatus.QUEUED) {
@@ -142,7 +136,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         transactionSubmitters.values.forEach { txSubmitter ->
 
             // Transaction status updates
-            txSubmitter.fetchAndClearSubmitTxUpdates().forEach { (rowId, result) ->
+            txSubmitter.getSubmitTxUpdates().forEach { (rowId, result) ->
                 operations.add(
                     OpData(
                         UPDATE_EVM_TRANSACTION_STATUS,
@@ -152,14 +146,16 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
                 // Status QUEUE can be set multiple times due to retry - add a no op for them
                 if (result.status == RellTransactionStatus.QUEUED) {
-                    operations.add(OpData(EVM_TX_NO_OP, arrayOf(gtv(bctx.height))))
+                    addNoOp(operations, bctx)
                 }
 
                 // We have processed this TX - cleanup
                 if (result.status != RellTransactionStatus.TAKEN) {
-                    bctx.addAfterCommitHook { txSubmitter.setSubmitBCPersisted(rowId) }
+                    txSubmitter.setSubmitBCPersisted(bctx, rowId)
                 }
             }
+
+            bctx.addAfterCommitHook { txSubmitter.clearSubmitTxUpdates() }
 
             txSubmitter.getVerifiedTransactions(txVerificationTime).forEach {
 
@@ -252,7 +248,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                 )
 
                 // Status TAKEN can be set multiple times due to retry - add a no op for them
-                operations.add(OpData(EVM_TX_NO_OP, arrayOf(gtv(bctx.height))))
+                addNoOp(operations, bctx)
             }
         }
         return operations
@@ -293,5 +289,19 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     fun setConfig(pubKey: ByteArray, txVerificationTime: Long) {
         this.pubKey = pubKey
         this.txVerificationTime = txVerificationTime
+    }
+
+    fun cleanupDb() {
+        transactionSubmitters.forEach { it.value.cleanupDb() }
+    }
+
+    private fun addNoOp(
+        operations: MutableList<OpData>,
+        bctx: BlockEContext
+    ) {
+
+        if (operations.none { it.opName == EVM_TX_NO_OP }) {
+            operations.add(OpData(EVM_TX_NO_OP, arrayOf(gtv(bctx.height))))
+        }
     }
 }

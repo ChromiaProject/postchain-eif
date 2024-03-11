@@ -13,6 +13,7 @@ import net.postchain.base.withReadWriteConnection
 import net.postchain.base.withWriteConnection
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.exception.UserMistake
+import net.postchain.core.BlockEContext
 import net.postchain.core.Shutdownable
 import net.postchain.core.Storage
 import net.postchain.eif.GtvToTypeMapper
@@ -34,6 +35,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 class TransactionSubmitter(
     private val web3jRequestHandler: Web3jRequestHandler,
@@ -69,6 +72,7 @@ class TransactionSubmitter(
     private val txSubmitJob: Job
     private val txStatusPollJob: Job
     private val healthCheckJob: Job
+    private val cleanupJob: Job
     private val healthy = AtomicBoolean(true)
     private val queue = LinkedBlockingQueue<EvmSubmitTxRequest>()
     private val pendingTransactions = ConcurrentHashMap<String, EvmPendingTx>()
@@ -83,9 +87,8 @@ class TransactionSubmitter(
                 // Transaction taken but not yet submitted
 
                 queue.offer(txSubmit)
-
             } else if (!txSubmit.bcPersisted) {
-                // Transaction submitted - update might not be persisted to BC yet however
+                // Transaction submitted but status not yet persisted to BC
 
                 submitTxUpdates[txSubmit.rowId] =
                     EvmSubmitTransactionResult(RellTransactionStatus.PENDING, txSubmit.txHash!!)
@@ -129,6 +132,19 @@ class TransactionSubmitter(
                         healthCheck()
 
                         delay(healthCheckInterval)
+                    } catch (e: CancellationException) {
+                        break
+                    }
+                }
+            }
+        cleanupJob =
+            CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-cleanup") + MDCContext()) {
+                while (isActive) {
+                    try {
+
+                        delay(1.toDuration(DurationUnit.DAYS))
+
+                        cleanupDb()
                     } catch (e: CancellationException) {
                         break
                     }
@@ -377,11 +393,7 @@ class TransactionSubmitter(
                     true
                 }
 
-                val txPending = EvmPendingRellTx.fromRellRequestAndHash(
-                    txRequest,
-                    response.transactionHash
-                )
-                addPendingTransaction(txPending)
+                addPendingTransaction(txRequest, response.transactionHash)
                 submitTxUpdates[txRequest.rowId] =
                     EvmSubmitTransactionResult(RellTransactionStatus.PENDING, response.transactionHash)
 
@@ -440,10 +452,12 @@ class TransactionSubmitter(
         queue.offer(evmSubmitTxRellRequest)
     }
 
-    fun fetchAndClearSubmitTxUpdates(): Map<Long, EvmSubmitTransactionResult> {
-        val copy = submitTxUpdates.toImmutableMap()
+    fun getSubmitTxUpdates(): Map<Long, EvmSubmitTransactionResult> {
+        return submitTxUpdates.toImmutableMap()
+    }
+
+    fun clearSubmitTxUpdates() {
         submitTxUpdates.clear()
-        return copy
     }
 
     // One for submitting and one for polling?
@@ -460,7 +474,18 @@ class TransactionSubmitter(
         txSubmitJob.cancel()
         txStatusPollJob.cancel()
         healthCheckJob.cancel()
+        cleanupJob.cancel()
         web3jRequestHandler.close()
+    }
+
+    fun addPendingTransaction(txRequest: EvmSubmitTxRequest, transactionHash: String) {
+
+        val txPending = EvmPendingRellTx.fromRellRequestAndHash(
+            txRequest,
+            transactionHash
+        )
+
+        addPendingTransaction(txPending)
     }
 
     fun addPendingTransaction(txPending: EvmPendingRellTx) {
@@ -486,10 +511,8 @@ class TransactionSubmitter(
         return pendingTransactions.values.firstOrNull { it.rowId == requestId }
     }
 
-    fun setSubmitBCPersisted(rowId: Long) {
-        withReadWriteConnection(storage, chainId) {
-            databaseOperations.setSubmitTxBCPersisted(it, rowId)
-        }
+    fun setSubmitBCPersisted(bctx: BlockEContext, rowId: Long) {
+        databaseOperations.setSubmitTxBCPersisted(bctx, rowId)
     }
 
     fun removePendingTx(rowId: Long) {

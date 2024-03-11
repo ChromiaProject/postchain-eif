@@ -239,10 +239,14 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
         val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config_cleanup.xml")
         val node = nodes[0]
 
+        val txSubmitterTestModule =
+            node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
+
         assertThat(countDbSubmit(node)).isEqualTo(2)
         assertThat(countDErrors(node)).isEqualTo(2)
 
-        buildBlock(1L)
+        val txExtension = txSubmitterTestModule.getSpecialTxExtensions().filterIsInstance<TransactionSubmitterSpecialTxExtension>().first()
+        txExtension.cleanupDb()
 
         assertThat(countDbSubmit(node)).isEqualTo(1)
         assertThat(countDErrors(node)).isEqualTo(1)
@@ -322,24 +326,6 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
                 )
             )
         }
-
-//        nodes.forEach { node ->
-//            Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
-//
-//                // Let the healthy nodes build the block
-//                buildBlock(1L)
-//
-//                val txExistsAndVerified: Boolean? = withTxSubmitter(allTxSubmitterTestModules, 0) { txSubmitter, pendingTx ->
-//                    // Pending tx found in this txSubmitter - is the verification completed?
-//                    val verifiedTxs = txSubmitter.getVerifiedTransactions(0)
-//                    verifiedTxs.any { it.rowId == 0L }
-//                }
-//                assertThat(txExistsAndVerified).isNotNull().isEqualTo(true)
-//            }
-//        }
-//
-//        // One node got to set the status SUCCESS
-//        assertTrue(allTxSubmitterTestModules.any { it.conf.successfulTxs.contains(0) })
 
         // One node got to set the status SUCCESS
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {

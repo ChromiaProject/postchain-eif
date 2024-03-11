@@ -190,3 +190,20 @@ function test_timeout_evm_transaction(){
     val tx = evm_submit_transaction @ {.status == transaction_status.FAILURE};
     assert_true(tx.contract_address == "address");
 }
+
+function test_update_evm_transaction_status() {
+
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+    ).run();
+
+    val tx_row_id = evm_submit_transaction @ { } ( .rowid );
+
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.PENDING, "00")
+    ).run();
+
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.PENDING, "11")
+    ).run_must_fail("Transaction hash can only be set once");
+}
