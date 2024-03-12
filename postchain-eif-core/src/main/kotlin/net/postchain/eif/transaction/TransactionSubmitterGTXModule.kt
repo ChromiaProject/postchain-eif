@@ -1,14 +1,20 @@
 package net.postchain.eif.transaction
 
 import net.postchain.core.EContext
+import net.postchain.core.TxEContext
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.EVM_TX_NO_OP
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension
+import net.postchain.gtx.GTXOperation
 import net.postchain.gtx.SimpleGTXModule
+import net.postchain.gtx.data.ExtOpData
 import net.postchain.gtx.special.GTXSpecialTxExtension
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.security.Security
 
 class TransactionSubmitterGTXModule : SimpleGTXModule<Unit>(
-        Unit, mapOf(), mapOf()
+    Unit, mapOf(EVM_TX_NO_OP to { conf, opData: ExtOpData ->
+        EvmTxNoOp(conf, opData)
+    }), mapOf()
 ) {
 
     init {
@@ -27,5 +33,13 @@ class TransactionSubmitterGTXModule : SimpleGTXModule<Unit>(
     override fun getSpecialTxExtensions(): List<GTXSpecialTxExtension> {
 
         return listOf(TransactionSubmitterSpecialTxExtension(), EvmAnchoringSpecialTxExtension())
+    }
+}
+
+class EvmTxNoOp(private val conf: Unit, private val extOpData: ExtOpData) :
+    GTXOperation(extOpData) {
+    override fun checkCorrectness() {}
+    override fun apply(ctx: TxEContext): Boolean {
+        return true
     }
 }

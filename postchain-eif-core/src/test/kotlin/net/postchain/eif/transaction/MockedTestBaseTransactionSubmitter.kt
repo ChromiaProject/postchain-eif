@@ -6,6 +6,7 @@ import net.postchain.devtools.IntegrationTestSetup
 import net.postchain.eif.Web3jRequestHandler
 import org.junit.jupiter.api.BeforeEach
 import org.mockito.ArgumentMatchers
+import org.mockito.Mockito
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argThat
 import org.mockito.kotlin.doAnswer
@@ -17,14 +18,21 @@ import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.Response
 import org.web3j.protocol.core.methods.response.EthEstimateGas
 import org.web3j.protocol.core.methods.response.EthGetBalance
+import org.web3j.protocol.core.methods.response.EthGetTransactionReceipt
 import org.web3j.protocol.core.methods.response.EthSendTransaction
+import org.web3j.protocol.core.methods.response.EthTransaction
+import org.web3j.protocol.core.methods.response.Transaction
+import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.tx.TransactionManager
 import org.web3j.tx.gas.ContractGasProvider
 import java.math.BigInteger
+import java.util.Optional
+import java.util.concurrent.LinkedBlockingQueue
+import kotlin.reflect.KClass
 import kotlin.reflect.jvm.ExperimentalReflectionOnLambdas
 import kotlin.reflect.jvm.reflect
 
-open class MockedBaseTransactionSubmitterTest : IntegrationTestSetup() {
+open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
 
     lateinit var storage: Storage
     lateinit var databaseOperations: TransactionSubmitterDatabaseOperations
@@ -79,6 +87,20 @@ open class MockedBaseTransactionSubmitterTest : IntegrationTestSetup() {
         return web3jRequestHandler
     }
 
+    @OptIn(ExperimentalReflectionOnLambdas::class)
+    fun <T : Response<*>> mockWeb3jRequest(
+        web3jRequestHandler: Web3jRequestHandler,
+        kClass: KClass<T>,
+        mock: T
+    ) {
+
+        Mockito.`when`(web3jRequestHandler.sendWeb3jRequest<T>(argThat {arg ->
+            arg != null && arg.reflect()!!.returnType.arguments[1].type!!.classifier == kClass
+        })).doAnswer {
+            mock
+        }
+    }
+
     fun createTransactionManager(
         url: String,
         fromAddress: String,
@@ -117,5 +139,61 @@ open class MockedBaseTransactionSubmitterTest : IntegrationTestSetup() {
             }
         }
         return Pair(url, transactionManager)
+    }
+
+    fun mockTransactionReceiptResponse(blockNumberValue: Long, statusOk: Boolean): EthGetTransactionReceipt {
+        val mockkTransactionReceipt = mockTransactionReceipt(blockNumberValue, statusOk)
+        return mock<EthGetTransactionReceipt> {
+            on { transactionReceipt } doReturn (Optional.of(mockkTransactionReceipt))
+        }
+    }
+
+    fun mockTransactionReceipt(blockNumberValue: Long, statusOk: Boolean): TransactionReceipt {
+        return mock<TransactionReceipt> {
+            on { transactionHash } doReturn "0x0000000000000000000000000000000000000000000000000000000000000000"
+            on { blockHash } doReturn "0x0000000000000000000000000000000000000000000000000000000000001100"
+            on { blockNumber } doReturn BigInteger.valueOf(blockNumberValue)
+            on { effectiveGasPrice } doReturn "0xf4610900"
+            on { gasUsed } doReturn BigInteger.valueOf(58575)
+            on { isStatusOK } doReturn statusOk
+        }
+    }
+
+    fun mockEthTransactionResponse(toAddress: String, input: String): EthTransaction {
+        val mockTransaction = mockTransaction(toAddress, input)
+        return mock<EthTransaction> {
+            on { transaction } doReturn (Optional.of(mockTransaction))
+        }
+    }
+
+    fun mockTransaction(toAddress: String, inputValue: String): Transaction {
+        return mock<Transaction> {
+            on { to } doReturn toAddress
+            on { input } doReturn inputValue
+        }
+    }
+
+    fun createTransactionSubmitter(
+        web3jRequestHandler: Web3jRequestHandler,
+        transactionManagers: Map<String, TransactionManager>,
+        gasProvider: ContractGasProvider
+    ): TransactionSubmitter {
+        return TransactionSubmitter(
+            web3jRequestHandler,
+            transactionManagers,
+            gasProvider,
+            databaseOperations,
+            storage,
+            0,
+            0,
+            Long.MAX_VALUE,
+            LinkedBlockingQueue(),
+            BigInteger.valueOf(10),
+            Long.MAX_VALUE,
+            24 * 60 * 60000,
+            1000 * 60 * 4,
+            5,
+            0
+        )
     }
 }

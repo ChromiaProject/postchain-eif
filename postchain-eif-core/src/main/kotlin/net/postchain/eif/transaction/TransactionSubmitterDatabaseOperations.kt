@@ -7,11 +7,9 @@ interface TransactionSubmitterDatabaseOperations {
 
     fun initialize(ctx: EContext)
 
-    fun queueTransaction(ctx: EContext, transactionRequest: EvmSubmitTransactionRequest, networkId: Long)
+    fun queueTransaction(ctx: EContext, transactionRequest: EvmSubmitTxRequest, networkId: Long)
 
-    fun pendTransaction(ctx: EContext, requestId: Long, transactionHash: String)
-
-    fun failTransaction(ctx: EContext, requestId: Long)
+    fun recordTransactionHash(ctx: EContext, requestId: Long, txHash: String)
 
     fun recordTransactionGas(
         ctx: EContext,
@@ -20,23 +18,17 @@ interface TransactionSubmitterDatabaseOperations {
         gasLimit: BigInteger,
     )
 
-    fun recordTransactionFailure(
+    fun setSubmitTxBCPersisted(ctx: EContext, requestId: Long)
+
+    fun recordTransactionError(
         ctx: EContext,
         requestId: Long,
         rpcUrl: String?,
         message: String,
-        stackTrace: String?
+        stackTrace: String? = null
     )
 
-    fun succeedTransaction(ctx: EContext, requestId: Long, effectiveGasPrice: BigInteger, gasUsed: BigInteger, blockHash: String)
+    fun getQueuedTransactions(ctx: EContext, networkId: Long): List<EvmSubmitTxRequest>
 
-    fun deactivateTransaction(ctx: EContext, requestId: Long)
-
-    fun getQueuedTransactions(ctx: EContext, networkId: Long): List<EvmSubmitTransactionRequest>
-
-    fun getPendingTransactions(ctx: EContext, networkId: Long): MutableMap<String, EvmSubmitTransactionRequest>
-
-    fun getCompletedTransactions(ctx: EContext, networkId: Long): MutableMap<Long, EvmSubmitTransactionResult>
-
-    fun getTransactionErrors(ctx: EContext, requestId: Long): List<EvmSubmitTransactionError>
+    fun cleanupDb(ctx: EContext, networkId: Long, dbRetentionTime: Long)
 }

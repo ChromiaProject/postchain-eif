@@ -59,6 +59,18 @@
             <entry key="node_tx_timeout">
                 <int>86400000</int>
             </entry>
+            <entry key="node_tx_verification_timeout">
+                <int>240000</int> <!-- 4 minutes -->
+            </entry>
+            <entry key="node_tx_verification_evm_blocks">
+                <int>0</int> <!-- disabled for tests -->
+            </entry>
+            <entry key="tx_verification_time">
+                <int>0</int> <!-- disabled for tests -->
+            </entry>
+            <entry key="db_retention_time">
+                <int>1296000000</int> <!-- 15 days -->
+            </entry>
         </dict>
     </entry>
     <entry key="gtx">

@@ -29,17 +29,6 @@ query get_transaction_receipt_data_by_transaction_data(contract_address: text, f
     return get_transaction_receipt_data(evm_transaction_id);
 }
 
-query get_transaction_error_data(evm_transaction_id: byte_array): list<transaction_error_data> {
-
-    val transaction = require_transaction(evm_transaction_id);
-
-    val errors = evm_submit_transaction_error @* { .transaction == transaction } (
-        transaction_error_data(timestamp = .timestamp, provider = .provider, rpc_url = .rpc_url, message = .message)
-    );
-
-    return errors;
-}
-
 function require_transaction(evm_transaction_id: byte_array): evm_submit_transaction {
 
     return require(evm_submit_transaction @? { .id == evm_transaction_id }, "Unknown transaction");

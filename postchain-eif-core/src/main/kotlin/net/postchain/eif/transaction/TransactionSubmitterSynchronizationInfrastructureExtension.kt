@@ -35,7 +35,10 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
             val ext = exs.find { it is TransactionSubmitterSpecialTxExtension }
             if (ext is TransactionSubmitterSpecialTxExtension) {
 
-                ext.setPubKey(postchainContext.appConfig.pubKeyByteArray)
+                ext.setConfig(
+                    postchainContext.appConfig.pubKeyByteArray,
+                    transactionSubmitterBlockchainConfig.txVerificationTime
+                )
 
                 for ((evmBlockchainName, networkBlockchainConfig) in transactionSubmitterBlockchainConfig.chains) {
                     val networkId = networkBlockchainConfig.networkId
@@ -64,13 +67,9 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                             .toMap()
                     val gasProvider = StaticGasProvider(BigInteger.valueOf(networkBlockchainConfig.maxGasPrice), BigInteger.valueOf(transactionSubmitterBlockchainConfig.gasLimit))
                     val nodeTxTimeout = transactionSubmitterBlockchainConfig.nodeTxTimeout
-                    val queue = LinkedList<EvmSubmitTransactionRequest>()
-                    val pendingTransactions = mutableMapOf<String, EvmSubmitTransactionRequest>()
-                    val completedTransactions = mutableMapOf<Long, EvmSubmitTransactionResult>()
+                    val queue = LinkedList<EvmSubmitTxRequest>()
                     withReadConnection(postchainContext.sharedStorage, process.blockchainEngine.chainID) {
                         queue.addAll(databaseOperations.getQueuedTransactions(it, networkId))
-                        pendingTransactions.putAll(databaseOperations.getPendingTransactions(it, networkId))
-                        completedTransactions.putAll(databaseOperations.getCompletedTransactions(it, networkId))
                     }
                     val transactionSubmitter = TransactionSubmitter(
                             web3jRequestHandler,
@@ -82,11 +81,12 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                             networkId,
                             appConfig.txPollInterval,
                             queue,
-                            pendingTransactions,
-                            completedTransactions,
                             BigInteger.valueOf(networkBlockchainConfig.minWalletBalance),
                             appConfig.healthCheckInterval,
-                            nodeTxTimeout
+                            nodeTxTimeout,
+                            transactionSubmitterBlockchainConfig.nodeTxVerificationTimeout,
+                            transactionSubmitterBlockchainConfig.nodeTxVerificationEvmBlocks,
+                            transactionSubmitterBlockchainConfig.dbRetentionTime,
                     )
                     transactionSubmitters[networkId] = transactionSubmitter
                     ext.addTransactionSubmitter(transactionSubmitter, networkId)

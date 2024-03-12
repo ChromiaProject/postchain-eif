@@ -13,19 +13,25 @@ import org.jooq.impl.DSL.using
 import org.jooq.util.postgres.PostgresDataType
 import java.math.BigInteger
 import java.sql.Timestamp
+import java.sql.Timestamp.from
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 
-enum class TransactionStatus {
-    QUEUED,
-    PENDING,
+enum class PendingTxStatus {
+    VERIFYING,
     SUCCESS,
-    FAILURE
+    REVERTED;
+
+    fun isCompleted(): Boolean {
+        return this == SUCCESS || this == REVERTED
+    }
 }
 
-fun DatabaseAccess.tableEvmTransaction(ctx: EContext) = tableName(ctx,
-    TransactionSubmitterDatabaseOperationsImpl.EVM_TX_TRANSACTIONS_TABLE_NAME
+fun DatabaseAccess.tableEvmTxSubmit(ctx: EContext) = tableName(ctx,
+    TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_TABLE_NAME
 )
 
-fun DatabaseAccess.tableEvmErrors(ctx: EContext) = tableName(ctx,
+fun DatabaseAccess.tableEvmTxErrors(ctx: EContext) = tableName(ctx,
     TransactionSubmitterDatabaseOperationsImpl.EVM_TX_ERRORS_TABLE_NAME
 )
 
@@ -33,108 +39,86 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
 
     companion object {
         private const val PREFIX: String = "sys.x.evm_tx" // This name should not clash with Rell
-        const val EVM_TX_TRANSACTIONS_TABLE_NAME: String = "${PREFIX}.transactions"
+        const val EVM_TX_SUBMIT_TABLE_NAME: String = "${PREFIX}.submit"
         const val EVM_TX_ERRORS_TABLE_NAME: String = "${PREFIX}.errors"
 
-        val TRANSACTIONS_COLUMN_REQUEST_ID: Field<Long> = field("request_id", PostgresDataType.BIGINT.nullable(false))
-        val TRANSACTIONS_COLUMN_ACTIVE: Field<Boolean> = field("active", PostgresDataType.BOOLEAN.nullable(false))
-        val TRANSACTIONS_COLUMN_CONTRACT: Field<String> = field("contract", PostgresDataType.TEXT.nullable(false))
-        val TRANSACTIONS_COLUMN_FUNCTION: Field<String> = field("function", PostgresDataType.TEXT.nullable(false))
-        val TRANSACTIONS_COLUMN_PARAMETER_TYPES: Field<String> = field("parameter_types", PostgresDataType.TEXT.nullable(false))
-        val TRANSACTIONS_COLUMN_PARAMETER_VALUES: Field<ByteArray> = field("parameter_values", PostgresDataType.BYTEA.nullable(false))
-        val TRANSACTIONS_COLUMN_GAS_PRICE: Field<Long> = field("gas_price", PostgresDataType.BIGINT.nullable(true))
-        val TRANSACTIONS_COLUMN_GAS_LIMIT: Field<Long> = field("gas_limit", PostgresDataType.BIGINT.nullable(true))
-        val TRANSACTIONS_COLUMN_TX_HASH: Field<String> = field("tx_hash", PostgresDataType.TEXT.nullable(true))
-        val TRANSACTIONS_COLUMN_STATUS: Field<String> = field("status", PostgresDataType.TEXT.nullable(false))
-        val TRANSACTIONS_COLUMN_TIMESTAMP: Field<Long> = field("timestamp", PostgresDataType.BIGINT.nullable(false))
-        val TRANSACTIONS_COLUMN_NETWORK_ID: Field<Long> = field("network_id", PostgresDataType.BIGINT.nullable(false))
-        val TRANSACTIONS_COLUMN_SENDER: Field<ByteArray> = field("sender", PostgresDataType.BYTEA.nullable(false))
-        val TRANSACTIONS_COLUMN_BLOCK_HASH: Field<String> = field("receipt_block_hash", PostgresDataType.VARCHAR.length(2 + 64).nullable(true))
-        val TRANSACTIONS_COLUMN_EFFECTIVE_GAS_PRICE: Field<Long> = field("receipt_effective_gas_price", PostgresDataType.BIGINT.nullable(true))
-        val TRANSACTIONS_COLUMN_GAS_USAGE: Field<Long> = field("receipt_gas_usage", PostgresDataType.BIGINT.nullable(true))
+        val EVM_TX_SUBMIT_COLUMN_REQUEST_ID: Field<Long> = field("request_id", PostgresDataType.BIGINT.nullable(false))
+        val EVM_TX_SUBMIT_COLUMN_CONTRACT: Field<String> = field("contract", PostgresDataType.TEXT.nullable(false))
+        val EVM_TX_SUBMIT_COLUMN_FUNCTION: Field<String> = field("function", PostgresDataType.TEXT.nullable(false))
+        val EVM_TX_SUBMIT_COLUMN_PARAMETER_TYPES: Field<String> = field("parameter_types", PostgresDataType.TEXT.nullable(false))
+        val EVM_TX_SUBMIT_COLUMN_PARAMETER_VALUES: Field<ByteArray> = field("parameter_values", PostgresDataType.BYTEA.nullable(false))
+        val EVM_TX_SUBMIT_COLUMN_GAS_PRICE: Field<Long> = field("gas_price", PostgresDataType.BIGINT.nullable(true))
+        val EVM_TX_SUBMIT_COLUMN_GAS_LIMIT: Field<Long> = field("gas_limit", PostgresDataType.BIGINT.nullable(true))
+        val EVM_TX_SUBMIT_COLUMN_TIMESTAMP: Field<Long> = field("timestamp", PostgresDataType.BIGINT.nullable(false))
+        val EVM_TX_SUBMIT_COLUMN_NETWORK_ID: Field<Long> = field("network_id", PostgresDataType.BIGINT.nullable(false))
+        val EVM_TX_SUBMIT_COLUMN_SENDER: Field<ByteArray> = field("sender", PostgresDataType.BYTEA.nullable(false))
+        val EVM_TX_SUBMIT_COLUMN_HASH: Field<String> = field("hash", PostgresDataType.TEXT.nullable(true))
+        val EVM_TX_SUBMIT_COLUMN_BC_PERSISTED: Field<Boolean> = field("bc_persisted", PostgresDataType.BOOLEAN.nullable(false).defaultValue(false))
 
-        val ERRORS_COLUMN_TIMESTAMP: Field<Timestamp> = field("timestamp", PostgresDataType.TIMESTAMP.nullable(false)
+        val EVM_TX_ERRORS_COLUMN_TIMESTAMP: Field<Timestamp> = field("timestamp", PostgresDataType.TIMESTAMP.nullable(false)
             .defaultValue(currentTimestamp()))
-        val ERRORS_COLUMN_REQUEST_ID: Field<Long> = field("request_id", PostgresDataType.BIGINT.nullable(false))
-        val ERRORS_COLUMN_RPC_URL: Field<String> = field("rpc_url", PostgresDataType.TEXT.nullable(true))
-        val ERRORS_COLUMN_MESSAGE: Field<String> = field("message", PostgresDataType.TEXT.nullable(false))
-        val ERRORS_COLUMN_STACK_TRACE: Field<String> = field("stack_trace", PostgresDataType.TEXT.nullable(true))
+        val EVM_TX_ERRORS_COLUMN_REQUEST_ID: Field<Long> = field("request_id", PostgresDataType.BIGINT.nullable(false))
+        val EVM_TX_ERRORS_COLUMN_RPC_URL: Field<String> = field("rpc_url", PostgresDataType.TEXT.nullable(true))
+        val EVM_TX_ERRORS_COLUMN_MESSAGE: Field<String> = field("message", PostgresDataType.TEXT.nullable(false))
+        val EVM_TX_ERRORS_COLUMN_STACK_TRACE: Field<String> = field("stack_trace", PostgresDataType.TEXT.nullable(true))
     }
 
     override fun initialize(ctx: EContext) {
         DatabaseAccess.of(ctx).apply {
             val jooq = createJooq(ctx)
 
-            val transactionTable = table(tableEvmTransaction(ctx))
+            val transactionTable = table(tableEvmTxSubmit(ctx))
             jooq.createTableIfNotExists(transactionTable)
-                    .column(TRANSACTIONS_COLUMN_REQUEST_ID)
-                    .column(TRANSACTIONS_COLUMN_ACTIVE)
-                    .column(TRANSACTIONS_COLUMN_CONTRACT)
-                    .column(TRANSACTIONS_COLUMN_FUNCTION)
-                    .column(TRANSACTIONS_COLUMN_PARAMETER_TYPES)
-                    .column(TRANSACTIONS_COLUMN_PARAMETER_VALUES)
-                    .column(TRANSACTIONS_COLUMN_GAS_PRICE)
-                    .column(TRANSACTIONS_COLUMN_GAS_LIMIT)
-                    .column(TRANSACTIONS_COLUMN_TX_HASH)
-                    .column(TRANSACTIONS_COLUMN_STATUS)
-                    .column(TRANSACTIONS_COLUMN_TIMESTAMP)
-                    .column(TRANSACTIONS_COLUMN_NETWORK_ID)
-                    .column(TRANSACTIONS_COLUMN_SENDER)
-                    .column(TRANSACTIONS_COLUMN_BLOCK_HASH)
-                    .column(TRANSACTIONS_COLUMN_EFFECTIVE_GAS_PRICE)
-                    .column(TRANSACTIONS_COLUMN_GAS_USAGE)
+                    .column(EVM_TX_SUBMIT_COLUMN_REQUEST_ID)
+                    .column(EVM_TX_SUBMIT_COLUMN_CONTRACT)
+                    .column(EVM_TX_SUBMIT_COLUMN_FUNCTION)
+                    .column(EVM_TX_SUBMIT_COLUMN_PARAMETER_TYPES)
+                    .column(EVM_TX_SUBMIT_COLUMN_PARAMETER_VALUES)
+                    .column(EVM_TX_SUBMIT_COLUMN_GAS_PRICE)
+                    .column(EVM_TX_SUBMIT_COLUMN_GAS_LIMIT)
+                    .column(EVM_TX_SUBMIT_COLUMN_TIMESTAMP)
+                    .column(EVM_TX_SUBMIT_COLUMN_NETWORK_ID)
+                    .column(EVM_TX_SUBMIT_COLUMN_SENDER)
+                    .column(EVM_TX_SUBMIT_COLUMN_HASH)
+                    .column(EVM_TX_SUBMIT_COLUMN_BC_PERSISTED)
                     .execute()
 
-            val errorsTable = table(tableEvmErrors(ctx))
+            val errorsTable = table(tableEvmTxErrors(ctx))
             jooq.createTableIfNotExists(errorsTable)
-                .column(ERRORS_COLUMN_TIMESTAMP)
-                .column(ERRORS_COLUMN_REQUEST_ID)
-                .column(ERRORS_COLUMN_RPC_URL)
-                .column(ERRORS_COLUMN_MESSAGE)
-                .column(ERRORS_COLUMN_STACK_TRACE)
+                .column(EVM_TX_ERRORS_COLUMN_TIMESTAMP)
+                .column(EVM_TX_ERRORS_COLUMN_REQUEST_ID)
+                .column(EVM_TX_ERRORS_COLUMN_RPC_URL)
+                .column(EVM_TX_ERRORS_COLUMN_MESSAGE)
+                .column(EVM_TX_ERRORS_COLUMN_STACK_TRACE)
                 .execute()
         }
     }
 
-    override fun queueTransaction(ctx: EContext, transactionRequest: EvmSubmitTransactionRequest, networkId: Long) {
+    override fun queueTransaction(ctx: EContext, transactionRequest: EvmSubmitTxRequest, networkId: Long) {
         DatabaseAccess.of(ctx).apply {
             val jooq = createJooq(ctx)
 
-            jooq.insertInto(table(tableEvmTransaction(ctx)))
-                .set(TRANSACTIONS_COLUMN_REQUEST_ID, transactionRequest.rowId)
-                .set(TRANSACTIONS_COLUMN_ACTIVE, true)
-                .set(TRANSACTIONS_COLUMN_CONTRACT, transactionRequest.contractAddress)
-                .set(TRANSACTIONS_COLUMN_FUNCTION, transactionRequest.functionName)
-                .set(TRANSACTIONS_COLUMN_PARAMETER_TYPES, transactionRequest.parameterTypes.joinToString(","))
-                .set(TRANSACTIONS_COLUMN_PARAMETER_VALUES, GtvEncoder.encodeGtv(GtvFactory.gtv(transactionRequest.parameterValues)))
-                .set(TRANSACTIONS_COLUMN_STATUS, TransactionStatus.QUEUED.name)
-                .set(TRANSACTIONS_COLUMN_TIMESTAMP, transactionRequest.timestamp)
-                .set(TRANSACTIONS_COLUMN_NETWORK_ID, networkId)
-                .set(TRANSACTIONS_COLUMN_SENDER, transactionRequest.sender)
+            jooq.insertInto(table(tableEvmTxSubmit(ctx)))
+                .set(EVM_TX_SUBMIT_COLUMN_REQUEST_ID, transactionRequest.rowId)
+                .set(EVM_TX_SUBMIT_COLUMN_CONTRACT, transactionRequest.contractAddress)
+                .set(EVM_TX_SUBMIT_COLUMN_FUNCTION, transactionRequest.functionName)
+                .set(EVM_TX_SUBMIT_COLUMN_PARAMETER_TYPES, transactionRequest.parameterTypes.joinToString(","))
+                .set(EVM_TX_SUBMIT_COLUMN_PARAMETER_VALUES, GtvEncoder.encodeGtv(GtvFactory.gtv(transactionRequest.parameterValues)))
+                .set(EVM_TX_SUBMIT_COLUMN_TIMESTAMP, transactionRequest.timestamp)
+                .set(EVM_TX_SUBMIT_COLUMN_NETWORK_ID, networkId)
+                .set(EVM_TX_SUBMIT_COLUMN_SENDER, transactionRequest.sender)
                 .execute()
         }
     }
 
-    override fun pendTransaction(ctx: EContext, requestId: Long, transactionHash: String) {
+    override fun recordTransactionHash(ctx: EContext, requestId: Long, txHash: String) {
         DatabaseAccess.of(ctx).apply {
             val jooq = createJooq(ctx)
 
-            jooq.update(table(tableEvmTransaction(ctx)))
-                    .set(TRANSACTIONS_COLUMN_STATUS, TransactionStatus.PENDING.name)
-                    .set(TRANSACTIONS_COLUMN_TX_HASH, transactionHash)
-                    .where(TRANSACTIONS_COLUMN_REQUEST_ID.eq(requestId))
-                    .execute()
-        }
-    }
-
-    override fun failTransaction(ctx: EContext, requestId: Long) {
-        DatabaseAccess.of(ctx).apply {
-            val jooq = createJooq(ctx)
-
-            jooq.update(table(tableEvmTransaction(ctx)))
-                    .set(TRANSACTIONS_COLUMN_STATUS, TransactionStatus.FAILURE.name)
-                    .where(TRANSACTIONS_COLUMN_REQUEST_ID.eq(requestId))
-                    .execute()
+            jooq.update(table(tableEvmTxSubmit(ctx)))
+                .set(EVM_TX_SUBMIT_COLUMN_HASH, txHash)
+                .where(EVM_TX_SUBMIT_COLUMN_REQUEST_ID.eq(requestId))
+                .execute()
         }
     }
 
@@ -142,15 +126,26 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
         DatabaseAccess.of(ctx).apply {
             val jooq = createJooq(ctx)
 
-            jooq.update(table(tableEvmTransaction(ctx)))
-                .set(TRANSACTIONS_COLUMN_GAS_PRICE, gasPrice.longValueExact())
-                .set(TRANSACTIONS_COLUMN_GAS_LIMIT, gasLimit.longValueExact())
-                .where(TRANSACTIONS_COLUMN_REQUEST_ID.eq(requestId))
+            jooq.update(table(tableEvmTxSubmit(ctx)))
+                .set(EVM_TX_SUBMIT_COLUMN_GAS_PRICE, gasPrice.longValueExact())
+                .set(EVM_TX_SUBMIT_COLUMN_GAS_LIMIT, gasLimit.longValueExact())
+                .where(EVM_TX_SUBMIT_COLUMN_REQUEST_ID.eq(requestId))
                 .execute()
         }
     }
 
-    override fun recordTransactionFailure(
+    override fun setSubmitTxBCPersisted(ctx: EContext, requestId: Long) {
+        DatabaseAccess.of(ctx).apply {
+            val jooq = createJooq(ctx)
+
+            jooq.update(table(tableEvmTxSubmit(ctx)))
+                .set(EVM_TX_SUBMIT_COLUMN_BC_PERSISTED, true)
+                .where(EVM_TX_SUBMIT_COLUMN_REQUEST_ID.eq(requestId))
+                .execute()
+        }
+    }
+
+    override fun recordTransactionError(
         ctx: EContext,
         requestId: Long,
         rpcUrl: String?,
@@ -160,84 +155,52 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
         DatabaseAccess.of(ctx).apply {
             val jooq = createJooq(ctx)
 
-            jooq.insertInto(table(tableEvmErrors(ctx)))
-                .set(ERRORS_COLUMN_TIMESTAMP, currentTimestamp())
-                .set(ERRORS_COLUMN_REQUEST_ID, requestId)
-                .set(ERRORS_COLUMN_RPC_URL, rpcUrl)
-                .set(ERRORS_COLUMN_MESSAGE, message)
-                .set(ERRORS_COLUMN_STACK_TRACE, stackTrace)
+            jooq.insertInto(table(tableEvmTxErrors(ctx)))
+                .set(EVM_TX_ERRORS_COLUMN_TIMESTAMP, currentTimestamp())
+                .set(EVM_TX_ERRORS_COLUMN_REQUEST_ID, requestId)
+                .set(EVM_TX_ERRORS_COLUMN_RPC_URL, rpcUrl)
+                .set(EVM_TX_ERRORS_COLUMN_MESSAGE, message)
+                .set(EVM_TX_ERRORS_COLUMN_STACK_TRACE, stackTrace)
                 .execute()
         }
     }
 
-    override fun succeedTransaction(ctx: EContext, requestId: Long, effectiveGasPrice: BigInteger, gasUsed: BigInteger, blockHash: String) {
+    override fun getQueuedTransactions(ctx: EContext, networkId: Long) : List<EvmSubmitTxRequest> {
         DatabaseAccess.of(ctx).apply {
             val jooq = createJooq(ctx)
 
-            jooq.update(table(tableEvmTransaction(ctx)))
-                    .set(TRANSACTIONS_COLUMN_STATUS, TransactionStatus.SUCCESS.name)
-                    .set(TRANSACTIONS_COLUMN_BLOCK_HASH, blockHash)
-                    .set(TRANSACTIONS_COLUMN_EFFECTIVE_GAS_PRICE, effectiveGasPrice.longValueExact())
-                    .set(TRANSACTIONS_COLUMN_GAS_USAGE, gasUsed.longValueExact())
-                    .where(TRANSACTIONS_COLUMN_REQUEST_ID.eq(requestId))
+            return jooq.select().from(tableEvmTxSubmit(ctx))
+                    .where(EVM_TX_SUBMIT_COLUMN_NETWORK_ID.eq(networkId))
+                    .fetch(evmSubmitTxRellRequestRecordMapper)
+        }
+    }
+
+    override fun cleanupDb(ctx: EContext, networkId: Long, dbRetentionTime: Long) {
+
+        val expireTime = from(Instant.now().minus(dbRetentionTime, ChronoUnit.MILLIS))
+
+        DatabaseAccess.of(ctx).apply {
+            val jooq = createJooq(ctx)
+            val requestIds = mutableSetOf<Long>()
+
+            requestIds.addAll(
+                jooq.select().from(table(tableEvmTxSubmit(ctx)))
+                    .where(
+                        EVM_TX_SUBMIT_COLUMN_TIMESTAMP.lessOrEqual(expireTime.time)
+                            .and(EVM_TX_SUBMIT_COLUMN_NETWORK_ID.eq(networkId))
+                            .and(EVM_TX_SUBMIT_COLUMN_BC_PERSISTED.eq(true))
+                    )
+                    .fetch { it.get(EVM_TX_SUBMIT_COLUMN_REQUEST_ID) })
+
+            if (requestIds.isNotEmpty()) {
+                jooq.delete(table(tableEvmTxSubmit(ctx)))
+                    .where(EVM_TX_SUBMIT_COLUMN_REQUEST_ID.`in`(requestIds))
                     .execute()
 
-        }
-    }
-
-    override fun deactivateTransaction(ctx: EContext, requestId: Long) {
-        DatabaseAccess.of(ctx).apply {
-            val jooq = createJooq(ctx)
-
-            jooq.update(table(tableEvmTransaction(ctx)))
-                    .set(TRANSACTIONS_COLUMN_ACTIVE, false)
-                    .where(TRANSACTIONS_COLUMN_REQUEST_ID.eq(requestId))
+                jooq.delete(table(tableEvmTxErrors(ctx)))
+                    .where(EVM_TX_SUBMIT_COLUMN_REQUEST_ID.`in`(requestIds))
                     .execute()
-        }
-    }
-
-    override fun getQueuedTransactions(ctx: EContext, networkId: Long) : List<EvmSubmitTransactionRequest> {
-        DatabaseAccess.of(ctx).apply {
-            val jooq = createJooq(ctx)
-
-            return jooq.select().from(tableEvmTransaction(ctx))
-                    .where(TRANSACTIONS_COLUMN_STATUS.eq(TransactionStatus.QUEUED.name).and(TRANSACTIONS_COLUMN_NETWORK_ID.eq(networkId)))
-                    .fetch(evmSubmitTransactionRequestRecordMapper)
-        }
-    }
-
-    override fun getPendingTransactions(ctx: EContext, networkId: Long) : MutableMap<String, EvmSubmitTransactionRequest>{
-        DatabaseAccess.of(ctx).apply {
-            val jooq = createJooq(ctx)
-
-            return jooq.select().from(tableEvmTransaction(ctx))
-                    .where(TRANSACTIONS_COLUMN_STATUS.eq(TransactionStatus.PENDING.name).and(TRANSACTIONS_COLUMN_NETWORK_ID.eq(networkId)))
-                    .fetchMap(TRANSACTIONS_COLUMN_TX_HASH, evmSubmitTransactionRequestRecordMapper)
-        }
-    }
-
-    override fun getCompletedTransactions(ctx: EContext, networkId: Long): MutableMap<Long, EvmSubmitTransactionResult> {
-        DatabaseAccess.of(ctx).apply {
-            val jooq = createJooq(ctx)
-
-            return jooq.select().from(tableEvmTransaction(ctx))
-                    .where(TRANSACTIONS_COLUMN_STATUS.eq(TransactionStatus.SUCCESS.name).or(TRANSACTIONS_COLUMN_STATUS.eq(TransactionStatus.FAILURE.name)).and(TRANSACTIONS_COLUMN_NETWORK_ID.eq(networkId).and(TRANSACTIONS_COLUMN_ACTIVE.eq(true))))
-                    .fetchMap(TRANSACTIONS_COLUMN_REQUEST_ID, evmSubmitTransactionResultRecordMapper)
-        }
-    }
-
-    override fun getTransactionErrors(ctx: EContext, requestId: Long): List<EvmSubmitTransactionError> {
-        DatabaseAccess.of(ctx).apply {
-            val jooq = createJooq(ctx)
-
-            return jooq.select().from(tableEvmErrors(ctx))
-                .where(ERRORS_COLUMN_REQUEST_ID.eq(requestId))
-                .fetch { EvmSubmitTransactionError(
-                    it.get(ERRORS_COLUMN_REQUEST_ID),
-                    it.get(ERRORS_COLUMN_TIMESTAMP),
-                    it.get(ERRORS_COLUMN_RPC_URL),
-                    it.get(ERRORS_COLUMN_MESSAGE)
-                ) }
+            }
         }
     }
 
