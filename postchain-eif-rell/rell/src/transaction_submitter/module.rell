@@ -15,12 +15,12 @@ operation __icmf_message(sender: byte_array, topic: text, body: gtv) {
     create_evm_submit_transaction(evm_submit_transaction_message.from_gtv(body), sender);
 }
 
-operation __update_evm_transaction_status(row_id: integer, status: transaction_status, tx_hash: text?) {
-    update_evm_transaction_status(row_id, status, tx_hash);
+operation __update_evm_transaction_status(row_id: integer, status: transaction_status, tx_hash: text?, signer: pubkey, signed_row_id: byte_array) {
+    update_evm_transaction_status(row_id, status, tx_hash, signer);
 }
 
 operation __update_evm_transaction_receipt(row_id: integer, block_hash: text, effective_gas_price: big_integer, gas_usage: big_integer) {
-    update evm_submit_transaction @ { rowid(row_id) } (.block_hash = block_hash, .effective_gas_price = effective_gas_price, .gas_usage = gas_usage);
+    update evm_submit_transaction @ { rowid(row_id) } ( .block_hash = block_hash, .effective_gas_price = effective_gas_price, .gas_usage = gas_usage );
 }
 
 operation __begin_block(height: integer) {
@@ -43,6 +43,7 @@ entity evm_submit_transaction {
     mutable effective_gas_price: big_integer = -1;
     mutable gas_usage: big_integer = -1;
     mutable tx_hash: text = "";
+    mutable processed_by: pubkey = x"";
 }
 
 entity evm_submit_transaction_taken_by {
@@ -232,19 +233,28 @@ function get_last_blocktime() {
     return block @ {} (@max .timestamp) ?: 0;
 }
 
-function update_evm_transaction_status(row_id: integer, status: transaction_status, tx_hash: text? = null) {
+function update_evm_transaction_status(row_id: integer, status: transaction_status, tx_hash: text? = null, signer: pubkey = x"") {
 
-    val transaction = evm_submit_transaction @ { .rowid == rowid(row_id) };
-
-    transaction.status = status;
+    val transaction = evm_submit_transaction @ { rowid(row_id) };
 
     if (status == transaction_status.TAKEN) {
+
+        require(transaction.processed_by == x"", "Transaction can't be taken while processed by other node");
+        require(evm_submit_transaction_taken_by @? { .transaction.rowid == rowid(row_id), signer } == null, "Each node can only process one transaction once");
+
         transaction.taken_timestamp = get_last_blocktime();
-        for (signer in op_context.get_signers()) {
-            create evm_submit_transaction_taken_by(transaction, signer);
-        }
+        transaction.processed_by = signer;
+        create evm_submit_transaction_taken_by(transaction, signer);
+
+    } else if (status == transaction_status.QUEUED) {
+
+        require(transaction.processed_by == signer, "Only the node currently processing the transaction can change the status back to QUEUE");
+
+        transaction.processed_by = x"";
+
     } else if (status == transaction_status.PENDING) {
 
+        require(transaction.processed_by == signer, "Only the node currently processing the transaction can change the status to PENDING");
         require(tx_hash, "Status PENDING requires providing transaction hash");
 
         if (tx_hash != transaction.tx_hash) {
@@ -252,9 +262,13 @@ function update_evm_transaction_status(row_id: integer, status: transaction_stat
             transaction.tx_hash = tx_hash;
         }
 
+        transaction.processed_by = signer;
+
     } else if (status == transaction_status.SUCCESS or status == transaction_status.FAILURE) {
         delete evm_submit_transaction_taken_by @* { .transaction == transaction };
     }
+
+    transaction.status = status;
 }
 
 function extract_number_of_signers_from_current_configuration(): integer {
