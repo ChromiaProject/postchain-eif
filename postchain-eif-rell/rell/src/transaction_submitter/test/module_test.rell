@@ -79,7 +79,7 @@ function test_fetch_oldest_queued_transactions_per_contract_and_taken_by() {
 
     // Take one
     rell.test.tx().op(
-        update_evm_transaction_status_op(1, transaction_status.TAKEN)
+        update_evm_transaction_status_op(1, transaction_status.TAKEN, x"01")
     ).sign(rell.test.keypairs.alice).run();
 
     assert_equals(fetch_oldest_queued_transactions_per_contract().size(), 1);
@@ -109,7 +109,7 @@ function test_fetch_oldest_queued_transactions_per_contract_and_rate_limit() {
 
     // Take one
     rell.test.tx().op(
-        update_evm_transaction_status_op(1, transaction_status.TAKEN)
+        update_evm_transaction_status_op(1, transaction_status.TAKEN, x"01")
     ).sign(rell.test.keypairs.alice).run();
 
     assert_equals(fetch_oldest_queued_transactions_per_contract().size(), 0);
@@ -191,7 +191,7 @@ function test_timeout_evm_transaction(){
     assert_true(tx.contract_address == "address");
 }
 
-function test_update_evm_transaction_status() {
+function test_update_evm_transaction_status_taken_to_pending() {
 
     rell.test.tx().op(
         create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
@@ -200,10 +200,92 @@ function test_update_evm_transaction_status() {
     val tx_row_id = evm_submit_transaction @ { } ( .rowid );
 
     rell.test.tx().op(
-        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.PENDING, "00")
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"01"),
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.PENDING, x"01", tx_hash = "00")
+    ).run();
+
+    assert_equals(evm_submit_transaction @ { tx_row_id } ( .processed_by ), x"01");
+}
+
+function test_update_evm_transaction_status_taken_to_queued() {
+
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+    ).run();
+
+    val tx_row_id = evm_submit_transaction @ { } ( .rowid );
+
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"01"),
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.QUEUED, x"01")
+    ).run();
+
+    assert_equals(evm_submit_transaction @ { tx_row_id } ( .processed_by ), x"");
+}
+
+function test_update_evm_transaction_status_taken_only_once() {
+
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+    ).run();
+
+    val tx_row_id = evm_submit_transaction @ { } ( .rowid );
+
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"01"),
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.QUEUED, x"01")
     ).run();
 
     rell.test.tx().op(
-        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.PENDING, "11")
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"01")
+    ).run_must_fail();
+}
+
+function test_update_evm_transaction_status_rejects() {
+
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+    ).run();
+
+    val tx_row_id = evm_submit_transaction @ { } ( .rowid );
+
+    // Taken by 01
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"01")
+    ).run();
+
+    // 02 not allowed to take it
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"02")
+    ).run_must_fail();
+
+    // 02 not allowed to set it to QUEUED
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.QUEUED, x"02")
+    ).run_must_fail();
+
+    // 02 not allowed to set it to PENDING
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.PENDING, x"02")
+    ).run_must_fail();
+}
+
+function test_update_evm_transaction_status_tx_hash() {
+
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+    ).run();
+
+    val tx_row_id = evm_submit_transaction @ { } ( .rowid );
+
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"01"),
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.PENDING, x"01", tx_hash = "00")
+    ).run();
+
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.PENDING, x"01", tx_hash = "01")
     ).run_must_fail("Transaction hash can only be set once");
+
+    assert_equals(evm_submit_transaction @ { tx_row_id } ( .tx_hash ), "00");
 }

@@ -305,7 +305,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
                     it.args[0].asInteger() == txSubmit.rowId &&
                             RellTransactionStatus.values()[it.args[1].asInteger()
                                 .toInt()] == RellTransactionStatus.PENDING &&
-                            it.args.size == 3
+                            it.args.size == 5
                 }
                 .map { it.args[2].asString() }
 
@@ -430,7 +430,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
                     it.args[0].asInteger() == txSubmit.rowId &&
                             RellTransactionStatus.values()[it.args[1].asInteger()
                                 .toInt()] == RellTransactionStatus.PENDING &&
-                            it.args.size == 3
+                            it.args.size == 5
                 }
                 .map { it.args[2].asString() }
 
