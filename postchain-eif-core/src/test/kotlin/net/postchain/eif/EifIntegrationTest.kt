@@ -836,7 +836,6 @@ abstract class EifIntegrationTest : ManagedModeTest() {
 
         // asserting that new config is loaded
         val witness = node.blockQueries().getBlockAtHeight(newConfigHeight).get()!!.witness as BaseBlockWitness
-        val signers = witness.getSignatures().map { it.subjectID.toHex() }.sorted().toTypedArray()
         assertArrayEquals(
                 listOf(nodes[0].pubKey, nodes[1].pubKey).sorted().toTypedArray(),
                 witness.getSignatures().map { it.subjectID.toHex() }.sorted().toTypedArray()

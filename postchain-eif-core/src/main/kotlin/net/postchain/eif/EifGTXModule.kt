@@ -96,6 +96,7 @@ class EifGTXModule : SimpleGTXModule<Config>(
 
 }
 
+@Suppress("UNUSED_PARAMETER")
 fun eventBlockHeightQuery(config: Config, ctx: EContext, args: Gtv): Gtv {
     val argsDict = args.asDict()
     val eventHash = argsDict["eventHash"]!!.asString().hexStringToByteArray()
