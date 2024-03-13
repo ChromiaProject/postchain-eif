@@ -476,7 +476,9 @@ abstract class EifIntegrationTest : ManagedModeTest() {
 
         val blockRid = nodes[0].getRestApiModel(bcRid)?.getBlock(eventBlockHeight, true)!!.rid
         val signature0 = nodes[0].getRestApiModel(bcRid)?.confirmBlock(BlockRid(blockRid))!!
+        assertThat(cryptoSystem.verifyDigest(blockRid, signature0.toSignature())).isEqualTo(true)
         val signature1 = nodes[1].getRestApiModel(bcRid)?.confirmBlock(BlockRid(blockRid))!!
+        assertThat(cryptoSystem.verifyDigest(blockRid, signature1.toSignature())).isEqualTo(true)
         val signatures = listOf(
                 EifSignature(
                         encodeSignatureWithV(blockRid, Signature(signature0.subjectID, signature0.data)),
