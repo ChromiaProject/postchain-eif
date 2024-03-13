@@ -13,14 +13,19 @@ import net.postchain.base.snapshot.SnapshotPageStore
 import net.postchain.common.data.KECCAK256
 import net.postchain.common.exception.UserMistake
 import net.postchain.common.hexStringToByteArray
+import net.postchain.common.toHex
 import net.postchain.core.BlockchainConfiguration
 import net.postchain.core.EContext
 import net.postchain.crypto.Secp256K1CryptoSystem
 import net.postchain.eif.config.EifBlockchainConfig
 import net.postchain.eif.merkle.ProofTreeParser.getProofListAndPosition
-import net.postchain.gtv.*
+import net.postchain.gtv.Gtv
+import net.postchain.gtv.GtvArray
+import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvEncoder.encodeGtv
 import net.postchain.gtv.GtvFactory.gtv
+import net.postchain.gtv.GtvNull
+import net.postchain.gtv.generateProof
 import net.postchain.gtv.mapper.GtvObjectMapper
 import net.postchain.gtv.mapper.Name
 import net.postchain.gtv.mapper.Nullable
@@ -30,10 +35,12 @@ import net.postchain.gtv.merkle.MerkleBasics
 import net.postchain.gtv.merkle.path.GtvPath
 import net.postchain.gtv.merkle.path.GtvPathFactory
 import net.postchain.gtv.merkle.path.GtvPathSet
+import net.postchain.gtv.merkleHash
 import net.postchain.gtx.PostchainContextAware
 import net.postchain.gtx.SimpleGTXModule
 import net.postchain.gtx.special.GTXSpecialTxExtension
 import org.bouncycastle.jce.provider.BouncyCastleProvider
+import org.web3j.abi.datatypes.Address
 import java.security.MessageDigest
 import java.security.Security
 
@@ -46,6 +53,7 @@ class Config(var levelsPerPage: Int = 2,
 
 class EifGTXModule : SimpleGTXModule<Config>(
         Config(), mapOf(), mapOf(
+        "get_event_block_height" to ::eventBlockHeightQuery,
         "get_event_merkle_proof" to ::eventMerkleProofQuery,
         "get_account_state_merkle_proof" to ::accountStateMerkleProofQuery
 )
@@ -86,6 +94,14 @@ class EifGTXModule : SimpleGTXModule<Config>(
         return listOf(EifSpecialTxExtension())
     }
 
+}
+
+fun eventBlockHeightQuery(config: Config, ctx: EContext, args: Gtv): Gtv {
+    val argsDict = args.asDict()
+    val eventHash = argsDict["eventHash"]!!.asString().hexStringToByteArray()
+    val db = DatabaseAccess.of(ctx)
+    val eventInfo = db.getEvent(ctx, PREFIX, eventHash) ?: return GtvNull
+    return gtv(eventInfo.blockHeight)
 }
 
 fun eventMerkleProofQuery(config: Config, ctx: EContext, args: Gtv): Gtv {
@@ -255,5 +271,5 @@ private fun blockWitnessData(
                 sig = encodeSignatureWithV(blockRid, it),
                 pubkey = getEthereumAddress(it.subjectID)
         )
-    }
+    }.sortedBy { Address(it.pubkey.toHex()).toUint().value }
 }
