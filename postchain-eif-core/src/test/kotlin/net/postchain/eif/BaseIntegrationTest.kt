@@ -111,8 +111,8 @@ abstract class EifBaseIntegrationTest(evmType: EvmType, private val prependUrls:
 
     @AfterEach
     override fun tearDown() {
-        super.tearDown()
-        web3j.shutdown()
+        super.tearDown() // Calling @AfterEach IntegrationTestSetup.tearDown()
+        if (::web3j.isInitialized) web3j.shutdown()
         evmContainer.stop()
     }
 

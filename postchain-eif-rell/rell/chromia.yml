@@ -90,15 +90,15 @@ compile:
   target: target
   rellVersion: 0.13.5
 libs:
- ft4:
-   registry: https://bitbucket.org/chromawallet/ft3-lib
-   path: rell/src/lib/ft4
-   tagOrBranch: v0.4.0r
-   rid: x"090F6B6ED8BFEB73CF67D8D671F3B72E8232C5E540449EB0A609A01F6901CE80"
-   insecure: false
- iccf:
-   registry: https://gitlab.com/chromaway/core/directory-chain
-   path: src/iccf
-   tagOrBranch: 1.32.2
-   rid: x"1D567580C717B91D2F188A4D786DB1D41501086B155A68303661D25364314A4D"
-   insecure: false
+  ft4:
+    registry: https://bitbucket.org/chromawallet/ft3-lib
+    path: rell/src/lib/ft4
+    tagOrBranch: v0.5.0r
+    rid: x"125809B57980D6E36C07210D0541E7BCAD86A66F324FC1C0DA9CA7D1F8D5A720"
+    insecure: false
+  iccf:
+    registry: https://gitlab.com/chromaway/core/directory-chain
+    path: src/iccf
+    tagOrBranch: 1.32.2
+    rid: x"1D567580C717B91D2F188A4D786DB1D41501086B155A68303661D25364314A4D"
+    insecure: false
