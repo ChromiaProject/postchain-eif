@@ -8,7 +8,7 @@ import net.postchain.common.hexStringToByteArray
 import net.postchain.crypto.KeyPair
 import net.postchain.crypto.SigMaker
 import net.postchain.crypto.devtools.KeyPairHelper
-import net.postchain.devtools.IntegrationTestSetup
+import net.postchain.devtools.ManagedModeTest
 import net.postchain.eif.transaction.TransactionSubmitter
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvArray
@@ -46,7 +46,7 @@ enum class AuthType {
     S, M
 }
 
-abstract class EifBaseIntegrationTest(evmType: EvmType, private val prependUrls: List<String> = listOf()) : IntegrationTestSetup() {
+abstract class EifBaseIntegrationTest(evmType: EvmType, private val prependUrls: List<String> = listOf()) : ManagedModeTest() {
 
     val networkId = 1337L
     val gasProvider = DefaultGasProvider()
