@@ -74,6 +74,9 @@ operation add_new_token_mapping(network_id: integer, token_address: byte_array, 
     create token_mapping(token, asset);
 }
 
+/**
+ *  Deprecated, use get_erc20_withdrawals()
+ */
 query get_erc20_withdrawal(network_id: integer, token_address: byte_array, beneficiary: byte_array) {
     val token = evm_erc20 @? { network_id, .address == token_address };
     if (empty(token)) {
@@ -81,6 +84,20 @@ query get_erc20_withdrawal(network_id: integer, token_address: byte_array, benef
     }
 
     return evm_erc20_withdraw @* { network_id, token , beneficiary } (@sort_desc .serial, .network_id, token = .token.address, .beneficiary, .amount);
+}
+
+query get_erc20_withdrawals(network_id: integer, token_address: byte_array, beneficiary: byte_array): list<struct<evm_erc20_withdraw>> {
+    val token = evm_erc20 @? { network_id, .address == token_address };
+    if (empty(token)) return [];
+
+    return evm_erc20_withdraw @* { network_id, token, beneficiary } ( @omit @sort_desc .serial, $.to_struct() );
+}
+
+query get_last_erc20_withdrawal(network_id: integer, token_address: byte_array, beneficiary: byte_array): struct<evm_erc20_withdraw>? {
+    val token = evm_erc20 @? { network_id, .address == token_address };
+    if (empty(token)) return null;
+
+    return evm_erc20_withdraw @? { network_id, token, beneficiary } ( @omit @sort_desc .serial, $.to_struct() ) limit 1;
 }
 
 query evm_balance_of_erc20(network_id: integer, token_address: byte_array, beneficiary: byte_array): big_integer {

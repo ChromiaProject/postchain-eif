@@ -860,7 +860,7 @@ abstract class EifIntegrationTest : ManagedModeTest() {
         assertArrayEquals(newValidators, getContractValidatorList().toTypedArray())
     }
 
-    protected fun getContractValidatorList(): List<Address> {
+    private fun getContractValidatorList(): List<Address> {
         val count = validator.validatorCount.send().value.toLong()
         val validators = mutableListOf<Address>()
         (0 until count).forEach {
@@ -869,13 +869,10 @@ abstract class EifIntegrationTest : ManagedModeTest() {
         return validators
     }
 
-    protected fun getLastWithdrawal(beneficiary: ByteArray): Map<String, Gtv> {
-        val all = blockQuery.query("eif.ft4.get_erc20_withdrawal", gtv(
-                "network_id" to gtv(networkId),
-                "token_address" to gtv(testTokenAddress),
-                "beneficiary" to gtv(beneficiary)
-        )).get().asArray()
-
-        return all.map { it.asDict() }.maxByOrNull { it["serial"]!!.asInteger() }!!
-    }
+    private fun getLastWithdrawal(beneficiary: ByteArray): Map<String, Gtv> =
+            blockQuery.query("eif.ft4.get_last_erc20_withdrawal", gtv(
+                    "network_id" to gtv(networkId),
+                    "token_address" to gtv(testTokenAddress),
+                    "beneficiary" to gtv(beneficiary)
+            )).get().asDict()
 }
