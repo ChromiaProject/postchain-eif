@@ -12,10 +12,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 // Internal libraries
 import "./Postchain.sol";
 
-interface ChromiaToken is IERC20 {
-    function transferFromChromia(address to, uint256 value, bytes32 refID) external returns (bool);
-}
-
 interface IValidator {
     function isValidSignatures(
         bytes32 hash,

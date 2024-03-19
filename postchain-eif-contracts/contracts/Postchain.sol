@@ -9,13 +9,17 @@ import "./utils/cryptography/Hash.sol";
 import "./utils/cryptography/MerkleProof.sol";
 import "./Data.sol";
 
+interface ChromiaToken is IERC20 {
+    function transferFromChromia(address to, uint256 value, bytes32 refID) external returns (bool);
+}
+
 library Postchain {
     using MerkleProof for bytes32[];
 
     struct Event {
         uint256 serialNumber;
         uint256 networkId;
-        IERC20 token;
+        ChromiaToken token;
         address beneficiary;
         uint256 amount;
     }
@@ -31,7 +35,10 @@ library Postchain {
         bytes32 extraDataHashedLeaf;
     }
 
-    function verifyEvent(bytes32 _hash, bytes memory _event) internal pure returns (IERC20, address, uint256, uint256) {
+    function verifyEvent(
+        bytes32 _hash,
+        bytes memory _event
+    ) internal pure returns (ChromiaToken, address, uint256, uint256) {
         Event memory evt = abi.decode(_event, (Event));
         bytes32 hash = keccak256(_event);
         if (hash != _hash) {
