@@ -1,0 +1,70 @@
+definitions:
+  - &eif_test
+    snapshot:
+      levels_per_page: 2
+      snapshots_to_keep: 2
+    chains:
+      ethereum:
+        network_id: 1337
+        contracts:
+          - '0x39615b16b74589919c9ce1ea73f1fc5d53141a78'
+        skip_to_height: 0
+        evm_read_offset: 0
+        read_offset: 0
+        events: !include events.yml
+  - &common_args
+    lib.ft4.accounts:
+      rate_limit:
+        active: true
+        max_points: 200
+        recovery_time: 5000
+        points_at_account_creation: 100
+  - &rell_test_args
+    lib.ft4.admin:
+      admin_pubkey: 03A301697BDFCD704313BA48E51D567543F2A182031EFD6915DDC07BBCC4E16070
+    lib.access.admin:
+      admin_pubkey: 03A301697BDFCD704313BA48E51D567543F2A182031EFD6915DDC07BBCC4E16070
+
+test:
+  modules:
+    - tests.utils
+    - tests.ft4
+  moduleArgs:
+    <<: *common_args
+    <<: *rell_test_args
+
+blockchains:
+  eif:
+    module: main
+    config:
+      blockstrategy:
+        name: "net.postchain.devtools.OnDemandBlockBuildingStrategy"
+      gtx:
+        modules: ['net.postchain.eif.EifGTXModule']
+      eif:
+        <<: *eif_test
+      sync_ext: ['net.postchain.eif.EifSynchronizationInfrastructureExtension']
+      signers:
+        - x"03a301697bdfcd704313ba48e51d567543f2a182031efd6915ddc07bbcc4e16070"
+    moduleArgs:
+      <<: *common_args
+      <<: *rell_test_args
+
+compile:
+  source: src
+  target: target
+  rellVersion: 0.13.5
+libs:
+  ft4:
+    registry: https://bitbucket.org/chromawallet/ft3-lib
+    path: rell/src/lib/ft4
+    tagOrBranch: v0.5.0r
+    rid: x"125809B57980D6E36C07210D0541E7BCAD86A66F324FC1C0DA9CA7D1F8D5A720"
+    insecure: false
+  iccf:
+    registry: https://gitlab.com/chromaway/core/directory-chain
+    path: src/iccf
+    tagOrBranch: 1.32.2
+    rid: x"1D567580C717B91D2F188A4D786DB1D41501086B155A68303661D25364314A4D"
+    insecure: false
+    
