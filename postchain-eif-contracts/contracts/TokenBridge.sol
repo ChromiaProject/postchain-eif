@@ -12,6 +12,10 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 // Internal libraries
 import "./Postchain.sol";
 
+interface ChromiaToken is IERC20 {
+    function transferFromChromia(address to, uint256 value, bytes32 refID) external returns (bool);
+}
+
 interface IValidator {
     function isValidSignatures(
         bytes32 hash,
@@ -29,9 +33,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
 
     using Postchain for bytes32;
     using MerkleProof for bytes32[];
-    using SafeERC20 for IERC20;
+    using SafeERC20 for ChromiaToken;
 
-    mapping(IERC20 => bool) public _allowedToken;
+    mapping(ChromiaToken => bool) public _allowedToken;
     mapping(bytes32 => Withdraw) public _withdraw;
     IValidator public validator;
     uint256 public networkId;
@@ -57,7 +61,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     }
 
     struct Withdraw {
-        IERC20 token;
+        ChromiaToken token;
         address beneficiary;
         uint256 amount;
         uint256 block_number;
@@ -70,7 +74,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     }
 
     struct ERC20AccountState {
-        IERC20 token;
+        ChromiaToken token;
         uint amount;
     }
 
@@ -81,27 +85,27 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
 
     event Initialize(IValidator indexed _validator, uint256 _withdrawOffset);
     event SetBlockchainRid(bytes32 rid);
-    event AllowToken(IERC20 indexed token);
+    event AllowToken(ChromiaToken indexed token);
     event TriggerMassExit(uint indexed height, bytes32 indexed blockRid);
     event PostponeMassExit();
     event UpdatedMassExitBlock(uint indexed height, bytes32 indexed blockRid);
     event PendingWithdraw(bytes32 indexed hash);
     event UnpendingWithdraw(bytes32 indexed hash);
-    event FundedERC20(address indexed sender, IERC20 indexed token, uint amount);
+    event FundedERC20(address indexed sender, ChromiaToken indexed token, uint amount);
     event DepositedERC20(
         address indexed sender,
-        IERC20 indexed token,
+        ChromiaToken indexed token,
         uint networkId,
         uint amount,
         string name,
         string symbol,
         uint8 decimals
     );
-    event WithdrawRequest(address indexed beneficiary, IERC20 indexed token, uint256 value, uint256 blockNumber);
-    event Withdrawal(address indexed beneficiary, IERC20 indexed token, uint256 value);
+    event WithdrawRequest(address indexed beneficiary, ChromiaToken indexed token, uint256 value, uint256 blockNumber);
+    event Withdrawal(address indexed beneficiary, ChromiaToken indexed token, uint256 value);
     event WithdrawalBySnapshot(address indexed beneficiary);
 
-    modifier isAllowToken(IERC20 token) {
+    modifier isAllowToken(ChromiaToken token) {
         require(_allowedToken[token], "TokenBridge: not allow token");
         _;
     }
@@ -146,7 +150,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         _unpause();
     }
 
-    function allowToken(IERC20 token) public onlyOwner {
+    function allowToken(ChromiaToken token) public onlyOwner {
         require(address(token) != address(0), "TokenBridge: token address is invalid");
         _allowedToken[token] = true;
         emit AllowToken(token);
@@ -198,13 +202,13 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
      * @dev admin need to fund enough token for bridge; otherwise, user cannot claim
      * and they might need to withdraw back to postchain.
      */
-    function fund(IERC20 token, uint256 amount) public isAllowToken(token) onlyOwner returns (bool) {
+    function fund(ChromiaToken token, uint256 amount) public isAllowToken(token) onlyOwner returns (bool) {
         token.safeTransferFrom(msg.sender, address(this), amount);
         emit FundedERC20(msg.sender, token, amount);
         return true;
     }
 
-    function deposit(IERC20 token, uint256 amount) public isAllowToken(token) whenNotPaused returns (bool) {
+    function deposit(ChromiaToken token, uint256 amount) public isAllowToken(token) whenNotPaused returns (bool) {
         (string memory name, string memory symbol, uint8 decimals) = _getTokenInfo(token);
         token.safeTransferFrom(msg.sender, address(this), amount);
         emit DepositedERC20(msg.sender, token, networkId, amount, name, symbol, decimals);
@@ -258,7 +262,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     function _updateWithdraw(bytes32 hash, bytes memory _event) internal returns (bool) {
         Withdraw storage wd = _withdraw[hash];
         {
-            (IERC20 token, address beneficiary, uint256 amount, uint256 netId) = hash.verifyEvent(_event);
+            (ChromiaToken token, address beneficiary, uint256 amount, uint256 netId) = hash.verifyEvent(_event);
             require(_allowedToken[token], "TokenBridge: not allow token");
             require(networkId == netId, "TokenBridge: incorrect network id");
             require(amount > 0, "TokenBridge: invalid amount to make request withdraw");
@@ -349,7 +353,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     }
 
     function _getTokenInfo(
-        IERC20 token
+        ChromiaToken token
     ) internal view returns (string memory name, string memory symbol, uint8 decimals) {
         // We don't know if this token supports metadata functions or not so we have to query and handle failure
         bool success;
@@ -374,7 +378,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
      * @notice this function will be use only in emergency case
      * by allow admin/owner (multi-sig wallet) to withdraw all the remaining balance after a specific period of time.
      */
-    function emergencyWithdraw(IERC20 token, address payable beneficiary) external onlyOwner {
+    function emergencyWithdraw(ChromiaToken token, address payable beneficiary) external onlyOwner {
         require(address(token) != address(0), "TokenBridge: token address is invalid");
         require(beneficiary != address(0), "TokenBridge: beneficiary address is invalid");
         require(
