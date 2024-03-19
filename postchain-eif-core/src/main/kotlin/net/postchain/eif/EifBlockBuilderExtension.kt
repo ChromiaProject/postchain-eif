@@ -12,13 +12,14 @@ import net.postchain.common.data.Hash
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.core.*
 import net.postchain.gtv.Gtv
+import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvByteArray
 import java.util.*
 
 const val EIF_EVENT = "eif_event"
 const val EIF_STATE = "eif_state"
 
-class EifImplementation(
+class EifBlockBuilderExtension(
         private val ds: DigestSystem,
         private val levelsPerPage: Int,
         private val snapshotsToKeep: Int): BaseBlockBuilderExtension, TxEventSink {
@@ -33,8 +34,8 @@ class EifImplementation(
 
     override fun processEmittedEvent(ctxt: TxEContext, type: String, data: Gtv) {
         when (type) {
-            EIF_EVENT -> emitEifEvent(ctxt, data)
-            EIF_STATE -> emitEifState(data[0].asInteger(), data[1])
+            EIF_EVENT -> emitEifEvent(ctxt, data as GtvArray)
+            EIF_STATE -> emitEifState(data[0].asInteger(), data[1] as GtvArray)
             else -> throw ProgrammerMistake("Unrecognized event")
         }
     }
@@ -52,21 +53,19 @@ class EifImplementation(
      * Compute event (as a simple Merkle tree) and state hashes (using updateSnapshot)
      */
     override fun finalize(): Map<String, Gtv> {
-        val extra = mutableMapOf<String, Gtv>()
         val stateRootHash = snapshot.updateSnapshot(bctx.height, states)
         if (states.size > 0 && snapshotsToKeep > 0) {
             snapshot.pruneSnapshot(bctx.height)
         }
         val eventRootHash = event.writeEventTree(bctx.height, events)
-        extra[EIF] = GtvByteArray(eventRootHash + stateRootHash)
-        return extra
+        return mapOf(EIF to GtvByteArray(eventRootHash + stateRootHash))
     }
 
     /**
      * Serialize, write to leaf store, hash using keccak256.
      * Hashes are remembered and later combined into a Merkle tree
      */
-    private fun emitEifEvent(ctxt: TxEContext, evt: Gtv) {
+    private fun emitEifEvent(ctxt: TxEContext, evt: GtvArray) {
         val data = SimpleGtvEncoder.encodeGtv(evt)
         val hash = ds.digest(data)
         store.writeEvent(ctxt, PREFIX, events.size.toLong(), hash, data)
@@ -78,7 +77,7 @@ class EifImplementation(
      * hash using keccak256. (state_n, hash) pairs are submitted to updateSnapshot
      * during finalization
      */
-    private fun emitEifState(state_n: Long, state: Gtv) {
+    private fun emitEifState(state_n: Long, state: GtvArray) {
         val data = SimpleGtvEncoder.encodeGtv(state)
         val hash = ds.digest(data)
         states[state_n] = hash

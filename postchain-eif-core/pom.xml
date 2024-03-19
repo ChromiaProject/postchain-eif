@@ -52,6 +52,11 @@
             <type>tar.gz</type>
         </dependency>
         <dependency>
+            <groupId>net.postchain</groupId>
+            <artifactId>postchain-eif-rell</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk18on</artifactId>
         </dependency>
@@ -96,12 +101,12 @@
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers</artifactId>
+            <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <groupId>org.junit-pioneer</groupId>
+            <artifactId>junit-pioneer</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -259,6 +264,27 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <plugin>
+                <groupId>net.postchain.rell</groupId>
+                <artifactId>rell-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>eif-dapp-build</id>
+                        <phase>generate-test-resources</phase>
+                        <goals>
+                            <goal>rell-compile</goal>
+                        </goals>
+                        <configuration>
+                            <rootFolder>${project.basedir}/..</rootFolder>
+                            <source>postchain-eif-rell/rell/src/</source>
+                            <configFile>postchain-eif-core/src/test/resources/net/postchain/eif/chromia.yml</configFile>
+                            <target>postchain-eif-core/target/test-classes/net/postchain/eif/</target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
         </plugins>
     </build>
 

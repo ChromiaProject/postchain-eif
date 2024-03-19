@@ -14,18 +14,15 @@ definitions:
         max_points: 200
         recovery_time: 5000
         points_at_account_creation: 100
-      max_auth_descriptor_rules: 8
   - &rell_test_args
     lib.ft4.admin:
       admin_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
     lib.access.admin:
       admin_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
-    lib.originals.marketplace:
-      oracle_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
   - &eif_sender_receiver # Base configuration for a chain that will both send and receive messages
     gtx:
       modules:
-        - "net.postchain.eif.EifSenderGTXModule"
+        - "net.postchain.eif.EifGTXModule"
         - "net.postchain.d1.icmf.IcmfSenderGTXModule"
         - "net.postchain.d1.icmf.IcmfReceiverGTXModule"
     sync_ext:
@@ -63,18 +60,18 @@ libs:
   ft4:
     registry: https://bitbucket.org/chromawallet/ft3-lib
     path: rell/src/lib/ft4
-    tagOrBranch: v0.2.0r
-    rid: x"4B3DA349B20558F5700E28C110D43E07CCA7160C42D2B5C0A53E1554ACD0971D"
+    tagOrBranch: v0.5.0r
+    rid: x"125809B57980D6E36C07210D0541E7BCAD86A66F324FC1C0DA9CA7D1F8D5A720"
     insecure: false
   iccf:
     registry: https://gitlab.com/chromaway/core/directory-chain
     path: src/iccf
-    tagOrBranch: 1.9.1
-    rid: x"593D6EBA650BAC473E105C047B2C43A099164870304B3E5E324F714FF2F3F82F"
+    tagOrBranch: 1.32.2
+    rid: x"1D567580C717B91D2F188A4D786DB1D41501086B155A68303661D25364314A4D"
     insecure: false
   icmf:
     registry: https://gitlab.com/chromaway/core/directory-chain
     path: src/messaging/icmf
-    tagOrBranch: 1.29.0
+    tagOrBranch: 1.32.2
     rid: x"19D6BC28D527E6D2239843608486A84F44EDCD244E253616F13D1C65893F35F6"
-    
+    insecure: false

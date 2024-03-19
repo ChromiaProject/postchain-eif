@@ -300,10 +300,7 @@ operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiar
         token_mapping @? { .token == token },
         "no token mapping"
     );
-    val ft_asset = require(
-        assets.asset @? { .id == token_mapping.asset.id },
-        "ft asset does not exist: " + token_mapping.asset.id
-    );
+    val ft_asset = token_mapping.asset;
     val balance = evm_erc20_balance @? { network_id, token, beneficiary };
     require_not_empty(balance, "No balance for this token");
     require(balance.amount >= amount, "Balance is too low");

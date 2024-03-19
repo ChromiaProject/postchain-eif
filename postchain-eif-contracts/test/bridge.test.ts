@@ -1,22 +1,23 @@
 import { ethers, upgrades, network} from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
-import { TestToken__factory, TokenBridge__factory, TokenBridgeDelegator__factory, Validator__factory } from "../src/types";
+import { TestToken__factory, TokenBridge__factory, TokenBridgeDelegator__factory, Validator__factory, Migration__factory } from "../src/types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BytesLike, hexZeroPad, keccak256 } from "ethers/lib/utils";
 import { ContractReceipt, ContractTransaction } from "ethers";
 import { intToHex } from "ethjs-util";
+import { constants } from "ethers";
 import { DecodeHexStringToByteArray, hashGtvBytes32Leaf, hashGtvBytes64Leaf, hashGtvIntegerLeaf, postchainMerkleNodeHash} from "./utils"
 
 chai.use(solidity);
 const { expect } = chai;
-const ft3_account_id = "0x95471c57f0bc16284cb1016eba3b2736fa5fb2a640e2f20984079f4349f867ff"
-const WITHDRAW_OFFSET = "0x2";
+const WITHDRAW_OFFSET = "0x20";
 describe("Token Bridge Test", () => {
     let tokenAddress: string;
     let bridgeAddress: string;
     let validatorAddress: string;
     let bridgeDelegatorAddress: string;
+    let migrationAddress: string;
     let admin: SignerWithAddress;
     let validator1: SignerWithAddress;
     let validator2: SignerWithAddress;
@@ -39,14 +40,19 @@ describe("Token Bridge Test", () => {
         validatorAddress = validatorContract.address
 
         const bridgeFactory = new TokenBridge__factory(admin)
-        const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress])
+        const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_OFFSET])
         bridgeAddress = bridge.address
 
         const bridgeDelegatorFactory = new TokenBridgeDelegator__factory(deployer)
         const bridgeDelegator = await bridgeDelegatorFactory.deploy(bridgeAddress)
         bridgeDelegatorAddress = bridgeDelegator.address
 
-        await bridge.allowToken(tokenAddress)
+        const migrationFactory = new Migration__factory(admin)
+        const migration = await migrationFactory.deploy(validatorAddress, bridgeAddress)
+        migrationAddress = migration.address
+
+        await expect(bridge.allowToken(constants.AddressZero)).to.be.revertedWith("TokenBridge: token address is invalid");
+        await expect(bridge.allowToken(tokenAddress)).to.emit(bridge, "AllowToken").withArgs(tokenAddress)
     });
 
     describe("Validators", async () => {
@@ -54,18 +60,28 @@ describe("Token Bridge Test", () => {
             const [node1, node2, node3, other] = await ethers.getSigners()
             const validator = new Validator__factory(admin).attach(validatorAddress)
             const otherValidator = new Validator__factory(other).attach(validatorAddress)
-            await expect(otherValidator.addValidator(0, node1.address))
+            await expect(validator.renounceOwnership())
+                .to.be.revertedWith("Validator: renounceOwnership is not allowed")
+            await expect(otherValidator.updateValidators([node1.address]))
                 .to.be.revertedWith('OwnableUnauthorizedAccount')
+            await expect(validator.updateValidators([node1.address, constants.AddressZero]))
+                .to.be.revertedWith('Validator: validator address cannot be zero')
 
-            // Update App Nodes
-            await validator.removeValidator(0, validator1.address)
-            await validator.removeValidator(0, validator2.address)
-            await validator.addValidator(0, node1.address)
-            await validator.addValidator(0, node2.address)
-            await validator.addValidator(0, node3.address)
-            expect(await validator.validators(0, 0)).to.eq(node1.address)
-            expect(await validator.validators(0, 1)).to.eq(node2.address)
-            expect(await validator.validators(0, 2)).to.eq(node3.address)
+            expect(await validator.getValidatorCount()).to.eq(2)
+
+            // Update validator list
+            const blockNum = await ethers.provider.getBlockNumber()
+            expect(await validator.updateValidators([node1.address]))
+            .to.emit(validator, "UpdateValidators").withArgs(blockNum+1, [node1.address])
+            expect(await validator.validators(0)).to.eq(node1.address)
+            expect(await validator.getValidatorCount()).to.eq(1)
+
+            expect(await validator.updateValidators([node1.address, node2.address, node3.address]))
+            .to.emit(validator, "UpdateValidators").withArgs(blockNum+2, [node1.address, node2.address, node3.address])
+            expect(await validator.validators(0)).to.eq(node1.address)
+            expect(await validator.validators(1)).to.eq(node2.address)
+            expect(await validator.validators(2)).to.eq(node3.address)
+            expect(await validator.getValidatorCount()).to.eq(3)
         })
     })
 
@@ -85,12 +101,11 @@ describe("Token Bridge Test", () => {
             const name = await tokenApproveInstance.name()
             const symbol = await tokenApproveInstance.symbol()
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
-            await expect(bridge.deposit(tokenAddress, toDeposit, ft3_account_id))
+            await expect(bridge.deposit(tokenAddress, toDeposit))
                     .to.emit(bridge, "DepositedERC20")
                     .withArgs(
                         user.address,
                         tokenAddress,
-                        ft3_account_id,
                         network.config.chainId,
                         toDeposit,
                         name,
@@ -98,7 +113,7 @@ describe("Token Bridge Test", () => {
                         18 // Default decimals is 18
                     )
 
-            expect(await bridge._balances(tokenAddress)).to.eq(toDeposit)
+            expect(await tokenInstance.balanceOf(bridge.address)).to.eq(toDeposit)
             expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint.sub(toDeposit))
         })
     })
@@ -117,7 +132,7 @@ describe("Token Bridge Test", () => {
             const toDeposit = ethers.utils.parseEther("100")
             const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
-            await bridge.deposit(tokenAddress, toDeposit, ft3_account_id)
+            await bridge.deposit(tokenAddress, toDeposit)
 
             // normal user cannot call emergencyWithdraw
             await expect(bridge.emergencyWithdraw(tokenAddress, beneficiary.address))
@@ -126,19 +141,23 @@ describe("Token Bridge Test", () => {
             const adminBridge = new TokenBridge__factory(deployer).attach(bridgeAddress)
             // admin or owner cannot call emergencyWithdraw before setting time
             await expect(adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address))
-                .to.be.revertedWith("TokenBridge: cannot do emergency withdrawl before setting timestamp")
+                .to.be.revertedWith("TokenBridge: cannot do emergency withdrawal before setting timestamp")
 
             // admin can call emergencyWithdraw after setting time
             expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(0)
-            expect(await adminBridge._balances(tokenAddress)).to.eq(toDeposit)
+            expect(await tokenInstance.balanceOf(adminBridge.address)).to.eq(toDeposit)
             const nighttyDays = 90 * 24 * 60 * 60
             const blockNum= await ethers.provider.getBlockNumber()
             const block = await ethers.provider.getBlock(blockNum)
             const timestamp = block.timestamp + nighttyDays
             await ethers.provider.send('evm_setNextBlockTimestamp', [timestamp])
+            await expect(adminBridge.emergencyWithdraw(constants.AddressZero, beneficiary.address))
+            .to.be.revertedWith("TokenBridge: token address is invalid")
+            await expect(adminBridge.emergencyWithdraw(tokenAddress, constants.AddressZero))
+            .to.be.revertedWith("TokenBridge: beneficiary address is invalid")
             await adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address)
             expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(toDeposit)
-            expect(await adminBridge._balances(tokenAddress)).to.eq(toDeposit)
+            expect(await tokenInstance.balanceOf(adminBridge.address)).to.eq(0)
         })
     })
 
@@ -154,16 +173,17 @@ describe("Token Bridge Test", () => {
             const bridgeOwner = new TokenBridge__factory(deployer).attach(bridgeAddress)
             const bridge = new TokenBridge__factory(user).attach(bridgeAddress)
             const validatorAdmin = new Validator__factory(admin).attach(validatorAddress)
+            const migration = new Migration__factory(admin).attach(migrationAddress)
             const toDeposit = ethers.utils.parseEther("100")
             const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
 
             await expect(bridge.pause()).to.be.revertedWith('OwnableUnauthorizedAccount')
-            await expect(bridge.deposit(bridgeAddress, toDeposit, ft3_account_id)).to.be.revertedWith('TokenBridge: not allow token')
-            await bridgeOwner.pause()
-            await expect(bridge.deposit(tokenAddress, toDeposit, ft3_account_id)).to.be.revertedWith('EnforcedPause()')
+            await expect(bridge.deposit(bridgeAddress, toDeposit)).to.be.revertedWith('TokenBridge: not allow token')
+            await expect(bridgeOwner.pause()).to.emit(bridgeOwner, "Paused").withArgs(deployer.address)
+            await expect(bridge.deposit(tokenAddress, toDeposit)).to.be.revertedWith('EnforcedPause()')
             await bridgeOwner.unpause()
-            let tx: ContractTransaction = await bridge.deposit(tokenAddress, toDeposit, ft3_account_id)
+            let tx: ContractTransaction = await bridge.deposit(tokenAddress, toDeposit)
             let receipt: ContractReceipt = await tx.wait()
             let logs = receipt.events?.filter((x) =>  {return x.event == 'DepositedERC20'})
             if (logs !== undefined) {
@@ -265,10 +285,8 @@ describe("Token Bridge Test", () => {
                                     wrongNetworkIdExtraDataMerkleRoot
                 )
 
-                // update to add new validator at height of 30
-                await validatorAdmin.addValidator(30, validator1.address)
-                await validatorAdmin.addValidator(30, validator2.address)
-                await validatorAdmin.addValidator(30, validator3.address)
+                // update to new validator list
+                await validatorAdmin.updateValidators([validator1.address, validator2.address, validator3.address])
 
                 let sig1 = await validator1.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
                 let sig2 = await validator2.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
@@ -349,7 +367,12 @@ describe("Token Bridge Test", () => {
                     DecodeHexStringToByteArray(wrongNetworkIdSig3.substring(2, wrongNetworkIdSig3.length))
                 ]
                 let validators = [validator1.address, validator2.address, validator3.address];
-                await bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid))
+                await expect(bridge.withdrawRequest(wrongNetworkIdData, wrongNetworkIdEventProof,
+                    DecodeHexStringToByteArray(wrongNetworkIdBlockHeader), wrongNetworkIdSigs, validators, 
+                    wrongNetworkIdExtraProof)
+                ).to.be.revertedWith('TokenBridge: blockchain rid is not set')
+                await expect(bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid)))
+                .to.emit(bridgeOwner, "SetBlockchainRid")
                 await expect(bridge.withdrawRequest(wrongNetworkIdData, wrongNetworkIdEventProof,
                     DecodeHexStringToByteArray(wrongNetworkIdBlockHeader), wrongNetworkIdSigs, validators, 
                     wrongNetworkIdExtraProof)
@@ -388,7 +411,7 @@ describe("Token Bridge Test", () => {
                         DecodeHexStringToByteArray(sig1.substring(2, sig1.length)), 
                         DecodeHexStringToByteArray(sig1.substring(2, sig1.length))
                     ], 
-                    [validator1.address, validator2.address],
+                    [validator1.address, validator1.address],
                     extraProof)
                 ).to.be.revertedWith('Validator: duplicate signature or signers is out of order')
                 await expect(bridge.withdrawRequest(data, eventProof,
@@ -411,24 +434,36 @@ describe("Token Bridge Test", () => {
                     extraProof)
                 ).to.be.revertedWith('Validator: signer is not validator')
 
-                await bridgeOwner.pause()
+                await expect(bridgeOwner.pause()).to.emit(bridgeOwner, "Paused").withArgs(deployer.address)
                 await expect(bridge.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     extraProof)
                 ).to.be.revertedWith('EnforcedPause()')
-                await bridgeOwner.unpause()
-                await bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(maliciousBlockchainRid))
+                await expect(bridgeOwner.unpause()).to.emit(bridgeOwner, "Unpaused").withArgs(deployer.address)
+                await expect(bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(maliciousBlockchainRid)))
+                .to.emit(bridgeOwner, "SetBlockchainRid")
                 await expect(bridge.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     extraProof)
                 ).to.be.revertedWith('Postchain: invalid blockchain rid')
 
-                await bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid))
-                await expect(bridge.withdrawRequest(data, eventProof,
-                    DecodeHexStringToByteArray(blockHeader), sigs, validators,
-                    extraProof)
-                ).to.emit(bridge, "WithdrawRequest")
-                .withArgs(user.address, tokenAddress, toDeposit)
+                await expect(bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid)))
+                .to.emit(bridgeOwner, "SetBlockchainRid")
+
+                await validatorAdmin.updateValidators([validator1.address, validator2.address])
+                await validatorAdmin.transferOwnership(migrationAddress)
+                await migration.acceptValidatorOwnership()
+                let blockNum = await ethers.provider.getBlockNumber()
+                await expect(migration.withdrawRequest(
+                    validators, [validator1.address, validator2.address], 
+                    data, eventProof, DecodeHexStringToByteArray(blockHeader), sigs, validators, extraProof)
+                ).to.be.emit(bridge, "WithdrawRequest").withArgs(user.address, tokenAddress, toDeposit, blockNum+1)
+
+                await migration.transferValidatorOwnership(admin.address)
+                validatorAdmin.acceptOwnership()
+                expect(await validatorAdmin.getValidatorCount()).to.eq(2)
+                await validatorAdmin.updateValidators(validators)
+                expect(await validatorAdmin.getValidatorCount()).to.eq(3)
 
                 await expect(bridge.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
@@ -447,7 +482,9 @@ describe("Token Bridge Test", () => {
                 let hashEvent = DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length))
 
                 // smart contract owner can update withdraw request status to pending (emergency case)
-                await bridgeOwner.pendingWithdraw(hashEvent)
+                await expect(bridgeOwner.pendingWithdraw(constants.HashZero)).to.be.revertedWith('TokenBridge: event hash is invalid')
+                await expect(bridgeOwner.pendingWithdraw(hashEvent))
+                .to.emit(bridge, "PendingWithdraw")
 
                 // then user cannot withdraw the fund
                 await expect(bridge.withdraw(
@@ -455,26 +492,28 @@ describe("Token Bridge Test", () => {
                     user.address)).to.be.revertedWith('TokenBridge: fund is pending or was already claimed')
 
                 // smart contract owner can set withdraw request status back to withdrawable
-                await bridgeOwner.unpendingWithdraw(hashEvent)
+                await expect(bridgeOwner.unpendingWithdraw(constants.HashZero)).to.be.revertedWith('TokenBridge: event hash is invalid')
+                await expect(bridgeOwner.unpendingWithdraw(hashEvent))
+                .to.emit(bridge, "UnpendingWithdraw")
 
                 expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint.sub(toDeposit))
-                expect(await bridge._balances(tokenAddress)).to.eq(toDeposit)
+                expect(await tokenInstance.balanceOf(bridge.address)).to.eq(toDeposit)
                 await expect(bridge.withdraw(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
                     deployer.address)).to.be.revertedWith('TokenBridge: no fund for the beneficiary')
 
-                await bridgeOwner.pause()
+                await expect(bridgeOwner.pause()).to.emit(bridgeOwner, "Paused").withArgs(deployer.address)
                 await expect(bridge.withdraw(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
                     user.address)).to.be.revertedWith('EnforcedPause()')
-                await bridgeOwner.unpause()
+                await expect(bridgeOwner.unpause()).to.emit(bridgeOwner, "Unpaused").withArgs(deployer.address)
                 // now user can withdraw the fund
                 await expect(bridge.withdraw(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
                     user.address))
                 .to.emit(bridge, "Withdrawal")
                 .withArgs(user.address, tokenAddress, toDeposit)
-                expect(await bridge._balances(tokenAddress)).to.eq(0)
+                expect(await tokenInstance.balanceOf(bridge.address)).to.eq(0)
                 expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint)
                 await expect(bridge.withdraw(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
@@ -499,8 +538,8 @@ describe("Token Bridge Test", () => {
             const toDeposit = ethers.utils.parseEther("100")
             await bridgeDelegator.approve(tokenAddress, bridgeAddress, toDeposit)
 
-            await expect(bridge.deposit(bridgeAddress, toDeposit, ft3_account_id)).to.be.revertedWith('TokenBridge: not allow token')
-            let tx: ContractTransaction = await bridgeDelegator.deposit(tokenAddress, toDeposit, ft3_account_id)
+            await expect(bridge.deposit(bridgeAddress, toDeposit)).to.be.revertedWith('TokenBridge: not allow token')
+            let tx: ContractTransaction = await bridgeDelegator.deposit(tokenAddress, toDeposit)
             let receipt: ContractReceipt = await tx.wait()
             let logs = receipt.logs
             if (logs !== undefined) {
@@ -578,10 +617,8 @@ describe("Token Bridge Test", () => {
                                     extraDataMerkleRoot
                 )
 
-                // update to add new validator at height of 30
-                await validatorAdmin.addValidator(30, validator1.address)
-                await validatorAdmin.addValidator(30, validator2.address)
-                await validatorAdmin.addValidator(30, validator3.address)
+                // update to add new validator list
+                await validatorAdmin.updateValidators([validator1.address, validator2.address, validator3.address])
 
                 let sig1 = await validator1.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
                 let sig2 = await validator2.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)))
@@ -640,7 +677,9 @@ describe("Token Bridge Test", () => {
                     DecodeHexStringToByteArray(sig3.substring(2, sig3.length))
                 ];
                 let validators = [validator1.address, validator2.address, validator3.address];
-                await bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid))
+                await expect(bridgeOwner.setBlockchainRid(constants.HashZero)).to.be.revertedWith('TokenBridge: blockchain rid is invalid')
+                await expect(bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid)))
+                .to.emit(bridgeOwner, "SetBlockchainRid")
                 await expect(bridgeDelegator.withdrawRequest(maliciousData, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators, 
                     extraProof)
@@ -675,7 +714,7 @@ describe("Token Bridge Test", () => {
                         DecodeHexStringToByteArray(sig1.substring(2, sig1.length)), 
                         DecodeHexStringToByteArray(sig1.substring(2, sig1.length))
                     ], 
-                    [validator1.address, validator2.address],
+                    [validator1.address, validator1.address],
                     extraProof)
                 ).to.be.revertedWith('Validator: duplicate signature or signers is out of order')
                 await expect(bridgeDelegator.withdrawRequest(data, eventProof,
@@ -697,11 +736,12 @@ describe("Token Bridge Test", () => {
                     [admin.address, validator1.address],
                     extraProof)
                 ).to.be.revertedWith('Validator: signer is not validator')
+                let blockNum = await ethers.provider.getBlockNumber()
                 await expect(bridgeDelegator.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     extraProof)
                 ).to.emit(bridge, "WithdrawRequest")
-                .withArgs(bridgeDelegatorAddress, tokenAddress, toDeposit)
+                .withArgs(bridgeDelegatorAddress, tokenAddress, toDeposit, blockNum+1)
 
                 await expect(bridgeDelegator.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
@@ -721,7 +761,8 @@ describe("Token Bridge Test", () => {
                 let hashEvent = DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length))
 
                 // smart contract owner can update withdraw request status to pending (emergency case)
-                await bridgeOwner.pendingWithdraw(hashEvent)
+                await expect(bridgeOwner.pendingWithdraw(hashEvent))
+                .to.emit(bridge, "PendingWithdraw")
 
                 // then user cannot withdraw the fund
                 await expect(bridgeDelegator.withdraw(
@@ -729,10 +770,11 @@ describe("Token Bridge Test", () => {
                     bridgeDelegatorAddress)).to.be.revertedWith('TokenBridge: fund is pending or was already claimed')
 
                 // smart contract owner can set withdraw request status back to withdrawable
-                await bridgeOwner.unpendingWithdraw(hashEvent)
+                await expect(bridgeOwner.unpendingWithdraw(hashEvent))
+                .to.emit(bridge, "UnpendingWithdraw")
 
                 expect(await tokenInstance.balanceOf(bridgeDelegatorAddress)).to.eq(toMint.sub(toDeposit))
-                expect(await bridge._balances(tokenAddress)).to.eq(toDeposit)
+                expect(await tokenInstance.balanceOf(bridge.address)).to.eq(toDeposit)
                 await expect(bridgeDelegator.withdraw(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
                     deployer.address)).to.be.revertedWith('TokenBridge: no fund for the beneficiary')
@@ -743,7 +785,7 @@ describe("Token Bridge Test", () => {
                     bridgeDelegatorAddress))
                 .to.emit(bridge, "Withdrawal")
                 .withArgs(bridgeDelegatorAddress, tokenAddress, toDeposit)
-                expect(await bridge._balances(tokenAddress)).to.eq(0)
+                expect(await tokenInstance.balanceOf(bridge.address)).to.eq(0)
                 expect(await tokenInstance.balanceOf(bridgeDelegatorAddress)).to.eq(toMint)
                 await expect(bridgeDelegator.withdraw(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
@@ -766,20 +808,31 @@ describe("Token Bridge Test", () => {
             await expect(otherTokenBridge.triggerMassExit(100, blockRid)).to.be.revertedWith('OwnableUnauthorizedAccount')
 
             // admin can trigger mass exit
-            await adminTokenBridge.triggerMassExit(100, blockRid)
+            await expect(adminTokenBridge.triggerMassExit(100, blockRid))
+            .to.emit(adminTokenBridge, "TriggerMassExit")
             expect(await adminTokenBridge.isMassExit()).to.be.true
             expect((await adminTokenBridge.massExitBlock()).blockRid).to.be.equal(blockRid)
             expect((await adminTokenBridge.massExitBlock()).height).to.be.equal(100)
 
             // update mass exit block
-            await adminTokenBridge.updateMassExitBlock(200, blockRid)
+            await expect(adminTokenBridge.updateMassExitBlock(200, blockRid))
+            .to.emit(adminTokenBridge, "UpdatedMassExitBlock")
             expect((await adminTokenBridge.massExitBlock()).blockRid).to.be.equal(blockRid)
             expect((await adminTokenBridge.massExitBlock()).height).to.be.equal(200)
 
             // postpone mass exit
             await expect(otherTokenBridge.postponeMassExit()).to.be.revertedWith('OwnableUnauthorizedAccount')
-            await adminTokenBridge.postponeMassExit()
+            await expect(adminTokenBridge.postponeMassExit())
+            .to.emit(adminTokenBridge, "PostponeMassExit")
             expect(await adminTokenBridge.isMassExit()).to.be.false
+        })
+    })
+
+    describe("Ownership", async () => {
+        it("renounce ownership is not allowed", async () => {
+            const [admin, other] = await ethers.getSigners()
+            let adminTokenBridge = new TokenBridge__factory(admin).attach(bridgeAddress)
+            await expect(adminTokenBridge.renounceOwnership()).to.be.revertedWith('TokenBridge: renounce ownership is not allowed')
         })
     })
 })

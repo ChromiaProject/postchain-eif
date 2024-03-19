@@ -1,6 +1,24 @@
 package net.postchain.eif
 
-import org.testcontainers.junit.jupiter.Testcontainers
+import org.junit.jupiter.api.BeforeAll
+import org.testcontainers.containers.output.Slf4jLogConsumer
+import org.testcontainers.containers.wait.strategy.Wait
 
-@Testcontainers(disabledWithoutDocker = true)
-class GethEifIT: EifIntegrationTest(EvmType.GETH)
+class GethEifIT : EifIntegrationTest() {
+
+    @BeforeAll
+    override fun setup() {
+        evmContainer = GethContainer()
+                .withExposedService(
+                        "geth", 8545,
+                        Wait.forLogMessage(".*HTTP server started.*\\s", 1)
+                ).withLogConsumer(
+                        "geth",
+                        Slf4jLogConsumer(node1Logger.underlyingLogger, true)
+                ).apply {
+                    start()
+                }
+
+        super.setup()
+    }
+}

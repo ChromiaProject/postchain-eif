@@ -24,12 +24,14 @@
 
     <properties>
         <revision>dev</revision>
-        <postchain.version>3.14.18</postchain.version>
+        <postchain.version>3.15.4</postchain.version>
         <rell.version>0.13.5</rell.version>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <kotlin.compiler.jvmTarget>17</kotlin.compiler.jvmTarget>
         <testcontainers.version>1.16.2</testcontainers.version>
+        <junit.pioneer.version>2.2.0</junit.pioneer.version>
+        <rell.maven.plugin.version>0.11.6</rell.maven.plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -66,14 +68,14 @@
             <!-- Tests -->
             <dependency>
                 <groupId>org.testcontainers</groupId>
-                <artifactId>testcontainers</artifactId>
+                <artifactId>junit-jupiter</artifactId>
                 <version>${testcontainers.version}</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
-                <groupId>org.testcontainers</groupId>
-                <artifactId>junit-jupiter</artifactId>
-                <version>${testcontainers.version}</version>
+                <groupId>org.junit-pioneer</groupId>
+                <artifactId>junit-pioneer</artifactId>
+                <version>${junit.pioneer.version}</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
@@ -105,8 +107,8 @@
                                 <goal>install-node-and-yarn</goal>
                             </goals>
                             <configuration>
-                                <nodeVersion>v16.13.2</nodeVersion>
-                                <yarnVersion>v1.22.17</yarnVersion>
+                                <nodeVersion>v20.11.0</nodeVersion>
+                                <yarnVersion>v1.22.19</yarnVersion>
                             </configuration>
                         </execution>
                     </executions>
@@ -124,6 +126,11 @@
                             <suppressionFile>dependencies-suppression.xml</suppressionFile>
                         </suppressionFiles>
                     </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>net.postchain.rell</groupId>
+                    <artifactId>rell-maven-plugin</artifactId>
+                    <version>${rell.maven.plugin.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>
@@ -202,6 +209,13 @@
             </snapshots>
         </repository>
     </repositories>
+
+    <pluginRepositories>
+        <pluginRepository>
+            <id>rellmaven</id>
+            <url>https://gitlab.com/api/v4/projects/37668820/packages/maven</url>
+        </pluginRepository>
+    </pluginRepositories>
 
     <distributionManagement>
         <repository>
