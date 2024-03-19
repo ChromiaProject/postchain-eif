@@ -286,7 +286,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         uint value = wd.amount;
         wd.amount = 0;
         // only support user to withdraw the token that be funded enough on the EVM bridge
-        wd.token.safeTransfer(beneficiary, value);
+        wd.token.transferFromChromia(beneficiary, value, "aa"); // TODO Change this
         emit Withdrawal(beneficiary, wd.token, value);
     }
 
