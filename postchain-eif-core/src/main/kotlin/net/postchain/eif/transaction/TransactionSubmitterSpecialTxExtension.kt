@@ -177,14 +177,12 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                     if (it.status == PendingTxStatus.SUCCESS) RellTransactionStatus.SUCCESS else RellTransactionStatus.FAILURE
 
                 operations.add(
-                    buildTxUpdateOp(it.rowId, rellStatus)
+                    buildTxReceiptOp(it)
                 )
 
-                if (rellStatus == RellTransactionStatus.SUCCESS) {
-                    operations.add(
-                        buildTxReceiptOp(it)
-                    )
-                }
+                operations.add(
+                    buildTxUpdateOp(it.rowId, rellStatus)
+                )
             }
         }
 
