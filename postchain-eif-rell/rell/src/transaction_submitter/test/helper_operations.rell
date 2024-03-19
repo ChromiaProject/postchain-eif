@@ -15,11 +15,6 @@ operation create_evm_submit_transaction_op(contract_address: text, function_name
         network_id = 1), x"");
 }
 
-operation update_evm_submit_transaction_queued_timestamp_op(contract_address: text, function_name: text){
-    val id = get_evm_transaction_id(contract_address, function_name, list(), list(), 1);
-    update evm_submit_transaction @ { .id == id} (timestamp = op_context.last_block_time, status = transaction_status.QUEUED);
-}
-
 operation update_evm_transaction_status_helper_op(row_id: rowid, status: transaction_status) {
     update evm_submit_transaction @ { .rowid == row_id } (.status = status);
 }
@@ -56,6 +51,7 @@ operation create_test_evm_submit_transaction(id: byte_array, contract_address: t
         parameter_types = "",
         parameter_values = list<text>().to_gtv().to_bytes(),
         network_id = 1,
+        currency_symbol = "ETH",
         sender = x"",
         status = status,
         timestamp = timestamp,

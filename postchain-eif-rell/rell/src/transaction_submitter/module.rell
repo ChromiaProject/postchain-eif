@@ -3,9 +3,11 @@ import .anchoring.*;
 import .utils.messaging.*;
 import .utils.*;
 
+import lib.icmf.*;
+
 function timeout_evm_transactions() {
     val timeout_timestamp = get_last_blocktime() - chain_context.args.tx_timeout;
-    val row_ids = evm_submit_transaction @* { .timestamp < timeout_timestamp } ( .rowid );
+    val row_ids = evm_submit_transaction @* { .status != transaction_status.SUCCESS and .status != transaction_status.FAILURE and .timestamp < timeout_timestamp } ( .rowid );
     for (row_id in row_ids) {
         update evm_submit_transaction @ { row_id } (status = transaction_status.FAILURE);
     }
@@ -35,9 +37,10 @@ entity evm_submit_transaction {
     parameter_types: text;
     parameter_values: byte_array;
     network_id: integer;
+    currency_symbol: text;
     sender: byte_array;
     index mutable status: transaction_status;
-    index mutable timestamp: timestamp;
+    index timestamp: timestamp;
     index mutable taken_timestamp: timestamp;
     mutable block_hash: text = "";
     mutable effective_gas_price: big_integer = -1;
@@ -91,6 +94,12 @@ struct module_args {
     contract_tx_rate_limit: big_integer;
     tx_timeout: big_integer;
     node_retry_strategy;
+    network_configs: gtv = list<network_config>().to_gtv();
+}
+
+struct network_config {
+    id: integer;
+    currency_symbol: text;
 }
 
 function create_evm_submit_transaction(evm_submit_transaction_message: evm_submit_transaction_message, sender: byte_array) {
@@ -120,6 +129,8 @@ function add_transaction_to_queue(contract_address: text, function_name: text, p
         network_id
     );
 
+    var currency_symbol = get_currency_symbol(network_id);
+
     create evm_submit_transaction(
         id = evm_transaction_id,
         contract_address = contract_address,
@@ -127,11 +138,23 @@ function add_transaction_to_queue(contract_address: text, function_name: text, p
         parameter_types = join_text_list(parameter_types),
         parameter_values = parameter_values.to_gtv().to_bytes(),
         network_id = network_id,
+        currency_symbol = currency_symbol,
         sender = sender,
         status = transaction_status.QUEUED,
         timestamp = op_context.last_block_time,
         taken_timestamp = 0
     );
+}
+
+function get_currency_symbol(network_id: integer) {
+    var currency_symbol = "";
+    val network_configs = list<network_config>.from_gtv_pretty(chain_context.args.network_configs);
+    for (network_config in network_configs) {
+        if (network_config.id == network_id) {
+            currency_symbol = network_config.currency_symbol;
+        }
+    }
+    return currency_symbol;
 }
 
 query fetch_oldest_queued_transactions_per_contract(exclude_taken_by_key: pubkey? = null) {
@@ -266,10 +289,27 @@ function update_evm_transaction_status(row_id: integer, status: transaction_stat
 
     } else if (status == transaction_status.SUCCESS or status == transaction_status.FAILURE) {
         delete evm_submit_transaction_taken_by @* { .transaction == transaction };
+        if (transaction.gas_usage > 0) {
+            send_message(evm_transaction_submitter_cost_topic,
+                evm_transaction_submitter_cost(
+                    id = transaction.id,
+                    processed_by = transaction.processed_by,
+                    cost = transaction.gas_usage * transaction.effective_gas_price,
+                    currency_symbol = transaction.currency_symbol).to_gtv());
+        }
     }
 
     transaction.status = status;
 }
+
+struct evm_transaction_submitter_cost {
+    id: byte_array;
+    processed_by: pubkey;
+    cost: big_integer;
+    currency_symbol: text;
+}
+
+val evm_transaction_submitter_cost_topic = ICMF_TOPIC_GLOBAL_PREFIX + "evm_transaction_submitter_cost_topic";
 
 function extract_number_of_signers_from_current_configuration(): integer {
     val config = map<text, gtv>.from_gtv(chain_context.raw_config);

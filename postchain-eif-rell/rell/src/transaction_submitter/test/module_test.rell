@@ -3,6 +3,15 @@
 import ^^.*;
 import ^.helper_operations.*;
 
+struct module_args {
+    network_configs: gtv = list<network_config>().to_gtv();
+}
+
+struct network_config {
+    id: integer;
+    currency_symbol: text;
+}
+
 function test_create_evm_submit_transaction() {
 
     rell.test.tx().op(create_evm_submit_transaction_operation(evm_submit_transaction_message(
@@ -31,28 +40,25 @@ function test_not_whitelisted_contracts_are_ignored(){
     assert_null(evm_submit_transaction);
 }
 
-function test_fetch_oldest_queued_transactions_per_contract(){
+function test_fetch_oldest_queued_transactions_per_contract() {
+    rell.test.block().run();
     rell.test.tx().op(
         create_evm_submit_transaction_op("address","myFunction1"),
-        create_evm_submit_transaction_op("address","myFunction2"),
-        create_evm_submit_transaction_op("address","myFunction3"),
-        create_evm_submit_transaction_op("address1","myFunction4"),
-        create_evm_submit_transaction_op("address1","myFunction5"),
-        create_evm_submit_transaction_op("address1","myFunction6")
+        create_evm_submit_transaction_op("address1","myFunction2")
     ).run();
 
     rell.test.tx().op(
-        update_evm_submit_transaction_queued_timestamp_op("address","myFunction1"),
-        update_evm_submit_transaction_queued_timestamp_op("address","myFunction2"),
-        update_evm_submit_transaction_queued_timestamp_op("address1","myFunction4"),
-        update_evm_submit_transaction_queued_timestamp_op("address1","myFunction5")
+        create_evm_submit_transaction_op("address","myFunction3"),
+        create_evm_submit_transaction_op("address1","myFunction4")
     ).run();
 
     val evm_submit_transaction = fetch_oldest_queued_transactions_per_contract();
 
     assert_true(evm_submit_transaction.size() == 2);
     assert_true(evm_submit_transaction[0].contract_address == "address");
+    assert_true(evm_submit_transaction[0].function_name == "myFunction1");
     assert_true(evm_submit_transaction[1].contract_address == "address1");
+    assert_true(evm_submit_transaction[1].function_name == "myFunction2");
 }
 
 function test_fetch_oldest_queued_transactions_per_contract_and_taken_by() {
@@ -191,6 +197,12 @@ function test_timeout_evm_transaction(){
     assert_true(tx.contract_address == "address");
 }
 
+function test_get_currency_symbol() {
+    val currency_symbol = get_currency_symbol(1337);
+
+    assert_equals(currency_symbol, "ETH");
+}
+
 function test_update_evm_transaction_status_taken_to_pending() {
 
     rell.test.tx().op(
@@ -288,4 +300,35 @@ function test_update_evm_transaction_status_tx_hash() {
     ).run_must_fail("Transaction hash can only be set once");
 
     assert_equals(evm_submit_transaction @ { tx_row_id } ( .tx_hash ), "00");
+}
+
+function test_update_evm_transaction_status_SUCCESS() {
+
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+    ).run();
+
+    val tx_row_id = evm_submit_transaction @ { } ( .rowid );
+    val tx_id = evm_submit_transaction @ { } ( .id );
+
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"01"),
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.PENDING, x"01", tx_hash = "00")
+    ).run();
+
+    rell.test.tx().op(
+        update_evm_transaction_receipt_helper_op(tx_row_id, "hash", 2L, 3L)
+    ).run();
+
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.SUCCESS, x"01", tx_hash = "01")
+    ).run();
+
+    val expected = evm_transaction_submitter_cost(
+        id = tx_id,
+        processed_by = x"01",
+        cost = 6L,
+        currency_symbol = "ETH");
+
+    assert_events(("icmf_message",(topic = evm_transaction_submitter_cost_topic, body = expected.to_gtv()).to_gtv_pretty()));
 }
