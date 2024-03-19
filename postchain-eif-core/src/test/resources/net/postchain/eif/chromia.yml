@@ -24,7 +24,15 @@ definitions:
       admin_pubkey: 03A301697BDFCD704313BA48E51D567543F2A182031EFD6915DDC07BBCC4E16070
     lib.access.admin:
       admin_pubkey: 03A301697BDFCD704313BA48E51D567543F2A182031EFD6915DDC07BBCC4E16070
-
+  - &eif_sender_receiver # Base configuration for a chain that will both send and receive messages
+    gtx:
+      modules:
+        - "net.postchain.eif.EifGTXModule"
+        - "net.postchain.d1.icmf.IcmfSenderGTXModule"
+        - "net.postchain.d1.icmf.IcmfReceiverGTXModule"
+    sync_ext:
+      - "net.postchain.eif.EifSynchronizationInfrastructureExtension"
+      - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"
 test:
   modules:
     - tests.utils
@@ -39,11 +47,14 @@ blockchains:
     config:
       blockstrategy:
         name: "net.postchain.devtools.OnDemandBlockBuildingStrategy"
-      gtx:
-        modules: ['net.postchain.eif.EifGTXModule']
       eif:
         <<: *eif_test
-      sync_ext: ['net.postchain.eif.EifSynchronizationInfrastructureExtension']
+      icmf:
+        receiver:
+          local:
+            - topic: "L_EVM_BLOCK_EVENTS"
+              brid: null
+      <<: *eif_sender_receiver
       signers:
         - x"03a301697bdfcd704313ba48e51d567543f2a182031efd6915ddc07bbcc4e16070"
     moduleArgs:
@@ -67,4 +78,9 @@ libs:
     tagOrBranch: 1.32.2
     rid: x"1D567580C717B91D2F188A4D786DB1D41501086B155A68303661D25364314A4D"
     insecure: false
-    
+  icmf:
+    registry: https://gitlab.com/chromaway/core/directory-chain
+    path: src/messaging/icmf
+    tagOrBranch: 1.32.2
+    rid: x"19D6BC28D527E6D2239843608486A84F44EDCD244E253616F13D1C65893F35F6"
+    insecure: false
