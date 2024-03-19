@@ -198,16 +198,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         emit UnpendingWithdraw(_hash);
     }
 
-    /**
-     * @dev admin need to fund enough token for bridge; otherwise, user cannot claim
-     * and they might need to withdraw back to postchain.
-     */
-    function fund(ChromiaToken token, uint256 amount) public isAllowToken(token) onlyOwner returns (bool) {
-        token.safeTransferFrom(msg.sender, address(this), amount);
-        emit FundedERC20(msg.sender, token, amount);
-        return true;
-    }
-
     function deposit(ChromiaToken token, uint256 amount) public isAllowToken(token) whenNotPaused returns (bool) {
         (string memory name, string memory symbol, uint8 decimals) = _getTokenInfo(token);
         token.safeTransferFrom(msg.sender, address(this), amount);
