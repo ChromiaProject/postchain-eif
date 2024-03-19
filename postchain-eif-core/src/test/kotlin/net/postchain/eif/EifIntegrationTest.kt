@@ -240,9 +240,7 @@ abstract class EifIntegrationTest : ManagedModeTest() {
         startManagedSystem(1, 1, restApi = true)
 
         // c1
-        val chainGtvConfig = GtvMLParser.parseGtvML(
-                javaClass.getResource("/net/postchain/eif/blockchain_config_it.xml")!!.readText()
-        )
+        val chainGtvConfig = loadEifBlockchainConfig()
         chainId = startNewBlockchain(
                 setOf(0), setOf(1), rawBlockchainConfiguration = GtvEncoder.encodeGtv(chainGtvConfig)
         )
@@ -819,9 +817,7 @@ abstract class EifIntegrationTest : ManagedModeTest() {
         val lastBlockHeight = getLastHeight(node)
         // replica node[1] becomes a validator
         val newSigners = listOf(0, 1).associateWith { nodes[it].pubKey.hexStringToByteArray() }
-        val newConfig = GtvMLParser.parseGtvML(
-                javaClass.getResource("/net/postchain/eif/blockchain_config_it.xml")!!.readText()
-        ).asDict().toMutableMap()
+        val newConfig = loadEifBlockchainConfig().asDict().toMutableMap()
         newConfig[KEY_SIGNERS] = gtv(newSigners.values.map { gtv(it) })
 
         // adding a new config at height (last + 2)
@@ -860,7 +856,7 @@ abstract class EifIntegrationTest : ManagedModeTest() {
         assertArrayEquals(newValidators, getContractValidatorList().toTypedArray())
     }
 
-    protected fun getContractValidatorList(): List<Address> {
+    private fun getContractValidatorList(): List<Address> {
         val count = validator.validatorCount.send().value.toLong()
         val validators = mutableListOf<Address>()
         (0 until count).forEach {
@@ -869,7 +865,7 @@ abstract class EifIntegrationTest : ManagedModeTest() {
         return validators
     }
 
-    protected fun getLastWithdrawal(beneficiary: ByteArray): Map<String, Gtv> {
+    private fun getLastWithdrawal(beneficiary: ByteArray): Map<String, Gtv> {
         val all = blockQuery.query("eif.ft4.get_erc20_withdrawal", gtv(
                 "network_id" to gtv(networkId),
                 "token_address" to gtv(testTokenAddress),
@@ -878,4 +874,8 @@ abstract class EifIntegrationTest : ManagedModeTest() {
 
         return all.map { it.asDict() }.maxByOrNull { it["serial"]!!.asInteger() }!!
     }
+
+    private fun loadEifBlockchainConfig(): Gtv = GtvMLParser.parseGtvML(
+            javaClass.getResource("/net/postchain/eif/eif.xml")!!.readText()
+    )
 }
