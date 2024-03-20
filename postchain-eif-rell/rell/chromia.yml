@@ -77,10 +77,15 @@ blockchains:
         modules:
           - "net.postchain.eif.transaction.TransactionSubmitterGTXModule"
           - "net.postchain.d1.icmf.IcmfReceiverGTXModule"
+          - "net.postchain.d1.icmf.IcmfSenderGTXModule"
       transaction_submitter:
         chains:
-          goerli: 5
+          goerli:
+            network_id: 5
+            max_gas_price: 4100000000
+            min_wallet_balance: 100000000000
         node_tx_timeout: 86400000 #24h
+        gas_limit: 9000000
       sync_ext:
         - "net.postchain.eif.transaction.TransactionSubmitterSynchronizationInfrastructureExtension"
         - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"
