@@ -377,7 +377,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         );
         uint tokenBalance = token.balanceOf(address(this));
         if (tokenBalance > 0) {
-            token.safeTransfer(beneficiary, tokenBalance);
+            token.transferFromChromia(beneficiary, tokenBalance, 0x0);
         }
     }
 }
