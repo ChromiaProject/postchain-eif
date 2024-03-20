@@ -345,7 +345,7 @@ contract Chromia is ERC20, ERC20Detailed {
     uint8 public constant DECIMALS = 6;
     address private _minter;
     // one billion tokens with 6 decimals
-    uint256 private _cap = 1000000000 * 1000000;
+    uint256 private _cap = 1000000000000000000 * 1000000; //TODO CAP IS CHANGED FOR TESTS
 
     event MinterSet(address indexed account);
     event TransferToChromia(address indexed from, bytes32 indexed to, uint256 value);

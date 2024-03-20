@@ -685,7 +685,7 @@ describe("Token Bridge Test", () => {
       const [deployer, user] = await ethers.getSigners();
       const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
       const toMint = ethers.utils.parseEther("10000");
-      await tokenInstance.transferFromChromia(user.address, toMint, ethers.utils.formatBytes32String("test"));
+      await tokenInstance.transferFromChromia(bridgeDelegatorAddress, toMint, ethers.utils.formatBytes32String("test"));
       expect(await tokenInstance.totalSupply()).to.eq(toMint);
 
       const bridge = new TokenBridge__factory(user).attach(bridgeAddress);
@@ -696,11 +696,9 @@ describe("Token Bridge Test", () => {
       await bridgeDelegator.approve(tokenAddress, bridgeAddress, toDeposit);
 
       await expect(bridge.deposit(bridgeAddress, toDeposit)).to.be.revertedWith("TokenBridge: not allow token");
-      console.log("test");
       let tx: ContractTransaction = await bridgeDelegator.deposit(tokenAddress, toDeposit);
       let receipt: ContractReceipt = await tx.wait();
       let logs = receipt.logs;
-      console.log("test");
 
       if (logs !== undefined) {
         const blockNumber = hexZeroPad(intToHex(2), 32);
@@ -1033,6 +1031,7 @@ describe("Token Bridge Test", () => {
           ),
         ).to.be.revertedWith("TokenBridge: no fund for the beneficiary");
 
+        await tokenInstance.changeMinter(bridgeAddress);
         // now user can withdraw the fund
         await expect(
           bridgeDelegator.withdraw(
@@ -1042,7 +1041,7 @@ describe("Token Bridge Test", () => {
         )
           .to.emit(bridge, "Withdrawal")
           .withArgs(bridgeDelegatorAddress, tokenAddress, toDeposit);
-        expect(await tokenInstance.balanceOf(bridge.address)).to.eq(0);
+        expect(await tokenInstance.balanceOf(bridge.address)).to.eq(toDeposit);
         expect(await tokenInstance.balanceOf(bridgeDelegatorAddress)).to.eq(toMint);
         await expect(
           bridgeDelegator.withdraw(
