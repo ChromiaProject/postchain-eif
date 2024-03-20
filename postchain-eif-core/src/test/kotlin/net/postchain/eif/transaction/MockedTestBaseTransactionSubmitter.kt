@@ -16,6 +16,7 @@ import org.mockito.kotlin.mock
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.Response
+import org.web3j.protocol.core.methods.response.EthBlockNumber
 import org.web3j.protocol.core.methods.response.EthEstimateGas
 import org.web3j.protocol.core.methods.response.EthGetBalance
 import org.web3j.protocol.core.methods.response.EthGetTransactionReceipt
@@ -170,6 +171,12 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
         return mock<Transaction> {
             on { to } doReturn toAddress
             on { input } doReturn inputValue
+        }
+    }
+
+    fun mockBlockNumber(number: BigInteger): EthBlockNumber {
+        return mock<EthBlockNumber> {
+            on { blockNumber } doReturn number
         }
     }
 
