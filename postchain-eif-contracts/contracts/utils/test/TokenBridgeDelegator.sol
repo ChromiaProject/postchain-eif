@@ -13,7 +13,7 @@ contract TokenBridgeDelegator {
         _bridge = bridge;
     }
 
-    function approve(IERC20 token, address _spender, uint256 _amount) public returns (bool) {
+    function approve(ChromiaToken token, address _spender, uint256 _amount) public returns (bool) {
         return token.approve(_spender, _amount);
     }
 
