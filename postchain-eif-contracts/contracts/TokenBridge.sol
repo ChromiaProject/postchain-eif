@@ -334,7 +334,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
                 (ERC20AccountState)
             );
             if (accountState.amount > 0 && _allowedToken[accountState.token]) {
-                accountState.token.safeTransfer(beneficiary, accountState.amount);
+                accountState.token.transferFromChromia(beneficiary, accountState.amount, 0x0);
             }
         }
 
