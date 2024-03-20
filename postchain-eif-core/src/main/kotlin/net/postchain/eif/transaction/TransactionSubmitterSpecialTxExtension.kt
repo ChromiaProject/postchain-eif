@@ -219,7 +219,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
     private fun addNewPendingTransactions(bctx: BlockEContext) {
 
-        val queryResult = module.query(bctx, GET_PENDING_TRANSACTIONS, gtv(listOf()))
+        val queryResult = module.query(bctx, GET_PENDING_TRANSACTIONS, gtv(mapOf()))
         val transactions = queryResult.asArray().map {
             it.toObject<EvmPendingRellTx>()
         }
@@ -260,7 +260,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     private fun takeTransactions(bctx: BlockEContext): MutableList<OpData> {
 
         val entities =
-            module.query(bctx, FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT, gtv(listOf(GtvByteArray(pubKey))))
+                module.query(bctx, FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT, gtv("exclude_taken_by_key" to GtvByteArray(pubKey)))
         val queuedTransactions = entities.asArray().map {
             it.toObject<EvmSubmitTxRellRequest>()
         }
@@ -301,12 +301,12 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
     private fun getTransactionBcStatus(bctx: BlockEContext, requestId: Long): RellTransactionStatus? {
 
-        val queryResult = module.query(bctx, GET_TRANSACTION_STATUS, gtv(listOf(gtv(requestId))))
+        val queryResult = module.query(bctx, GET_TRANSACTION_STATUS, gtv("row_id" to gtv(requestId)))
         if (queryResult.isNull()) {
             return null
         }
 
-        return RellTransactionStatus.values()[queryResult.asInteger().toInt()]
+        return RellTransactionStatus.valueOf(queryResult.asString())
     }
 
     fun addTransactionSubmitter(transactionSubmitter: TransactionSubmitter, networkId: Long) {
