@@ -44,11 +44,11 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
         val systemAnchoringQueries = systemAnchoringBrid?.let { blockQueriesProvider.getBlockQueries(it) }
         if (systemAnchoringQueries == null) return listOf()
 
-        val shouldAnchor = module.query(bctx, SHOULD_ANCHOR_SYSTEM_ANCHORING_BLOCK_QUERY, gtv(listOf())).asBoolean()
+        val shouldAnchor = module.query(bctx, SHOULD_ANCHOR_SYSTEM_ANCHORING_BLOCK_QUERY, gtv(mapOf())).asBoolean()
 
         return if (shouldAnchor) {
             val lastHeight = systemAnchoringQueries.getLastBlockHeight().get()
-            val lastAnchoredHeight = module.query(bctx, GET_PREVIOUSLY_ANCHORED_SYSTEM_ANCHORING_BLOCK_HEIGHT_QUERY, gtv(listOf())).asInteger()
+            val lastAnchoredHeight = module.query(bctx, GET_PREVIOUSLY_ANCHORED_SYSTEM_ANCHORING_BLOCK_HEIGHT_QUERY, gtv(mapOf())).asInteger()
             if (lastHeight <= lastAnchoredHeight) return listOf()
 
             val lastBlock = systemAnchoringQueries.getBlockAtHeight(lastHeight).get()
@@ -97,7 +97,7 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
             return false
         }
 
-        val shouldAnchor = module.query(bctx, SHOULD_ANCHOR_SYSTEM_ANCHORING_BLOCK_QUERY, gtv(listOf())).asBoolean()
+        val shouldAnchor = module.query(bctx, SHOULD_ANCHOR_SYSTEM_ANCHORING_BLOCK_QUERY, gtv(mapOf())).asBoolean()
         if (!shouldAnchor) {
             logger.warn("Validation failed. We should not anchor yet")
             return false
@@ -107,7 +107,7 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
 
         val header = anchoringOp.args[0].asByteArray()
         val decodedHeader = decodeBlockHeaderDataFromEVM(header)
-        val lastAnchoredHeight = module.query(bctx, GET_PREVIOUSLY_ANCHORED_SYSTEM_ANCHORING_BLOCK_HEIGHT_QUERY, gtv(listOf())).asInteger()
+        val lastAnchoredHeight = module.query(bctx, GET_PREVIOUSLY_ANCHORED_SYSTEM_ANCHORING_BLOCK_HEIGHT_QUERY, gtv(mapOf())).asInteger()
         if (decodedHeader.height <= lastAnchoredHeight) {
             logger.warn("Validation failed. Trying to anchor block at height ${decodedHeader.height} when last anchored height was $lastAnchoredHeight")
             return false
@@ -134,7 +134,7 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
     }
 
     private fun getCurrentEVMSignerList(bctx: BlockEContext) =
-            module.query(bctx, GET_CURRENT_EVM_SYSTEM_ANCHORING_SIGNER_LIST_QUERY, gtv(listOf()))
+            module.query(bctx, GET_CURRENT_EVM_SYSTEM_ANCHORING_SIGNER_LIST_QUERY, gtv(mapOf()))
                     .asArray()
                     .map { it.asByteArray() }
 

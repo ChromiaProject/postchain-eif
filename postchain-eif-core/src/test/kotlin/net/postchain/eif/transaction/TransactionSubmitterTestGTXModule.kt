@@ -14,7 +14,7 @@ import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvEncoder
 import net.postchain.gtv.GtvFactory.gtv
-import net.postchain.gtv.GtvInteger
+import net.postchain.gtv.GtvString
 import net.postchain.gtv.mapper.GtvObjectMapper
 import net.postchain.gtx.GTXOperation
 import net.postchain.gtx.SimpleGTXModule
@@ -158,8 +158,8 @@ open class TransactionSubmitterTestGTXModule(
                 pending
                                         },
             GET_TRANSACTION_STATUS to { conf: TransactionSubmitterTestContext, _, args: Gtv ->
-                val rowId = args.get(0).asInteger()
-                GtvInteger(conf.getTransactionStatus[rowId]!!.ordinal.toLong())
+                val rowId = args["row_id"]!!.asInteger()
+                GtvString(conf.getTransactionStatus[rowId]!!.name)
             }
         ) + queryOverrides
 ) {

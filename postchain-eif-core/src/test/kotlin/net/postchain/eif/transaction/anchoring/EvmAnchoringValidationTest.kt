@@ -41,9 +41,9 @@ class EvmAnchoringValidationTest {
     private val systemAnchoringBrid = BlockchainRid.ZERO_RID
     private val systemAnchoringSigner = cryptoSystem.generateKeyPair()
     private val module: GTXModule = mock {
-        on { query(mockContext, SHOULD_ANCHOR_SYSTEM_ANCHORING_BLOCK_QUERY, gtv(listOf())) } doReturn gtv(1)
-        on { query(mockContext, GET_PREVIOUSLY_ANCHORED_SYSTEM_ANCHORING_BLOCK_HEIGHT_QUERY, gtv(listOf())) } doReturn gtv(-1)
-        on { query(mockContext, GET_CURRENT_EVM_SYSTEM_ANCHORING_SIGNER_LIST_QUERY, gtv(listOf())) } doReturn gtv(listOf(gtv(systemAnchoringSigner.pubKey.data)))
+        on { query(mockContext, SHOULD_ANCHOR_SYSTEM_ANCHORING_BLOCK_QUERY, gtv(mapOf())) } doReturn gtv(1)
+        on { query(mockContext, GET_PREVIOUSLY_ANCHORED_SYSTEM_ANCHORING_BLOCK_HEIGHT_QUERY, gtv(mapOf())) } doReturn gtv(-1)
+        on { query(mockContext, GET_CURRENT_EVM_SYSTEM_ANCHORING_SIGNER_LIST_QUERY, gtv(mapOf())) } doReturn gtv(listOf(gtv(systemAnchoringSigner.pubKey.data)))
     }
 
     private val sut = EvmAnchoringSpecialTxExtension()
@@ -91,7 +91,7 @@ class EvmAnchoringValidationTest {
     @Test
     fun `Wrong signers`() {
         whenever(module.query(
-                mockContext, GET_CURRENT_EVM_SYSTEM_ANCHORING_SIGNER_LIST_QUERY, gtv(listOf())
+                mockContext, GET_CURRENT_EVM_SYSTEM_ANCHORING_SIGNER_LIST_QUERY, gtv(mapOf())
         )).doReturn(gtv(listOf(gtv(cryptoSystem.generateKeyPair().pubKey.data))))
 
         assertThat(sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
