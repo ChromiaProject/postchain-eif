@@ -170,9 +170,10 @@ describe("Token Bridge Test", () => {
       await expect(adminBridge.emergencyWithdraw(tokenAddress, constants.AddressZero)).to.be.revertedWith(
         "TokenBridge: beneficiary address is invalid",
       );
+      await tokenInstance.changeMinter(adminBridge.address);
       await adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address);
       expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(toDeposit);
-      expect(await tokenInstance.balanceOf(adminBridge.address)).to.eq(0);
+      expect(await tokenInstance.balanceOf(adminBridge.address)).to.eq(toDeposit);
     });
   });
 
