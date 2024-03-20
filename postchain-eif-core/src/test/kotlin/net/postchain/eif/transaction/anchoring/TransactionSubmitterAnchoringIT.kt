@@ -86,7 +86,7 @@ class TransactionSubmitterAnchoringIT : EifBaseIntegrationTest(
 
         // Assert anchoring event was emitted
         val txReceipt = web3j.ethGetTransactionReceipt(txHash).send().transactionReceipt.get()
-        val events = anchoringContract.getAnchoredBlockEvents(txReceipt)
+        val events = Anchoring.getAnchoredBlockEvents(txReceipt)
 
         assertThat(events).hasSize(1)
 
