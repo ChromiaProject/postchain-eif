@@ -146,6 +146,10 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         _unpause();
     }
 
+    function changeMinter(ChromiaToken token, address newMinter) external onlyOwner {
+        token.changeMinter(newMinter);
+    }
+
     function allowToken(ChromiaToken token) public onlyOwner {
         require(address(token) != address(0), "TokenBridge: token address is invalid");
         _allowedToken[token] = true;
