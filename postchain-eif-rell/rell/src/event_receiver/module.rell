@@ -1,0 +1,37 @@
+module;
+
+import .messaging.*;
+import .model.*;
+import ^.lib.icmf. { send_message };
+
+operation __evm_block(
+    network_id: integer,
+    evm_block_height: integer,
+    evm_block_hash: byte_array,
+    events: list<event_data>
+) {
+    _evm_block(network_id, evm_block_height, evm_block_hash, events);
+}
+
+function _evm_block(
+    network_id: integer,
+    evm_block_height: integer,
+    evm_block_hash: byte_array,
+    events: list<event_data>
+) {
+
+    create evm_block (
+        network_id,
+        evm_block_height,
+        evm_block_hash
+    );
+
+    val message = evm_block_message(
+        network_id,
+        evm_block_height,
+        evm_block_hash,
+        events
+    );
+
+    send_message(evm_block_events_topic, message.to_gtv());
+}

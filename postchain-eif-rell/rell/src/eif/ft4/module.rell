@@ -1,9 +1,11 @@
 @mount('eif.ft4')
 module;
 
+import ^^.event_receiver.messaging.*;
+import ^^.event_receiver.model.*;
+
 import ^.main;
 import ^.common;
-import ^.common.messages. { msg };
 import ^.utils;
 import ^.evm;
 
@@ -136,17 +138,17 @@ query evm_balance_of_erc20(network_id: integer, token_address: byte_array, benef
     return [0: state];
 }
 
-@extend(main.handle_evm_block) function (msg: msg.evm_block) {
-    var evm_block = common.evm_block @? { .network_id == msg.network_id, .evm_block_height == msg.evm_block_height };
+@extend(main.handle_evm_block) function (message: evm_block_message) {
+    var evm_block = evm_block @? { .network_id == message.network_id, .evm_block_height == message.evm_block_height };
     if (empty(evm_block)) {
-        evm_block = create common.evm_block (
-            network_id = msg.network_id,
-            evm_block_height = msg.evm_block_height,
-            evm_block_hash = msg.evm_block_hash
+        evm_block = create evm_block (
+            network_id = message.network_id,
+            evm_block_height = message.evm_block_height,
+            evm_block_hash = message.evm_block_hash
         );
     }
 
-    for (event in msg.events) {
+    for (event in message.events) {
         if (event.name != "DepositedERC20") {
             continue;
         }
@@ -162,15 +164,15 @@ query evm_balance_of_erc20(network_id: integer, token_address: byte_array, benef
 
         // ignore invalid events' network id
         val network_id = integer.from_gtv(event.non_indexed_values[0]);
-        if (network_id != msg.network_id) {
-            log("ignore invalid events' network id: " + network_id + " : " + msg.network_id);
+        if (network_id != evm_block.network_id) {
+            log("ignore invalid events' network id: " + network_id + " : " + evm_block.network_id);
             continue;
         }
 
         val beneficiary = byte_array.from_gtv(event.indexed_values[0]);
         val evm_account = evm.evm_account @? { .address == beneficiary };        
         val token_address = byte_array.from_gtv(event.indexed_values[1]);
-        val token = evm_erc20 @? { .network_id == msg.network_id, .address == token_address };
+        val token = evm_erc20 @? { .network_id == evm_block.network_id, .address == token_address };
         if (empty(token)) {
             log("ignore the unsupported token, move to process next events if any: " + token_address);
             continue;
@@ -183,7 +185,7 @@ query evm_balance_of_erc20(network_id: integer, token_address: byte_array, benef
         }
 
         val amount = big_integer.from_gtv(event.non_indexed_values[1]);
-        val evm_event = create common.evm_event(
+        create evm_event (
             evm_block,
             tnx_hash = event.tnx_hash,
             log_index = event.log_index,
@@ -198,10 +200,10 @@ query evm_balance_of_erc20(network_id: integer, token_address: byte_array, benef
             val symbol = text.from_gtv(event.non_indexed_values[3]);
             val decimals = integer.from_gtv(event.non_indexed_values[4]);
             log("record the state into EIF for withdraw back to EVM chains later for beneficiary: " + beneficiary);
-            deposit_ERC20(msg.network_id, beneficiary, token_address, amount, name, symbol, decimals);
+            deposit_ERC20(evm_block.network_id, beneficiary, token_address, amount, name, symbol, decimals);
 
-            val account_link = common.get_or_create_evm_account_link(msg.network_id, beneficiary);
-            val state = common.build_account_state(msg.network_id, beneficiary, null);
+            val account_link = common.get_or_create_evm_account_link(evm_block.network_id, beneficiary);
+            val state = common.build_account_state(evm_block.network_id, beneficiary, null);
             val state_data = common.state_data(
                 account_link.state_n,
                 account = state

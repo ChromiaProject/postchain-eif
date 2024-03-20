@@ -19,15 +19,7 @@ definitions:
       admin_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
     lib.access.admin:
       admin_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
-  - &eif_sender_receiver # Base configuration for a chain that will both send and receive messages
-    gtx:
-      modules:
-        - "net.postchain.eif.EifGTXModule"
-        - "net.postchain.d1.icmf.IcmfSenderGTXModule"
-        - "net.postchain.d1.icmf.IcmfReceiverGTXModule"
-    sync_ext:
-      - "net.postchain.eif.EifSynchronizationInfrastructureExtension"
-      - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"
+
 test:
   modules:
     - tests.utils
@@ -37,17 +29,31 @@ test:
     <<: *rell_test_args
 
 blockchains:
+  event_receiver:
+    module: event_receiver
+    config:
+      gtx:
+        modules:
+          - "net.postchain.eif.EifGTXModule"
+          - "net.postchain.d1.icmf.IcmfSenderGTXModule"
+      sync_ext:
+        - "net.postchain.eif.EifSynchronizationInfrastructureExtension"
   eif:
     module: main
     config:
+      gtx:
+        modules:
+          - "net.postchain.eif.EifGTXModule"
+          - "net.postchain.d1.icmf.IcmfReceiverGTXModule"
+      sync_ext:
+        - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"
       eif:
         <<: *eif_test
       icmf:
         receiver:
-          local:
-            - topic: "L_EVM_BLOCK_EVENTS"
-              brid: null
-      <<: *eif_sender_receiver
+          global:
+            topics:
+              - G_evm_block_events
     moduleArgs:
       <<: *common_args
       <<: *rell_test_args
