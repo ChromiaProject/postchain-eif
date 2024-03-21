@@ -40,6 +40,10 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     uint256 public withdrawOffset;
     uint256 public emergencyTimestamp;
 
+    uint dayStart; // Timestamp at which the day started
+    uint dayAmount; // Amount of tokens withdrawn so far
+    uint dayLimit; // Maximum amount of tokens that can be withdrawn in a day
+
     // Postchain/Chromia blockchain rid
     bytes32 private blockchainRid;
 
@@ -125,6 +129,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         validator = _validator;
         withdrawOffset = _withdrawOffset;
         emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
+        dayStart = block.timestamp;
+        dayAmount = 0;
+        dayLimit = 1000000000000000000000000; // 1,000,000 tokens TODO CHANGE
         emit Initialize(_validator, _withdrawOffset);
     }
 
@@ -146,6 +153,10 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         _unpause();
     }
 
+    function setDayLimit(uint newDayLimit) public onlyOwner {
+        dayLimit = newDayLimit;
+    }
+
     function changeMinter(ChromiaToken token, address newMinter) external onlyOwner {
         token.changeMinter(newMinter);
     }
@@ -160,6 +171,15 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
      * Note: the mass exit block should be the block at which snapshot was updated
      *          with state root was stored properly in the block header extra data.
      */
+    function _updateDayLimit(uint withdrawAmount) internal {
+        if (block.timestamp > dayStart + 1 days) {
+            dayStart = block.timestamp;
+            dayAmount = 0;
+        }
+        require(dayAmount + withdrawAmount <= dayLimit, "TokenBridge: withdraw daily limit");
+        dayAmount += withdrawAmount;
+    }
+
     function triggerMassExit(uint height, bytes32 blockRid) public onlyOwner {
         require(!isMassExit, "TokenBridge: mass exit already set");
         isMassExit = true;
@@ -275,6 +295,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         wd.status = Status.Withdrawn;
         uint value = wd.amount;
         wd.amount = 0;
+        _updateDayLimit(value);
         // only support user to withdraw the token that be funded enough on the EVM bridge
         wd.token.transferFromChromia(beneficiary, value, 0x0);
         emit Withdrawal(beneficiary, wd.token, value);
