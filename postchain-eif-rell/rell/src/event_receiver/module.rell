@@ -2,6 +2,7 @@ module;
 
 import .messaging.*;
 import .model.*;
+import .queries.*;
 import ^.lib.icmf. { send_message };
 
 operation __evm_block(

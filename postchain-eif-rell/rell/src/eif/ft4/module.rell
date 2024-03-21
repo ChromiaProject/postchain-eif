@@ -344,7 +344,7 @@ operation withdraw_ERC20(network_id: integer, token_address: byte_array, benefic
 }
 
 function deposit_ERC20(network_id: integer, beneficiary: byte_array, token_address: byte_array, amount: big_integer, name: text, symbol: text, decimals: integer) {
-    log("deposit_ERC20: " + token_address + " : " + beneficiary + " : " + name);
+    log("deposit_ERC20: " + token_address + " : " + beneficiary + " : " + name + " : " + amount);
     var token = evm_erc20 @? { network_id, .address == token_address };
     if (empty(token)) {
         token = create evm_erc20(
