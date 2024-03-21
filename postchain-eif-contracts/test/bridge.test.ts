@@ -24,6 +24,7 @@ import {
 chai.use(solidity);
 const { expect } = chai;
 const WITHDRAW_OFFSET = "0x20";
+const DAILY_LIMIT = BigInt(1000000000000000000000000);
 describe("Token Bridge Test", () => {
   let tokenAddress: string;
   let bridgeAddress: string;
@@ -52,7 +53,7 @@ describe("Token Bridge Test", () => {
     validatorAddress = validatorContract.address;
 
     const bridgeFactory = new TokenBridge__factory(admin);
-    const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_OFFSET]);
+    const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_OFFSET, DAILY_LIMIT]);
     bridgeAddress = bridge.address;
 
     const bridgeDelegatorFactory = new TokenBridgeDelegator__factory(deployer);

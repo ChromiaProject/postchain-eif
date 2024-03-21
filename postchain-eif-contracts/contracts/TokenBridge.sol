@@ -115,7 +115,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         _;
     }
 
-    function initialize(IValidator _validator, uint256 _withdrawOffset) public initializer {
+    function initialize(IValidator _validator, uint256 _withdrawOffset, uint _dayLimit) public initializer {
         require(address(_validator) != address(0), "TokenBridge: validator address is invalid");
         __Ownable_init(_msgSender());
         __Pausable_init();
@@ -131,7 +131,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
         dayStart = block.timestamp;
         dayAmount = 0;
-        dayLimit = 1000000000000000000000000; // 1,000,000 tokens TODO CHANGE
+        dayLimit = _dayLimit;
         emit Initialize(_validator, _withdrawOffset);
     }
 
