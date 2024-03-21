@@ -97,6 +97,22 @@ describe("Token Bridge Test", () => {
       expect(await validator.getValidatorCount()).to.eq(3);
     });
   });
+  describe("ChromiaToken", async () => {
+    it("Admin can change minter", async () => {
+      const [deployer, user] = await ethers.getSigners();
+      const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
+      const bridge = new TokenBridge__factory(deployer).attach(bridgeAddress);
+
+      const bridgeUser = new TokenBridge__factory(user).attach(bridgeAddress);
+
+      await expect(tokenInstance.changeMinter(bridgeAddress)).to.emit(tokenInstance, "MinterSet");
+      await expect(bridgeUser.changeMinter(tokenAddress, deployer.address)).to.be.revertedWith(
+        "OwnableUnauthorizedAccount",
+      );
+      await expect(bridge.changeMinter(tokenAddress, deployer.address)).to.emit(tokenInstance, "MinterSet");
+      await expect(bridge.changeMinter(tokenAddress, bridgeAddress)).to.be.revertedWith("caller is not a minter");
+    });
+  });
 
   describe("Deposit", async () => {
     it("User can deposit ERC20 token to target smartcontract", async () => {
