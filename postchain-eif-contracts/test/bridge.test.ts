@@ -683,6 +683,14 @@ describe("Token Bridge Test", () => {
         await expect(bridgeOwner.unpause()).to.emit(bridgeOwner, "Unpaused").withArgs(deployer.address);
         // now user can withdraw the fund
         await tokenInstance.changeMinter(bridgeAddress);
+
+        // Set the daily limit to one less than withdraw amount
+        await bridgeOwner.setDayLimit(toDeposit.sub(1));
+        await expect(
+          bridge.withdraw(DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)), user.address),
+        ).to.be.revertedWith("TokenBridge: withdraw daily limit");
+        // Set the daily limit to more than withdraw amount, now user can withdraw
+        await bridgeOwner.setDayLimit(toDeposit.add(1));
         await expect(
           bridge.withdraw(DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)), user.address),
         )
