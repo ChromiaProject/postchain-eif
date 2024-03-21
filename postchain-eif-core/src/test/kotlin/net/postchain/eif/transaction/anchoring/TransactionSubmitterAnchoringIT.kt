@@ -38,7 +38,7 @@ class TransactionSubmitterAnchoringIT : EifBaseIntegrationTest(
     @Test
     fun `Anchoring blocks on EVM`() {
         with(configOverrides) {
-            setProperty("evm.privateKey", "0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
+            setProperty("ethereum.privateKey", "0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
             setProperty("evm.txPollInterval", 1000)
         }
 
