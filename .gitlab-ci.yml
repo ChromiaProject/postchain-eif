@@ -68,6 +68,7 @@ build:
     when: always
     paths:
       - $JACOCO_REPORT_DIR/*
+      - postchain-eif-core/logs/
 
 dependency-check:
   extends: .maven-dependency-check
