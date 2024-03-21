@@ -176,8 +176,8 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
             dayStart = block.timestamp;
             dayAmount = 0;
         }
-        require(dayAmount + withdrawAmount <= dayLimit, "TokenBridge: withdraw daily limit");
         dayAmount += withdrawAmount;
+        require(dayAmount <= dayLimit, "TokenBridge: withdraw daily limit");
     }
 
     function triggerMassExit(uint height, bytes32 blockRid) public onlyOwner {
@@ -355,6 +355,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
                 (ERC20AccountState)
             );
             if (accountState.amount > 0 && _allowedToken[accountState.token]) {
+                _updateDayLimit(accountState.amount);
                 accountState.token.transferFromChromia(beneficiary, accountState.amount, 0x0);
             }
         }
