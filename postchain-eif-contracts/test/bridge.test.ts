@@ -4,6 +4,7 @@ import { solidity } from "ethereum-waffle";
 import {
   Chromia__factory,
   TokenBridge__factory,
+  DailyLimit__factory,
   TokenBridgeDelegator__factory,
   Validator__factory,
   Migration__factory,
@@ -29,6 +30,7 @@ describe("Token Bridge Test", () => {
   let tokenAddress: string;
   let bridgeAddress: string;
   let validatorAddress: string;
+  let dailyLimitAddress: string;
   let bridgeDelegatorAddress: string;
   let migrationAddress: string;
   let admin: SignerWithAddress;
@@ -52,9 +54,15 @@ describe("Token Bridge Test", () => {
     const validatorContract = await validatorFactory.deploy([validator1.address, validator2.address]);
     validatorAddress = validatorContract.address;
 
+    const dailyLimitFactory = new DailyLimit__factory(admin);
+    const dailyLimitContract = await dailyLimitFactory.deploy(DAILY_LIMIT);
+    dailyLimitAddress = dailyLimitContract.address;
+
     const bridgeFactory = new TokenBridge__factory(admin);
-    const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_OFFSET, DAILY_LIMIT]);
+    const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_OFFSET, dailyLimitAddress]);
     bridgeAddress = bridge.address;
+
+    dailyLimitContract.setParentContract(bridgeAddress);
 
     const bridgeDelegatorFactory = new TokenBridgeDelegator__factory(deployer);
     const bridgeDelegator = await bridgeDelegatorFactory.deploy(bridgeAddress);
@@ -204,6 +212,7 @@ describe("Token Bridge Test", () => {
       expect(await tokenInstance.totalSupply()).to.eq(toMint);
 
       const bridgeOwner = new TokenBridge__factory(deployer).attach(bridgeAddress);
+      const dailyLimitOwner = new DailyLimit__factory(deployer).attach(dailyLimitAddress);
       const bridge = new TokenBridge__factory(user).attach(bridgeAddress);
       const validatorAdmin = new Validator__factory(admin).attach(validatorAddress);
       const migration = new Migration__factory(admin).attach(migrationAddress);
@@ -686,12 +695,12 @@ describe("Token Bridge Test", () => {
         await tokenInstance.changeMinter(bridgeAddress);
 
         // Set the daily limit to one less than withdraw amount
-        await bridgeOwner.setDayLimit(toDeposit.sub(1));
+        await dailyLimitOwner.setDayLimit(toDeposit.sub(1));
         await expect(
           bridge.withdraw(DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)), user.address),
         ).to.be.revertedWith("TokenBridge: withdraw daily limit");
         // Set the daily limit to more than withdraw amount, now user can withdraw
-        await bridgeOwner.setDayLimit(toDeposit.add(1));
+        await dailyLimitOwner.setDayLimit(toDeposit.add(1));
         await expect(
           bridge.withdraw(DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)), user.address),
         )

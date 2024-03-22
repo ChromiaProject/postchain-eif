@@ -10,11 +10,10 @@ contract DailyLimit is Ownable {
 
     address public parentContract;
 
-    constructor(uint _dayLimit, address _parentContract) Ownable(msg.sender) {
+    constructor(uint _dayLimit) Ownable(msg.sender) {
         dayStart = block.timestamp;
         dayAmount = 0;
         dayLimit = _dayLimit;
-        parentContract = _parentContract;
     }
 
     function setDayLimit(uint newDayLimit) external onlyOwner {
