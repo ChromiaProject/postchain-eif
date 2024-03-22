@@ -20,6 +20,10 @@ interface IValidator {
     ) external view returns (bool);
 }
 
+interface DailyLimit {
+    function _updateDayLimit(uint withdrawAmount) external;
+}
+
 // This contract is upgradeable. This imposes restrictions on how storage layout can be modified once it is deployed
 // Some instructions are also not allowed. Read more at: https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable
 // Note: To enhance the security & decentralization, we should call transferOwnership() to external multi-sig owner after deploy the smart contract
@@ -40,12 +44,10 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     uint256 public withdrawOffset;
     uint256 public emergencyTimestamp;
 
-    uint dayStart; // Timestamp at which the day started
-    uint dayAmount; // Amount of tokens withdrawn so far
-    uint dayLimit; // Maximum amount of tokens that can be withdrawn in a day
-
     // Postchain/Chromia blockchain rid
     bytes32 private blockchainRid;
+
+    DailyLimit private dailyLimit;
 
     // Each postchain event will be used to claim only one time.
     mapping(bytes32 => bool) private _events;
@@ -115,7 +117,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         _;
     }
 
-    function initialize(IValidator _validator, uint256 _withdrawOffset, uint _dayLimit) public initializer {
+    function initialize(IValidator _validator, uint256 _withdrawOffset) public initializer {
         require(address(_validator) != address(0), "TokenBridge: validator address is invalid");
         __Ownable_init(_msgSender());
         __Pausable_init();
@@ -129,9 +131,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         validator = _validator;
         withdrawOffset = _withdrawOffset;
         emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
-        dayStart = block.timestamp;
-        dayAmount = 0;
-        dayLimit = _dayLimit;
         emit Initialize(_validator, _withdrawOffset);
     }
 
@@ -153,10 +152,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         _unpause();
     }
 
-    function setDayLimit(uint newDayLimit) public onlyOwner {
-        dayLimit = newDayLimit;
-    }
-
     function changeMinter(ChromiaToken token, address newMinter) external onlyOwner {
         token.changeMinter(newMinter);
     }
@@ -171,14 +166,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
      * Note: the mass exit block should be the block at which snapshot was updated
      *          with state root was stored properly in the block header extra data.
      */
-    function _updateDayLimit(uint withdrawAmount) internal {
-        if (block.timestamp > dayStart + 1 days) {
-            dayStart = block.timestamp;
-            dayAmount = 0;
-        }
-        dayAmount += withdrawAmount;
-        require(dayAmount <= dayLimit, "TokenBridge: withdraw daily limit");
-    }
 
     function triggerMassExit(uint height, bytes32 blockRid) public onlyOwner {
         require(!isMassExit, "TokenBridge: mass exit already set");
@@ -295,7 +282,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         wd.status = Status.Withdrawn;
         uint value = wd.amount;
         wd.amount = 0;
-        _updateDayLimit(value);
+        dailyLimit._updateDayLimit(value);
         // only support user to withdraw the token that be funded enough on the EVM bridge
         wd.token.transferFromChromia(beneficiary, value, 0x0);
         emit Withdrawal(beneficiary, wd.token, value);
@@ -355,7 +342,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
                 (ERC20AccountState)
             );
             if (accountState.amount > 0 && _allowedToken[accountState.token]) {
-                _updateDayLimit(accountState.amount);
+                dailyLimit._updateDayLimit(accountState.amount);
                 accountState.token.transferFromChromia(beneficiary, accountState.amount, 0x0);
             }
         }
