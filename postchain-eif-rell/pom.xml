@@ -26,9 +26,14 @@
                 <version>0.11.6</version>
                 <executions>
                     <execution>
-                        <id>rell test</id>
+                        <id>rell install</id>
                         <goals>
                             <goal>rell-install</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>rell test</id>
+                        <goals>
                             <goal>rell-integration-test</goal>
                         </goals>
                         <configuration>
