@@ -1,6 +1,7 @@
 function test_evm_block() {
     val contract_address = x"b7eB5d60Dd5610A82A4844Beb3F7d750316d3D32";
     val token_address = x"39615b16b74589919c9ce1ea73f1fc5d53141a78";
+    val token_address2 = x"39615b16b74589919c9ce1ea73f1fc5d53141a76";
     val token_name = "Chromia";
     val token_symbol = "CHR";
     val token_decimal = 6;
@@ -15,6 +16,7 @@ function test_evm_block() {
     val event_name = "DepositedERC20";
     val amount = 10000000000000000000L;
     val network_id = 1;
+    val network_id2 = 2;
     val asset_id = (token_name, chain_context.blockchain_rid).hash();
 
     rell.test.tx().op(
@@ -26,8 +28,21 @@ function test_evm_block() {
         ).sign(admin_privkey).run();
 
     rell.test.tx().op(
+            ft.add_new_evm_erc20(network_id2, token_address2, token_name, token_symbol, token_decimal)
+        ).sign(admin_privkey).run();
+
+    rell.test.tx().op(
             ft.add_new_token_mapping(network_id, token_address, asset_id)
         ).sign(admin_privkey).run();
+    rell.test.tx().op(
+            ft.delete_token_mapping(network_id, token_address, asset_id)
+        ).sign(admin_privkey).run();
+    rell.test.tx().op(
+            ft.add_new_token_mapping(network_id, token_address, asset_id)
+        ).sign(admin_privkey).nop().run();
+    rell.test.tx().op(
+            ft.add_new_token_mapping(network_id2, token_address2, asset_id)
+        ).sign(admin_privkey).nop().run();
 
     val auth = auth_descriptor(
         auth_type.S,
