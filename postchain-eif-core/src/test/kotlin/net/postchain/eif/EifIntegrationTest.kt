@@ -39,6 +39,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
@@ -117,9 +118,8 @@ abstract class EifIntegrationTest(evmType: EvmType) : EifBaseIntegrationTest(
     private var currentBlockHeight = 0L
     private var lastSnapshotBlockHeight = -1L
 
-    @BeforeEach
-    override fun setup() {
-
+    @BeforeAll
+    fun setupBeforeAll() {
         super.setup()
 
         ds = SimpleDigestSystem(MessageDigest.getInstance(KECCAK256))
@@ -132,6 +132,11 @@ abstract class EifIntegrationTest(evmType: EvmType) : EifBaseIntegrationTest(
         }
     }
 
+    @BeforeEach
+    override fun setup() {
+        // This method blocks @BeforeEach in EifBaseIntegrationTest.setup()
+    }
+
     @AfterAll
     fun tearDownAfterAll() {
         super.tearDown() // Calling @AfterEach IntegrationTestSetup.tearDown()
@@ -141,7 +146,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : EifBaseIntegrationTest(
 
     @AfterEach
     override fun tearDown() {
-        // This method blocks @AfterEach IntegrationTestSetup.tearDown()
+        // This method blocks @AfterEach EifBaseIntegrationTest.tearDown()
     }
 
     @Test
