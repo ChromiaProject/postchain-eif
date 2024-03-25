@@ -53,7 +53,7 @@ blockchains:
         receiver:
           local:
             - topic: L_evm_block_events
-              bc-rid: 0000000000000000000000000000000000000000000000000000000000000000
+              bc-rid: x"0000000000000000000000000000000000000000000000000000000000000000"
     moduleArgs:
       <<: *common_args
       <<: *rell_test_args
