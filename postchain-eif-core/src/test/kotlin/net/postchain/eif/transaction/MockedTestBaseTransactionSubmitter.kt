@@ -16,14 +16,7 @@ import org.mockito.kotlin.mock
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.Response
-import org.web3j.protocol.core.methods.response.EthBlockNumber
-import org.web3j.protocol.core.methods.response.EthEstimateGas
-import org.web3j.protocol.core.methods.response.EthGetBalance
-import org.web3j.protocol.core.methods.response.EthGetTransactionReceipt
-import org.web3j.protocol.core.methods.response.EthSendTransaction
-import org.web3j.protocol.core.methods.response.EthTransaction
-import org.web3j.protocol.core.methods.response.Transaction
-import org.web3j.protocol.core.methods.response.TransactionReceipt
+import org.web3j.protocol.core.methods.response.*
 import org.web3j.tx.TransactionManager
 import org.web3j.tx.gas.ContractGasProvider
 import java.math.BigInteger
@@ -84,6 +77,28 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
                     }
                 }
             }
+            on {
+                sendWeb3jRequest(argThat<(Web3j) -> Request<*, EthBlockNumber>> { it ->
+                    it != null && it.reflect()!!.returnType.arguments[1].type!!.classifier == EthBlockNumber::class
+                })
+            } doAnswer {
+                mock<EthBlockNumber> {
+                    on { blockNumber } doReturn BigInteger.valueOf(123)
+                }
+            }
+            on {
+                sendWeb3jRequest(argThat<(Web3j) -> Request<*, EthBlock>> { it ->
+                    it != null && it.reflect()!!.returnType.arguments[1].type!!.classifier == EthBlock::class
+                })
+            } doAnswer {
+                mock<EthBlock> {
+                    val ethBlock = EthBlock()
+                    val resultBlock = EthBlock.Block()
+                    resultBlock.setBaseFeePerGas("3")
+                    ethBlock.result = resultBlock
+                    on { block } doReturn ethBlock.block;
+                }
+            }
         }
         return web3jRequestHandler
     }
@@ -113,7 +128,9 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
             on { getFromAddress() } doReturn (fromAddress)
             if (exception != null) {
                 on {
-                    sendTransaction(
+                    sendEIP1559Transaction(
+                        ArgumentMatchers.anyLong(),
+                        any(),
                         any(),
                         any(),
                         ArgumentMatchers.anyString(),
@@ -129,7 +146,9 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
                     on { getError() } doReturn (Response.Error(404, "Not found"))
                 }
                 on {
-                    sendTransaction(
+                    sendEIP1559Transaction(
+                        ArgumentMatchers.anyLong(),
+                        any(),
                         any(),
                         any(),
                         ArgumentMatchers.anyString(),

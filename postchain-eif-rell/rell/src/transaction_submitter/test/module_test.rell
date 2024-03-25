@@ -19,7 +19,10 @@ function test_create_evm_submit_transaction() {
         function_name = "myFunction",
         parameter_types = list(),
         parameter_values = list(),
-        network_id = 1), x"")).run();
+        network_id = 1,
+        max_priority_fee_per_gas = 1,
+        max_fee_per_gas = 4000000000
+    ), x"")).run();
 
     val evm_submit_transaction = evm_submit_transaction @? {};
 
@@ -33,7 +36,9 @@ function test_not_whitelisted_contracts_are_ignored(){
         function_name = "myFunction",
         parameter_types = list(),
         parameter_values = list(),
-        network_id = 1), x"")).run();
+        network_id = 1,
+        max_priority_fee_per_gas = 1,
+        max_fee_per_gas = 4000000000), x"")).run();
 
     val evm_submit_transaction = evm_submit_transaction @? {};
 

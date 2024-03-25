@@ -39,6 +39,8 @@ test:
           currency_symbol: "ETH"
     transaction_submitter.anchoring:
       anchoring_interval: 3600000
+      max_priority_fee_per_gas: 1000000000
+      max_fee_per_gas: 4000000000
       network_configs:
         - id: 1337
           contract: "anchoring_contract"

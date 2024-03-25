@@ -70,6 +70,8 @@ class TransactionSubmitterSubmitRetryIT : EifBaseIntegrationTest(
                 listOf("address[]"),
                 listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
             1337,
+            BigInteger.ONE,
+            BigInteger.valueOf(4000000000),
             BlockchainRid.ZERO_RID.data,
             System.currentTimeMillis()
         )

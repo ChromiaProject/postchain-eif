@@ -61,6 +61,8 @@ class TransactionSubmitterTimeoutIT : EifBaseIntegrationTest(
                 listOf("uint", "address"),
                 listOf(gtv(1), gtv(ByteArray(20))),
                 1337,
+                BigInteger.ONE,
+                BigInteger.valueOf(4000000000),
                 BlockchainRid.ZERO_RID.data,
                 System.currentTimeMillis() - 25 * 60 * 60000
         )

@@ -12,7 +12,9 @@ operation create_evm_submit_transaction_op(contract_address: text, function_name
         function_name = function_name,
         parameter_types = list(),
         parameter_values = list(),
-        network_id = 1), x"");
+        network_id = 1,
+        max_priority_fee_per_gas = 1,
+        max_fee_per_gas = 4000000000), x"");
 }
 
 operation update_evm_transaction_status_helper_op(row_id: rowid, status: transaction_status) {
@@ -52,6 +54,8 @@ operation create_test_evm_submit_transaction(id: byte_array, contract_address: t
         parameter_values = list<text>().to_gtv().to_bytes(),
         network_id = 1,
         currency_symbol = "ETH",
+        max_priority_fee_per_gas = 1,
+        max_fee_per_gas = 4000000000,
         sender = x"",
         status = status,
         timestamp = timestamp,

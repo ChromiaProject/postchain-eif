@@ -38,6 +38,8 @@ entity evm_submit_transaction {
     parameter_values: byte_array;
     network_id: integer;
     currency_symbol: text;
+    max_priority_fee_per_gas: big_integer;
+    max_fee_per_gas: big_integer;
     sender: byte_array;
     index mutable status: transaction_status;
     index timestamp: timestamp;
@@ -116,11 +118,13 @@ function create_evm_submit_transaction(evm_submit_transaction_message: evm_submi
         evm_submit_transaction_message.parameter_types,
         evm_submit_transaction_message.parameter_values,
         evm_submit_transaction_message.network_id,
+        evm_submit_transaction_message.max_priority_fee_per_gas,
+        evm_submit_transaction_message.max_fee_per_gas,
         sender
     );
 }
 
-function add_transaction_to_queue(contract_address: text, function_name: text, parameter_types: list<text>, parameter_values: list<gtv>, network_id: integer, sender: byte_array) {
+function add_transaction_to_queue(contract_address: text, function_name: text, parameter_types: list<text>, parameter_values: list<gtv>, network_id: integer, max_priority_fee_per_gas: big_integer, max_fee_per_gas: big_integer, sender: byte_array) {
     val evm_transaction_id = get_evm_transaction_id(
         contract_address,
         function_name,
@@ -139,6 +143,8 @@ function add_transaction_to_queue(contract_address: text, function_name: text, p
         parameter_values = parameter_values.to_gtv().to_bytes(),
         network_id = network_id,
         currency_symbol = currency_symbol,
+        max_priority_fee_per_gas = max_priority_fee_per_gas,
+        max_fee_per_gas = max_fee_per_gas,
         sender = sender,
         status = transaction_status.QUEUED,
         timestamp = op_context.last_block_time,

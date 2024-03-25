@@ -90,6 +90,44 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
     }
 
     @Test
+    fun `fail send transaction max fee per gas exceeds limit`() {
+
+        val web3jRequestHandler = mockBalanceAndEstimateGas(200, 10)
+        val gasProvider = mockGasProvider(3, 10)
+        val transactionManagers =
+                mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear"))
+
+        val ts = createTransactionSubmitter(
+                web3jRequestHandler,
+                transactionManagers,
+                gasProvider
+        )
+
+        val exception = assertThrows<RuntimeException>("Expected thrown exception") {
+            ts.submitTransaction(
+                    mkEvmSubmitTxRequest()
+            )
+        }
+        assertThat(exception.message).isEqualTo("Max fee per gas 4 for tx exceeds limit of 3")
+
+        assertThat(mockingDetails(databaseOperations).invocations.size).isEqualTo(2)
+        verify(databaseOperations).recordTransactionGas(
+                any(),
+                eq(0L),
+                eq(BigInteger.valueOf(3)),
+                eq(BigInteger.valueOf(10))
+        )
+        verify(databaseOperations).recordTransactionError(
+                any(),
+                eq(0L),
+                eq(null),
+                eq("Max fee per gas 4 for tx exceeds limit of 3"),
+                anyString()
+        )
+    }
+
+
+    @Test
     fun `fail send transaction for all 1 nodes`() {
 
         val web3jRequestHandler = mockBalanceAndEstimateGas(200, 10)
@@ -194,6 +232,8 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
             listOf(),
             listOf(),
             0L,
+            BigInteger.ONE,
+            BigInteger.valueOf(4),
             "".toByteArray(),
             System.currentTimeMillis()
         )

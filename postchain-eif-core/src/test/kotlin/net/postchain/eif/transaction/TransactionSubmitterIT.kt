@@ -2,6 +2,7 @@ package net.postchain.eif.transaction
 
 import assertk.assertThat
 import assertk.assertions.isEqualTo
+import assertk.assertions.isLessThan
 import assertk.assertions.isNotNull
 import net.postchain.common.BlockchainRid
 import net.postchain.devtools.getModules
@@ -69,6 +70,8 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
             listOf("address[]"),
             listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
             1337,
+            BigInteger.ONE,
+            BigInteger.valueOf(4000000000),
             BlockchainRid.ZERO_RID.data,
             System.currentTimeMillis()
         )
@@ -131,7 +134,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
             withUpdateEvmTransactionReceipt(txSubmitterTestModule, evmSubmitTransactionRequest.rowId) {
                 assertThat(it.size).isEqualTo(1)
                 assertThat(it[0].blockHash).isNotNull()
-                assertThat(it[0].effectiveGasPrice).isEqualTo(4100000000)
+                assertThat(it[0].effectiveGasPrice).isLessThan(4000000000)
                 assertThat(it[0].gasUsage).isEqualTo(58575)
             }
         }
@@ -152,6 +155,8 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
             listOf("address[]"),
             listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
             1337,
+            BigInteger.ONE,
+            BigInteger.valueOf(4000000000),
             BlockchainRid.ZERO_RID.data,
             System.currentTimeMillis()
         )
@@ -198,7 +203,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
             withUpdateEvmTransactionReceipt(txSubmitterTestModule, evmSubmitTxRellRequest.rowId) {
                 assertThat(it.size).isEqualTo(1)
                 assertThat(it[0].blockHash).isNotNull()
-                assertThat(it[0].effectiveGasPrice).isEqualTo(4100000000)
+                assertThat(it[0].effectiveGasPrice).isLessThan(4000000000)
                 assertThat(it[0].gasUsage).isEqualTo(58575)
             }
         }
@@ -218,6 +223,8 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
             listOf("address[]"),
             listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
             1337,
+            BigInteger.ONE,
+            BigInteger.valueOf(4000000000),
             BlockchainRid.ZERO_RID.data,
             System.currentTimeMillis()
         )
@@ -267,6 +274,8 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
             listOf("address[]"),
             listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
             1337,
+            BigInteger.ONE,
+            BigInteger.valueOf(4000000000),
             BlockchainRid.ZERO_RID.data,
             System.currentTimeMillis()
         )
@@ -365,6 +374,8 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
             listOf("address[]"),
             listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
             1337,
+            BigInteger.ONE,
+            BigInteger.valueOf(4000000000),
             BlockchainRid.ZERO_RID.data,
             System.currentTimeMillis()
         )

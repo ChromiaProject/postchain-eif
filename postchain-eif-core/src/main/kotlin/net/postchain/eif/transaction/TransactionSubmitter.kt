@@ -23,6 +23,7 @@ import okhttp3.internal.toImmutableMap
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.TypeReference
 import org.web3j.abi.datatypes.Function
+import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.methods.request.Transaction
 import org.web3j.tx.TransactionManager
@@ -362,17 +363,23 @@ class TransactionSubmitter(
         }
 
         val functionData = encodeFunction(txRequest.functionName, txRequest.parameterTypes, txRequest.parameterValues)
-        val gasPrice = gasProvider.getGasPrice(functionData)
+        val maxGasPrice = gasProvider.getGasPrice(functionData)
         val gasLimit = gasProvider.getGasLimit(functionData)
 
         withWriteConnection(storage, chainId) {
-            databaseOperations.recordTransactionGas(it, txRequest.rowId, gasPrice, gasLimit)
+            databaseOperations.recordTransactionGas(it, txRequest.rowId, maxGasPrice, gasLimit)
             true
+        }
+
+        val baseFeePerGas = getBaseFeePerGas();
+
+        if (txRequest.maxFeePerGas < baseFeePerGas) {
+            throw UserMistake("Max fee per gas less than block base fee. maxFeePerGas: ${txRequest.maxFeePerGas} baseFeePerGas: $baseFeePerGas")
         }
 
         val estimatedGasUsage =
             try {
-                getEstimatedGasUsage(gasPrice, gasLimit, txRequest.contractAddress, functionData, fromAddress)
+                getEstimatedGasUsage(txRequest.maxPriorityFeePerGas, txRequest.maxFeePerGas, gasLimit, txRequest.contractAddress, functionData, fromAddress, chainId)
             } catch (e: Exception) {
                 val errorMessage = "Failed to get estimated gas usage for request id ${txRequest.rowId}: ${e.message}"
                 logger.error(e) { errorMessage }
@@ -382,15 +389,21 @@ class TransactionSubmitter(
             throw UserMistake("Estimated gas usage $estimatedGasUsage for tx exceeds limit of $gasLimit")
         }
 
-        if (walletBalance.balance < gasPrice * gasLimit) {
+        if (walletBalance.balance < txRequest.maxFeePerGas * estimatedGasUsage) {
             throw UserMistake("Insufficient wallet balance")
+        }
+
+        if (txRequest.maxFeePerGas > maxGasPrice) {
+            throw UserMistake("Max fee per gas ${txRequest.maxFeePerGas} for tx exceeds limit of $maxGasPrice")
         }
 
         for ((rpcUrl, transactionManager) in transactionManagers) {
             try {
 
-                val response = transactionManager.sendTransaction(
-                    gasPrice,
+                val response = transactionManager.sendEIP1559Transaction(
+                    networkId,
+                    txRequest.maxPriorityFeePerGas,
+                    txRequest.maxFeePerGas,
                     gasLimit,
                     txRequest.contractAddress,
                     functionData,
@@ -440,24 +453,39 @@ class TransactionSubmitter(
     }
 
     private fun getEstimatedGasUsage(
-        gasPrice: BigInteger,
-        gasLimit: BigInteger,
-        contractAddress: String,
-        functionData: String,
-        fromAddress: String
+            maxPriorityFeePerGas: BigInteger,
+            maxFeePerGas: BigInteger,
+            gasLimit: BigInteger,
+            contractAddress: String,
+            functionData: String,
+            fromAddress: String,
+            chainId: Long
     ): BigInteger {
         val transaction = Transaction(
             fromAddress,
             BigInteger.ZERO,
-            gasPrice,
+            null,
             gasLimit,
             "0x$contractAddress",
             BigInteger.ZERO,
-            functionData
+            functionData,
+            chainId,
+            maxPriorityFeePerGas,
+            maxFeePerGas
         )
         return web3jRequestHandler.sendWeb3jRequest {
             it.ethEstimateGas(transaction)
         }.amountUsed
+    }
+
+    private fun getBaseFeePerGas(): BigInteger {
+        val blockNumber = web3jRequestHandler.sendWeb3jRequest {
+            it.ethBlockNumber()
+        }.blockNumber
+        val baseFeePerGas = web3jRequestHandler.sendWeb3jRequest {
+            it.ethGetBlockByNumber(DefaultBlockParameter.valueOf(blockNumber), false)
+        }.block.baseFeePerGas
+        return baseFeePerGas;
     }
 
     fun enqueue(evmSubmitTxRellRequest: EvmSubmitTxRequest) {
