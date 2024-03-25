@@ -4,6 +4,8 @@ import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_CONTRACT
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_FUNCTION
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_HASH
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_MAX_FEE_PER_GAS
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_MAX_PRIORITY_FEE_PER_GAS
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_NETWORK_ID
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_PARAMETER_TYPES
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_PARAMETER_VALUES
@@ -38,6 +40,10 @@ open class EvmSubmitTxRellRequest(
     val parameterValues: List<Gtv>,
     @Name("network_id")
     val networkId: Long,
+    @Name("max_priority_fee_per_gas")
+    var maxPriorityFeePerGas: BigInteger,
+    @Name("max_fee_per_gas")
+    var maxFeePerGas: BigInteger,
     @Name("sender")
     val sender: ByteArray,
     @Name("timestamp")
@@ -55,6 +61,8 @@ class EvmSubmitTxRequest(
     rellRequest.parameterTypes,
     rellRequest.parameterValues,
     rellRequest.networkId,
+    rellRequest.maxPriorityFeePerGas,
+    rellRequest.maxFeePerGas,
     rellRequest.sender,
     rellRequest.timestamp,
 )  {
@@ -127,6 +135,8 @@ val evmSubmitTxRellRequestRecordMapper = RecordMapper<Record, EvmSubmitTxRequest
             it.get(EVM_TX_SUBMIT_COLUMN_PARAMETER_TYPES).split(","),
             GtvDecoder.decodeGtv(it.get(EVM_TX_SUBMIT_COLUMN_PARAMETER_VALUES)).asArray().toList(),
             it.get(EVM_TX_SUBMIT_COLUMN_NETWORK_ID),
+            BigInteger.valueOf(it.get(EVM_TX_SUBMIT_COLUMN_MAX_PRIORITY_FEE_PER_GAS)),
+            BigInteger.valueOf(it.get(EVM_TX_SUBMIT_COLUMN_MAX_FEE_PER_GAS)),
             it.get(EVM_TX_SUBMIT_COLUMN_SENDER),
             it.get(EVM_TX_SUBMIT_COLUMN_TIMESTAMP),
         )

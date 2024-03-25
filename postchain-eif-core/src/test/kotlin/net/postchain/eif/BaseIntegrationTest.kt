@@ -257,15 +257,16 @@ abstract class EifBaseIntegrationTest(evmType: EvmType, private val prependUrls:
     fun sendTransaction(contractAddress: String, functionName: String, parameterTypes: List<String>, parameterValues: List<Gtv>): EthSendTransaction? {
 
         val functionData = TransactionSubmitter.encodeFunction(functionName, parameterTypes, parameterValues)
-        val gasPrice = gasProvider.getGasPrice(functionData)
         val gasLimit = gasProvider.getGasLimit(functionData)
 
-        return transactionManager.sendTransaction(
-            gasPrice,
-            gasLimit,
-            contractAddress,
-            functionData,
-            BigInteger.ZERO
+        return transactionManager.sendEIP1559Transaction(
+                1337,
+                BigInteger.ONE,
+                BigInteger.valueOf(4000000000),
+                gasLimit,
+                contractAddress,
+                functionData,
+                BigInteger.ZERO
         )
     }
 }

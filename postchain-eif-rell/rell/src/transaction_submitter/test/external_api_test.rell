@@ -9,6 +9,8 @@ function test_query_transaction_state() {
     val parameter_types = ["uint"];
     val parameter_values = [(1).to_gtv()];
     val network_id = 1;
+    val max_priority_fee_per_gas = 1;
+    val max_fee_per_gas = 4000000000;
 
     val evm_transaction_id = get_evm_transaction_id(contract_address, function_name, parameter_types, parameter_values, network_id);
 
@@ -19,7 +21,9 @@ function test_query_transaction_state() {
         function_name = function_name,
         parameter_types = parameter_types,
         parameter_values = parameter_values,
-        network_id = network_id), x"")).run();
+        network_id = network_id,
+        max_priority_fee_per_gas = max_priority_fee_per_gas,
+        max_fee_per_gas = max_fee_per_gas), x"")).run();
 
     assert_equals(get_transaction_status(evm_transaction_id), transaction_status.QUEUED);
 
@@ -32,6 +36,8 @@ function test_query_transaction_receipt() {
     val parameter_types = ["uint"];
     val parameter_values = [(1).to_gtv()];
     val network_id = 1;
+    val max_priority_fee_per_gas = 1;
+    val max_fee_per_gas = 4000000000;
 
     val evm_transaction_id = get_evm_transaction_id(contract_address, function_name, parameter_types, parameter_values, network_id);
 
@@ -42,7 +48,9 @@ function test_query_transaction_receipt() {
         function_name = function_name,
         parameter_types = parameter_types,
         parameter_values = parameter_values,
-        network_id = network_id), x"")).run();
+        network_id = network_id,
+        max_priority_fee_per_gas = max_priority_fee_per_gas,
+        max_fee_per_gas = max_fee_per_gas), x"")).run();
 
     val evm_submit_transaction_rowid = evm_submit_transaction @ {}.rowid;
 

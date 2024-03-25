@@ -13,6 +13,7 @@ import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Co
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtx.GTXOperation
 import net.postchain.gtx.data.ExtOpData
+import java.math.BigInteger
 
 class TransactionSubmitterAnchoringTestGTXModule : TransactionSubmitterTestGTXModule(
         mapOf(
@@ -45,7 +46,9 @@ class AnchorOperation(private val conf: TransactionSubmitterTestContext, private
                 listOf("bytes", "bytes[]", "address[]"),
                 extOpData.args.toList(),
                 1337,
-                BlockchainRid.ZERO_RID.data, // Don't care
+                BigInteger.ONE,
+                BigInteger.valueOf(4000000000),
+                BlockchainRid.ZERO_RID.data,
                 System.currentTimeMillis()
         ))
 

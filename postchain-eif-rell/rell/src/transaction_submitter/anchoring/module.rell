@@ -7,6 +7,8 @@ object anchoring {
 
 struct module_args {
     anchoring_interval: integer = -1; // -1 to disable anchoring
+    max_priority_fee_per_gas: integer;
+    max_fee_per_gas: integer;
     network_configs: gtv = list<network_config>().to_gtv();
 }
 
@@ -29,6 +31,8 @@ function handle_anchor_block(block_header_data: byte_array, signatures: list<byt
             ["bytes", "bytes[]", "address[]"],
             [block_header_data.to_gtv(), signatures.to_gtv(), signers.to_gtv()],
             network_config.id,
+            chain_context.args.max_priority_fee_per_gas,
+            chain_context.args.max_fee_per_gas,
             chain_context.blockchain_rid
         );
     }
