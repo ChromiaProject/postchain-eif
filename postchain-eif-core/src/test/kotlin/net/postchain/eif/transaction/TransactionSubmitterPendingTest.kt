@@ -7,6 +7,7 @@ import net.postchain.eif.Web3jRequestHandler
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
@@ -23,7 +24,11 @@ import java.math.BigInteger
 class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
 
     @Test
-    fun `fail getting receipt`() {
+    fun `fail getting transaction details for verification`() {
+
+        val blockNumber = mock<EthBlockNumber> {
+            on { blockNumber } doReturn BigInteger.valueOf(10)
+        }
 
         val web3jRequestHandler = mock<Web3jRequestHandler> {
             on { sendWeb3jRequest(requestFactory = any<(Web3j) -> Request<*, EthGetBalance>>()) } doThrow RuntimeException(
@@ -31,23 +36,24 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
             )
         }
 
+        mockWeb3jRequest(web3jRequestHandler, EthBlockNumber::class, blockNumber)
+
         val ts = createTransactionSubmitter(
             web3jRequestHandler,
             mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
             mock<ContractGasProvider>()
         )
 
-        // Fails on getting receipt
-        ts.pollPendingTransaction(
-            "tx-hash",
-            mkEvmPendingDbTx()
-        )
+        ts.addPendingTransaction(mkEvmPendingDbTx(5))
+
+        // Fails on getting transaction details
+        ts.pollPendingTransactions()
 
         verify(databaseOperations).recordTransactionError(
             any(),
             eq(0L),
             eq(null),
-            eq("Failed to poll for receipt for request id 0"),
+            eq("Failed to process pending transaction 0: Oh dear"),
             anyString()
         )
     }
@@ -63,11 +69,14 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
             mock<ContractGasProvider>()
         )
 
-        val txPending = mkEvmPendingDbTx(5)
+        val txPending = mkEvmPendingDbTx(10)
+        txPending.blockNumber = BigInteger.TEN
 
-        mockWeb3jRequest(web3jRequestHandler, EthBlockNumber::class, mockBlockNumber(BigInteger.TEN))
+        mockWeb3jRequest(web3jRequestHandler, EthBlockNumber::class, mockBlockNumber(BigInteger.valueOf(20)))
         mockWeb3jRequest(web3jRequestHandler, EthTransaction::class, mockEthTransactionResponse("contract-address-no-match", "0x4c6240000"))
-        ts.pollPendingTransaction("tx-hash", txPending)
+        mockWeb3jRequest(web3jRequestHandler, EthGetTransactionReceipt::class, mockTransactionReceiptResponse(5, true))
+
+        ts.pollPendingTransaction(txPending, BigInteger.valueOf(15))
 
         assertThat(txPending.status).isEqualTo(PendingTxStatus.REVERTED)
 
@@ -97,9 +106,9 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         mockWeb3jRequest(web3jRequestHandler, EthBlockNumber::class, mockBlockNumber(BigInteger.TEN))
         mockWeb3jRequest(web3jRequestHandler, EthTransaction::class, mockEthTransactionResponse(
             "contractAddress",
-            "0xe71731e4000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000101010101010101010101010101010101010101"
+            "0x9329efad000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000101010101010101010101010101010101010101"
         ))
-        ts.pollPendingTransaction("tx-hash", txPending)
+        ts.pollPendingTransaction(txPending, BigInteger.valueOf(15))
 
         assertThat(txPending.status).isEqualTo(PendingTxStatus.REVERTED)
 
@@ -127,26 +136,26 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
 
         // First poll - get receipt and store block number
         mockWeb3jRequest(web3jRequestHandler, EthGetTransactionReceipt::class, mockTransactionReceiptResponse(5, true))
-        mockWeb3jRequest(web3jRequestHandler, EthBlockNumber::class, mockBlockNumber(BigInteger.valueOf(5)))
-        ts.pollPendingTransaction("tx-hash", txPending)
+//        mockWeb3jRequest(web3jRequestHandler, EthBlockNumber::class, mockBlockNumber(BigInteger.valueOf(5)))
+        ts.pollPendingTransaction(txPending, BigInteger.valueOf(5))
 
         assertThat(txPending.blockNumber!!.toLong()).isEqualTo(5)
         assertThat(txPending.status).isEqualTo(PendingTxStatus.VERIFYING)
 
         // Second poll with block number 6 - nothing has changed since we wait for 5 blocks
         mockWeb3jRequest(web3jRequestHandler, EthBlockNumber::class, mockBlockNumber(BigInteger.valueOf(6)))
-        ts.pollPendingTransaction("tx-hash", txPending)
+        ts.pollPendingTransaction(txPending, BigInteger.valueOf(6))
 
         assertThat(txPending.blockNumber!!.toLong()).isEqualTo(5)
         assertThat(txPending.status).isEqualTo(PendingTxStatus.VERIFYING)
 
         // Third poll with block number 10 - evm has built 5 blocks - lets verify everything
-        mockWeb3jRequest(web3jRequestHandler, EthBlockNumber::class, mockBlockNumber(BigInteger.TEN))
+//        mockWeb3jRequest(web3jRequestHandler, EthBlockNumber::class, mockBlockNumber(BigInteger.TEN))
         mockWeb3jRequest(web3jRequestHandler, EthTransaction::class, mockEthTransactionResponse(
             "contractAddress",
-            "0xe71731e4000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000101010101010101010101010101010101010101"
+            "0x9329efad000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000101010101010101010101010101010101010101"
         ))
-        ts.pollPendingTransaction("tx-hash", txPending)
+        ts.pollPendingTransaction(txPending, BigInteger.valueOf(10))
 
         assertThat(txPending.blockNumber!!.toLong()).isEqualTo(5)
         assertThat(txPending.status).isEqualTo(PendingTxStatus.SUCCESS)

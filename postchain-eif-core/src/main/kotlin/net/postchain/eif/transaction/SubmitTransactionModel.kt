@@ -15,6 +15,7 @@ import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvDecoder
 import net.postchain.gtv.mapper.Name
+import net.postchain.gtv.mapper.Nullable
 import org.jooq.Record
 import org.jooq.RecordMapper
 import java.math.BigInteger
@@ -48,11 +49,16 @@ open class EvmSubmitTxRellRequest(
     val sender: ByteArray,
     @Name("timestamp")
     val timestamp: Long,
+    @Nullable
+    @Name("tx_hash")
+    var txHash: String?,
+    @Nullable
+    @Name("status")
+    val status: RellTransactionStatus?,
 )
 
 class EvmSubmitTxRequest(
     rellRequest: EvmSubmitTxRellRequest,
-    var txHash: String? = null,
     var bcPersisted: Boolean = false,
 ): EvmSubmitTxRellRequest(
     rellRequest.rowId,
@@ -65,69 +71,51 @@ class EvmSubmitTxRequest(
     rellRequest.maxFeePerGas,
     rellRequest.sender,
     rellRequest.timestamp,
+    rellRequest.txHash,
+    rellRequest.status
 )  {
-
     companion object {
         fun fromRell(rellRequest: EvmSubmitTxRellRequest): EvmSubmitTxRequest {
-            return EvmSubmitTxRequest(
-                rellRequest
-            )
-        }
-    }
-}
-
-open class EvmPendingRellTx(
-    @Name("row_id")
-    val rowId: Long,
-    @Name("network_id")
-    val networkId: Long,
-    @Name("contract_address")
-    val contractAddress: String,
-    @Name("function_name")
-    val functionName: String,
-    @Name("parameter_types")
-    val parameterTypes: List<String>,
-    @Name("parameter_values")
-    val parameterValues: List<Gtv>,
-    @Name("tx_hash")
-    val txHash: String,
-) {
-    companion object {
-
-        fun fromRellRequestAndHash(submitTxRequest: EvmSubmitTxRequest, txHash: String): EvmPendingRellTx {
-            return EvmPendingRellTx(
-                submitTxRequest.rowId,
-                submitTxRequest.networkId,
-                submitTxRequest.contractAddress,
-                submitTxRequest.functionName,
-                submitTxRequest.parameterTypes,
-                submitTxRequest.parameterValues,
-                txHash
-            )
+            return EvmSubmitTxRequest(rellRequest)
         }
     }
 }
 
 class EvmPendingTx(
-    pendingTransaction: EvmPendingRellTx,
+    // From BC
+    val rowId: Long,
+    val networkId: Long,
+    val contractAddress: String,
+    val functionName: String,
+    val parameterTypes: List<String>,
+    val parameterValues: List<Gtv>,
+    val txHash: String,
+
+    // Internal
     var created: Long = System.currentTimeMillis(),
     var blockNumber: BigInteger? = null,
     var blockHash: String? = null,
     var status: PendingTxStatus = PendingTxStatus.VERIFYING,
     var effectiveGasPrice: BigInteger? = null,
     var gasUsed: BigInteger? = null,
-) : EvmPendingRellTx(
-    pendingTransaction.rowId,
-    pendingTransaction.networkId,
-    pendingTransaction.contractAddress,
-    pendingTransaction.functionName,
-    pendingTransaction.parameterTypes,
-    pendingTransaction.parameterValues,
-    pendingTransaction.txHash,
-)
+) {
+    companion object {
+        fun fromEvmSubmitTxRellRequest(txPending: EvmSubmitTxRellRequest, txHash: String): EvmPendingTx {
+            return EvmPendingTx(
+                txPending.rowId,
+                txPending.networkId,
+                txPending.contractAddress,
+                txPending.functionName,
+                txPending.parameterTypes,
+                txPending.parameterValues,
+                txHash,
+            )
+        }
+    }
+}
 
-val evmSubmitTxRellRequestRecordMapper = RecordMapper<Record, EvmSubmitTxRequest> {
-    val submitTx = EvmSubmitTxRequest.fromRell(
+val evmSubmitTxRequestRecordMapper = RecordMapper<Record, EvmSubmitTxRequest> {
+    EvmSubmitTxRequest(
         EvmSubmitTxRellRequest(
             it.get(EVM_TX_SUBMIT_COLUMN_REQUEST_ID),
             it.get(EVM_TX_SUBMIT_COLUMN_CONTRACT),
@@ -139,9 +127,9 @@ val evmSubmitTxRellRequestRecordMapper = RecordMapper<Record, EvmSubmitTxRequest
             BigInteger.valueOf(it.get(EVM_TX_SUBMIT_COLUMN_MAX_FEE_PER_GAS)),
             it.get(EVM_TX_SUBMIT_COLUMN_SENDER),
             it.get(EVM_TX_SUBMIT_COLUMN_TIMESTAMP),
-        )
+            it.get(EVM_TX_SUBMIT_COLUMN_HASH),
+            null
+        ),
+        it.get(EVM_TX_SUBMIT_COLUMN_BC_PERSISTED)
     )
-    submitTx.txHash = it.get(EVM_TX_SUBMIT_COLUMN_HASH)
-    submitTx.bcPersisted = it.get(EVM_TX_SUBMIT_COLUMN_BC_PERSISTED)
-    submitTx
 }

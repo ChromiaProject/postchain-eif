@@ -26,6 +26,7 @@ import org.web3j.abi.datatypes.Function
 import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.methods.request.Transaction
+import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.tx.TransactionManager
 import org.web3j.tx.gas.ContractGasProvider
 import org.web3j.utils.Numeric
@@ -54,7 +55,7 @@ class TransactionSubmitter(
     private val txTimeout: Long,
     private val nodeTxVerificationTimeout: Long,
     private val nodeTxVerificationEvmBlocks: Long,
-    private val dbRetentionTime: Long,
+    private val dbRetentionTime: Long
 ) : Shutdownable {
 
     companion object : KLogging() {
@@ -87,10 +88,13 @@ class TransactionSubmitter(
             if (txSubmit.txHash == null) {
                 // Transaction taken but not yet submitted
 
+                logger.info { "Adding transaction ${txSubmit.rowId} to the queue to be submitted" }
                 queue.offer(txSubmit)
+
             } else if (!txSubmit.bcPersisted) {
                 // Transaction submitted but status not yet persisted to BC
 
+                logger.info { "Adding transaction ${txSubmit.rowId} to the status update queue to be set to ${RellTransactionStatus.PENDING}" }
                 submitTxUpdates[txSubmit.rowId] =
                     EvmSubmitTransactionResult(RellTransactionStatus.PENDING, txSubmit.txHash!!)
             }
@@ -185,36 +189,10 @@ class TransactionSubmitter(
         }
     }
 
-    private fun pollPendingTransactions() {
+    internal fun pollPendingTransactions() {
 
-        pendingTransactions.forEach { (txHash, txPending) ->
-            try {
-                pollPendingTransaction(txHash, txPending)
-            } catch (e: Exception) {
-                logger.error(e) { "Failed to process pending transaction ${txPending.rowId}" }
-            }
-        }
-    }
+        if (pendingTransactions.isNotEmpty()) {
 
-    internal fun pollPendingTransaction(txHash: String, txPending: EvmPendingTx) {
-
-        if (txPending.status.isCompleted()) {
-            return
-        }
-
-        if (txPending.blockNumber == null) {
-            logger.info { "Fetching receipt for pending transaction ${txPending.rowId}" }
-
-            val txReceiptResult = fetchTransactionReceipt(txHash, txPending)
-
-            // First time we get receipt - store height and verify it later
-            if (txReceiptResult != null && txReceiptResult.transactionReceipt.isPresent) {
-                val txReceipt = txReceiptResult.transactionReceipt.get()
-
-                txPending.blockNumber = txReceipt.blockNumber
-                logger.info { "Transaction ${txPending.rowId} first receipt found at block number ${txPending.blockNumber}: $txReceipt" }
-            }
-        } else {
             val currentBlockHeight = try {
                 web3jRequestHandler.sendWeb3jRequest { it.ethBlockNumber() }.blockNumber
             } catch (e: Exception) {
@@ -222,71 +200,81 @@ class TransactionSubmitter(
                 return
             }
 
-            if (currentBlockHeight.minus(txPending.blockNumber!!).longValueExact() >= nodeTxVerificationEvmBlocks) {
-                // Verify transaction structure
-                val transactionByHashResponse =
-                    web3jRequestHandler.sendWeb3jRequest { it.ethGetTransactionByHash(txHash) }
-                if (transactionByHashResponse.transaction.isPresent) {
-
-                    val transaction = transactionByHashResponse.transaction.get()
-                    val functionData =
-                        encodeFunction(txPending.functionName, txPending.parameterTypes, txPending.parameterValues)
-
-                    if (
-                        functionData != transaction.input ||
-                        !transaction.to.contains(txPending.contractAddress)
-                    ) {
-                        txPending.status = PendingTxStatus.REVERTED
-                        withWriteConnection(storage, chainId) {
-                            databaseOperations.recordTransactionError(
-                                it,
-                                txPending.rowId,
-                                null,
-                                "Transaction does not match original"
-                            )
-                            true
-                        }
-                        return
+            pendingTransactions.forEach { (_, txPending) ->
+                try {
+                    pollPendingTransaction(txPending, currentBlockHeight)
+                } catch (e: Exception) {
+                    logger.error(e) { "Failed to process pending transaction ${txPending.rowId}" }
+                    withWriteConnection(storage, chainId) {
+                        databaseOperations.recordTransactionError(
+                            it,
+                            txPending.rowId,
+                            null,
+                            "Failed to process pending transaction ${txPending.rowId}: ${e.message}",
+                            e.stackTraceToString()
+                        )
+                        true
                     }
-                }
+                } finally {
 
-                logger.info { "Re-fetching receipt for pending transaction ${txPending.rowId}" }
-                // Re-fetch receipt
-                val txReceiptResult = fetchTransactionReceipt(txHash, txPending)
-
-                if (txReceiptResult != null && txReceiptResult.transactionReceipt.isPresent) {
-                    val txReceipt = txReceiptResult.transactionReceipt.get()
-
-                    if (txReceipt.blockNumber != txPending.blockNumber) {
-                        // Some kind of re-org happened, store the new block number and return, will be polled again
-                        txPending.blockNumber = txReceipt.blockNumber
-                        return
+                    try {
+                        checkTransactionTimeout(txPending)
+                    } catch (e: Exception) {
+                        logger.error(e) { "Failed to verify timeout of transaction ${txPending.rowId}" }
                     }
-
-                    txPending.status = if (txReceipt.isStatusOK) PendingTxStatus.SUCCESS else PendingTxStatus.REVERTED
-                    txPending.blockNumber = txReceipt.blockNumber
-                    txPending.blockHash = txReceipt.blockHash
-                    txPending.effectiveGasPrice = Numeric.decodeQuantity(txReceipt.effectiveGasPrice)
-                    txPending.gasUsed = txReceipt.gasUsed
-
-                    if (txPending.status == PendingTxStatus.REVERTED) {
-                        withWriteConnection(storage, chainId) {
-
-                            databaseOperations.recordTransactionError(
-                                    it,
-                                    txPending.rowId,
-                                    null,
-                                    "Transaction was reverted"
-                            )
-                            true
-                        }
-                    }
-
-                    logger.info { "Pending transaction ${txPending.rowId} verified: ${txPending.status} - block hash: ${txPending.blockHash}, effective gas price ${txPending.effectiveGasPrice}, gas usage: ${txPending.gasUsed}" }
                 }
             }
         }
+    }
 
+    internal fun pollPendingTransaction(txPending: EvmPendingTx, currentBlockHeight: BigInteger) {
+
+        if (txPending.status.isCompleted()) {
+            return
+        }
+
+        var txReceipt: TransactionReceipt? = null
+
+        if (txPending.blockNumber == null) {
+            logger.info { "Fetching receipt for pending transaction ${txPending.rowId} / ${txPending.txHash}" }
+
+            val txReceiptResult = fetchTransactionReceipt(txPending.txHash, txPending)
+
+            if (txReceiptResult != null && txReceiptResult.transactionReceipt.isPresent) {
+
+                txReceipt = txReceiptResult.transactionReceipt.get()
+                txPending.blockNumber = txReceipt.blockNumber
+
+                logger.info { "Transaction ${txPending.rowId} first receipt found at block number ${txPending.blockNumber}: $txReceipt" }
+            }
+        }
+
+        val blocksSinceReceipt = currentBlockHeight.minus(txPending.blockNumber!!).longValueExact()
+        if (blocksSinceReceipt >= nodeTxVerificationEvmBlocks) {
+            // Verify transaction structure
+            if (verifyTxStructure(txPending)) return
+
+            if (txReceipt == null) {
+                logger.info { "Re-fetching receipt for pending transaction ${txPending.rowId}" }
+
+                // Re-fetch receipt
+                val txReceiptResult = fetchTransactionReceipt(txPending.txHash, txPending)
+
+                if (txReceiptResult != null && txReceiptResult.transactionReceipt.isPresent) {
+                    txReceipt = txReceiptResult.transactionReceipt.get()
+                }
+            } else {
+
+                logger.info { "Receipt for transaction ${txPending.rowId} is old ($blocksSinceReceipt blocks) - verify" }
+            }
+
+            if (txReceipt != null) {
+                if (verifyTxReceipt(txReceipt, txPending, currentBlockHeight)) return
+            }
+        }
+    }
+
+    fun checkTransactionTimeout(txPending: EvmPendingTx) {
         if (!txPending.status.isCompleted()) {
             try {
                 isTimeout(txPending.rowId, txPending.created, nodeTxVerificationTimeout)
@@ -302,29 +290,99 @@ class TransactionSubmitter(
                     )
                     true
                 }
+                submitTxUpdates[txPending.rowId] = EvmSubmitTransactionResult(RellTransactionStatus.QUEUED)
                 return
             }
         }
     }
 
-    private fun fetchTransactionReceipt(txHash: String, txPending: EvmPendingTx) =
-            try {
-                web3jRequestHandler.sendWeb3jRequest { it.ethGetTransactionReceipt(txHash) }
-            } catch (e: Exception) {
-                val errorMessage = "Failed to poll for receipt for request id ${txPending.rowId}"
-                logger.error(e) { errorMessage }
+    private fun verifyTxReceipt(
+        txReceipt: TransactionReceipt,
+        txPending: EvmPendingTx,
+        currentBlockHeight: BigInteger
+    ): Boolean {
+
+        logger.info { "Verify receipt of transaction ${txPending.rowId}" }
+
+        if (txReceipt.blockNumber != txPending.blockNumber) {
+            // Some kind of re-org happened, store the new block number and return, will be polled again
+            txPending.blockNumber = txReceipt.blockNumber
+            return true
+        }
+
+        txPending.status = if (txReceipt.isStatusOK) PendingTxStatus.SUCCESS else PendingTxStatus.REVERTED
+        txPending.blockNumber = txReceipt.blockNumber
+        txPending.blockHash = txReceipt.blockHash
+        txPending.effectiveGasPrice = Numeric.decodeQuantity(txReceipt.effectiveGasPrice)
+        txPending.gasUsed = txReceipt.gasUsed
+
+        if (txPending.status == PendingTxStatus.REVERTED) {
+            withWriteConnection(storage, chainId) {
+
+                databaseOperations.recordTransactionError(
+                    it,
+                    txPending.rowId,
+                    null,
+                    "Transaction was reverted"
+                )
+                true
+            }
+        }
+
+        logger.info { "Pending transaction ${txPending.rowId} verified at block number $currentBlockHeight: ${txPending.status} - block hash: ${txPending.blockHash}, effective gas price ${txPending.effectiveGasPrice}, gas usage: ${txPending.gasUsed}" }
+        return false
+    }
+
+    private fun verifyTxStructure(txPending: EvmPendingTx): Boolean {
+
+        logger.info { "Verify structure of transaction ${txPending.rowId}" }
+
+        val transactionByHashResponse =
+            web3jRequestHandler.sendWeb3jRequest { it.ethGetTransactionByHash(txPending.txHash) }
+        if (transactionByHashResponse.transaction.isPresent) {
+
+            val transaction = transactionByHashResponse.transaction.get()
+            val functionData =
+                encodeFunction(txPending.functionName, txPending.parameterTypes, txPending.parameterValues)
+
+            if (
+                functionData != transaction.input ||
+                !transaction.to.contains(txPending.contractAddress)
+            ) {
+                txPending.status = PendingTxStatus.REVERTED
                 withWriteConnection(storage, chainId) {
                     databaseOperations.recordTransactionError(
-                            it,
-                            txPending.rowId,
-                            null,
-                            errorMessage,
-                            e.stackTraceToString()
+                        it,
+                        txPending.rowId,
+                        null,
+                        "Transaction does not match original"
                     )
                     true
                 }
-                null
+                return true
             }
+        }
+        return false
+    }
+
+    private fun fetchTransactionReceipt(txHash: String, txPending: EvmPendingTx) =
+        try {
+            web3jRequestHandler.sendWeb3jRequest { it.ethGetTransactionReceipt(txHash) }
+        } catch (e: Exception) {
+            val errorMessage = "Failed to poll for receipt for request id ${txPending.rowId}"
+            logger.error(e) { errorMessage }
+            withWriteConnection(storage, chainId) {
+                databaseOperations.recordTransactionError(
+                    it,
+                    txPending.rowId,
+                    null,
+                    errorMessage,
+                    e.stackTraceToString()
+                )
+                true
+            }
+            null
+        }
 
     internal fun submitTransaction(transactionRequest: EvmSubmitTxRequest) {
         try {
@@ -379,7 +437,15 @@ class TransactionSubmitter(
 
         val estimatedGasUsage =
             try {
-                getEstimatedGasUsage(txRequest.maxPriorityFeePerGas, txRequest.maxFeePerGas, gasLimit, txRequest.contractAddress, functionData, fromAddress, chainId)
+                getEstimatedGasUsage(
+                    txRequest.maxPriorityFeePerGas,
+                    txRequest.maxFeePerGas,
+                    gasLimit,
+                    txRequest.contractAddress,
+                    functionData,
+                    fromAddress,
+                    chainId
+                )
             } catch (e: Exception) {
                 val errorMessage = "Failed to get estimated gas usage for request id ${txRequest.rowId}: ${e.message}"
                 logger.error(e) { errorMessage }
@@ -417,12 +483,10 @@ class TransactionSubmitter(
                     throw ProgrammerMistake(errorMessage)
                 }
 
-                withWriteConnection(storage, chainId) {
+                withReadWriteConnection(storage, chainId) {
                     databaseOperations.recordTransactionHash(it, txRequest.rowId, response.transactionHash)
-                    true
                 }
 
-                addPendingTransaction(txRequest, response.transactionHash)
                 submitTxUpdates[txRequest.rowId] =
                     EvmSubmitTransactionResult(RellTransactionStatus.PENDING, response.transactionHash)
 
@@ -453,13 +517,13 @@ class TransactionSubmitter(
     }
 
     private fun getEstimatedGasUsage(
-            maxPriorityFeePerGas: BigInteger,
-            maxFeePerGas: BigInteger,
-            gasLimit: BigInteger,
-            contractAddress: String,
-            functionData: String,
-            fromAddress: String,
-            chainId: Long
+        maxPriorityFeePerGas: BigInteger,
+        maxFeePerGas: BigInteger,
+        gasLimit: BigInteger,
+        contractAddress: String,
+        functionData: String,
+        fromAddress: String,
+        chainId: Long
     ): BigInteger {
         val transaction = Transaction(
             fromAddress,
@@ -522,21 +586,13 @@ class TransactionSubmitter(
         web3jRequestHandler.close()
     }
 
-    fun addPendingTransaction(txRequest: EvmSubmitTxRequest, transactionHash: String) {
-
-        val txPending = EvmPendingRellTx.fromRellRequestAndHash(
-            txRequest,
-            transactionHash
-        )
-
-        addPendingTransaction(txPending)
-    }
-
-    fun addPendingTransaction(txPending: EvmPendingRellTx) {
+    fun addPendingTransaction(txPending: EvmPendingTx) {
 
         if (!pendingTransactions.containsKey(txPending.txHash)) {
 
-            pendingTransactions[txPending.txHash] = EvmPendingTx(txPending)
+            pendingTransactions[txPending.txHash] = txPending
+
+            logger.info { "Transaction ${txPending.rowId} / ${txPending.txHash} added for verification" }
         }
     }
 
