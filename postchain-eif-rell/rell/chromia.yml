@@ -51,9 +51,9 @@ blockchains:
         <<: *eif_test
       icmf:
         receiver:
-          global:
-            topics:
-              - G_evm_block_events
+          local:
+            - topic: L_evm_block_events
+              bc-rid: 0000000000000000000000000000000000000000000000000000000000000000
     moduleArgs:
       <<: *common_args
       <<: *rell_test_args

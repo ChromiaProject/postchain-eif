@@ -1,8 +1,8 @@
 module;
 
-import ^^.lib.icmf.constants. { ICMF_TOPIC_GLOBAL_PREFIX };
+import ^^.lib.icmf.constants. { ICMF_TOPIC_LOCAL_PREFIX };
 
-val evm_block_events_topic = ICMF_TOPIC_GLOBAL_PREFIX + "evm_block_events";
+val evm_block_events_topic = ICMF_TOPIC_LOCAL_PREFIX + "evm_block_events";
 
 struct evm_block_message {
     network_id: integer;
