@@ -62,6 +62,8 @@ struct evm_submit_transaction_data {
     parameter_types: list<text>;
     parameter_values: list<gtv>;
     network_id: integer;
+    max_priority_fee_per_gas: big_integer;
+    max_fee_per_gas: big_integer;
     sender: byte_array;
     status: transaction_status;
     timestamp: timestamp;
@@ -190,6 +192,8 @@ query fetch_oldest_queued_transactions_per_contract(exclude_taken_by_key: pubkey
                     parameter_types = .parameter_types.split("."),
                     parameter_values = list<gtv>.from_gtv(gtv.from_bytes(.parameter_values)),
                     network_id = .network_id,
+                    max_priority_fee_per_gas = .max_priority_fee_per_gas,
+                    max_fee_per_gas = .max_fee_per_gas,
                     sender = .sender,
                     status = .status,
                     timestamp = .timestamp,
