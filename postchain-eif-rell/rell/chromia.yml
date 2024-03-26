@@ -71,6 +71,8 @@ blockchains:
             currency_symbol: "ETH"
       transaction_submitter.anchoring:
         anchoring_interval: 3600000 # 1 per hour
+        max_priority_fee_per_gas: 1000000000
+        max_fee_per_gas: 4000000000
         network_configs:
           - id: 1337
             contract: "anchoring_contract"
@@ -88,6 +90,8 @@ blockchains:
             min_wallet_balance: 100000000000
         node_tx_timeout: 86400000 #24h
         gas_limit: 9000000
+        node_tx_verification_evm_blocks: 10
+        tx_verification_time: 20000
       sync_ext:
         - "net.postchain.eif.transaction.TransactionSubmitterSynchronizationInfrastructureExtension"
         - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"

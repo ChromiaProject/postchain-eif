@@ -176,8 +176,8 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
             val jooq = createJooq(ctx)
 
             return jooq.select().from(tableEvmTxSubmit(ctx))
-                    .where(EVM_TX_SUBMIT_COLUMN_NETWORK_ID.eq(networkId))
-                    .fetch(evmSubmitTxRellRequestRecordMapper)
+                    .where(EVM_TX_SUBMIT_COLUMN_NETWORK_ID.eq(networkId).and(EVM_TX_SUBMIT_COLUMN_BC_PERSISTED.eq(false)))
+                    .fetch(evmSubmitTxRequestRecordMapper)
         }
     }
 

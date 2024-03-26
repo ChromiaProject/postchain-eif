@@ -4,14 +4,12 @@ import assertk.assertThat
 import assertk.assertions.isEqualTo
 import assertk.assertions.isNotNull
 import assertk.assertions.matches
-import net.postchain.common.BlockchainRid
 import net.postchain.devtools.getModules
 import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.EvmType
 import net.postchain.eif.contracts.Validator
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_ERRORS_COLUMN_MESSAGE
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_ERRORS_COLUMN_REQUEST_ID
-import net.postchain.gtv.GtvFactory.gtv
 import org.awaitility.Awaitility
 import org.awaitility.Duration
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -54,19 +52,8 @@ class TransactionSubmitterTimeoutIT : EifBaseIntegrationTest(
 
         val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
 
-        val evmSubmitTxRellRequest = EvmSubmitTxRellRequest(
-                0,
-                contractAddress,
-                "updateValidators",
-                listOf("uint", "address"),
-                listOf(gtv(1), gtv(ByteArray(20))),
-                1337,
-                BigInteger.ONE,
-                BigInteger.valueOf(4000000000),
-                BlockchainRid.ZERO_RID.data,
-                System.currentTimeMillis() - 25 * 60 * 60000
-        )
-        txSubmitterTestModule.addTxToQueue(evmSubmitTxRellRequest)
+        val evmSubmitTxRellRequest = mkEvmSubmitTxRellRequest(0, contractAddress, created = System.currentTimeMillis() - 25 * 60 * 60000)
+        txSubmitterTestModule.addTransactionsAvailableToTake(evmSubmitTxRellRequest)
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
             assertTrue(txSubmitterTestModule.conf.queuedTxs.contains(0))
@@ -81,7 +68,7 @@ class TransactionSubmitterTimeoutIT : EifBaseIntegrationTest(
     @Test
     fun `timeout pending transaction`() {
 
-        val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config_0_verification_timeout.xml")
+        val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config_0_verification_timeout_and_pending.xml")
         val node = nodes[0]
 
         val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
@@ -89,9 +76,9 @@ class TransactionSubmitterTimeoutIT : EifBaseIntegrationTest(
         val sendResult =
             sendTransaction(contractAddress)
 
-        val evmSubmitTransactionRequest = mkEvmPendingRellTx(sendResult!!.transactionHash, contractAddress, "updateValidators-incorrect")
+        val evmSubmitTransactionRequest = mkEvmSubmitTxRellRequest(0, contractAddress, txHash = sendResult!!.transactionHash, functionName =  "updateValidators-incorrect", status = RellTransactionStatus.PENDING)
 
-        txSubmitterTestModule.addGetPendingTransactions(evmSubmitTransactionRequest)
+        txSubmitterTestModule.addTransaction(evmSubmitTransactionRequest)
 
         // Make sure it is added
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
@@ -107,10 +94,11 @@ class TransactionSubmitterTimeoutIT : EifBaseIntegrationTest(
 
             // There should be a timeout error message
             withDbErrors(node, evmSubmitTransactionRequest.rowId)  {
-                assertThat(it.size).isEqualTo(1)
-                assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_REQUEST_ID)).isEqualTo(evmSubmitTransactionRequest.rowId)
-                assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_MESSAGE))
-                    .matches("Transaction 0 with timestamp \\d+ was not processed within 0 ms and timed out".toRegex())
+                assertTrue(
+                    it.any { it.get(EVM_TX_ERRORS_COLUMN_REQUEST_ID) == evmSubmitTransactionRequest.rowId &&
+                            it.get(EVM_TX_ERRORS_COLUMN_MESSAGE).matches("Transaction 0 with timestamp \\d+ was not processed within 0 ms and timed out".toRegex())
+                    }
+                )
             }
         }
     }

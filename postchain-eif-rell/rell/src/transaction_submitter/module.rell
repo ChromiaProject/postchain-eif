@@ -68,16 +68,7 @@ struct evm_submit_transaction_data {
     status: transaction_status;
     timestamp: timestamp;
     tx_hash: text? = null;
-}
-
-struct evm_pending_transaction_data {
-    row_id: integer;
-    network_id: integer;
-    contract_address: text;
-    function_name: text;
-    parameter_types: list<text>;
-    parameter_values: list<gtv>;
-    tx_hash: text? = null;
+    processed_by: pubkey;
 }
 
 enum transaction_status {
@@ -197,7 +188,8 @@ query fetch_oldest_queued_transactions_per_contract(exclude_taken_by_key: pubkey
                     sender = .sender,
                     status = .status,
                     timestamp = .timestamp,
-                    tx_hash = .tx_hash))
+                    tx_hash = .tx_hash,
+                    processed_by = .processed_by))
             limit 1;
             result.add(evm_submit_transaction);
         }
@@ -206,16 +198,58 @@ query fetch_oldest_queued_transactions_per_contract(exclude_taken_by_key: pubkey
     return result;
 }
 
-query get_pending_transactions(): list<evm_pending_transaction_data> {
+query get_transaction(row_id: integer): evm_submit_transaction_data {
 
-    return evm_submit_transaction @* { .status == transaction_status.PENDING } (evm_pending_transaction_data(
+    return evm_submit_transaction @ { rowid(row_id) } (evm_submit_transaction_data(
         row_id = .rowid.to_integer(),
-        network_id = .network_id,
         contract_address = .contract_address,
         function_name = .function_name,
         parameter_types = .parameter_types.split("."),
         parameter_values = list<gtv>.from_gtv(gtv.from_bytes(.parameter_values)),
-        tx_hash = .tx_hash));
+        network_id = .network_id,
+        max_priority_fee_per_gas = .max_priority_fee_per_gas,
+        max_fee_per_gas = .max_fee_per_gas,
+        sender = .sender,
+        status = .status,
+        timestamp = .timestamp,
+        tx_hash = .tx_hash,
+        processed_by = .processed_by));
+}
+
+query get_transactions(): list<evm_submit_transaction_data> {
+
+    return evm_submit_transaction @* {} (evm_submit_transaction_data(
+        row_id = .rowid.to_integer(),
+        contract_address = .contract_address,
+        function_name = .function_name,
+        parameter_types = .parameter_types.split("."),
+        parameter_values = list<gtv>.from_gtv(gtv.from_bytes(.parameter_values)),
+        network_id = .network_id,
+        max_priority_fee_per_gas = .max_priority_fee_per_gas,
+        max_fee_per_gas = .max_fee_per_gas,
+        sender = .sender,
+        status = .status,
+        timestamp = .timestamp,
+        tx_hash = .tx_hash,
+        processed_by = .processed_by));
+}
+
+query get_pending_transactions(): list<evm_submit_transaction_data> {
+
+    return evm_submit_transaction @* { .status == transaction_status.PENDING } (evm_submit_transaction_data(
+        row_id = .rowid.to_integer(),
+        contract_address = .contract_address,
+        function_name = .function_name,
+        parameter_types = .parameter_types.split("."),
+        parameter_values = list<gtv>.from_gtv(gtv.from_bytes(.parameter_values)),
+        network_id = .network_id,
+        max_priority_fee_per_gas = .max_priority_fee_per_gas,
+        max_fee_per_gas = .max_fee_per_gas,
+        sender = .sender,
+        status = .status,
+        timestamp = .timestamp,
+        tx_hash = .tx_hash,
+        processed_by = .processed_by));
 }
 
 query get_evm_transaction_status(row_id: integer): transaction_status? {

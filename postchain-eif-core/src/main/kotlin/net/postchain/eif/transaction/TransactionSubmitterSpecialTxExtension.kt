@@ -4,11 +4,11 @@ import mu.KLogging
 import net.postchain.base.SpecialTransactionPosition
 import net.postchain.common.BlockchainRid
 import net.postchain.core.BlockEContext
+import net.postchain.core.EContext
 import net.postchain.crypto.CryptoSystem
 import net.postchain.crypto.KeyPair
 import net.postchain.crypto.SigMaker
 import net.postchain.crypto.Signature
-import net.postchain.crypto.devtools.KeyPairHelper
 import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvNull
@@ -27,6 +27,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         const val EVM_TX_NO_OP = "__evm_tx_no_op"
 
         const val FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT = "fetch_oldest_queued_transactions_per_contract"
+        const val GET_TRANSACTION = "get_transaction"
         const val GET_PENDING_TRANSACTIONS = "get_pending_transactions"
         const val GET_TRANSACTION_STATUS = "get_evm_transaction_status"
     }
@@ -36,12 +37,11 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     private lateinit var sigMaker: SigMaker
     private val transactionSubmitters = mutableMapOf<Long, TransactionSubmitter>()
     private lateinit var module: GTXModule
+    private lateinit var privKey: ByteArray
     private lateinit var pubKey: ByteArray
     private var txVerificationTime: Long = Long.MAX_VALUE
 
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
-
-        addNewPendingTransactions(bctx)
 
         val operations = mutableListOf<OpData>()
 
@@ -68,6 +68,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
                 val requestId = op.args[0].asInteger()
                 val newTxStatus = RellTransactionStatus.values()[op.args[1].asInteger().toInt()]
+                val txHash = if (op.args[2].isNull()) null else op.args[2].asString()
                 val signer = op.args[3].asByteArray()
                 val signedRowId = op.args[4].asByteArray()
 
@@ -76,7 +77,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                     return false
                 }
 
-                val currentTxStatus = getTransactionBcStatus(bctx, requestId)
+                val currentTxStatus = getBcTransactionStatus(bctx, requestId)
 
                 if (currentTxStatus == null) {
                     logger.warn { "Validation failed. Transaction $requestId not found" }
@@ -88,34 +89,45 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                     return false
                 }
 
-                if (newTxStatus == RellTransactionStatus.PENDING && currentTxStatus != RellTransactionStatus.QUEUED && currentTxStatus != RellTransactionStatus.TAKEN) {
-                    logger.warn { "Validation failed. Transaction $requestId can not be set to status ${RellTransactionStatus.PENDING} from current status $currentTxStatus" }
-                    return false
-                }
-
-                if (newTxStatus == RellTransactionStatus.FAILURE || newTxStatus == RellTransactionStatus.SUCCESS) {
-                    // A transaction can only be set to SUCCESS/FAILURE by a node when in pending state.
-                    // Other FAILURE will be set by rell (as timeout, enough failing nodes etc).
-                    if (currentTxStatus != RellTransactionStatus.PENDING) {
+                if (newTxStatus == RellTransactionStatus.PENDING) {
+                    if (currentTxStatus != RellTransactionStatus.QUEUED && currentTxStatus != RellTransactionStatus.TAKEN) {
                         logger.warn { "Validation failed. Transaction $requestId can not be set to status ${RellTransactionStatus.PENDING} from current status $currentTxStatus" }
                         return false
                     }
 
-                    // A pending transaction must be verified
-                    if (withTxPending(requestId) { txSubmitter, txPending ->
+                    if (txHash == null) {
+                        logger.warn { "Validation failed. Transaction $requestId did not set any transaction hash when changing status to ${RellTransactionStatus.PENDING}" }
+                        return false
+                    }
 
-                            val acceptable =
+                    val txPending = getBcTransaction(bctx, requestId)
+
+                    withTxSubmitter(txPending.networkId) {
+                        it.addPendingTransaction(EvmPendingTx.fromEvmSubmitTxRellRequest(txPending, txHash))
+                    }
+                }
+
+                if (newTxStatus == RellTransactionStatus.FAILURE || newTxStatus == RellTransactionStatus.SUCCESS) {
+
+                    // A pending transaction must be verified
+                    val txStatusMatchesThisNode = withTxPending(requestId) { txSubmitter, txPending ->
+
+                        val acceptable =
                                 (newTxStatus == RellTransactionStatus.SUCCESS && txPending.status == PendingTxStatus.SUCCESS) ||
                                         (newTxStatus == RellTransactionStatus.FAILURE && txPending.status == PendingTxStatus.REVERTED)
 
-                            if (acceptable) {
-                                bctx.addAfterCommitHook { txSubmitter.removePendingTx(requestId) }
-                            }
+                        if (acceptable) {
+                            bctx.addAfterCommitHook { txSubmitter.removePendingTx(requestId) }
+                        }
 
-                            acceptable
-                        } == false) {
-                        logger.warn { "Validation failed. Transaction $requestId can not be set to status ${newTxStatus} because the status can't be approved by this node" }
+                        acceptable
                     }
+                    if (txStatusMatchesThisNode != true) {
+                        logger.warn { "Validation failed. Transaction $requestId can not be set to status $newTxStatus because the status can't be approved by this node" }
+                        return false
+                    }
+
+                    logger.info { "Transaction $requestId is verified as $newTxStatus" }
                 }
             } else if (op.opName == UPDATE_EVM_TRANSACTION_RECEIPT) {
 
@@ -153,9 +165,10 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         transactionSubmitters.values.forEach { txSubmitter ->
 
             // Transaction status updates
-            txSubmitter.getSubmitTxUpdates().forEach { (rowId, result) ->
+            val submitTxUpdates = txSubmitter.getSubmitTxUpdates()
+            submitTxUpdates.forEach { result ->
                 operations.add(
-                    buildTxUpdateOp(rowId, result.status, result.txHash)
+                    buildTxUpdateOp(result.requestId, result.status, result.txHash)
                 )
 
                 // Status QUEUE can be set multiple times due to retry - add a no op for them
@@ -165,11 +178,11 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
                 // We have processed this TX - cleanup
                 if (result.status != RellTransactionStatus.TAKEN) {
-                    txSubmitter.setSubmitBCPersisted(bctx, rowId)
+                    txSubmitter.setSubmitBCPersisted(bctx, result.requestId)
                 }
             }
 
-            bctx.addAfterCommitHook { txSubmitter.clearSubmitTxUpdates() }
+            bctx.addAfterCommitHook { txSubmitter.clearSubmitTxUpdates(submitTxUpdates) }
 
             txSubmitter.getVerifiedTransactions(txVerificationTime).forEach {
 
@@ -217,16 +230,16 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         )
     }
 
-    private fun addNewPendingTransactions(bctx: BlockEContext) {
+    fun addNewPendingTransactions(eContext: EContext) {
 
-        val queryResult = module.query(bctx, GET_PENDING_TRANSACTIONS, gtv(mapOf()))
+        val queryResult = module.query(eContext, GET_PENDING_TRANSACTIONS, gtv(mapOf()))
         val transactions = queryResult.asArray().map {
-            it.toObject<EvmPendingRellTx>()
+            it.toObject<EvmSubmitTxRellRequest>()
         }
 
         transactions.forEach { transaction ->
             withTxSubmitter(transaction.networkId) {
-                it.addPendingTransaction(transaction)
+                it.addPendingTransaction(EvmPendingTx.fromEvmSubmitTxRellRequest(transaction, transaction.txHash!!))
             }
         }
     }
@@ -276,6 +289,8 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
                 // Status TAKEN can be set multiple times due to retry - add a no op for them
                 addNoOp(operations, bctx)
+
+                logger.info { "Transaction ${transaction.rowId} taken to be processed by this node" }
             }
         }
         return operations
@@ -288,8 +303,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     override fun init(module: GTXModule, chainID: Long, blockchainRID: BlockchainRid, cs: CryptoSystem) {
         this.module = module
         this.cryptoSystem = cs
-        this.merkelHashCalculator = GtvMerkleHashCalculator(cryptoSystem)
-        this.sigMaker = cs.buildSigMaker(KeyPair(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
+        this.merkelHashCalculator = GtvMerkleHashCalculator(this.cryptoSystem)
     }
 
     override fun needsSpecialTransaction(position: SpecialTransactionPosition): Boolean {
@@ -299,7 +313,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         }
     }
 
-    private fun getTransactionBcStatus(bctx: BlockEContext, requestId: Long): RellTransactionStatus? {
+    private fun getBcTransactionStatus(bctx: BlockEContext, requestId: Long): RellTransactionStatus? {
 
         val queryResult = module.query(bctx, GET_TRANSACTION_STATUS, gtv("row_id" to gtv(requestId)))
         if (queryResult.isNull()) {
@@ -309,6 +323,12 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         return RellTransactionStatus.valueOf(queryResult.asString())
     }
 
+    private fun getBcTransaction(bctx: BlockEContext, requestId: Long): EvmSubmitTxRellRequest {
+
+        val queryResult = module.query(bctx, GET_TRANSACTION, gtv("row_id" to gtv(requestId)))
+        return queryResult.toObject<EvmSubmitTxRellRequest>()
+    }
+
     fun addTransactionSubmitter(transactionSubmitter: TransactionSubmitter, networkId: Long) {
 
         transactionSubmitters[networkId] = transactionSubmitter
@@ -316,8 +336,10 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
     fun getTransactionSubmitter(networkId: Long) = transactionSubmitters[networkId]
 
-    fun setConfig(pubKey: ByteArray, txVerificationTime: Long) {
+    fun setConfig(privKey: ByteArray, pubKey: ByteArray, txVerificationTime: Long) {
+        this.privKey = privKey
         this.pubKey = pubKey
+        this.sigMaker = cryptoSystem.buildSigMaker(KeyPair(pubKey, privKey))
         this.txVerificationTime = txVerificationTime
     }
 

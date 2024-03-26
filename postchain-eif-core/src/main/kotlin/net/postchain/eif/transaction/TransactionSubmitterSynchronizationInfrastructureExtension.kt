@@ -36,6 +36,7 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
             if (ext is TransactionSubmitterSpecialTxExtension) {
 
                 ext.setConfig(
+                    postchainContext.appConfig.privKeyByteArray,
                     postchainContext.appConfig.pubKeyByteArray,
                     transactionSubmitterBlockchainConfig.txVerificationTime
                 )
@@ -86,10 +87,14 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                             nodeTxTimeout,
                             transactionSubmitterBlockchainConfig.nodeTxVerificationTimeout,
                             transactionSubmitterBlockchainConfig.nodeTxVerificationEvmBlocks,
-                            transactionSubmitterBlockchainConfig.dbRetentionTime,
+                            transactionSubmitterBlockchainConfig.dbRetentionTime
                     )
                     transactionSubmitters[networkId] = transactionSubmitter
                     ext.addTransactionSubmitter(transactionSubmitter, networkId)
+                }
+
+                withReadConnection(postchainContext.sharedStorage, process.blockchainEngine.chainID) {
+                    ext.addNewPendingTransactions(it)
                 }
             }
 

@@ -1,12 +1,12 @@
 package net.postchain.eif.transaction
 
 import net.postchain.base.data.DatabaseAccess
-import net.postchain.common.BlockchainRid
 import net.postchain.core.EContext
 import net.postchain.core.TxEContext
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.EVM_TX_NO_OP
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.GET_PENDING_TRANSACTIONS
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.GET_TRANSACTION
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.GET_TRANSACTION_STATUS
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_RECEIPT
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_STATUS
@@ -14,7 +14,6 @@ import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvEncoder
 import net.postchain.gtv.GtvFactory.gtv
-import net.postchain.gtv.GtvString
 import net.postchain.gtv.mapper.GtvObjectMapper
 import net.postchain.gtx.GTXOperation
 import net.postchain.gtx.SimpleGTXModule
@@ -26,16 +25,14 @@ import org.jooq.impl.DSL.table
 import java.math.BigInteger
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util.concurrent.LinkedBlockingQueue
 
 data class TransactionSubmitterTestContext(
-    val queue: LinkedBlockingQueue<EvmSubmitTxRellRequest>,
-    val pending: LinkedBlockingQueue<EvmPendingRellTx>,
+    val transactionsAvailableToTake: MutableList<EvmSubmitTxRellRequest>,
+    val transactions: MutableList<EvmSubmitTxRellRequest>, // Mocks all transactions on BC
     val taken: MutableSet<Long>,
     val successfulTxs: MutableSet<Long>,
     val queuedTxs: MutableSet<Long>,
     val failedTxs: MutableSet<Long>,
-    val getTransactionStatus: MutableMap<Long, RellTransactionStatus>, // Used to mock bc statuses returned by get_transaction_status
     val operations: MutableList<ExtOpData>
 )
 
@@ -43,20 +40,7 @@ class TransactionSubmitterQueuedTransactionTestGTXModule : TransactionSubmitterT
     override fun initializeDB(ctx: EContext) {
         val transactionSubmitterDatabaseOperations = TransactionSubmitterDatabaseOperationsImpl()
         transactionSubmitterDatabaseOperations.initialize(ctx)
-        transactionSubmitterDatabaseOperations.queueTransaction(ctx, EvmSubmitTxRequest(
-            EvmSubmitTxRellRequest(
-                0,
-                "6936b1761eafc2116650b6593bbc86bd79a339a5", // TODO: Fetch contract address instead of hardcoding
-                "updateValidators",
-                listOf("address[]"),
-                listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
-                1337,
-                BigInteger.ONE,
-                BigInteger.valueOf(4000000000),
-                BlockchainRid.ZERO_RID.data,
-                System.currentTimeMillis()
-            )
-        ), 1337L)
+        transactionSubmitterDatabaseOperations.queueTransaction(ctx, mkEvmSubmitTxRequest(), 1337L)
     }
 }
 
@@ -84,6 +68,8 @@ class TransactionSubmitterPendingTransactionTestGTXModule : TransactionSubmitter
                 .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_BC_PERSISTED, true)
                 .execute()
         }
+
+        this.addTransaction(mkEvmSubmitTxRellRequest(0, "", RellTransactionStatus.PENDING, txHash = "tx-hash"))
     }
 }
 
@@ -150,7 +136,7 @@ open class TransactionSubmitterTestGTXModule(
         opOverrides: Map<String, (TransactionSubmitterTestContext, ExtOpData) -> net.postchain.core.Transactor> = mapOf(),
         queryOverrides: Map<String, (TransactionSubmitterTestContext, EContext, Gtv) -> Gtv> = mapOf()
 ) : SimpleGTXModule<TransactionSubmitterTestContext>(
-        TransactionSubmitterTestContext(LinkedBlockingQueue(), LinkedBlockingQueue(), mutableSetOf(), mutableSetOf(), mutableSetOf(), mutableSetOf(), mutableMapOf(), mutableListOf()),
+        TransactionSubmitterTestContext(mutableListOf(), mutableListOf(), mutableSetOf(), mutableSetOf(), mutableSetOf(), mutableSetOf(), mutableListOf()),
         mapOf(UPDATE_EVM_TRANSACTION_STATUS to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
             ModifyTxStatusOperation(conf, opData)
         }, UPDATE_EVM_TRANSACTION_RECEIPT to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
@@ -160,15 +146,17 @@ open class TransactionSubmitterTestGTXModule(
         }) + opOverrides,
         mapOf(
             FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT to { conf: TransactionSubmitterTestContext, _: EContext, _: Gtv ->
-                gtv(conf.queue.map { GtvObjectMapper.toGtvDictionary(it) }) },
+                gtv(conf.transactionsAvailableToTake.map { GtvObjectMapper.toGtvDictionary(it) }) },
+            GET_TRANSACTION to { conf: TransactionSubmitterTestContext, _, args: Gtv ->
+                GtvObjectMapper.toGtvDictionary(conf.transactions.first { it.rowId == args["row_id"]!!.asInteger() })
+            },
             GET_PENDING_TRANSACTIONS to { conf: TransactionSubmitterTestContext, _, _ ->
-                val pending = gtv(conf.pending.map { GtvObjectMapper.toGtvDictionary(it) })
-                conf.pending.clear()
-                pending
-                                        },
+                gtv(conf.transactions
+                    .filter { it.status == RellTransactionStatus.PENDING }
+                    .map { GtvObjectMapper.toGtvDictionary(it) })
+            },
             GET_TRANSACTION_STATUS to { conf: TransactionSubmitterTestContext, _, args: Gtv ->
-                val rowId = args["row_id"]!!.asInteger()
-                GtvString(conf.getTransactionStatus[rowId]!!.name)
+                gtv(conf.transactions.first { it.rowId == args["row_id"]!!.asInteger() }.status!!.name)
             }
         ) + queryOverrides
 ) {
@@ -185,19 +173,25 @@ open class TransactionSubmitterTestGTXModule(
         return specialTxExtensions
     }
 
-    fun addTxToQueue(tx: EvmSubmitTxRellRequest) {
-        addGetTransactionStatus(tx.rowId, RellTransactionStatus.QUEUED)
-        conf.queue.offer(tx)
+    /** Adds a transaction to be mocked by rell query operations. The status is tracked and updated once updated by a node. */
+    fun addTransaction(tx: EvmSubmitTxRellRequest) {
+        if (conf.transactions.any { it.rowId == tx.rowId }) {
+            conf.transactions.replaceAll {
+                if (it.rowId == tx.rowId) {
+                    tx
+                } else {
+                    it
+                }
+            }
+        } else {
+            conf.transactions.add(tx)
+        }
     }
 
-    fun addGetPendingTransactions(tx: EvmPendingRellTx) {
-        addGetTransactionStatus(tx.rowId, RellTransactionStatus.PENDING)
-        conf.pending.offer(tx)
-    }
-
-    fun addGetTransactionStatus(requestId: Long, status: RellTransactionStatus) {
-
-        conf.getTransactionStatus[requestId] = status
+    // Adds a transaction to be mocked by rell query operations, but also makes it available for the query operation to select transactions available to be taken
+    fun addTransactionsAvailableToTake(tx: EvmSubmitTxRellRequest) {
+        conf.transactionsAvailableToTake.add(tx)
+        addTransaction(tx)
     }
 }
 
@@ -210,10 +204,32 @@ class ModifyTxStatusOperation(
         val rowId = extOpData.args[0].asInteger()
         val status = RellTransactionStatus.values()[extOpData.args[1].asInteger().toInt()]
 
+        conf.transactions.replaceAll {
+
+            if (it.rowId == rowId) {
+                EvmSubmitTxRellRequest(
+                    it.rowId,
+                it.contractAddress,
+                it.functionName,
+                it.parameterTypes,
+                it.parameterValues,
+                it.networkId,
+                    BigInteger.ONE,
+                    BigInteger.valueOf(4000000000),
+                it.sender,
+                it.timestamp,
+                    it.txHash,
+                    status
+                )
+            } else {
+                it
+            }
+        }
+
         when (status) {
             RellTransactionStatus.TAKEN -> {
-                conf.queue.removeIf { it.rowId == rowId }
                 conf.taken.add(rowId)
+                conf.transactionsAvailableToTake.removeIf { it.rowId == rowId }
             }
             RellTransactionStatus.SUCCESS -> conf.successfulTxs.add(rowId)
             RellTransactionStatus.QUEUED -> conf.queuedTxs.add(rowId)
@@ -221,7 +237,6 @@ class ModifyTxStatusOperation(
             else -> {}
         }
 
-        conf.getTransactionStatus[rowId] = status
         conf.operations.add(extOpData)
 
         return true

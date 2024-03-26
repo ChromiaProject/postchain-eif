@@ -2,8 +2,11 @@ package net.postchain.eif.transaction
 
 import assertk.assertThat
 import assertk.assertions.contains
+import assertk.assertions.isEqualTo
 import net.postchain.base.data.DatabaseAccess
 import net.postchain.base.withReadConnection
+import net.postchain.common.BlockchainRid
+import net.postchain.common.toHex
 import net.postchain.devtools.PostchainTestNode
 import net.postchain.devtools.PostchainTestNode.Companion.DEFAULT_CHAIN_IID
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_ERRORS_COLUMN_REQUEST_ID
@@ -36,6 +39,20 @@ fun withUpdateEvmTransactionReceipt(
 
         op(receiptOperations)
     }
+}
+
+fun assertNoQueuedTxs(txSubmitterTestModule: TransactionSubmitterTestGTXModule) {
+
+    assertThat(txSubmitterTestModule.conf.transactions.
+    filter { it.status == RellTransactionStatus.QUEUED }
+        .count()).isEqualTo(0)
+}
+
+fun assertTransactionsByStatus(txSubmitterTestModule: TransactionSubmitterTestGTXModule, status: RellTransactionStatus, count: Int) {
+
+    assertThat(txSubmitterTestModule.conf.transactions.
+    filter { it.status == status }
+        .count()).isEqualTo(count)
 }
 
 // Evaluate sent transaction status
@@ -119,26 +136,57 @@ fun withDbErrors(node: PostchainTestNode, rowId: Long, op: (List<org.jooq.Record
     }
 }
 
-fun mkEvmPendingRellTx(
-    txHash: String,
+fun mkEvmSubmitTxRellRequest(
+    rowId: Long = 0,
     contractAddress: String,
+    status: RellTransactionStatus = RellTransactionStatus.QUEUED,
+    created: Long = System.currentTimeMillis(),
+    txHash: String? = null,
     functionName: String = "updateValidators",
-) = EvmPendingRellTx(
-    0,
-    1337,
-    contractAddress,
-    functionName,
-    listOf("address[]"),
-    listOf(GtvFactory.gtv(listOf(GtvFactory.gtv(ByteArray(20) { 1 })))),
-    txHash
+) = EvmSubmitTxRellRequest(
+        rowId,
+        contractAddress,
+        functionName,
+        listOf("address[]"),
+        listOf(GtvFactory.gtv(listOf(GtvFactory.gtv(ByteArray(20) { 1 })))),
+        1337,
+        BigInteger.ONE,
+        BigInteger.valueOf(4000000000),
+        BlockchainRid.ZERO_RID.data,
+        created,
+        txHash,
+        status
+    )
+
+fun mkEvmSubmitTxRequest(maxFeePerGas: Long = 4000000000) = EvmSubmitTxRequest(
+    EvmSubmitTxRequest(
+        EvmSubmitTxRellRequest(
+            0L,
+            "",
+            "function_name",
+            listOf(),
+            listOf(),
+            0L,
+            BigInteger.ONE,
+            BigInteger.valueOf(maxFeePerGas),
+            "".toByteArray(),
+            System.currentTimeMillis(),
+            null,
+            null,
+        )
+    )
 )
 
 fun mkEvmPendingDbTx(blockNumber: Long? = null) = EvmPendingTx(
-    mkEvmPendingRellTx("tx-hash", "contractAddress"),
+    0,
+    1337,
+    "contractAddress",
+    "functionName",
+    listOf("address[]"),
+    listOf(GtvFactory.gtv(listOf(GtvFactory.gtv(ByteArray(20) { 1 })))),
+    "0x" + ByteArray(32){123}.toHex(),
     System.currentTimeMillis(),
-
-    blockNumber?.let { BigInteger.valueOf(blockNumber) }
-)
+    blockNumber = blockNumber?.let { BigInteger.valueOf(blockNumber) })
 
 fun <T> withTxSubmitter(
     txSubmitterTestModule: TransactionSubmitterTestGTXModule,

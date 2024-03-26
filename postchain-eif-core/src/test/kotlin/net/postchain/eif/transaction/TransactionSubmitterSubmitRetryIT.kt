@@ -2,8 +2,9 @@ package net.postchain.eif.transaction
 
 import assertk.assertThat
 import assertk.assertions.isEqualTo
+import assertk.assertions.isGreaterThan
+import assertk.assertions.isGreaterThanOrEqualTo
 import assertk.assertions.isNotNull
-import net.postchain.common.BlockchainRid
 import net.postchain.devtools.getModules
 import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.EvmType
@@ -13,7 +14,6 @@ import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_ERRORS_COLUMN_RPC_URL
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_ERRORS_COLUMN_STACK_TRACE
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_ERRORS_COLUMN_TIMESTAMP
-import net.postchain.gtv.GtvFactory.gtv
 import org.awaitility.Awaitility
 import org.awaitility.Duration
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -29,7 +29,7 @@ import java.math.BigInteger
 @Testcontainers(disabledWithoutDocker = true)
 class TransactionSubmitterSubmitRetryIT : EifBaseIntegrationTest(
     EvmType.GETH,
-    prependUrls = listOf("http://127.0.0.1:8888", "http://127.0.0.1:9999")
+    prependUrls = listOf("http://127.0.0.1:1", "http://127.0.0.1:2")
 ) {
 
     @BeforeEach
@@ -63,22 +63,13 @@ class TransactionSubmitterSubmitRetryIT : EifBaseIntegrationTest(
 
         val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
 
-        val evmSubmitTxRellRequest = EvmSubmitTxRellRequest(
-            0,
-                contractAddress,
-                "updateValidators",
-                listOf("address[]"),
-                listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))),
-            1337,
-            BigInteger.ONE,
-            BigInteger.valueOf(4000000000),
-            BlockchainRid.ZERO_RID.data,
-            System.currentTimeMillis()
-        )
-        txSubmitterTestModule.addTxToQueue(evmSubmitTxRellRequest)
+        val evmSubmitTxRellRequest = mkEvmSubmitTxRellRequest(0, contractAddress)
+        txSubmitterTestModule.addTransactionsAvailableToTake(evmSubmitTxRellRequest)
+
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
-            assertTrue(txSubmitterTestModule.conf.queue.isEmpty())
+            assertNoQueuedTxs(txSubmitterTestModule)
+            assertStatusOperation(txSubmitterTestModule, 0, RellTransactionStatus.TAKEN)
         }
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
@@ -89,32 +80,19 @@ class TransactionSubmitterSubmitRetryIT : EifBaseIntegrationTest(
         // Verify errors in table
         withDbErrors(node, evmSubmitTxRellRequest.rowId) {
 
-            assertThat(it.size).isEqualTo(2)
+            assertThat(it.size).isGreaterThanOrEqualTo(2) // We might have received pending errors also at this point
 
             assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_TIMESTAMP)).isNotNull()
             assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_REQUEST_ID)).isEqualTo(0)
-            assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_RPC_URL)).isEqualTo("http://127.0.0.1:8888")
-            assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_MESSAGE)).isEqualTo("Failed to send transaction 0: Failed to connect to /127.0.0.1:8888")
+            assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_RPC_URL)).isEqualTo("http://127.0.0.1:1")
+            assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_MESSAGE)).isEqualTo("Failed to send transaction 0: Failed to connect to /127.0.0.1:1")
             assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_STACK_TRACE)).isNotNull()
 
             assertThat(it[1].get(EVM_TX_ERRORS_COLUMN_TIMESTAMP)).isNotNull()
             assertThat(it[1].get(EVM_TX_ERRORS_COLUMN_REQUEST_ID)).isEqualTo(0)
-            assertThat(it[1].get(EVM_TX_ERRORS_COLUMN_RPC_URL)).isEqualTo("http://127.0.0.1:9999")
-            assertThat(it[1].get(EVM_TX_ERRORS_COLUMN_MESSAGE)).isEqualTo("Failed to send transaction 0: Failed to connect to /127.0.0.1:9999")
+            assertThat(it[1].get(EVM_TX_ERRORS_COLUMN_RPC_URL)).isEqualTo("http://127.0.0.1:2")
+            assertThat(it[1].get(EVM_TX_ERRORS_COLUMN_MESSAGE)).isEqualTo("Failed to send transaction 0: Failed to connect to /127.0.0.1:2")
             assertThat(it[1].get(EVM_TX_ERRORS_COLUMN_STACK_TRACE)).isNotNull()
-        }
-
-        withDbErrors(node, evmSubmitTxRellRequest.rowId) {
-
-            assertThat(it.size).isEqualTo(2)
-
-            assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_TIMESTAMP)).isNotNull()
-            assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_RPC_URL)).isEqualTo("http://127.0.0.1:8888")
-            assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_MESSAGE)).isEqualTo("Failed to send transaction 0: Failed to connect to /127.0.0.1:8888")
-
-            assertThat(it[1].get(EVM_TX_ERRORS_COLUMN_TIMESTAMP)).isNotNull()
-            assertThat(it[1].get(EVM_TX_ERRORS_COLUMN_RPC_URL)).isEqualTo("http://127.0.0.1:9999")
-            assertThat(it[1].get(EVM_TX_ERRORS_COLUMN_MESSAGE)).isEqualTo("Failed to send transaction 0: Failed to connect to /127.0.0.1:9999")
         }
 
         // Operation was successfully on 3rd try

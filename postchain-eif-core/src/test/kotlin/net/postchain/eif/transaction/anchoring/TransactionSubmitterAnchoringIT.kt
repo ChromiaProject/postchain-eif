@@ -64,8 +64,6 @@ class TransactionSubmitterAnchoringIT : EifBaseIntegrationTest(
 
         val txSubmitterTestModule = node.getModules(txSubmitterChain).filterIsInstance<TransactionSubmitterAnchoringTestGTXModule>().first()
 
-        txSubmitterTestModule.addGetTransactionStatus(0, RellTransactionStatus.QUEUED)
-
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(nodes.toList(), txSubmitterChain)
             assertStatusOperation(txSubmitterTestModule, 0, RellTransactionStatus.SUCCESS)

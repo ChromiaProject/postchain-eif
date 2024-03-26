@@ -2,6 +2,7 @@ package net.postchain.eif.transaction
 
 import assertk.assertThat
 import assertk.assertions.isEqualTo
+import assertk.assertions.isGreaterThan
 import net.postchain.devtools.getModules
 import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.EvmType
@@ -9,7 +10,6 @@ import net.postchain.eif.contracts.Validator
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_ERRORS_COLUMN_MESSAGE
 import org.awaitility.Awaitility
 import org.awaitility.Duration
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.testcontainers.junit.jupiter.Testcontainers
@@ -48,12 +48,12 @@ class TransactionSubmitterStartupIT : EifBaseIntegrationTest(
 
         val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
 
-        txSubmitterTestModule.addGetTransactionStatus(0, RellTransactionStatus.QUEUED)
+        txSubmitterTestModule.addTransaction(mkEvmSubmitTxRellRequest(0, contractAddress, RellTransactionStatus.TAKEN))
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
-            assertTrue(txSubmitterTestModule.conf.queue.isEmpty())
-            assertStatusOperation(txSubmitterTestModule, 0, RellTransactionStatus.PENDING)
+            assertTransactionsByStatus(txSubmitterTestModule, RellTransactionStatus.QUEUED, 1)
+            assertStatusOperation(txSubmitterTestModule, 0, RellTransactionStatus.QUEUED)
         }
     }
 
@@ -62,21 +62,13 @@ class TransactionSubmitterStartupIT : EifBaseIntegrationTest(
 
         val node = createNodes(1, "/net/postchain/eif/transaction/blockchain_config_pending.xml")[0]
 
-        val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
-
-        txSubmitterTestModule.addGetTransactionStatus(0, RellTransactionStatus.PENDING)
-        txSubmitterTestModule.addGetPendingTransactions(mkEvmPendingRellTx(
-            "tx-hash",
-            contractAddress,
-        ))
-
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
 
             // It will fail since the transaction is not actually submitted
             withDbErrors(node, 0) {
-                assertThat(it.size).isEqualTo(1)
-                assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_MESSAGE)).isEqualTo("Failed to poll for receipt for request id 0")
+                assertThat(it.size).isGreaterThan(1)
+                assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_MESSAGE)).isEqualTo("Failed to poll for receipt for request id 0: Failed to send web3j request to all 1 nodes")
             }
         }
     }

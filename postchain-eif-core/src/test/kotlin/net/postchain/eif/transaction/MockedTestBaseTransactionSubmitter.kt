@@ -205,21 +205,21 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
         gasProvider: ContractGasProvider
     ): TransactionSubmitter {
         return TransactionSubmitter(
-            web3jRequestHandler,
-            transactionManagers,
-            gasProvider,
-            databaseOperations,
-            storage,
-            0,
-            0,
-            Long.MAX_VALUE,
-            LinkedBlockingQueue(),
-            BigInteger.valueOf(10),
-            Long.MAX_VALUE,
-            24 * 60 * 60000,
-            1000 * 60 * 4,
-            5,
-            0
+                web3jRequestHandler,
+                transactionManagers,
+                gasProvider,
+                databaseOperations,
+                storage,
+                0,
+                0,
+                Long.MAX_VALUE,
+                LinkedBlockingQueue(),
+                BigInteger.valueOf(10),
+                -1,
+                24 * 60 * 60000,
+                1000 * 60 * 4,
+                5,
+                0
         )
     }
 }

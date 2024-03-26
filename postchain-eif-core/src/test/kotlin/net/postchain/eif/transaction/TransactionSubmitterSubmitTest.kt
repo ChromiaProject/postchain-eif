@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
@@ -105,7 +106,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
 
         val exception = assertThrows<RuntimeException>("Expected thrown exception") {
             ts.submitTransaction(
-                    mkEvmSubmitTxRequest()
+                    mkEvmSubmitTxRequest(4)
             )
         }
         assertThat(exception.message).isEqualTo("Max fee per gas 4 for tx exceeds limit of 3")
@@ -143,7 +144,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
 
         val exception = assertThrows<RuntimeException>("Expected thrown exception") {
             ts.submitTransaction(
-                mkEvmSubmitTxRequest()
+                mkEvmSubmitTxRequest(4)
             )
         }
         assertThat(exception.message).isEqualTo("Failed to send transaction to all 1 nodes")
@@ -189,7 +190,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
 
         val exception = assertThrows<RuntimeException>("Expected thrown exception") {
             ts.submitTransaction(
-                mkEvmSubmitTxRequest()
+                mkEvmSubmitTxRequest(4)
             )
         }
         assertThat(exception.message).isEqualTo("Failed to send transaction to all 2 nodes")
@@ -223,19 +224,4 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
             anyString()
         )
     }
-
-    private fun mkEvmSubmitTxRequest() = EvmSubmitTxRequest(
-        EvmSubmitTxRellRequest(
-            0L,
-            "",
-            "function_name",
-            listOf(),
-            listOf(),
-            0L,
-            BigInteger.ONE,
-            BigInteger.valueOf(4),
-            "".toByteArray(),
-            System.currentTimeMillis()
-        )
-    )
 }
