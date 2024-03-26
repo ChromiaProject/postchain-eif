@@ -46,14 +46,31 @@ test:
           contract: "anchoring_contract"
 
 blockchains:
+  event_receiver:
+    module: event_receiver
+    config:
+      gtx:
+        modules:
+          - "net.postchain.eif.EifGTXModule"
+          - "net.postchain.d1.icmf.IcmfSenderGTXModule"
+      sync_ext:
+        - "net.postchain.eif.EifSynchronizationInfrastructureExtension"
   eif:
     module: main
     config:
       gtx:
-        modules: ['net.postchain.eif.EifGTXModule']
+        modules:
+          - "net.postchain.eif.EifGTXModule"
+          - "net.postchain.d1.icmf.IcmfReceiverGTXModule"
+      sync_ext:
+        - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"
       eif:
         <<: *eif_test
-      sync_ext: ['net.postchain.eif.EifSynchronizationInfrastructureExtension']
+      icmf:
+        receiver:
+          local:
+            - topic: L_evm_block_events
+              bc-rid: x"0000000000000000000000000000000000000000000000000000000000000000"
     moduleArgs:
       <<: *common_args
       <<: *rell_test_args

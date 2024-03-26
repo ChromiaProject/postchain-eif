@@ -1,12 +1,20 @@
 @test module;
 
-import main: eif.main;
-import th_eif: eif.test_helper;
-import evm: eif.evm;
-import ft: eif.ft4;
-import c: eif.common;
-import ft_auth: lib.ft4.auth;
-import admin: lib.ft4.admin;
-import ac: lib.ft4.accounts;
-import assets: lib.ft4.assets;
-import lib.ft4.accounts.{auth_descriptor, auth_type};
+// libs
+import lib.icmf.test.{ test_icmf_message };
+import lib.ft4.auth;
+import lib.ft4.admin;
+import lib.ft4.accounts;
+import lib.ft4.assets;
+import lib.ft4.accounts.{ auth_descriptor, auth_type };
+
+// event_receiver
+import ^^.event_receiver.messaging.*;
+import ^^.event_receiver.queries.*;
+import ^^.event_receiver.test.helpers.*;
+
+// eif
+import eif.main;
+import eif.evm;
+import eif.ft4;
+import eif.common;

@@ -732,6 +732,6 @@ abstract class EifIntegrationTest(evmType: EvmType) : EifBaseIntegrationTest(
     }
 
     private fun loadEifBlockchainConfig(): Gtv = GtvMLParser.parseGtvML(
-            javaClass.getResource("/net/postchain/eif/eif.xml")!!.readText()
+            javaClass.getResource("/net/postchain/eif/blockchain_config_it.xml")!!.readText()
     )
 }
