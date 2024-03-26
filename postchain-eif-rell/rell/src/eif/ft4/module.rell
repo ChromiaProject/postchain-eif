@@ -81,6 +81,15 @@ operation add_new_token_mapping(network_id: integer, token_address: byte_array, 
         empty(token_mapping @? { token }),
         "Token was already mapped: " + token_address
     );
+    require(
+        not token
+            .mass_exit_support or token_mapping @* {
+            asset
+        } (
+            @sum 1
+        )[0] == 0,
+        "Token must have mass exit support disabled for many to one mapping"
+    );
 
     create token_mapping ( token, asset );
 }
