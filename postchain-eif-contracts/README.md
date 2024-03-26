@@ -105,3 +105,78 @@ yarn upgrade:nft --network goerli --verify --address PROXY_ADDRESS
 ```sh
 yarn import:bridge --network goerli --address PROXY_ADDRESS
 ```
+
+## Admin operations
+
+### Token Bridge
+
+`renounceOwnership()`
+- Renounce ownership is not allowed.
+
+`setBlockchainRid(bytes32 rid)`
+- Sets blockchain rid.
+    
+`pause()`
+- Triggers stopped state.
+- Requirements: The contract must not be paused.
+
+`unpause()`
+- Returns to normal state.
+- Requirements: The contract must be paused.
+
+`allowToken(IERC20 token)`
+- Allows token.
+
+`triggerMassExit(uint height, bytes32 blockRid)`
+- Triggers mass exit.
+
+`postponeMassExit()` 
+- Postpone mass exit. 
+- Requirements: Mass exit state.
+
+`updateMassExitBlock(uint height, bytes32 blockRid)` 
+- Updates mass exit block.
+- Requirements: Mass exit state.
+
+`pendingWithdraw(bytes32 _hash)`
+- Blocks the withdrawal request by changing its status from `Withdrawable` to `Pending`.
+- Requirements: Withdraw request status to be `Withdrawable`.
+
+`unpendingWithdraw(bytes32 _hash)`
+- Unblocks the withdrawal request by changing its status from `Pending` to `Withdrawable`.
+- Requirements: Withdraw request status to be `Pending`.
+
+`fund(IERC20 token, uint256 amount)`
+- Admin funds `amount` of `token` to bridge.
+- Requirements: `token` to be allowed.
+
+`emergencyWithdraw(IERC20 token, address payable beneficiary)`
+- Transfer all of `token` balance of admin/owner to the `beneficiary` after a specific period of time.
+
+### Validator
+
+`updateValidators(address[] _validators)`
+- Update validator list.
+
+### Migration.sol
+
+`renounceOwnership()`
+- Renounce ownership is not allowed.
+
+`transferValidatorOwnership(address newOwner)`
+- Transfer ownership to `newOwner`.
+
+`acceptValidatorOwnership()`
+- Accept validator ownership.
+
+`withdrawRequest(
+address[] _oldValidators,
+address[] _newValidators,
+bytes _event,
+Data.Proof eventProof,
+bytes blockHeader,
+bytes[] sigs,
+address[] signers,
+Data.ExtraProofData extraProof
+)`
+- Request withdraw using `oldValidators`.
