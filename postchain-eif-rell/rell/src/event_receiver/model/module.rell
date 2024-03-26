@@ -1,0 +1,18 @@
+module;
+
+entity evm_block {
+    network_id: integer;
+    evm_block_height: integer;
+    evm_block_hash: byte_array;
+    key network_id, evm_block_height, evm_block_hash;
+}
+
+entity evm_event {
+    index evm_block;
+    tnx_hash: byte_array;
+    log_index: integer;
+    event_signature: byte_array;
+    contract_address: byte_array;
+    indexed_values: byte_array;
+    non_indexed_values: byte_array;
+}
