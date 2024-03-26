@@ -35,6 +35,7 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
                 "Oh dear"
             )
         }
+        mockWeb3jRequest(web3jRequestHandler, EthGetTransactionReceipt::class, mockTransactionReceiptResponse(5, true))
 
         mockWeb3jRequest(web3jRequestHandler, EthBlockNumber::class, blockNumber)
 

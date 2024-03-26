@@ -6,6 +6,7 @@ import assertk.assertions.isEqualTo
 import net.postchain.base.data.DatabaseAccess
 import net.postchain.base.withReadConnection
 import net.postchain.common.BlockchainRid
+import net.postchain.common.toHex
 import net.postchain.devtools.PostchainTestNode
 import net.postchain.devtools.PostchainTestNode.Companion.DEFAULT_CHAIN_IID
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_ERRORS_COLUMN_REQUEST_ID
@@ -183,7 +184,7 @@ fun mkEvmPendingDbTx(blockNumber: Long? = null) = EvmPendingTx(
     "functionName",
     listOf("address[]"),
     listOf(GtvFactory.gtv(listOf(GtvFactory.gtv(ByteArray(20) { 1 })))),
-    "txHash",
+    "0x" + ByteArray(32){123}.toHex(),
     System.currentTimeMillis(),
     blockNumber = blockNumber?.let { BigInteger.valueOf(blockNumber) })
 

@@ -68,7 +68,7 @@ class TransactionSubmitterStartupIT : EifBaseIntegrationTest(
             // It will fail since the transaction is not actually submitted
             withDbErrors(node, 0) {
                 assertThat(it.size).isGreaterThan(1)
-                assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_MESSAGE)).isEqualTo("Failed to poll for receipt for request id 0")
+                assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_MESSAGE)).isEqualTo("Failed to poll for receipt for request id 0: Failed to send web3j request to all 1 nodes")
             }
         }
     }

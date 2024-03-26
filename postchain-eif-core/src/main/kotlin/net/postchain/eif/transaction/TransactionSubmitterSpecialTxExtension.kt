@@ -122,8 +122,8 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
                         acceptable
                     }
-                    if (txStatusMatchesThisNode == null || txStatusMatchesThisNode == false) {
-                        logger.warn { "Validation failed. Transaction $requestId can not be set to status ${newTxStatus} because the status can't be approved by this node" }
+                    if (txStatusMatchesThisNode != true) {
+                        logger.warn { "Validation failed. Transaction $requestId can not be set to status $newTxStatus because the status can't be approved by this node" }
                         return false
                     }
 
@@ -165,9 +165,10 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         transactionSubmitters.values.forEach { txSubmitter ->
 
             // Transaction status updates
-            txSubmitter.getSubmitTxUpdates().forEach { (rowId, result) ->
+            val submitTxUpdates = txSubmitter.getSubmitTxUpdates()
+            submitTxUpdates.forEach { result ->
                 operations.add(
-                    buildTxUpdateOp(rowId, result.status, result.txHash)
+                    buildTxUpdateOp(result.requestId, result.status, result.txHash)
                 )
 
                 // Status QUEUE can be set multiple times due to retry - add a no op for them
@@ -177,11 +178,11 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
                 // We have processed this TX - cleanup
                 if (result.status != RellTransactionStatus.TAKEN) {
-                    txSubmitter.setSubmitBCPersisted(bctx, rowId)
+                    txSubmitter.setSubmitBCPersisted(bctx, result.requestId)
                 }
             }
 
-            bctx.addAfterCommitHook { txSubmitter.clearSubmitTxUpdates() }
+            bctx.addAfterCommitHook { txSubmitter.clearSubmitTxUpdates(submitTxUpdates) }
 
             txSubmitter.getVerifiedTransactions(txVerificationTime).forEach {
 

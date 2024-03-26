@@ -19,7 +19,7 @@ import net.postchain.core.Storage
 import net.postchain.eif.GtvToTypeMapper
 import net.postchain.eif.Web3jRequestHandler
 import net.postchain.gtv.Gtv
-import okhttp3.internal.toImmutableMap
+import okhttp3.internal.toImmutableList
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.TypeReference
 import org.web3j.abi.datatypes.Function
@@ -33,6 +33,7 @@ import org.web3j.utils.Numeric
 import java.math.BigInteger
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
@@ -78,7 +79,7 @@ class TransactionSubmitter(
     private val healthy = AtomicBoolean(true)
     private val queue = LinkedBlockingQueue<EvmSubmitTxRequest>()
     private val pendingTransactions = ConcurrentHashMap<String, EvmPendingTx>()
-    private val submitTxUpdates = ConcurrentHashMap<Long, EvmSubmitTransactionResult>()
+    private val submitTxUpdates: MutableList<EvmSubmitTransactionResult> = Collections.synchronizedList(mutableListOf())
 
     init {
 
@@ -95,8 +96,7 @@ class TransactionSubmitter(
                 // Transaction submitted but status not yet persisted to BC
 
                 logger.info { "Adding transaction ${txSubmit.rowId} to the status update queue to be set to ${RellTransactionStatus.PENDING}" }
-                submitTxUpdates[txSubmit.rowId] =
-                    EvmSubmitTransactionResult(RellTransactionStatus.PENDING, txSubmit.txHash!!)
+                submitTxUpdates.add(EvmSubmitTransactionResult(txSubmit.rowId, RellTransactionStatus.PENDING, txSubmit.txHash!!))
             }
         }
 
@@ -109,7 +109,7 @@ class TransactionSubmitter(
                             submitTransaction(txToSubmit)
                         } catch (e: Exception) {
                             logger.error("Failed to submit EVM transaction: ${e.message}", e)
-                            submitTxUpdates[txToSubmit.rowId] = EvmSubmitTransactionResult(RellTransactionStatus.QUEUED)
+                            submitTxUpdates.add(EvmSubmitTransactionResult(txToSubmit.rowId, RellTransactionStatus.QUEUED))
                         }
                     } catch (e: CancellationException) {
                         break
@@ -238,7 +238,7 @@ class TransactionSubmitter(
         if (txPending.blockNumber == null) {
             logger.info { "Fetching receipt for pending transaction ${txPending.rowId} / ${txPending.txHash}" }
 
-            val txReceiptResult = fetchTransactionReceipt(txPending.txHash, txPending)
+            val txReceiptResult = fetchTransactionReceipt(txPending.txHash, txPending.rowId)
 
             if (txReceiptResult != null && txReceiptResult.transactionReceipt.isPresent) {
 
@@ -251,14 +251,11 @@ class TransactionSubmitter(
 
         val blocksSinceReceipt = currentBlockHeight.minus(txPending.blockNumber!!).longValueExact()
         if (blocksSinceReceipt >= nodeTxVerificationEvmBlocks) {
-            // Verify transaction structure
-            if (verifyTxStructure(txPending)) return
-
             if (txReceipt == null) {
                 logger.info { "Re-fetching receipt for pending transaction ${txPending.rowId}" }
 
                 // Re-fetch receipt
-                val txReceiptResult = fetchTransactionReceipt(txPending.txHash, txPending)
+                val txReceiptResult = fetchTransactionReceipt(txPending.txHash, txPending.rowId)
 
                 if (txReceiptResult != null && txReceiptResult.transactionReceipt.isPresent) {
                     txReceipt = txReceiptResult.transactionReceipt.get()
@@ -269,12 +266,17 @@ class TransactionSubmitter(
             }
 
             if (txReceipt != null) {
-                if (verifyTxReceipt(txReceipt, txPending, currentBlockHeight)) return
+
+                verifyTxStructure(txPending)
+
+                if (!txPending.status.isCompleted()) {
+                    verifyTxReceipt(txReceipt, txPending, currentBlockHeight)
+                }
             }
         }
     }
 
-    fun checkTransactionTimeout(txPending: EvmPendingTx) {
+    private fun checkTransactionTimeout(txPending: EvmPendingTx) {
         if (!txPending.status.isCompleted()) {
             try {
                 isTimeout(txPending.rowId, txPending.created, nodeTxVerificationTimeout)
@@ -290,7 +292,7 @@ class TransactionSubmitter(
                     )
                     true
                 }
-                submitTxUpdates[txPending.rowId] = EvmSubmitTransactionResult(RellTransactionStatus.QUEUED)
+                submitTxUpdates.add(EvmSubmitTransactionResult(txPending.rowId, RellTransactionStatus.QUEUED))
                 return
             }
         }
@@ -300,14 +302,14 @@ class TransactionSubmitter(
         txReceipt: TransactionReceipt,
         txPending: EvmPendingTx,
         currentBlockHeight: BigInteger
-    ): Boolean {
+    ) {
 
         logger.info { "Verify receipt of transaction ${txPending.rowId}" }
 
         if (txReceipt.blockNumber != txPending.blockNumber) {
             // Some kind of re-org happened, store the new block number and return, will be polled again
             txPending.blockNumber = txReceipt.blockNumber
-            return true
+            return
         }
 
         txPending.status = if (txReceipt.isStatusOK) PendingTxStatus.SUCCESS else PendingTxStatus.REVERTED
@@ -318,7 +320,6 @@ class TransactionSubmitter(
 
         if (txPending.status == PendingTxStatus.REVERTED) {
             withWriteConnection(storage, chainId) {
-
                 databaseOperations.recordTransactionError(
                     it,
                     txPending.rowId,
@@ -330,10 +331,9 @@ class TransactionSubmitter(
         }
 
         logger.info { "Pending transaction ${txPending.rowId} verified at block number $currentBlockHeight: ${txPending.status} - block hash: ${txPending.blockHash}, effective gas price ${txPending.effectiveGasPrice}, gas usage: ${txPending.gasUsed}" }
-        return false
     }
 
-    private fun verifyTxStructure(txPending: EvmPendingTx): Boolean {
+    private fun verifyTxStructure(txPending: EvmPendingTx) {
 
         logger.info { "Verify structure of transaction ${txPending.rowId}" }
 
@@ -359,29 +359,27 @@ class TransactionSubmitter(
                     )
                     true
                 }
-                return true
             }
         }
-        return false
     }
 
-    private fun fetchTransactionReceipt(txHash: String, txPending: EvmPendingTx) =
+    private fun fetchTransactionReceipt(txHash: String, rowId: Long) =
         try {
             web3jRequestHandler.sendWeb3jRequest { it.ethGetTransactionReceipt(txHash) }
         } catch (e: Exception) {
-            val errorMessage = "Failed to poll for receipt for request id ${txPending.rowId}"
+            val errorMessage = "Failed to poll for receipt for request id $rowId: ${e.message}"
             logger.error(e) { errorMessage }
             withWriteConnection(storage, chainId) {
                 databaseOperations.recordTransactionError(
                     it,
-                    txPending.rowId,
+                    rowId,
                     null,
                     errorMessage,
                     e.stackTraceToString()
                 )
                 true
             }
-            null
+            throw ProgrammerMistake(errorMessage, e)
         }
 
     internal fun submitTransaction(transactionRequest: EvmSubmitTxRequest) {
@@ -429,7 +427,7 @@ class TransactionSubmitter(
             true
         }
 
-        val baseFeePerGas = getBaseFeePerGas();
+        val baseFeePerGas = getBaseFeePerGas()
 
         if (txRequest.maxFeePerGas < baseFeePerGas) {
             throw UserMistake("Max fee per gas less than block base fee. maxFeePerGas: ${txRequest.maxFeePerGas} baseFeePerGas: $baseFeePerGas")
@@ -487,8 +485,7 @@ class TransactionSubmitter(
                     databaseOperations.recordTransactionHash(it, txRequest.rowId, response.transactionHash)
                 }
 
-                submitTxUpdates[txRequest.rowId] =
-                    EvmSubmitTransactionResult(RellTransactionStatus.PENDING, response.transactionHash)
+                submitTxUpdates.add(EvmSubmitTransactionResult(txRequest.rowId, RellTransactionStatus.PENDING, response.transactionHash))
 
                 logger.info { "Transaction ${txRequest.rowId} submitted successfully" }
 
@@ -549,7 +546,7 @@ class TransactionSubmitter(
         val baseFeePerGas = web3jRequestHandler.sendWeb3jRequest {
             it.ethGetBlockByNumber(DefaultBlockParameter.valueOf(blockNumber), false)
         }.block.baseFeePerGas
-        return baseFeePerGas;
+        return baseFeePerGas
     }
 
     fun enqueue(evmSubmitTxRellRequest: EvmSubmitTxRequest) {
@@ -560,12 +557,12 @@ class TransactionSubmitter(
         queue.offer(evmSubmitTxRellRequest)
     }
 
-    fun getSubmitTxUpdates(): Map<Long, EvmSubmitTransactionResult> {
-        return submitTxUpdates.toImmutableMap()
+    fun getSubmitTxUpdates(): List<EvmSubmitTransactionResult> {
+        return submitTxUpdates.toImmutableList()
     }
 
-    fun clearSubmitTxUpdates() {
-        submitTxUpdates.clear()
+    fun clearSubmitTxUpdates(updatesToRemove: List<EvmSubmitTransactionResult>) {
+        this.submitTxUpdates.removeAll(updatesToRemove)
     }
 
     // One for submitting and one for polling?
