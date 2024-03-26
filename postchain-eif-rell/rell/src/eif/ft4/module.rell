@@ -497,7 +497,7 @@ function(
 }
 
 function update_account_state(accounts.account, assets.asset) {
-    val token = token_mapping @? { .asset == asset } ( .token );
+    val token = token_mapping @? { .asset == asset } ( .token ) limit 1;
     if (empty(token) or not(token.mass_exit_support)) {
         return;
     }
