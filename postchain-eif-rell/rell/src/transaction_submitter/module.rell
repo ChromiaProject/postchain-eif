@@ -4,6 +4,7 @@ import .utils.messaging.*;
 import .utils.*;
 
 import lib.icmf.*;
+import lib.icmf.receiver.{ receive_icmf_message };
 
 function timeout_evm_transactions() {
     val timeout_timestamp = get_last_blocktime() - chain_context.args.tx_timeout;
@@ -13,8 +14,11 @@ function timeout_evm_transactions() {
     }
 }
 
-operation __icmf_message(sender: byte_array, topic: text, body: gtv) {
-    create_evm_submit_transaction(evm_submit_transaction_message.from_gtv(body), sender);
+@extend(receive_icmf_message)
+function handle_icmf_message(sender: byte_array, topic: text, body: gtv) {
+    if (topic == evm_submit_transaction_topic) {
+        create_evm_submit_transaction(evm_submit_transaction_message.from_gtv(body), sender);
+    }
 }
 
 operation __update_evm_transaction_status(row_id: integer, status: transaction_status, tx_hash: text?, signer: pubkey, signed_row_id: byte_array) {
