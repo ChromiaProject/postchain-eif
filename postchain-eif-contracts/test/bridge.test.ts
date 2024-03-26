@@ -54,19 +54,28 @@ describe("Token Bridge Test", () => {
     const validatorContract = await validatorFactory.deploy([validator1.address, validator2.address]);
     validatorAddress = validatorContract.address;
 
-    const dailyLimitFactory = new DailyLimit__factory(admin);
-    const dailyLimitContract = await dailyLimitFactory.deploy(DAILY_LIMIT);
-    dailyLimitAddress = dailyLimitContract.address;
+    // Preserve bridgeDelegator deployment order, needed for `Withdraw via smart contract` test suite
+    const { getContractAddress } = require('@ethersproject/address');
+    const transactionCount = await admin.getTransactionCount();
+    const futureTransactionCount = transactionCount + 4;
+    const futureDailyLimitAddress = getContractAddress({
+      from: admin.address,
+      nonce: futureTransactionCount
+    })
 
     const bridgeFactory = new TokenBridge__factory(admin);
-    const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_OFFSET, dailyLimitAddress]);
+    const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_OFFSET, futureDailyLimitAddress]);
     bridgeAddress = bridge.address;
-
-    dailyLimitContract.setParentContract(bridgeAddress);
 
     const bridgeDelegatorFactory = new TokenBridgeDelegator__factory(deployer);
     const bridgeDelegator = await bridgeDelegatorFactory.deploy(bridgeAddress);
     bridgeDelegatorAddress = bridgeDelegator.address;
+
+    const dailyLimitFactory = new DailyLimit__factory(admin);
+    const dailyLimitContract = await dailyLimitFactory.deploy(DAILY_LIMIT);
+    dailyLimitAddress = dailyLimitContract.address;
+    expect(dailyLimitAddress).to.eq(ethers.utils.getAddress(futureDailyLimitAddress));
+    await dailyLimitContract.setParentContract(bridgeAddress);
 
     const migrationFactory = new Migration__factory(admin);
     const migration = await migrationFactory.deploy(validatorAddress, bridgeAddress);
