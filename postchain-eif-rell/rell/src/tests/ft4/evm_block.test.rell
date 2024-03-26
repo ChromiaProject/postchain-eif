@@ -24,24 +24,24 @@ function test_evm_block() {
         ).sign(admin_privkey).run();
 
     rell.test.tx().op(
-            ft.add_new_evm_erc20(network_id, token_address, token_name, token_symbol, token_decimal)
+            ft4.add_new_evm_erc20(network_id, token_address, token_name, token_symbol, token_decimal)
         ).sign(admin_privkey).run();
 
     rell.test.tx().op(
-            ft.add_new_evm_erc20(network_id2, token_address2, token_name, token_symbol, token_decimal)
+            ft4.add_new_evm_erc20(network_id2, token_address2, token_name, token_symbol, token_decimal)
         ).sign(admin_privkey).run();
 
     rell.test.tx().op(
-            ft.add_new_token_mapping(network_id, token_address, asset_id)
+            ft4.add_new_token_mapping(network_id, token_address, asset_id)
         ).sign(admin_privkey).run();
     rell.test.tx().op(
-            ft.delete_token_mapping(network_id, token_address, asset_id)
+            ft4.delete_token_mapping(network_id, token_address, asset_id)
         ).sign(admin_privkey).run();
     rell.test.tx().op(
-            ft.add_new_token_mapping(network_id, token_address, asset_id)
+            ft4.add_new_token_mapping(network_id, token_address, asset_id)
         ).sign(admin_privkey).nop().run();
     rell.test.tx().op(
-            ft.add_new_token_mapping(network_id2, token_address2, asset_id)
+            ft4.add_new_token_mapping(network_id2, token_address2, asset_id)
         ).sign(admin_privkey).nop().run();
 
     val auth_descriptor = auth_descriptor(
@@ -60,7 +60,7 @@ function test_evm_block() {
     );
 
     rell.test.tx().op(
-            evm.register_account(user_evm_address, auth, sig)
+            evm.register_account(user_evm_address, auth_descriptor, sig)
         ).sign(user_privkey).run();
 
     val ft_asset = assets.asset @ { .id == asset_id };
