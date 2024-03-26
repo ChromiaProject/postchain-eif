@@ -78,7 +78,7 @@ operation add_new_token_mapping(network_id: integer, token_address: byte_array, 
     );
 
     require(
-        empty(token_mapping @? { token, asset }),
+        empty(token_mapping @? { token }),
         "Token was already mapped: " + token_address
     );
 
