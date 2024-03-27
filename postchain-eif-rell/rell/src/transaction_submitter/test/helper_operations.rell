@@ -6,13 +6,13 @@ operation create_evm_submit_transaction_operation(evm_submit_transaction_message
     create_evm_submit_transaction(evm_submit_transaction_message, sender);
 }
 
-operation create_evm_submit_transaction_op(contract_address: text, function_name: text){
+operation create_evm_submit_transaction_op(contract_address: text, function_name: text, network_id: integer = 1){
     create_evm_submit_transaction(evm_submit_transaction_message(
         contract_address = contract_address,
         function_name = function_name,
         parameter_types = list(),
         parameter_values = list(),
-        network_id = 1,
+        network_id = network_id,
         max_priority_fee_per_gas = 1,
         max_fee_per_gas = 4000000000), x"");
 }
@@ -45,14 +45,14 @@ operation fail_transactions_with_enough_retries_op(node_retry_strategy) {
     fail_transactions_with_enough_retries(node_retry_strategy);
 }
 
-operation create_test_evm_submit_transaction(id: byte_array, contract_address: text, function_name: text, status: transaction_status, timestamp: timestamp) {
+operation create_test_evm_submit_transaction(id: byte_array, contract_address: text, function_name: text, status: transaction_status, timestamp: timestamp, network_id: integer = 1) {
     create evm_submit_transaction (
         id = id,
         contract_address = contract_address,
         function_name = function_name,
         parameter_types = "",
         parameter_values = list<text>().to_gtv().to_bytes(),
-        network_id = 1,
+        network_id = network_id,
         currency_symbol = "ETH",
         max_priority_fee_per_gas = 1,
         max_fee_per_gas = 4000000000,
@@ -64,4 +64,8 @@ operation create_test_evm_submit_transaction(id: byte_array, contract_address: t
 
 operation timeout_evm_transactions_op(){
     timeout_evm_transactions();
+}
+
+operation bridge_mapping_message_op(bridge_mapping_message) {
+    handle_bridge_mapping_message(x"", bridge_mapping_topic, bridge_mapping_message.to_gtv());
 }

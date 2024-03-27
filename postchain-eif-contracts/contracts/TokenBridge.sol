@@ -222,7 +222,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         require(blockchainRid != bytes32(0), "TokenBridge: blockchain rid is not set");
         require(_events[eventProof.leaf] == false, "TokenBridge: event hash was already used");
         {
-            (uint height, bytes32 blockRid, bytes32 eventRoot, ) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
+            require(Hash.hashGtvBytes64Leaf(extraProof.leaf) == extraProof.hashedLeaf, "Postchain: invalid EIF extra data");
+            (uint height, bytes32 blockRid) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
+            bytes32 eventRoot = _bytesToBytes32(extraProof.leaf, 0);
             if (isMassExit) {
                 require(height <= massExitBlock.height, "TokenBridge: cannot withdraw request after the mass exit block height");
             }
@@ -293,7 +295,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     ) whenMassExit whenNotPaused nonReentrant public  {
         require(_snapshots[stateProof.leaf] == false, "TokenBridge: snapshot already used");
         require(stateProof.leaf == keccak256(snapshot), "TokenBridge: snapshot data is not correct");
-        (uint height, bytes32 blockRid, , bytes32 stateRoot) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
+        require(Hash.hashGtvBytes64Leaf(extraProof.leaf) == extraProof.hashedLeaf, "Postchain: invalid EIF extra data");
+        (uint height, bytes32 blockRid) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
+        bytes32 stateRoot = _bytesToBytes32(extraProof.leaf, 32);
         require(blockRid == massExitBlock.blockRid && height == massExitBlock.height, "TokenBridge: snapshot block should be the same with mass exit block");
         if (!validator.isValidSignatures(blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
         if (!MerkleProof.verify(stateProof.merkleProofs, stateProof.leaf, stateProof.position, stateRoot)) revert("TokenBridge: invalid merkle proof");
@@ -346,6 +350,15 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         if (tokenBalance > 0) {
             token.safeTransfer(beneficiary, tokenBalance);
         }
+    }
+
+    function _bytesToBytes32(bytes memory b, uint offset) internal pure returns (bytes32) {
+        bytes32 out;
+
+        for (uint i = 0; i < 32; i++) {
+            out |= bytes32(b[offset + i] & 0xFF) >> (i * 8);
+        }
+        return out;
     }
 }
 

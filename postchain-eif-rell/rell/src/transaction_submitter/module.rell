@@ -1,4 +1,5 @@
 import .anchoring.*;
+import .signer_update.*;
 
 import .utils.messaging.*;
 import .utils.*;
@@ -89,11 +90,17 @@ enum node_retry_strategy {
 }
 
 struct module_args {
-    contract_whitelist: text;
+    genesis_node: byte_array;
+    system_chain_bridges: gtv;
+    directory_chain_config: gtv;
+    system_anchoring_chain_config: gtv?;
     contract_tx_rate_limit: big_integer;
     tx_timeout: big_integer;
     node_retry_strategy;
     network_configs: gtv = list<network_config>().to_gtv();
+    manual_admins: gtv;
+    system_max_priority_fee_per_gas: integer;
+    system_max_fee_per_gas: integer;
 }
 
 struct network_config {
@@ -102,10 +109,11 @@ struct network_config {
 }
 
 function create_evm_submit_transaction(evm_submit_transaction_message: evm_submit_transaction_message, sender: byte_array) {
-    val contract_whitelist = get_contract_whitelist();
+    val mapped_bridge_contract = get_bridge_contract(sender, evm_submit_transaction_message.network_id);
     val contract_address = evm_submit_transaction_message.contract_address;
-    if (not contract_whitelist.contains(contract_address)) {
-        log("Contract %s is not included in whitelist. Ignoring tx request.".format(contract_address));
+    if (mapped_bridge_contract == null or contract_address != mapped_bridge_contract) {
+        log("Contract %s does not match mapped contract %s for blockchain. Ignoring tx request."
+            .format(contract_address, mapped_bridge_contract));
         return;
     }
 
@@ -121,7 +129,7 @@ function create_evm_submit_transaction(evm_submit_transaction_message: evm_submi
     );
 }
 
-function add_transaction_to_queue(contract_address: text, function_name: text, parameter_types: list<text>, parameter_values: list<gtv>, network_id: integer, max_priority_fee_per_gas: big_integer, max_fee_per_gas: big_integer, sender: byte_array) {
+function add_transaction_to_queue(contract_address: text, function_name: text, parameter_types: list<text>, parameter_values: list<gtv>, network_id: integer, max_priority_fee_per_gas: big_integer, max_fee_per_gas: big_integer, sender: byte_array): evm_submit_transaction {
     val evm_transaction_id = get_evm_transaction_id(
         contract_address,
         function_name,
@@ -132,7 +140,7 @@ function add_transaction_to_queue(contract_address: text, function_name: text, p
 
     var currency_symbol = get_currency_symbol(network_id);
 
-    create evm_submit_transaction(
+    return create evm_submit_transaction(
         id = evm_transaction_id,
         contract_address = contract_address,
         function_name = function_name,
@@ -298,8 +306,6 @@ function join_text_list(components: list<text>) {
     return result;
 }
 
-function get_contract_whitelist() = chain_context.args.contract_whitelist.split(",");
-
 function get_last_blocktime() {
     return block @ {} (@max .timestamp) ?: 0;
 }
@@ -345,10 +351,19 @@ function update_evm_transaction_status(row_id: integer, status: transaction_stat
                     cost = transaction.gas_usage * transaction.effective_gas_price,
                     currency_symbol = transaction.currency_symbol).to_gtv());
         }
+        on_transaction_completed(transaction, status);
     }
 
     transaction.status = status;
 }
+
+function get_default_signers() = [chain_context.args.genesis_node];
+
+function get_manual_admins() = set<byte_array>.from_gtv(chain_context.args.manual_admins);
+
+function get_system_max_priority_fee_per_gas() = chain_context.args.system_max_priority_fee_per_gas;
+
+function get_system_max_fee_per_gas() = chain_context.args.system_max_fee_per_gas;
 
 struct evm_transaction_submitter_cost {
     id: byte_array;
@@ -363,3 +378,5 @@ function extract_number_of_signers_from_current_configuration(): integer {
     val config = map<text, gtv>.from_gtv(chain_context.raw_config);
     return list<byte_array>.from_gtv(config["signers"]).size();
 }
+
+@extendable function on_transaction_completed(transaction: evm_submit_transaction, status: transaction_status) {}

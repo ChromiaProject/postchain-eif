@@ -14,8 +14,9 @@ import net.postchain.eif.encodeBlockHeaderDataForEVM
 import net.postchain.eif.encodeSignatureWithV
 import net.postchain.eif.getEthereumAddress
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.ANCHOR_SYSTEM_ANCHORING_BLOCK_OP
-import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.GET_CURRENT_EVM_SYSTEM_ANCHORING_SIGNER_LIST_QUERY
+import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.GET_CURRENT_EVM_SIGNER_LIST_QUERY
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.GET_PREVIOUSLY_ANCHORED_SYSTEM_ANCHORING_BLOCK_HEIGHT_QUERY
+import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.GET_SYSTEM_ANCHORING_BLOCKCHAIN_RID_QUERY
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.SHOULD_ANCHOR_SYSTEM_ANCHORING_BLOCK_QUERY
 import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvEncoder
@@ -43,7 +44,8 @@ class EvmAnchoringValidationTest {
     private val module: GTXModule = mock {
         on { query(mockContext, SHOULD_ANCHOR_SYSTEM_ANCHORING_BLOCK_QUERY, gtv(mapOf())) } doReturn gtv(1)
         on { query(mockContext, GET_PREVIOUSLY_ANCHORED_SYSTEM_ANCHORING_BLOCK_HEIGHT_QUERY, gtv(mapOf())) } doReturn gtv(-1)
-        on { query(mockContext, GET_CURRENT_EVM_SYSTEM_ANCHORING_SIGNER_LIST_QUERY, gtv(mapOf())) } doReturn gtv(listOf(gtv(systemAnchoringSigner.pubKey.data)))
+        on { query(mockContext, GET_CURRENT_EVM_SIGNER_LIST_QUERY, gtv(mapOf("blockchain_rid" to gtv(systemAnchoringBrid)))) } doReturn gtv(listOf(gtv(systemAnchoringSigner.pubKey.data)))
+        on { query(mockContext, GET_SYSTEM_ANCHORING_BLOCKCHAIN_RID_QUERY, gtv(mapOf())) } doReturn gtv(systemAnchoringBrid)
     }
 
     private val sut = EvmAnchoringSpecialTxExtension()
@@ -91,7 +93,7 @@ class EvmAnchoringValidationTest {
     @Test
     fun `Wrong signers`() {
         whenever(module.query(
-                mockContext, GET_CURRENT_EVM_SYSTEM_ANCHORING_SIGNER_LIST_QUERY, gtv(mapOf())
+                mockContext, GET_CURRENT_EVM_SIGNER_LIST_QUERY, gtv("blockchain_rid" to gtv(systemAnchoringBrid))
         )).doReturn(gtv(listOf(gtv(cryptoSystem.generateKeyPair().pubKey.data))))
 
         assertThat(sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(

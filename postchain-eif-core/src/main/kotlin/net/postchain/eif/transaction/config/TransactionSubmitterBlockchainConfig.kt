@@ -2,7 +2,6 @@ package net.postchain.eif.transaction.config
 
 import net.postchain.gtv.mapper.DefaultValue
 import net.postchain.gtv.mapper.Name
-import net.postchain.gtv.mapper.Nullable
 
 data class TransactionSubmitterBlockchainConfig(
         @Name("chains")
@@ -23,8 +22,5 @@ data class TransactionSubmitterBlockchainConfig(
         val txVerificationTime: Long,
         @Name("db_retention_time")                        // Time to keep data in db
         @DefaultValue(1296000000)
-        val dbRetentionTime: Long,
-        @Name("system_anchoring_brid")
-        @Nullable
-        val systemAnchoringBrid: ByteArray?
+        val dbRetentionTime: Long
 )

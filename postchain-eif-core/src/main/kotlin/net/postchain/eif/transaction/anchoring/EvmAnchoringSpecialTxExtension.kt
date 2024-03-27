@@ -10,13 +10,11 @@ import net.postchain.concurrent.util.get
 import net.postchain.core.BlockEContext
 import net.postchain.core.block.BlockQueriesProvider
 import net.postchain.crypto.CryptoSystem
-import net.postchain.crypto.Signature
 import net.postchain.eif.decodeBlockHeaderDataFromEVM
-import net.postchain.eif.decodeEVMEncodedSignature
 import net.postchain.eif.encodeBlockHeaderDataForEVM
 import net.postchain.eif.encodeSignatureWithV
 import net.postchain.eif.getEthereumAddress
-import net.postchain.getBFTRequiredSignatureCount
+import net.postchain.eif.transaction.EvmBlockHeaderValidator
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.merkle.GtvMerkleHashCalculator
 import net.postchain.gtx.GTXModule
@@ -32,12 +30,15 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
     private lateinit var cryptoSystem: CryptoSystem
     private lateinit var hashCalculator: GtvMerkleHashCalculator
 
+    private val evmBlockHeaderValidator = EvmBlockHeaderValidator("Validation of EVM anchoring failed:")
+
     companion object : KLogging() {
         const val ANCHOR_SYSTEM_ANCHORING_BLOCK_OP = "__anchor_system_anchoring_block"
 
         const val SHOULD_ANCHOR_SYSTEM_ANCHORING_BLOCK_QUERY = "should_anchor_system_anchoring_block"
         const val GET_PREVIOUSLY_ANCHORED_SYSTEM_ANCHORING_BLOCK_HEIGHT_QUERY = "get_previously_anchored_system_anchoring_block_height"
-        const val GET_CURRENT_EVM_SYSTEM_ANCHORING_SIGNER_LIST_QUERY = "get_current_evm_system_anchoring_signer_list_query"
+        const val GET_SYSTEM_ANCHORING_BLOCKCHAIN_RID_QUERY = "get_system_anchoring_blockchain_rid"
+        const val GET_CURRENT_EVM_SIGNER_LIST_QUERY = "get_current_evm_signer_list"
     }
 
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
@@ -59,7 +60,10 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
 
             // Since signer updates can take a while to be propagated to EVM side we should validate the witness against the current list
             // This should be a temporary issue but should be highlighted in the logs in case it does not resolve itself
-            if (!verifySignersAgainstCurrentEVMSignerList(getCurrentEVMSignerList(bctx), blockWitness.getSignatures().toList())) return listOf()
+            if (!evmBlockHeaderValidator.verifySignersAgainstCurrentEVMSignerList(getCurrentEVMSignerList(bctx), blockWitness.getSignatures().toList())) {
+                logger.warn("Unable to verify last block witness with signer list on EVM side. Will not attempt to anchor.")
+                return listOf()
+            }
 
             val blockHeaderData = encodeBlockHeaderDataForEVM(lastBlock.header.blockRID, BlockHeaderData.fromBinary(lastBlock.header.rawData), hashCalculator)
             val signatures = blockWitness.getSignatures().map {
@@ -97,6 +101,11 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
             return false
         }
 
+        if (systemAnchoringBrid == null) {
+            logger.warn("Validation failed. Received anchoring op when anchoring is disabled.")
+            return false
+        }
+
         val shouldAnchor = module.query(bctx, SHOULD_ANCHOR_SYSTEM_ANCHORING_BLOCK_QUERY, gtv(mapOf())).asBoolean()
         if (!shouldAnchor) {
             logger.warn("Validation failed. We should not anchor yet")
@@ -118,38 +127,24 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
             return false
         }
 
-        // Now we are satisfied that this is a legit block to anchor, but we should check that the witness data is valid
-        val evmSignatures = anchoringOp.args[1].asArray()
-        val evmSigners = anchoringOp.args[2].asArray()
-        val signatures = try {
-            evmSignatures.mapIndexed { index, data ->
-                decodeEVMEncodedSignature(data.asByteArray(), decodedHeader.blockRid.data, evmSigners[index].asByteArray())
-            }
-        } catch (e: Exception) {
-            logger.warn("Validation failed. Invalid witness data: ${e.message}")
-            return false
-        }
-
-        return verifySignersAgainstCurrentEVMSignerList(getCurrentEVMSignerList(bctx), signatures)
-    }
-
-    private fun getCurrentEVMSignerList(bctx: BlockEContext) =
-            module.query(bctx, GET_CURRENT_EVM_SYSTEM_ANCHORING_SIGNER_LIST_QUERY, gtv(mapOf()))
-                    .asArray()
-                    .map { it.asByteArray() }
-
-    private fun verifySignersAgainstCurrentEVMSignerList(currentEVMSigners: List<ByteArray>, signatures: List<Signature>): Boolean {
-        if (!signatures.map { it.subjectID }.all { signer -> currentEVMSigners.any { signer.contentEquals(it) } }) {
-            logger.warn("All signers are not known on EVM")
-            return false
-        }
-
-        val currentRequiredSignatureCount = getBFTRequiredSignatureCount(currentEVMSigners.size)
-        if (signatures.size < currentRequiredSignatureCount) {
-            logger.warn("Number of signatures ${signatures.size} is less than required amount $currentRequiredSignatureCount")
+        val evmSignatures = anchoringOp.args[1].asArray().map { it.asByteArray() }
+        val evmSigners = anchoringOp.args[2].asArray().map { it.asByteArray() }
+        if (!evmBlockHeaderValidator.verifyEVMSignaturesAndCompareAgainstCurrentEVMSignerList(
+                        decodedHeader,
+                        evmSignatures,
+                        evmSigners,
+                        getCurrentEVMSignerList(bctx)
+                )) {
+            logger.warn("Validation failed. Signature mismatch.")
             return false
         }
 
         return true
     }
+
+    private fun getCurrentEVMSignerList(bctx: BlockEContext) = systemAnchoringBrid?.let {
+        module.query(bctx, GET_CURRENT_EVM_SIGNER_LIST_QUERY, gtv("blockchain_rid" to gtv(it)))
+                    .asArray()
+                    .map { signer -> signer.asByteArray() }
+    } ?: throw ProgrammerMistake("Trying to fetch SAC signers without having blockchain rid")
 }

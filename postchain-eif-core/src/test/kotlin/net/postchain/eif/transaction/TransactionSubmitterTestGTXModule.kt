@@ -11,9 +11,12 @@ import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Comp
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_RECEIPT
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_STATUS
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension
+import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.GET_SYSTEM_ANCHORING_BLOCKCHAIN_RID_QUERY
+import net.postchain.eif.transaction.signerupdate.EvmSignerUpdate
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvEncoder
 import net.postchain.gtv.GtvFactory.gtv
+import net.postchain.gtv.GtvNull
 import net.postchain.gtv.mapper.GtvObjectMapper
 import net.postchain.gtx.GTXOperation
 import net.postchain.gtx.SimpleGTXModule
@@ -33,7 +36,8 @@ data class TransactionSubmitterTestContext(
     val successfulTxs: MutableSet<Long>,
     val queuedTxs: MutableSet<Long>,
     val failedTxs: MutableSet<Long>,
-    val operations: MutableList<ExtOpData>
+    val operations: MutableList<ExtOpData>,
+    val signerUpdates: MutableList<EvmSignerUpdate>
 )
 
 class TransactionSubmitterQueuedTransactionTestGTXModule : TransactionSubmitterTestGTXModule(){
@@ -136,7 +140,7 @@ open class TransactionSubmitterTestGTXModule(
         opOverrides: Map<String, (TransactionSubmitterTestContext, ExtOpData) -> net.postchain.core.Transactor> = mapOf(),
         queryOverrides: Map<String, (TransactionSubmitterTestContext, EContext, Gtv) -> Gtv> = mapOf()
 ) : SimpleGTXModule<TransactionSubmitterTestContext>(
-        TransactionSubmitterTestContext(mutableListOf(), mutableListOf(), mutableSetOf(), mutableSetOf(), mutableSetOf(), mutableSetOf(), mutableListOf()),
+        TransactionSubmitterTestContext(mutableListOf(), mutableListOf(), mutableSetOf(), mutableSetOf(), mutableSetOf(), mutableSetOf(), mutableListOf(), mutableListOf()),
         mapOf(UPDATE_EVM_TRANSACTION_STATUS to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
             ModifyTxStatusOperation(conf, opData)
         }, UPDATE_EVM_TRANSACTION_RECEIPT to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
@@ -157,6 +161,9 @@ open class TransactionSubmitterTestGTXModule(
             },
             GET_TRANSACTION_STATUS to { conf: TransactionSubmitterTestContext, _, args: Gtv ->
                 gtv(conf.transactions.first { it.rowId == args["row_id"]!!.asInteger() }.status!!.name)
+            },
+                GET_SYSTEM_ANCHORING_BLOCKCHAIN_RID_QUERY to { _, _, _ ->
+                    GtvNull
             }
         ) + queryOverrides
 ) {

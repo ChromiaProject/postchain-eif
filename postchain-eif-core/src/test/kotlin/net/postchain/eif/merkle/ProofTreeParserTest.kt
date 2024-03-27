@@ -4,7 +4,7 @@ import net.postchain.common.data.Hash
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
 import net.postchain.crypto.Secp256K1CryptoSystem
-import net.postchain.eif.merkle.MerkleTestUtil.getMerkleProof
+import net.postchain.eif.MerkleProofUtil.getPrefixedMerkleProof
 import net.postchain.gtv.*
 import net.postchain.gtv.merkle.GtvMerkleBasics
 import net.postchain.gtv.merkle.GtvMerkleHashCalculator
@@ -47,25 +47,7 @@ class ProofTreeParserTest {
             byteArrayOf(MerkleBasics.HASH_PREFIX_LEAF) + GtvEncoder.encodeGtv(leaf),
             cryptoSystem
         )
-        val hashUntilLast = getMerkleProof(treeProofs.dropLast(1), proofs.second, hashedLeaf, ::hashFunction)
-
-        // Special case for last proof
-        val lastIndex = treeProofs.size - 1
-        val root = if (((proofs.second shr lastIndex) and 1) != 0) {
-            dictHashFunction(treeProofs[lastIndex], hashUntilLast)
-        } else {
-            dictHashFunction(hashUntilLast, treeProofs[lastIndex])
-        }
+        val root = getPrefixedMerkleProof(treeProofs, proofs.second, hashedLeaf, cryptoSystem)
         assertEquals(root.toHex(), gtvExtra.merkleHash(calculator).toHex())
-    }
-
-    private fun hashFunction(left: Hash, right: Hash): Hash {
-        val byteArraySum = byteArrayOf(MerkleBasics.HASH_PREFIX_NODE) + left + right
-        return MerkleBasics.hashingFun(byteArraySum, cryptoSystem)
-    }
-
-    private fun dictHashFunction(left: Hash, right: Hash): Hash {
-        val byteArraySum = byteArrayOf(GtvMerkleBasics.HASH_PREFIX_NODE_GTV_DICT) + left + right
-        return MerkleBasics.hashingFun(byteArraySum, cryptoSystem)
     }
 }

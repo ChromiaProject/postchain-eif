@@ -49,12 +49,12 @@ function test_fetch_oldest_queued_transactions_per_contract() {
     rell.test.block().run();
     rell.test.tx().op(
         create_evm_submit_transaction_op("address","myFunction1"),
-        create_evm_submit_transaction_op("address1","myFunction2")
+        create_evm_submit_transaction_op("address1","myFunction2", 1337)
     ).run();
 
     rell.test.tx().op(
         create_evm_submit_transaction_op("address","myFunction3"),
-        create_evm_submit_transaction_op("address1","myFunction4")
+        create_evm_submit_transaction_op("address1","myFunction4", 1337)
     ).run();
 
     val evm_submit_transaction = fetch_oldest_queued_transactions_per_contract();
@@ -83,7 +83,8 @@ function test_fetch_oldest_queued_transactions_per_contract_and_taken_by() {
             "address1",
             "myFunction-2",
             transaction_status.QUEUED,
-            get_last_blocktime())
+            get_last_blocktime(),
+            1337)
     ).run();
 
     assert_equals(fetch_oldest_queued_transactions_per_contract().size(), 2);
@@ -194,7 +195,7 @@ function test_timeout_evm_transaction(){
     rell.test.set_next_block_time(86400000);
     rell.test.block().run();
     rell.test.tx().op(
-        create_test_evm_submit_transaction(x"01", "address1","myFunction", transaction_status.QUEUED, 86400000)
+        create_test_evm_submit_transaction(x"01", "address1","myFunction", transaction_status.QUEUED, 86400000, 1337)
     ).run();
     rell.test.block().run();
 
