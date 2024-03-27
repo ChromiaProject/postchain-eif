@@ -1,6 +1,6 @@
 module;
 
-import ^^.event_receiver.messaging.*;
+import ^.event_receiver.messaging.*;
 import lib.icmf.receiver.{ receive_icmf_message };
 
 @extend(receive_icmf_message)

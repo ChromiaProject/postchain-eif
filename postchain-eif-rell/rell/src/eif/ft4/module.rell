@@ -1,7 +1,7 @@
 @mount('eif.ft4')
 module;
 
-import ^^.event_receiver.messaging.*;
+import ^.event_receiver.messaging.*;
 
 import ^.main;
 import ^.common;
