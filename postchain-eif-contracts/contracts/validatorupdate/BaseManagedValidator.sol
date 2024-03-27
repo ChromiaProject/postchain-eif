@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "../utils/cryptography/ECDSA.sol";
 import {IValidator} from "../IValidator.sol";
 import "../Data.sol";
@@ -9,7 +8,7 @@ import "../Postchain.sol";
 import {IManagedValidator} from "./IManagedValidator.sol";
 import "./ValidatorUpdateUtils.sol";
 
-abstract contract BaseManagedValidator is Ownable2Step, IManagedValidator {
+abstract contract BaseManagedValidator is IManagedValidator {
     using EC for bytes32;
 
     mapping(address => bool) private validatorMap;
@@ -26,11 +25,6 @@ abstract contract BaseManagedValidator is Ownable2Step, IManagedValidator {
         for (uint i = 0; i < validators.length; i++) {
             validatorMap[validators[i]] = true;
         }
-    }
-
-    // override renounceOwnership to prevent owner from renouncing ownership
-    function renounceOwnership() public view override onlyOwner {
-        revert("Validator: renounceOwnership is not allowed");
     }
 
     function isValidator(address _addr) public view returns (bool) {

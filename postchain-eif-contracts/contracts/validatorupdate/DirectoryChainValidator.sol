@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {BaseManagedValidator} from "./BaseManagedValidator.sol";
 
 contract DirectoryChainValidator is BaseManagedValidator {
 
-    constructor(bytes32 _blockchainRid, address[] memory _validators) Ownable(msg.sender) {
+    constructor(bytes32 _blockchainRid, address[] memory _validators) {
         _initializeValidators(_blockchainRid, _validators);
     }
 
