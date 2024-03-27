@@ -4,6 +4,7 @@ import net.postchain.core.EContext
 import net.postchain.core.TxEContext
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.EVM_TX_NO_OP
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension
+import net.postchain.eif.transaction.signerupdate.EvmSignerUpdateSpecialTxExtension
 import net.postchain.gtx.GTXOperation
 import net.postchain.gtx.SimpleGTXModule
 import net.postchain.gtx.data.ExtOpData
@@ -32,7 +33,7 @@ class TransactionSubmitterGTXModule : SimpleGTXModule<Unit>(
 
     override fun getSpecialTxExtensions(): List<GTXSpecialTxExtension> {
 
-        return listOf(TransactionSubmitterSpecialTxExtension(), EvmAnchoringSpecialTxExtension())
+        return listOf(TransactionSubmitterSpecialTxExtension(), EvmAnchoringSpecialTxExtension(), EvmSignerUpdateSpecialTxExtension())
     }
 }
 

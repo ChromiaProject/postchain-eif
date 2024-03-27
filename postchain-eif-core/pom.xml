@@ -243,6 +243,8 @@
                             <include>TestToken</include>
                             <include>Validator</include>
                             <include>Anchoring</include>
+                            <include>DirectoryChainValidator</include>
+                            <include>ManagedValidator</include>
                         </includes>
                     </contract>
                     <pathPrefixes>
@@ -255,6 +257,8 @@
                             <include>**/TestToken.json</include>
                             <include>**/Validator.json</include>
                             <include>**/Anchoring.json</include>
+                            <include>**/DirectoryChainValidator.json</include>
+                            <include>**/ManagedValidator.json</include>
                         </includes>
                     </abiSourceFiles>
                     <outputDirectory>

@@ -1,8 +1,10 @@
 package net.postchain.eif.transaction
 
 import net.postchain.PostchainContext
+import net.postchain.base.data.DatabaseAccess
 import net.postchain.base.withReadConnection
 import net.postchain.common.BlockchainRid
+import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.exception.UserMistake
 import net.postchain.core.BlockchainProcess
 import net.postchain.core.SynchronizationInfrastructureExtension
@@ -10,8 +12,11 @@ import net.postchain.eif.Web3jRequestHandler
 import net.postchain.eif.Web3jServiceFactory
 import net.postchain.eif.metrics.RpcUsageMetrics
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension
+import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.GET_SYSTEM_ANCHORING_BLOCKCHAIN_RID_QUERY
 import net.postchain.eif.transaction.config.EvmTransactionSubmitterConfig
 import net.postchain.eif.transaction.config.TransactionSubmitterBlockchainConfig
+import net.postchain.eif.transaction.signerupdate.EvmSignerUpdateSpecialTxExtension
+import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.mapper.toObject
 import net.postchain.gtx.GTXModuleAware
 import org.web3j.crypto.Credentials
@@ -101,7 +106,23 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
             val anchoringExt = exs.find { it is EvmAnchoringSpecialTxExtension }
             if (anchoringExt is EvmAnchoringSpecialTxExtension) {
                 anchoringExt.blockQueriesProvider = postchainContext.blockQueriesProvider
-                anchoringExt.systemAnchoringBrid = transactionSubmitterBlockchainConfig.systemAnchoringBrid?.let { BlockchainRid(it) }
+                anchoringExt.systemAnchoringBrid = withReadConnection(postchainContext.sharedStorage, process.blockchainEngine.chainID) {
+                    val response = blockchainConfig.module.query(it, GET_SYSTEM_ANCHORING_BLOCKCHAIN_RID_QUERY, gtv(mapOf()))
+                    if (response.isNull()) {
+                        null
+                    } else {
+                        BlockchainRid(response.asByteArray())
+                    }
+                }
+            }
+
+            val signerUpdateExt = exs.find { it is EvmSignerUpdateSpecialTxExtension }
+            if (signerUpdateExt is EvmSignerUpdateSpecialTxExtension) {
+                signerUpdateExt.blockQueriesProvider = postchainContext.blockQueriesProvider
+                signerUpdateExt.directoryChainBrid = withReadConnection(postchainContext.sharedStorage, 0L) {
+                    val db = DatabaseAccess.of(it)
+                    db.getBlockchainRid(it) ?: throw ProgrammerMistake("No blockchain-rid found for chain 0")
+                }
             }
         }
     }
