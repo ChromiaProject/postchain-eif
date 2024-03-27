@@ -157,26 +157,3 @@ yarn import:bridge --network goerli --address PROXY_ADDRESS
 
 `updateValidators(address[] _validators)`
 - Update validator list.
-
-### Migration.sol
-
-`renounceOwnership()`
-- Renounce ownership is not allowed.
-
-`transferValidatorOwnership(address newOwner)`
-- Transfer ownership to `newOwner`.
-
-`acceptValidatorOwnership()`
-- Accept validator ownership.
-
-`withdrawRequest(
-address[] _oldValidators,
-address[] _newValidators,
-bytes _event,
-Data.Proof eventProof,
-bytes blockHeader,
-bytes[] sigs,
-address[] signers,
-Data.ExtraProofData extraProof
-)`
-- Request withdraw using `oldValidators`.

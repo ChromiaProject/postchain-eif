@@ -1,7 +1,7 @@
 import { ethers, upgrades, network} from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
-import { TestToken__factory, TokenBridge__factory, TokenBridgeDelegator__factory, Validator__factory, Migration__factory } from "../src/types";
+import { TestToken__factory, TokenBridge__factory, TokenBridgeDelegator__factory, Validator__factory } from "../src/types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BytesLike, hexZeroPad, keccak256 } from "ethers/lib/utils";
 import { ContractReceipt, ContractTransaction } from "ethers";
@@ -17,7 +17,6 @@ describe("Token Bridge Test", () => {
     let bridgeAddress: string;
     let validatorAddress: string;
     let bridgeDelegatorAddress: string;
-    let migrationAddress: string;
     let admin: SignerWithAddress;
     let validator1: SignerWithAddress;
     let validator2: SignerWithAddress;
@@ -46,10 +45,6 @@ describe("Token Bridge Test", () => {
         const bridgeDelegatorFactory = new TokenBridgeDelegator__factory(deployer)
         const bridgeDelegator = await bridgeDelegatorFactory.deploy(bridgeAddress)
         bridgeDelegatorAddress = bridgeDelegator.address
-
-        const migrationFactory = new Migration__factory(admin)
-        const migration = await migrationFactory.deploy(validatorAddress, bridgeAddress)
-        migrationAddress = migration.address
 
         await expect(bridge.allowToken(constants.AddressZero)).to.be.revertedWith("TokenBridge: token address is invalid");
         await expect(bridge.allowToken(tokenAddress)).to.emit(bridge, "AllowToken").withArgs(tokenAddress)
@@ -173,7 +168,6 @@ describe("Token Bridge Test", () => {
             const bridgeOwner = new TokenBridge__factory(deployer).attach(bridgeAddress)
             const bridge = new TokenBridge__factory(user).attach(bridgeAddress)
             const validatorAdmin = new Validator__factory(admin).attach(validatorAddress)
-            const migration = new Migration__factory(admin).attach(migrationAddress)
             const toDeposit = ethers.utils.parseEther("100")
             const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
@@ -450,20 +444,12 @@ describe("Token Bridge Test", () => {
                 await expect(bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid)))
                 .to.emit(bridgeOwner, "SetBlockchainRid")
 
-                await validatorAdmin.updateValidators([validator1.address, validator2.address])
-                await validatorAdmin.transferOwnership(migrationAddress)
-                await migration.acceptValidatorOwnership()
                 let blockNum = await ethers.provider.getBlockNumber()
-                await expect(migration.withdrawRequest(
-                    validators, [validator1.address, validator2.address], 
-                    data, eventProof, DecodeHexStringToByteArray(blockHeader), sigs, validators, extraProof)
-                ).to.be.emit(bridge, "WithdrawRequest").withArgs(user.address, tokenAddress, toDeposit, blockNum+1)
-
-                await migration.transferValidatorOwnership(admin.address)
-                validatorAdmin.acceptOwnership()
-                expect(await validatorAdmin.getValidatorCount()).to.eq(2)
-                await validatorAdmin.updateValidators(validators)
-                expect(await validatorAdmin.getValidatorCount()).to.eq(3)
+                await expect(bridge.withdrawRequest(data, eventProof,
+                    DecodeHexStringToByteArray(blockHeader), sigs, validators,
+                    extraProof)
+                ).to.emit(bridge, "WithdrawRequest")
+                    .withArgs(user.address, tokenAddress, toDeposit, blockNum+1)
 
                 await expect(bridge.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
