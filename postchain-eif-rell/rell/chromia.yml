@@ -30,7 +30,7 @@ test:
 
 blockchains:
   event_receiver:
-    module: eif.event_receiver
+    module: eif_event_receiver_chain
     config:
       gtx:
         modules:
