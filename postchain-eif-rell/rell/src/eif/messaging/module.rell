@@ -1,0 +1,6 @@
+module;
+
+import ^^.eif_event_receiver_chain.messaging.*;
+
+@extendable
+function handle_evm_block(evm_block: evm_block_message) {}
