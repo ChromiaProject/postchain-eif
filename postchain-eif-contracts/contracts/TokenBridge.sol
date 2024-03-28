@@ -135,10 +135,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         emit Initialize(_validator, _withdrawOffset);
     }
 
-    function setDailyLimit(IDailyLimit _dailyLimit) public onlyOwner {
-        dailyLimit = _dailyLimit;
-    }
-
     function renounceOwnership() public override onlyOwner {
         revert("TokenBridge: renounce ownership is not allowed");
     }
@@ -155,6 +151,10 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
 
     function unpause() public onlyOwner {
         _unpause();
+    }
+
+    function setDailyLimit(IDailyLimit _dailyLimit) public onlyOwner {
+        dailyLimit = _dailyLimit;
     }
 
     function changeMinter(ChromiaToken token, address newMinter) external onlyOwner {
@@ -213,6 +213,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     function deposit(ChromiaToken token, uint256 amount) public isAllowToken(token) whenNotPaused returns (bool) {
         (string memory name, string memory symbol, uint8 decimals) = _getTokenInfo(token);
         token.safeTransferFrom(msg.sender, address(this), amount);
+        token.transferToChromia(bytes32(0), amount);
         emit DepositedERC20(msg.sender, token, networkId, amount, name, symbol, decimals);
         return true;
     }

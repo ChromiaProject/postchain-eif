@@ -12,6 +12,8 @@ import "./Data.sol";
 interface ChromiaToken is IERC20 {
     function transferFromChromia(address to, uint256 value, bytes32 refID) external returns (bool);
 
+    function transferToChromia(bytes32 to, uint256 value) external;
+
     function changeMinter(address newMinter) external;
 }
 
