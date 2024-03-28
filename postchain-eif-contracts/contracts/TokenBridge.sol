@@ -135,6 +135,10 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         emit Initialize(_validator, _withdrawOffset);
     }
 
+    function setDailyLimit(IDailyLimit _dailyLimit) public onlyOwner {
+        dailyLimit = _dailyLimit;
+    }
+
     function renounceOwnership() public override onlyOwner {
         revert("TokenBridge: renounce ownership is not allowed");
     }
