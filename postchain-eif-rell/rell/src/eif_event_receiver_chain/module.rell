@@ -1,6 +1,6 @@
 module;
 
-import lib.icmf. { send_message };
+import lib.icmf;
 import .messaging.*;
 import .model.*;
 import .queries.*;
@@ -60,5 +60,5 @@ function _evm_block(
         relevant_events
     );
 
-    send_message(evm_block_events_topic, message.to_gtv());
+    icmf.send_message(evm_block_events_topic, message.to_gtv());
 }
