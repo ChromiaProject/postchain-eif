@@ -134,17 +134,23 @@ describe("Token Bridge Test", () => {
                 .to.be.revertedWith('OwnableUnauthorizedAccount')
 
             const adminBridge = new TokenBridge__factory(deployer).attach(bridgeAddress)
-            // admin or owner cannot call emergencyWithdraw before setting time
+            // admin or owner cannot call emergencyWithdraw before mass exit
             await expect(adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address))
-                .to.be.revertedWith("TokenBridge: cannot do emergency withdrawal before setting timestamp")
+                .to.be.revertedWith("TokenBridge: mass exit was not triggered yet")
+
+            await adminBridge.triggerMassExit(1, new Uint8Array(32))
+
+            // admin or owner cannot call emergencyWithdraw before emergency timestamp has passed
+            await expect(adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address))
+                .to.be.revertedWith("TokenBridge: cannot do emergency withdrawal until 90 days after mass exit")
 
             // admin can call emergencyWithdraw after setting time
             expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(0)
             expect(await tokenInstance.balanceOf(adminBridge.address)).to.eq(toDeposit)
-            const nighttyDays = 90 * 24 * 60 * 60
+            const ninetyDays = 90 * 24 * 60 * 60
             const blockNum= await ethers.provider.getBlockNumber()
             const block = await ethers.provider.getBlock(blockNum)
-            const timestamp = block.timestamp + nighttyDays
+            const timestamp = block.timestamp + ninetyDays
             await ethers.provider.send('evm_setNextBlockTimestamp', [timestamp])
             await expect(adminBridge.emergencyWithdraw(constants.AddressZero, beneficiary.address))
             .to.be.revertedWith("TokenBridge: token address is invalid")
@@ -799,12 +805,6 @@ describe("Token Bridge Test", () => {
             expect(await adminTokenBridge.isMassExit()).to.be.true
             expect((await adminTokenBridge.massExitBlock()).blockRid).to.be.equal(blockRid)
             expect((await adminTokenBridge.massExitBlock()).height).to.be.equal(100)
-
-            // update mass exit block
-            await expect(adminTokenBridge.updateMassExitBlock(200, blockRid))
-            .to.emit(adminTokenBridge, "UpdatedMassExitBlock")
-            expect((await adminTokenBridge.massExitBlock()).blockRid).to.be.equal(blockRid)
-            expect((await adminTokenBridge.massExitBlock()).height).to.be.equal(200)
 
             // postpone mass exit
             await expect(otherTokenBridge.postponeMassExit()).to.be.revertedWith('OwnableUnauthorizedAccount')
