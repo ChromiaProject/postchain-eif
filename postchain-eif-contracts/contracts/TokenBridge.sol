@@ -81,7 +81,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     event AllowToken(IERC20 indexed token);
     event TriggerMassExit(uint indexed height, bytes32 indexed blockRid);
     event PostponeMassExit();
-    event UpdatedMassExitBlock(uint indexed height, bytes32 indexed blockRid);
     event PendingWithdraw(bytes32 indexed hash);
     event UnpendingWithdraw(bytes32 indexed hash);
     event FundedERC20(address indexed sender, IERC20 indexed token, uint amount);
@@ -113,11 +112,10 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         networkId = id;
         validator = _validator;
         withdrawOffset = _withdrawOffset;
-        emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
         emit Initialize(_validator, _withdrawOffset);
     }
 
-    function renounceOwnership() public override onlyOwner {
+    function renounceOwnership() public override view onlyOwner {
         revert("TokenBridge: renounce ownership is not allowed");
     }
 
@@ -149,6 +147,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         require(!isMassExit, "TokenBridge: mass exit already set");
         isMassExit = true;
         massExitBlock = PostchainBlock(height, blockRid);
+        emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
         emit TriggerMassExit(height, blockRid);
     }
 
@@ -156,15 +155,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         isMassExit = false;
         massExitBlock = PostchainBlock(0, bytes32(0));
         emit PostponeMassExit();
-    }
-
-    /**
-     * Note: the mass exit block should be the block at which snapshot was updated
-     *          with state root was stored properly in the block header extra data.
-     */
-    function updateMassExitBlock(uint height, bytes32 blockRid) onlyOwner whenMassExit public {
-        massExitBlock = PostchainBlock(height, blockRid);
-        emit UpdatedMassExitBlock(height, blockRid);
     }
 
     function pendingWithdraw(bytes32 _hash) onlyOwner public {
@@ -339,12 +329,13 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
 
     /**
      * @notice this function will be use only in emergency case
-     * by allow admin/owner (multi-sig wallet) to withdraw all the remaining balance after a specific period of time.
+     * by allow admin/owner (multi-sig wallet) to withdraw all the remaining balance after a specific period of time
+     * has passed since mass exit.
      */
-    function emergencyWithdraw(IERC20 token, address payable beneficiary) external onlyOwner {
+    function emergencyWithdraw(IERC20 token, address payable beneficiary) external onlyOwner whenMassExit {
         require(address(token) != address(0), "TokenBridge: token address is invalid");
         require(beneficiary != address(0), "TokenBridge: beneficiary address is invalid");
-        require(block.timestamp > emergencyTimestamp, "TokenBridge: cannot do emergency withdrawal before setting timestamp");
+        require(block.timestamp >= emergencyTimestamp, "TokenBridge: cannot do emergency withdrawal until 90 days after mass exit");
         uint tokenBalance = token.balanceOf(address(this));
         if (tokenBalance > 0) {
             token.safeTransfer(beneficiary, tokenBalance);

@@ -134,10 +134,6 @@ yarn import:bridge --network goerli --address PROXY_ADDRESS
 - Postpone mass exit. 
 - Requirements: Mass exit state.
 
-`updateMassExitBlock(uint height, bytes32 blockRid)` 
-- Updates mass exit block.
-- Requirements: Mass exit state.
-
 `pendingWithdraw(bytes32 _hash)`
 - Blocks the withdrawal request by changing its status from `Withdrawable` to `Pending`.
 - Requirements: Withdraw request status to be `Withdrawable`.
@@ -151,7 +147,9 @@ yarn import:bridge --network goerli --address PROXY_ADDRESS
 - Requirements: `token` to be allowed.
 
 `emergencyWithdraw(IERC20 token, address payable beneficiary)`
-- Transfer all of `token` balance of admin/owner to the `beneficiary` after a specific period of time.
+
+- Transfer all of `token` balance of admin/owner to the `beneficiary` after a specific period of time since mass exit.
+- Requirements: Mass exit state and emergency timestamp has passed.
 
 ### Validator
 
