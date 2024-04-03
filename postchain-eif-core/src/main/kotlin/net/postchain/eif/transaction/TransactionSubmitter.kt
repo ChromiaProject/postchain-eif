@@ -83,6 +83,10 @@ class TransactionSubmitter(
 
     init {
 
+        logger.info { "Initializing transaction submitter - chainId: $chainId, networkId: $networkId, " +
+                "txPollInterval: $txPollInterval, healthCheckInterval: $healthCheckInterval, txTimeout: $txTimeout" +
+                ", nodeTxVerificationTimeout: $nodeTxVerificationTimeout, nodeTxVerificationEvmBlocks: $nodeTxVerificationEvmBlocks" }
+
         // Add transactions to queue and recover states lost on node restart
         for (txSubmit in initQueue) {
 
