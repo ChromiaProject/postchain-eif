@@ -9,7 +9,7 @@ import lib.icmf.receiver.{ receive_icmf_message };
 
 function timeout_evm_transactions() {
     val timeout_timestamp = get_last_blocktime() - chain_context.args.tx_timeout;
-    val row_ids = evm_submit_transaction @* { .status != transaction_status.SUCCESS and .status != transaction_status.FAILURE and .timestamp < timeout_timestamp } ( .rowid );
+    val row_ids = evm_submit_transaction @* { .status != transaction_status.SUCCESS and .status != transaction_status.FAILURE and .created < timeout_timestamp } ( .rowid );
     for (row_id in row_ids) {
         update evm_submit_transaction @ { row_id } (status = transaction_status.FAILURE);
     }
@@ -33,79 +33,6 @@ operation __update_evm_transaction_receipt(row_id: integer, block_hash: text, ef
 operation __begin_block(height: integer) {
     timeout_evm_transactions();
     fail_transactions_with_enough_retries(chain_context.args.node_retry_strategy);
-}
-
-entity evm_submit_transaction {
-    key id: byte_array;
-    contract_address: text;
-    function_name: text;
-    parameter_types: text;
-    parameter_values: byte_array;
-    network_id: integer;
-    currency_symbol: text;
-    max_priority_fee_per_gas: big_integer;
-    max_fee_per_gas: big_integer;
-    sender: byte_array;
-    index mutable status: transaction_status;
-    index timestamp: timestamp;
-    index mutable taken_timestamp: timestamp;
-    mutable block_hash: text = "";
-    mutable effective_gas_price: big_integer = -1;
-    mutable gas_usage: big_integer = -1;
-    mutable tx_hash: text = "";
-    mutable processed_by: pubkey = x"";
-}
-
-entity evm_submit_transaction_taken_by {
-    key transaction: evm_submit_transaction, provider: pubkey;
-}
-
-struct evm_submit_transaction_data {
-    row_id: integer;
-    contract_address: text;
-    function_name: text;
-    parameter_types: list<text>;
-    parameter_values: list<gtv>;
-    network_id: integer;
-    max_priority_fee_per_gas: big_integer;
-    max_fee_per_gas: big_integer;
-    sender: byte_array;
-    status: transaction_status;
-    timestamp: timestamp;
-    tx_hash: text? = null;
-    processed_by: pubkey;
-}
-
-enum transaction_status {
-    QUEUED,
-    TAKEN,
-    PENDING,
-    SUCCESS,
-    FAILURE
-}
-
-enum node_retry_strategy {
-    ALL,
-    SUPERMAJORITY
-}
-
-struct module_args {
-    genesis_node: byte_array;
-    system_chain_bridges: gtv;
-    directory_chain_config: gtv;
-    system_anchoring_chain_config: gtv?;
-    contract_tx_rate_limit: big_integer;
-    tx_timeout: big_integer;
-    node_retry_strategy;
-    network_configs: gtv = list<network_config>().to_gtv();
-    manual_admins: gtv;
-    system_max_priority_fee_per_gas: integer;
-    system_max_fee_per_gas: integer;
-}
-
-struct network_config {
-    id: integer;
-    currency_symbol: text;
 }
 
 function create_evm_submit_transaction(evm_submit_transaction_message: evm_submit_transaction_message, sender: byte_array) {
@@ -152,7 +79,7 @@ function add_transaction_to_queue(contract_address: text, function_name: text, p
         max_fee_per_gas = max_fee_per_gas,
         sender = sender,
         status = transaction_status.QUEUED,
-        timestamp = op_context.last_block_time,
+        created = op_context.last_block_time,
         taken_timestamp = 0
     );
 }
@@ -174,7 +101,7 @@ query fetch_oldest_queued_transactions_per_contract(exclude_taken_by_key: pubkey
         evm_submit_transaction @* {
             .status == transaction_status.QUEUED,
             .rowid not in evm_submit_transaction_taken_by @* { .provider == exclude_taken_by_key ?: x"" } ( .transaction.rowid )
-    } ( @group .contract_address, @omit @min .timestamp );
+    } ( @group .contract_address, @omit @min .created );
 
     val last_blocktime = get_last_blocktime();
     for (contract_address in contract_addresses_with_eligible_queued_transaction) {
@@ -199,7 +126,7 @@ query fetch_oldest_queued_transactions_per_contract(exclude_taken_by_key: pubkey
                     max_fee_per_gas = .max_fee_per_gas,
                     sender = .sender,
                     status = .status,
-                    timestamp = .timestamp,
+                    created = .created,
                     tx_hash = .tx_hash,
                     processed_by = .processed_by))
             limit 1;
@@ -223,7 +150,7 @@ query get_transaction(row_id: integer): evm_submit_transaction_data {
         max_fee_per_gas = .max_fee_per_gas,
         sender = .sender,
         status = .status,
-        timestamp = .timestamp,
+        created = .created,
         tx_hash = .tx_hash,
         processed_by = .processed_by));
 }
@@ -241,7 +168,7 @@ query get_transactions(): list<evm_submit_transaction_data> {
         max_fee_per_gas = .max_fee_per_gas,
         sender = .sender,
         status = .status,
-        timestamp = .timestamp,
+        created = .created,
         tx_hash = .tx_hash,
         processed_by = .processed_by));
 }
@@ -259,7 +186,7 @@ query get_pending_transactions(): list<evm_submit_transaction_data> {
         max_fee_per_gas = .max_fee_per_gas,
         sender = .sender,
         status = .status,
-        timestamp = .timestamp,
+        created = .created,
         tx_hash = .tx_hash,
         processed_by = .processed_by));
 }
@@ -364,13 +291,6 @@ function get_manual_admins() = set<byte_array>.from_gtv(chain_context.args.manua
 function get_system_max_priority_fee_per_gas() = chain_context.args.system_max_priority_fee_per_gas;
 
 function get_system_max_fee_per_gas() = chain_context.args.system_max_fee_per_gas;
-
-struct evm_transaction_submitter_cost {
-    id: byte_array;
-    processed_by: pubkey;
-    cost: big_integer;
-    currency_symbol: text;
-}
 
 val evm_transaction_submitter_cost_topic = ICMF_TOPIC_GLOBAL_PREFIX + "evm_transaction_submitter_cost_topic";
 

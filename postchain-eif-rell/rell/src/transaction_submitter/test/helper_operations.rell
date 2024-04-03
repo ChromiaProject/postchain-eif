@@ -45,7 +45,7 @@ operation fail_transactions_with_enough_retries_op(node_retry_strategy) {
     fail_transactions_with_enough_retries(node_retry_strategy);
 }
 
-operation create_test_evm_submit_transaction(id: byte_array, contract_address: text, function_name: text, status: transaction_status, timestamp: timestamp, network_id: integer = 1) {
+operation create_test_evm_submit_transaction(id: byte_array, contract_address: text, function_name: text, status: transaction_status, created: timestamp, network_id: integer = 1) {
     create evm_submit_transaction (
         id = id,
         contract_address = contract_address,
@@ -58,7 +58,7 @@ operation create_test_evm_submit_transaction(id: byte_array, contract_address: t
         max_fee_per_gas = 4000000000,
         sender = x"",
         status = status,
-        timestamp = timestamp,
+        created = created,
         taken_timestamp = 0);
 }
 

@@ -13,9 +13,6 @@ import org.jooq.impl.DSL.using
 import org.jooq.util.postgres.PostgresDataType
 import java.math.BigInteger
 import java.sql.Timestamp
-import java.sql.Timestamp.from
-import java.time.Instant
-import java.time.temporal.ChronoUnit
 
 enum class PendingTxStatus {
     VERIFYING,
@@ -51,7 +48,7 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
         val EVM_TX_SUBMIT_COLUMN_MAX_PRIORITY_FEE_PER_GAS: Field<Long> = field("max_priority_fee_per_gas", PostgresDataType.BIGINT.nullable(false))
         val EVM_TX_SUBMIT_COLUMN_MAX_FEE_PER_GAS: Field<Long> = field("max_fee_per_gas", PostgresDataType.BIGINT.nullable(false))
         val EVM_TX_SUBMIT_COLUMN_GAS_LIMIT: Field<Long> = field("gas_limit", PostgresDataType.BIGINT.nullable(true))
-        val EVM_TX_SUBMIT_COLUMN_TIMESTAMP: Field<Long> = field("timestamp", PostgresDataType.BIGINT.nullable(false))
+        val EVM_TX_SUBMIT_COLUMN_CREATED: Field<Long> = field("created", PostgresDataType.BIGINT.nullable(false))
         val EVM_TX_SUBMIT_COLUMN_NETWORK_ID: Field<Long> = field("network_id", PostgresDataType.BIGINT.nullable(false))
         val EVM_TX_SUBMIT_COLUMN_SENDER: Field<ByteArray> = field("sender", PostgresDataType.BYTEA.nullable(false))
         val EVM_TX_SUBMIT_COLUMN_HASH: Field<String> = field("hash", PostgresDataType.TEXT.nullable(true))
@@ -80,7 +77,7 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
                     .column(EVM_TX_SUBMIT_COLUMN_MAX_PRIORITY_FEE_PER_GAS)
                     .column(EVM_TX_SUBMIT_COLUMN_MAX_FEE_PER_GAS)
                     .column(EVM_TX_SUBMIT_COLUMN_GAS_LIMIT)
-                    .column(EVM_TX_SUBMIT_COLUMN_TIMESTAMP)
+                    .column(EVM_TX_SUBMIT_COLUMN_CREATED)
                     .column(EVM_TX_SUBMIT_COLUMN_NETWORK_ID)
                     .column(EVM_TX_SUBMIT_COLUMN_SENDER)
                     .column(EVM_TX_SUBMIT_COLUMN_HASH)
@@ -108,7 +105,7 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
                 .set(EVM_TX_SUBMIT_COLUMN_FUNCTION, transactionRequest.functionName)
                 .set(EVM_TX_SUBMIT_COLUMN_PARAMETER_TYPES, transactionRequest.parameterTypes.joinToString(","))
                 .set(EVM_TX_SUBMIT_COLUMN_PARAMETER_VALUES, GtvEncoder.encodeGtv(GtvFactory.gtv(transactionRequest.parameterValues)))
-                .set(EVM_TX_SUBMIT_COLUMN_TIMESTAMP, transactionRequest.timestamp)
+                .set(EVM_TX_SUBMIT_COLUMN_CREATED, transactionRequest.created)
                 .set(EVM_TX_SUBMIT_COLUMN_NETWORK_ID, networkId)
                 .set(EVM_TX_SUBMIT_COLUMN_MAX_PRIORITY_FEE_PER_GAS, transactionRequest.maxPriorityFeePerGas.longValueExact())
                 .set(EVM_TX_SUBMIT_COLUMN_MAX_FEE_PER_GAS, transactionRequest.maxFeePerGas.longValueExact())
@@ -178,35 +175,6 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
             return jooq.select().from(tableEvmTxSubmit(ctx))
                     .where(EVM_TX_SUBMIT_COLUMN_NETWORK_ID.eq(networkId).and(EVM_TX_SUBMIT_COLUMN_BC_PERSISTED.eq(false)))
                     .fetch(evmSubmitTxRequestRecordMapper)
-        }
-    }
-
-    override fun cleanupDb(ctx: EContext, networkId: Long, dbRetentionTime: Long) {
-
-        val expireTime = from(Instant.now().minus(dbRetentionTime, ChronoUnit.MILLIS))
-
-        DatabaseAccess.of(ctx).apply {
-            val jooq = createJooq(ctx)
-            val requestIds = mutableSetOf<Long>()
-
-            requestIds.addAll(
-                jooq.select().from(table(tableEvmTxSubmit(ctx)))
-                    .where(
-                        EVM_TX_SUBMIT_COLUMN_TIMESTAMP.lessOrEqual(expireTime.time)
-                            .and(EVM_TX_SUBMIT_COLUMN_NETWORK_ID.eq(networkId))
-                            .and(EVM_TX_SUBMIT_COLUMN_BC_PERSISTED.eq(true))
-                    )
-                    .fetch { it.get(EVM_TX_SUBMIT_COLUMN_REQUEST_ID) })
-
-            if (requestIds.isNotEmpty()) {
-                jooq.delete(table(tableEvmTxSubmit(ctx)))
-                    .where(EVM_TX_SUBMIT_COLUMN_REQUEST_ID.`in`(requestIds))
-                    .execute()
-
-                jooq.delete(table(tableEvmTxErrors(ctx)))
-                    .where(EVM_TX_SUBMIT_COLUMN_REQUEST_ID.`in`(requestIds))
-                    .execute()
-            }
         }
     }
 

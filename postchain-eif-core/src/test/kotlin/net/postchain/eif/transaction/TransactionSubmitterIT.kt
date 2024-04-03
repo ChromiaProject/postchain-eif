@@ -166,24 +166,6 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
     }
 
     @Test
-    fun `cleanup old transactions`() {
-        val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config_cleanup.xml")
-        val node = nodes[0]
-
-        val txSubmitterTestModule =
-            node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
-
-        assertThat(countDbSubmit(node)).isEqualTo(2)
-        assertThat(countDErrors(node)).isEqualTo(2)
-
-        val txExtension = txSubmitterTestModule.getSpecialTxExtensions().filterIsInstance<TransactionSubmitterSpecialTxExtension>().first()
-        txExtension.cleanupDb()
-
-        assertThat(countDbSubmit(node)).isEqualTo(1)
-        assertThat(countDErrors(node)).isEqualTo(1)
-    }
-
-    @Test
     fun `submit transaction in multi node env - successfully`() {
 
         val nodes = createNodes(4, "/net/postchain/eif/transaction/blockchain_config_4_nodes.xml")

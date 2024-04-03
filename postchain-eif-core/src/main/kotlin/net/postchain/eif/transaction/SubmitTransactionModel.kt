@@ -11,7 +11,7 @@ import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_PARAMETER_VALUES
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_REQUEST_ID
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_SENDER
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_TIMESTAMP
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_CREATED
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvDecoder
 import net.postchain.gtv.mapper.Name
@@ -47,8 +47,8 @@ open class EvmSubmitTxRellRequest(
     var maxFeePerGas: BigInteger,
     @Name("sender")
     val sender: ByteArray,
-    @Name("timestamp")
-    val timestamp: Long,
+    @Name("created")
+    val created: Long,
     @Nullable
     @Name("tx_hash")
     var txHash: String?,
@@ -70,7 +70,7 @@ class EvmSubmitTxRequest(
     rellRequest.maxPriorityFeePerGas,
     rellRequest.maxFeePerGas,
     rellRequest.sender,
-    rellRequest.timestamp,
+    rellRequest.created,
     rellRequest.txHash,
     rellRequest.status
 )  {
@@ -126,7 +126,7 @@ val evmSubmitTxRequestRecordMapper = RecordMapper<Record, EvmSubmitTxRequest> {
             BigInteger.valueOf(it.get(EVM_TX_SUBMIT_COLUMN_MAX_PRIORITY_FEE_PER_GAS)),
             BigInteger.valueOf(it.get(EVM_TX_SUBMIT_COLUMN_MAX_FEE_PER_GAS)),
             it.get(EVM_TX_SUBMIT_COLUMN_SENDER),
-            it.get(EVM_TX_SUBMIT_COLUMN_TIMESTAMP),
+            it.get(EVM_TX_SUBMIT_COLUMN_CREATED),
             it.get(EVM_TX_SUBMIT_COLUMN_HASH),
             null
         ),

@@ -38,8 +38,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.time.DurationUnit
-import kotlin.time.toDuration
 
 class TransactionSubmitter(
     private val web3jRequestHandler: Web3jRequestHandler,
@@ -55,8 +53,7 @@ class TransactionSubmitter(
     private val healthCheckInterval: Long,
     private val txTimeout: Long,
     private val nodeTxVerificationTimeout: Long,
-    private val nodeTxVerificationEvmBlocks: Long,
-    private val dbRetentionTime: Long
+    private val nodeTxVerificationEvmBlocks: Long
 ) : Shutdownable {
 
     companion object : KLogging() {
@@ -75,7 +72,6 @@ class TransactionSubmitter(
     private val txSubmitJob: Job
     private val txStatusPollJob: Job
     private val healthCheckJob: Job
-    private val cleanupJob: Job
     private val healthy = AtomicBoolean(true)
     private val queue = LinkedBlockingQueue<EvmSubmitTxRequest>()
     private val pendingTransactions = ConcurrentHashMap<String, EvmPendingTx>()
@@ -141,19 +137,6 @@ class TransactionSubmitter(
                         healthCheck()
 
                         delay(healthCheckInterval)
-                    } catch (e: CancellationException) {
-                        break
-                    }
-                }
-            }
-        cleanupJob =
-            CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-cleanup") + MDCContext()) {
-                while (isActive) {
-                    try {
-
-                        delay(1.toDuration(DurationUnit.DAYS))
-
-                        cleanupDb()
                     } catch (e: CancellationException) {
                         break
                     }
@@ -412,7 +395,7 @@ class TransactionSubmitter(
 
         logger.info { "Submitting transaction ${txRequest.rowId}" }
 
-        isTimeout(txRequest.rowId, txRequest.timestamp, txTimeout)
+        isTimeout(txRequest.rowId, txRequest.created, txTimeout)
         val fromAddress = transactionManagers.values.first().fromAddress
         val walletBalance = try {
             web3jRequestHandler.sendWeb3jRequest { it.ethGetBalance(fromAddress, DefaultBlockParameterName.LATEST) }
@@ -583,7 +566,6 @@ class TransactionSubmitter(
         txSubmitJob.cancel()
         txStatusPollJob.cancel()
         healthCheckJob.cancel()
-        cleanupJob.cancel()
         web3jRequestHandler.close()
     }
 
@@ -624,13 +606,6 @@ class TransactionSubmitter(
             .filterValues { it.rowId == rowId }
             .keys
             .forEach { pendingTransactions.remove(it) }
-    }
-
-    fun cleanupDb() {
-
-        withReadWriteConnection(storage, chainId) {
-            databaseOperations.cleanupDb(it, networkId, dbRetentionTime)
-        }
     }
 }
 

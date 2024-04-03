@@ -96,7 +96,7 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
                     val resultBlock = EthBlock.Block()
                     resultBlock.setBaseFeePerGas("3")
                     ethBlock.result = resultBlock
-                    on { block } doReturn ethBlock.block;
+                    on { block } doReturn ethBlock.block
                 }
             }
         }
@@ -219,7 +219,6 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
                 24 * 60 * 60000,
                 1000 * 60 * 4,
                 5,
-                0
         )
     }
 }

@@ -3,7 +3,7 @@
 import ^^.*;
 import ^.helper_operations.*;
 
-function test_query_transaction_state() {
+function test_query_transaction_status() {
     val contract_address = "address";
     val function_name = "myFunction";
     val parameter_types = ["uint"];

@@ -18,3 +18,9 @@ function test_system_chain_functions() {
 
     assert_equals(get_anchoring_contracts(), [(address = "anchoring", network_id = 5)]);
 }
+
+function test_text_without_0x() {
+
+    assert_equals(text_without_0x("AABBCC"), "AABBCC");
+    assert_equals(text_without_0x("0xAABBCC"), "AABBCC");
+}

@@ -29,6 +29,4 @@ interface TransactionSubmitterDatabaseOperations {
     )
 
     fun getQueuedTransactions(ctx: EContext, networkId: Long): List<EvmSubmitTxRequest>
-
-    fun cleanupDb(ctx: EContext, networkId: Long, dbRetentionTime: Long)
 }

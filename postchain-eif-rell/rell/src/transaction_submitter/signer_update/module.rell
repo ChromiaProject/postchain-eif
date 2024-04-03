@@ -168,7 +168,7 @@ query latest_signer_list_update_txs(blockchain_rid: byte_array): signer_list_upd
                 max_fee_per_gas = .evm_submit_transaction.max_fee_per_gas,
                 sender = .evm_submit_transaction.sender,
                 status = .evm_submit_transaction.status,
-                timestamp = .evm_submit_transaction.timestamp,
+                created = .evm_submit_transaction.created,
                 tx_hash = .evm_submit_transaction.tx_hash,
                 processed_by = .evm_submit_transaction.processed_by
             )

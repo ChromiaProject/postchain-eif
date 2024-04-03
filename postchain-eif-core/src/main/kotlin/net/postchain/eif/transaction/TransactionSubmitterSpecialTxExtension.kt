@@ -58,8 +58,8 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         ops: List<OpData>
     ): Boolean {
 
-        // Only accept one no op per transaction
-        if (ops.count { it.opName == EVM_TX_NO_OP } > 1) {
+        if (!isNoOpValid(ops, bctx.height)) {
+            logger.warn { "Validation failed. Invalid no op. Operations: $ops" }
             return false
         }
 
@@ -71,9 +71,9 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                 val newTxStatus = RellTransactionStatus.values()[op.args[1].asInteger().toInt()]
                 val txHash = if (op.args[2].isNull()) null else op.args[2].asString()
                 val signer = op.args[3].asByteArray()
-                val signedRowId = op.args[4].asByteArray()
+                val signedData = op.args[4].asByteArray()
 
-                if (!cryptoSystem.verifyDigest(signatureDataHash(requestId, newTxStatus), Signature(signer, signedRowId))) {
+                if (!cryptoSystem.verifyDigest(signatureDataHash(requestId, newTxStatus), Signature(signer, signedData))) {
                     logger.warn { "Validation failed. Invalid signature" }
                     return false
                 }
@@ -156,6 +156,21 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                     return false
                 }
             }
+        }
+
+        return true
+    }
+
+    private fun isNoOpValid(ops: List<OpData>, height: Long): Boolean {
+
+        // Only accept one no op per transaction and with current height as argument
+        val noOps = ops.filter { it.opName == EVM_TX_NO_OP }
+
+        if (noOps.isNotEmpty()) {
+
+            return noOps.size == 1 &&
+                    noOps[0].args.size == 1 &&
+                    noOps[0].args[0].asInteger() == height
         }
 
         return true
@@ -349,14 +364,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         logger.info { "Transaction submitter special tx extension config: txVerificationTime: $txVerificationTime, verifyTransactions: $verifyTransactions" }
     }
 
-    fun cleanupDb() {
-        transactionSubmitters.forEach { it.value.cleanupDb() }
-    }
-
-    private fun addNoOp(
-        operations: MutableList<OpData>,
-        bctx: BlockEContext
-    ) {
+    private fun addNoOp(operations: MutableList<OpData>, bctx: BlockEContext) {
 
         if (operations.none { it.opName == EVM_TX_NO_OP }) {
             operations.add(OpData(EVM_TX_NO_OP, arrayOf(gtv(bctx.height))))

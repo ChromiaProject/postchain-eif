@@ -20,7 +20,4 @@ data class TransactionSubmitterBlockchainConfig(
         @Name("tx_verification_time")                   // Elapsed time before verification consensus begins
         @DefaultValue(60000)
         val txVerificationTime: Long,
-        @Name("db_retention_time")                        // Time to keep data in db
-        @DefaultValue(1296000000)
-        val dbRetentionTime: Long
 )

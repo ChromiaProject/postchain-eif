@@ -97,7 +97,6 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                                 nodeTxTimeout,
                                 transactionSubmitterBlockchainConfig.nodeTxVerificationTimeout,
                                 transactionSubmitterBlockchainConfig.nodeTxVerificationEvmBlocks,
-                                transactionSubmitterBlockchainConfig.dbRetentionTime,
                         )
                         transactionSubmitters[networkId] = transactionSubmitter
                         ext.addTransactionSubmitter(transactionSubmitter, networkId)
