@@ -40,6 +40,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     private lateinit var privKey: ByteArray
     private lateinit var pubKey: ByteArray
     private var txVerificationTime: Long = Long.MAX_VALUE
+    private var verifyTransactions: Boolean = true
 
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
 
@@ -102,12 +103,14 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
                     val txPending = getBcTransaction(bctx, requestId)
 
-                    withTxSubmitter(txPending.networkId) {
-                        it.addPendingTransaction(EvmPendingTx.fromEvmSubmitTxRellRequest(txPending, txHash))
+                    if (verifyTransactions) {
+                        withTxSubmitter(txPending.networkId) {
+                            it.addPendingTransaction(EvmPendingTx.fromEvmSubmitTxRellRequest(txPending, txHash))
+                        }
                     }
                 }
 
-                if (newTxStatus == RellTransactionStatus.FAILURE || newTxStatus == RellTransactionStatus.SUCCESS) {
+                if (verifyTransactions && (newTxStatus == RellTransactionStatus.FAILURE || newTxStatus == RellTransactionStatus.SUCCESS)) {
 
                     // A pending transaction must be verified
                     val txStatusMatchesThisNode = withTxPending(requestId) { txSubmitter, txPending ->
@@ -129,7 +132,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
                     logger.info { "Transaction $requestId is verified as $newTxStatus" }
                 }
-            } else if (op.opName == UPDATE_EVM_TRANSACTION_RECEIPT) {
+            } else if (verifyTransactions && op.opName == UPDATE_EVM_TRANSACTION_RECEIPT) {
 
                 val requestId = op.args[0].asInteger()
                 val blockHash = op.args[1].asString()
@@ -336,11 +339,14 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
     fun getTransactionSubmitter(networkId: Long) = transactionSubmitters[networkId]
 
-    fun setConfig(privKey: ByteArray, pubKey: ByteArray, txVerificationTime: Long) {
+    fun setConfig(privKey: ByteArray, pubKey: ByteArray, txVerificationTime: Long, verifyTransactions: Boolean) {
         this.privKey = privKey
         this.pubKey = pubKey
         this.sigMaker = cryptoSystem.buildSigMaker(KeyPair(pubKey, privKey))
         this.txVerificationTime = txVerificationTime
+        this.verifyTransactions = verifyTransactions
+
+        logger.info { "Transaction submitter special tx extension config: txVerificationTime: $txVerificationTime, verifyTransactions: $verifyTransactions" }
     }
 
     fun cleanupDb() {

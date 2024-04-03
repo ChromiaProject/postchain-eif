@@ -9,9 +9,10 @@ import lib.ft4.assets;
 import lib.ft4.accounts.{ auth_descriptor, auth_type };
 
 // event_receiver
-import eif.event_receiver.messaging.*;
-import eif.event_receiver.queries.*;
-import eif.event_receiver.test.helpers.*;
+import eif_event_receiver_chain.*;
+import eif_event_receiver_chain.messaging.*;
+import eif_event_receiver_chain.test.helpers.*;
+import eif_event_receiver_connector.*;
 
 // eif
 import eif.main;
