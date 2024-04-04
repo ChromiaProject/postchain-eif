@@ -225,6 +225,11 @@ class EvmEventProcessor(
 
             val op = ops[index]
             if (op.opName == OP_EVM_BLOCK) {
+                if (op.args.size != 4) {
+                    logger.error("Got $OP_EVM_BLOCK operation with wrong number of arguments: ${op.args.size}")
+                    return false
+                }
+
                 val opNetworkId = op.args[EncodedBlock.NETWORK_ID.index]
                 val eventNetworkId = eventBlock[EncodedBlock.NETWORK_ID.index]
                 val opBlockNumber = op.args[EncodedBlock.NUMBER.index]

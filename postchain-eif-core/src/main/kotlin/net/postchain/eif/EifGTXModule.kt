@@ -57,8 +57,7 @@ class EifGTXModule : SimpleGTXModule<Config>(
         "get_event_block_height" to ::eventBlockHeightQuery,
         "get_event_merkle_proof" to ::eventMerkleProofQuery,
         "get_account_state_merkle_proof" to ::accountStateMerkleProofQuery
-)
-), PostchainContextAware {
+)), PostchainContextAware {
 
     init {
         // We add this provider so that we can get keccak-256 message digest instances
