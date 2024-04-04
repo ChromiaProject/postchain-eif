@@ -1,13 +1,9 @@
 package net.postchain.eif.transaction
 
-import assertk.assertThat
-import assertk.assertions.isEqualTo
-import assertk.assertions.isGreaterThan
 import net.postchain.devtools.getModules
 import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.EvmType
 import net.postchain.eif.contracts.Validator
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_ERRORS_COLUMN_MESSAGE
 import org.awaitility.Awaitility
 import org.awaitility.Duration
 import org.junit.jupiter.api.BeforeEach
@@ -66,10 +62,7 @@ class TransactionSubmitterStartupIT : EifBaseIntegrationTest(
             buildBlock(1L)
 
             // It will fail since the transaction is not actually submitted
-            withDbErrors(node, 0) {
-                assertThat(it.size).isGreaterThan(1)
-                assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_MESSAGE)).isEqualTo("Failed to poll for receipt for request id 0: Failed to send web3j request to all 1 nodes")
-            }
+            testLogAppender.assertError("Failed to poll for receipt for request id 0: Failed to send web3j request to all 1 nodes")
         }
     }
 }

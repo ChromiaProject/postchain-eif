@@ -26,8 +26,6 @@ import org.jooq.SQLDialect
 import org.jooq.impl.DSL
 import org.jooq.impl.DSL.table
 import java.math.BigInteger
-import java.time.Instant
-import java.time.temporal.ChronoUnit
 
 data class TransactionSubmitterTestContext(
     val transactionsAvailableToTake: MutableList<EvmSubmitTxRellRequest>,
@@ -40,7 +38,7 @@ data class TransactionSubmitterTestContext(
     val signerUpdates: MutableList<EvmSignerUpdate>
 )
 
-class TransactionSubmitterQueuedTransactionTestGTXModule : TransactionSubmitterTestGTXModule(){
+class TransactionSubmitterQueuedTransactionTestGTXModule : TransactionSubmitterTestGTXModule() {
     override fun initializeDB(ctx: EContext) {
         val transactionSubmitterDatabaseOperations = TransactionSubmitterDatabaseOperationsImpl()
         transactionSubmitterDatabaseOperations.initialize(ctx)
@@ -48,7 +46,7 @@ class TransactionSubmitterQueuedTransactionTestGTXModule : TransactionSubmitterT
     }
 }
 
-class TransactionSubmitterPendingTransactionTestGTXModule : TransactionSubmitterTestGTXModule(){
+class TransactionSubmitterPendingTransactionTestGTXModule : TransactionSubmitterTestGTXModule() {
     override fun initializeDB(ctx: EContext) {
         val transactionSubmitterDatabaseOperations = TransactionSubmitterDatabaseOperationsImpl()
         transactionSubmitterDatabaseOperations.initialize(ctx)
@@ -77,65 +75,6 @@ class TransactionSubmitterPendingTransactionTestGTXModule : TransactionSubmitter
     }
 }
 
-class TransactionSubmitterCleanupTransactionTestGTXModule : TransactionSubmitterTestGTXModule(){
-    override fun initializeDB(ctx: EContext) {
-        val transactionSubmitterDatabaseOperations = TransactionSubmitterDatabaseOperationsImpl()
-        transactionSubmitterDatabaseOperations.initialize(ctx)
-
-        val time15DaysAgo = Instant.now().minus(15, ChronoUnit.DAYS).toEpochMilli()
-
-        DatabaseAccess.of(ctx).apply {
-            val jooq = DSL.using(ctx.conn, SQLDialect.POSTGRES)
-
-            // Submit and pending to be removed
-            jooq.insertInto(table(tableEvmTxSubmit(ctx)))
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_REQUEST_ID, 0)
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_CONTRACT, "")
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_FUNCTION, "")
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_PARAMETER_TYPES, "")
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_PARAMETER_VALUES, GtvEncoder.encodeGtv(gtv(listOf())))
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_CREATED, time15DaysAgo)
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_NETWORK_ID, 1337)
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_MAX_PRIORITY_FEE_PER_GAS, 1)
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_MAX_FEE_PER_GAS, 4)
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_SENDER, "".toByteArray())
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_HASH, "00")
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_BC_PERSISTED, true)
-                .execute()
-
-            jooq.insertInto(table(tableEvmTxErrors(ctx)))
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_ERRORS_COLUMN_TIMESTAMP, DSL.currentTimestamp())
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_ERRORS_COLUMN_REQUEST_ID, 0)
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_ERRORS_COLUMN_RPC_URL, "")
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_ERRORS_COLUMN_MESSAGE, "")
-                .execute()
-
-            // Submit and pending to be kept
-            jooq.insertInto(table(tableEvmTxSubmit(ctx)))
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_REQUEST_ID, 1)
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_CONTRACT, "")
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_FUNCTION, "")
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_PARAMETER_TYPES, "")
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_PARAMETER_VALUES, GtvEncoder.encodeGtv(gtv(listOf())))
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_CREATED, System.currentTimeMillis())
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_MAX_PRIORITY_FEE_PER_GAS, 1)
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_MAX_FEE_PER_GAS, 4)
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_NETWORK_ID, 1337)
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_SENDER, "".toByteArray())
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_HASH, "00")
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_BC_PERSISTED, true)
-                .execute()
-
-            jooq.insertInto(table(tableEvmTxErrors(ctx)))
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_ERRORS_COLUMN_TIMESTAMP, DSL.currentTimestamp())
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_ERRORS_COLUMN_REQUEST_ID, 1)
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_ERRORS_COLUMN_RPC_URL, "")
-                .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_ERRORS_COLUMN_MESSAGE, "")
-                .execute()
-        }
-    }
-}
-
 open class TransactionSubmitterTestGTXModule(
         opOverrides: Map<String, (TransactionSubmitterTestContext, ExtOpData) -> net.postchain.core.Transactor> = mapOf(),
         queryOverrides: Map<String, (TransactionSubmitterTestContext, EContext, Gtv) -> Gtv> = mapOf()
@@ -150,7 +89,8 @@ open class TransactionSubmitterTestGTXModule(
         }) + opOverrides,
         mapOf(
             FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT to { conf: TransactionSubmitterTestContext, _: EContext, _: Gtv ->
-                gtv(conf.transactionsAvailableToTake.map { GtvObjectMapper.toGtvDictionary(it) }) },
+                    gtv(conf.transactionsAvailableToTake.map { GtvObjectMapper.toGtvDictionary(it) })
+                },
             GET_TRANSACTION to { conf: TransactionSubmitterTestContext, _, args: Gtv ->
                 GtvObjectMapper.toGtvDictionary(conf.transactions.first { it.rowId == args["row_id"]!!.asInteger() })
             },

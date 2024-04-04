@@ -105,6 +105,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
                     if (verifyTransactions) {
                         withTxSubmitter(txPending.networkId) {
+                            it.removeSubmitTx(bctx, requestId)
                             it.addPendingTransaction(EvmPendingTx.fromEvmSubmitTxRellRequest(txPending, txHash))
                         }
                     }

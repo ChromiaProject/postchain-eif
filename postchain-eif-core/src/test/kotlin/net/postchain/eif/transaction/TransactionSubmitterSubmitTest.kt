@@ -5,13 +5,10 @@ import assertk.assertions.isEqualTo
 import net.postchain.eif.Web3jRequestHandler
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import org.mockito.ArgumentMatchers.anyString
 import org.mockito.kotlin.any
-import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
-import org.mockito.kotlin.mockingDetails
 import org.mockito.kotlin.verify
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.Request
@@ -42,15 +39,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
             )
         }
         assertThat(exception.message).isEqualTo("Failed to get balance for request id 0: Oh dear")
-
-        assertThat(mockingDetails(databaseOperations).invocations.size).isEqualTo(1)
-        verify(databaseOperations).recordTransactionError(
-            any(),
-            eq(0L),
-            eq(null),
-            eq("Failed to get balance for request id 0: Oh dear"),
-            anyString()
-        )
+        testLogAppender.assertError("Failed to get balance for request id 0: Oh dear")
     }
 
     @Test
@@ -74,20 +63,13 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         }
         assertThat(exception.message).isEqualTo("Failed to get estimated gas usage for request id 0: Failed to get gas estimate")
 
-        assertThat(mockingDetails(databaseOperations).invocations.size).isEqualTo(2)
         verify(databaseOperations).recordTransactionGas(
             any(),
             eq(0L),
             eq(BigInteger.valueOf(5)),
             eq(BigInteger.valueOf(10))
         )
-        verify(databaseOperations).recordTransactionError(
-            any(),
-            eq(0L),
-            eq(null),
-            eq("Failed to get estimated gas usage for request id 0: Failed to get gas estimate"),
-            anyString()
-        )
+        testLogAppender.assertError("Failed to get estimated gas usage for request id 0: Failed to get gas estimate")
     }
 
     @Test
@@ -111,20 +93,13 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         }
         assertThat(exception.message).isEqualTo("Max fee per gas 4 for tx exceeds limit of 3")
 
-        assertThat(mockingDetails(databaseOperations).invocations.size).isEqualTo(2)
         verify(databaseOperations).recordTransactionGas(
                 any(),
                 eq(0L),
                 eq(BigInteger.valueOf(3)),
                 eq(BigInteger.valueOf(10))
         )
-        verify(databaseOperations).recordTransactionError(
-                any(),
-                eq(0L),
-                eq(null),
-                eq("Max fee per gas 4 for tx exceeds limit of 3"),
-                anyString()
-        )
+        testLogAppender.assertError("Max fee per gas 4 for tx exceeds limit of 3")
     }
 
 
@@ -149,27 +124,15 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         }
         assertThat(exception.message).isEqualTo("Failed to send transaction to all 1 nodes")
 
-        assertThat(mockingDetails(databaseOperations).invocations.size).isEqualTo(3)
         verify(databaseOperations).recordTransactionGas(
             any(),
             eq(0L),
             eq(BigInteger.valueOf(5)),
             eq(BigInteger.valueOf(10))
         )
-        verify(databaseOperations).recordTransactionError(
-            any(),
-            eq(0L),
-            eq("http://127.0.0.1:9999"),
-            eq("Failed to send transaction 0: Oh dear"),
-            anyString()
-        )
-        verify(databaseOperations).recordTransactionError(
-            any(),
-            eq(0L),
-            eq(null),
-            eq("Failed to send transaction to all 1 nodes"),
-            anyString()
-        )
+
+        testLogAppender.assertError("Failed to send transaction 0 to http://127.0.0.1:9999: Oh dear")
+        testLogAppender.assertError("Failed to send transaction to all 1 nodes")
     }
 
     @Test
@@ -195,33 +158,15 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         }
         assertThat(exception.message).isEqualTo("Failed to send transaction to all 2 nodes")
 
-        assertThat(mockingDetails(databaseOperations).invocations.size).isEqualTo(4)
         verify(databaseOperations).recordTransactionGas(
             any(),
             eq(0L),
             eq(BigInteger.valueOf(5)),
             eq(BigInteger.valueOf(10))
         )
-        verify(databaseOperations).recordTransactionError(
-            any(),
-            eq(0L),
-            eq("http://evm-node-1:9999"),
-            eq("Failed to send transaction 0: Oh dear"),
-            anyString()
-        )
-        verify(databaseOperations).recordTransactionError(
-            any(),
-            eq(0L),
-            eq("http://evm-node-2:9999"),
-            eq("Failed to send transaction 0: Web3j request failed with error code: 404 and message: Not found"),
-            anyString()
-        )
-        verify(databaseOperations).recordTransactionError(
-            any(),
-            eq(0L),
-            eq(null),
-            eq("Failed to send transaction to all 2 nodes"),
-            anyString()
-        )
+
+        testLogAppender.assertError("Failed to send transaction 0 to http://evm-node-1:9999: Oh dear")
+        testLogAppender.assertError("Failed to send transaction 0 to http://evm-node-2:9999: Web3j request failed with error code: 404 and message: Not found")
+        testLogAppender.assertError("Failed to send transaction to all 2 nodes")
     }
 }

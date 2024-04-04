@@ -3,20 +3,12 @@ package net.postchain.eif.transaction
 import assertk.assertThat
 import assertk.assertions.contains
 import assertk.assertions.isEqualTo
-import net.postchain.base.data.DatabaseAccess
-import net.postchain.base.withReadConnection
 import net.postchain.common.BlockchainRid
 import net.postchain.common.toHex
-import net.postchain.devtools.PostchainTestNode
-import net.postchain.devtools.PostchainTestNode.Companion.DEFAULT_CHAIN_IID
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_ERRORS_COLUMN_REQUEST_ID
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_RECEIPT
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_STATUS
 import net.postchain.gtv.GtvFactory
 import net.postchain.gtx.data.ExtOpData
-import org.jooq.SQLDialect
-import org.jooq.impl.DSL
-import org.junit.Assert.fail
 import java.math.BigInteger
 
 data class TxReceiptUpdateOpArg(val blockHash: String, val effectiveGasPrice: Long, val gasUsage: Long)
@@ -43,15 +35,13 @@ fun withUpdateEvmTransactionReceipt(
 
 fun assertNoQueuedTxs(txSubmitterTestModule: TransactionSubmitterTestGTXModule) {
 
-    assertThat(txSubmitterTestModule.conf.transactions.
-    filter { it.status == RellTransactionStatus.QUEUED }
+    assertThat(txSubmitterTestModule.conf.transactions.filter { it.status == RellTransactionStatus.QUEUED }
         .count()).isEqualTo(0)
 }
 
 fun assertTransactionsByStatus(txSubmitterTestModule: TransactionSubmitterTestGTXModule, status: RellTransactionStatus, count: Int) {
 
-    assertThat(txSubmitterTestModule.conf.transactions.
-    filter { it.status == status }
+    assertThat(txSubmitterTestModule.conf.transactions.filter { it.status == status }
         .count()).isEqualTo(count)
 }
 
@@ -60,16 +50,27 @@ fun assertStatusOperation(
     txSubmitterTestModule: TransactionSubmitterTestGTXModule,
     rowId: Long,
     expectedStatus: RellTransactionStatus
-) {
-    withTxOperations(
+): String? {
+    return withTxOperations(
         txSubmitterTestModule,
         UPDATE_EVM_TRANSACTION_STATUS
     ) { operations ->
-        val statusOperations = operations
+        val requestOps = operations
             .filter { it.args[0].asInteger() == rowId }
+        val statusOperations = requestOps
             .map { RellTransactionStatus.values()[it.args[1].asInteger().toInt()] }
 
         assertThat(statusOperations).contains(expectedStatus)
+
+        var txHash: String? = null
+        if (expectedStatus == RellTransactionStatus.PENDING) {
+            for (requestOp in requestOps) {
+                if (RellTransactionStatus.values()[requestOp.args[1].asInteger().toInt()] == RellTransactionStatus.PENDING) {
+                    txHash = requestOp.args[2].asString()
+                }
+            }
+        }
+        txHash
     }
 }
 
@@ -84,56 +85,6 @@ fun <RT> withTxOperations(
         .filter { it.opName == operationName }
 
     return op(operations)
-}
-
-fun countDbSubmit(node: PostchainTestNode): Int {
-    return withReadConnection(node.getBlockchainInstance().blockchainEngine.sharedStorage, DEFAULT_CHAIN_IID) {
-        val jooq = DSL.using(it.conn, SQLDialect.POSTGRES)
-
-        val tableName = DatabaseAccess.of(it).tableEvmTxSubmit(it)
-
-        jooq
-            .select()
-            .from(tableName)
-            .count()
-
-    }
-}
-
-fun countDErrors(node: PostchainTestNode): Int {
-    return withReadConnection(node.getBlockchainInstance().blockchainEngine.sharedStorage, DEFAULT_CHAIN_IID) {
-        val jooq = DSL.using(it.conn, SQLDialect.POSTGRES)
-
-        val tableName = DatabaseAccess.of(it).tableEvmTxErrors(it)
-
-        jooq
-            .select()
-            .from(tableName)
-            .count()
-
-    }
-}
-
-// Evaluate errors in DB
-fun withDbErrors(node: PostchainTestNode, rowId: Long, op: (List<org.jooq.Record>) -> Unit) {
-
-    withReadConnection(node.getBlockchainInstance().blockchainEngine.sharedStorage, DEFAULT_CHAIN_IID) {
-        val jooq = DSL.using(it.conn, SQLDialect.POSTGRES)
-
-        val tableName = DatabaseAccess.of(it).tableEvmTxErrors(it)
-
-        val fetch = jooq
-            .select()
-            .from(tableName)
-            .where(EVM_TX_ERRORS_COLUMN_REQUEST_ID.eq(rowId))
-            .fetch()
-
-        try {
-            op(fetch)
-        } catch (e: Exception) {
-            fail("Failed to get pending rows")
-        }
-    }
 }
 
 fun mkEvmSubmitTxRellRequest(

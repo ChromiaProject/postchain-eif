@@ -3,13 +3,11 @@ package net.postchain.eif.transaction
 import assertk.assertThat
 import assertk.assertions.isEqualTo
 import assertk.assertions.isNotNull
-import assertk.assertions.matches
 import net.postchain.devtools.getModules
 import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.EvmType
 import net.postchain.eif.contracts.Validator
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_ERRORS_COLUMN_MESSAGE
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_ERRORS_COLUMN_REQUEST_ID
+import org.apache.logging.log4j.Level
 import org.awaitility.Awaitility
 import org.awaitility.Duration
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -59,10 +57,7 @@ class TransactionSubmitterTimeoutIT : EifBaseIntegrationTest(
             assertTrue(txSubmitterTestModule.conf.queuedTxs.contains(0))
         }
         assertStatusOperation(txSubmitterTestModule, evmSubmitTxRellRequest.rowId, RellTransactionStatus.QUEUED)
-        withDbErrors(node, evmSubmitTxRellRequest.rowId) {
-            assertThat(it.size).isEqualTo(1)
-            assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_MESSAGE)).matches("Transaction 0 with timestamp \\d+ was not processed within \\d+ ms and timed out".toRegex())
-        }
+        testLogAppender.assertEventMatches(Level.WARN, "Transaction 0 with timestamp \\d+ was not processed within \\d+ ms and timed out")
     }
 
     @Test
@@ -76,7 +71,7 @@ class TransactionSubmitterTimeoutIT : EifBaseIntegrationTest(
         val sendResult =
             sendTransaction(contractAddress)
 
-        val evmSubmitTransactionRequest = mkEvmSubmitTxRellRequest(0, contractAddress, txHash = sendResult!!.transactionHash, functionName =  "updateValidators-incorrect", status = RellTransactionStatus.PENDING)
+        val evmSubmitTransactionRequest = mkEvmSubmitTxRellRequest(0, contractAddress, txHash = sendResult!!.transactionHash, functionName = "updateValidators-incorrect", status = RellTransactionStatus.PENDING)
 
         txSubmitterTestModule.addTransaction(evmSubmitTransactionRequest)
 
@@ -93,13 +88,7 @@ class TransactionSubmitterTimeoutIT : EifBaseIntegrationTest(
             buildBlock(1L)
 
             // There should be a timeout error message
-            withDbErrors(node, evmSubmitTransactionRequest.rowId)  {
-                assertTrue(
-                    it.any { it.get(EVM_TX_ERRORS_COLUMN_REQUEST_ID) == evmSubmitTransactionRequest.rowId &&
-                            it.get(EVM_TX_ERRORS_COLUMN_MESSAGE).matches("Transaction 0 with timestamp \\d+ was not processed within 0 ms and timed out".toRegex())
-                    }
-                )
-            }
+            testLogAppender.assertEventMatches(Level.WARN, "Transaction 0 with timestamp \\d+ was not processed within 0 ms and timed out")
         }
     }
 }

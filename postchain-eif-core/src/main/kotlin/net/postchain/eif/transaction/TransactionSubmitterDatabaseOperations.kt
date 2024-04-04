@@ -1,5 +1,6 @@
 package net.postchain.eif.transaction
 
+import net.postchain.core.BlockEContext
 import net.postchain.core.EContext
 import java.math.BigInteger
 
@@ -20,13 +21,7 @@ interface TransactionSubmitterDatabaseOperations {
 
     fun setSubmitTxBCPersisted(ctx: EContext, requestId: Long)
 
-    fun recordTransactionError(
-        ctx: EContext,
-        requestId: Long,
-        rpcUrl: String?,
-        message: String,
-        stackTrace: String? = null
-    )
-
     fun getQueuedTransactions(ctx: EContext, networkId: Long): List<EvmSubmitTxRequest>
+
+    fun removeTransaction(bctx: BlockEContext, requestId: Long)
 }

@@ -3,7 +3,9 @@ package net.postchain.eif.transaction
 import net.postchain.core.EContext
 import net.postchain.core.Storage
 import net.postchain.devtools.IntegrationTestSetup
+import net.postchain.eif.TestLogAppender
 import net.postchain.eif.Web3jRequestHandler
+import org.apache.logging.log4j.Level
 import org.junit.jupiter.api.BeforeEach
 import org.mockito.ArgumentMatchers
 import org.mockito.Mockito
@@ -16,7 +18,15 @@ import org.mockito.kotlin.mock
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.Response
-import org.web3j.protocol.core.methods.response.*
+import org.web3j.protocol.core.methods.response.EthBlock
+import org.web3j.protocol.core.methods.response.EthBlockNumber
+import org.web3j.protocol.core.methods.response.EthEstimateGas
+import org.web3j.protocol.core.methods.response.EthGetBalance
+import org.web3j.protocol.core.methods.response.EthGetTransactionReceipt
+import org.web3j.protocol.core.methods.response.EthSendTransaction
+import org.web3j.protocol.core.methods.response.EthTransaction
+import org.web3j.protocol.core.methods.response.Transaction
+import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.tx.TransactionManager
 import org.web3j.tx.gas.ContractGasProvider
 import java.math.BigInteger
@@ -30,6 +40,7 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
 
     lateinit var storage: Storage
     lateinit var databaseOperations: TransactionSubmitterDatabaseOperations
+    lateinit var testLogAppender: TestLogAppender
 
     @BeforeEach
     fun setup() {
@@ -41,6 +52,9 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
         }
 
         databaseOperations = mock<TransactionSubmitterDatabaseOperations>()
+
+        testLogAppender = TestLogAppender.addAppender(listOf(Level.WARN, Level.ERROR))
+        testLogAppender.clear()
     }
 
     fun mockGasProvider(gasPrice: Long, gasLimit: Long): ContractGasProvider {
@@ -71,7 +85,7 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
             } doAnswer {
                 mock<EthEstimateGas> {
                     if (amountUsedValue == null) {
-                        on { amountUsed } doThrow(RuntimeException("Failed to get gas estimate"))
+                        on { amountUsed } doThrow (RuntimeException("Failed to get gas estimate"))
                     } else {
                         on { amountUsed } doReturn (BigInteger.valueOf(amountUsedValue))
                     }

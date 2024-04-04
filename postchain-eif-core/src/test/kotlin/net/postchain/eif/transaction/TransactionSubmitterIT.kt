@@ -4,15 +4,19 @@ import assertk.assertThat
 import assertk.assertions.isEqualTo
 import assertk.assertions.isLessThan
 import assertk.assertions.isNotNull
+import net.postchain.base.data.DatabaseAccess
+import net.postchain.base.withReadConnection
+import net.postchain.devtools.PostchainTestNode.Companion.DEFAULT_CHAIN_IID
 import net.postchain.devtools.getModules
 import net.postchain.devtools.utils.configuration.NodeSeqNumber
 import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.EvmType
 import net.postchain.eif.contracts.Validator
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_ERRORS_COLUMN_MESSAGE
 import org.apache.commons.configuration2.MapConfiguration
 import org.awaitility.Awaitility
 import org.awaitility.Duration
+import org.jooq.SQLDialect
+import org.jooq.impl.DSL
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -80,9 +84,19 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
             )
         }
 
-        withDbErrors(node, txSubmit.rowId) {
-            assertThat(it.size).isEqualTo(0)
+        // Verify that the transaction was removed
+        val transactionsCount = withReadConnection(node.getBlockchainInstance(DEFAULT_CHAIN_IID).blockchainEngine.sharedStorage, DEFAULT_CHAIN_IID) {
+            val jooq = DSL.using(it.conn, SQLDialect.POSTGRES)
+
+            val tableName = DatabaseAccess.of(it).tableEvmTxSubmit(it)
+
+            jooq
+                    .select(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_HASH)
+                    .from(tableName)
+                    .where(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_REQUEST_ID.eq(txSubmit.rowId))
+                    .count()
         }
+        assertThat(transactionsCount).isEqualTo(0)
     }
 
     @Test
@@ -110,10 +124,6 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
                 txSubmit.rowId,
                 RellTransactionStatus.PENDING
             )
-        }
-
-        withDbErrors(node, txSubmit.rowId) {
-            assertThat(it.size).isEqualTo(0)
         }
 
         // Exists and might have the first receipt - but we don't know since it is asynchronous
@@ -261,10 +271,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
             assertStatusOperation(txSubmitterTestModule0, txSubmit.rowId, RellTransactionStatus.QUEUED)
-            withDbErrors(nodes[0], 0) {
-                assertThat(it.size).isEqualTo(1)
-                assertThat(it[0].get(EVM_TX_ERRORS_COLUMN_MESSAGE)).isEqualTo("Failed to get balance for request id 0: Failed to send web3j request to all 1 nodes")
-            }
+            testLogAppender.assertError("Failed to get balance for request id 0: Failed to send web3j request to all 1 nodes")
         }
 
         // Mock rell status for other nodes to be able to verify the operation

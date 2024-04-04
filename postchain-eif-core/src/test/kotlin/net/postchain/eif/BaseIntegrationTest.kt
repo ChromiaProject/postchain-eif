@@ -16,6 +16,7 @@ import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvInteger
 import net.postchain.gtv.GtvNull
 import net.postchain.gtx.GtxBuilder
+import org.apache.logging.log4j.Level
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.testcontainers.containers.DockerComposeContainer
@@ -75,9 +76,13 @@ abstract class EifBaseIntegrationTest(evmType: EvmType, private val prependUrls:
 
     lateinit var web3j: Web3j
     lateinit var transactionManager: TransactionManager
+    lateinit var testLogAppender: TestLogAppender
 
     @BeforeEach
     open fun setup() {
+
+        testLogAppender = TestLogAppender.addAppender(listOf(Level.WARN, Level.ERROR))
+        testLogAppender.clear()
 
         evmContainer.start()
 

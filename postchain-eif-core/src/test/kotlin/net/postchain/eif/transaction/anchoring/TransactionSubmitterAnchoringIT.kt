@@ -3,8 +3,7 @@ package net.postchain.eif.transaction.anchoring
 import assertk.assertThat
 import assertk.assertions.hasSize
 import assertk.assertions.isEqualTo
-import net.postchain.base.data.DatabaseAccess
-import net.postchain.base.withReadConnection
+import assertk.assertions.isNotNull
 import net.postchain.common.toHex
 import net.postchain.concurrent.util.get
 import net.postchain.devtools.addBlockchainAndStart
@@ -15,13 +14,9 @@ import net.postchain.eif.contracts.Anchoring
 import net.postchain.eif.contracts.Validator
 import net.postchain.eif.getEthereumAddress
 import net.postchain.eif.transaction.RellTransactionStatus
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl
 import net.postchain.eif.transaction.assertStatusOperation
-import net.postchain.eif.transaction.tableEvmTxSubmit
 import org.awaitility.Awaitility
 import org.awaitility.Duration
-import org.jooq.SQLDialect
-import org.jooq.impl.DSL
 import org.junit.jupiter.api.Test
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.FunctionEncoder
@@ -64,22 +59,13 @@ class TransactionSubmitterAnchoringIT : EifBaseIntegrationTest(
 
         val txSubmitterTestModule = node.getModules(txSubmitterChain).filterIsInstance<TransactionSubmitterAnchoringTestGTXModule>().first()
 
+        var txHash: String? = null
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(nodes.toList(), txSubmitterChain)
             assertStatusOperation(txSubmitterTestModule, 0, RellTransactionStatus.SUCCESS)
-        }
 
-        val txHash = withReadConnection(node.getBlockchainInstance(txSubmitterChain).blockchainEngine.sharedStorage, txSubmitterChain) {
-            val jooq = DSL.using(it.conn, SQLDialect.POSTGRES)
-
-            val tableName = DatabaseAccess.of(it).tableEvmTxSubmit(it)
-
-            jooq
-                    .select(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_HASH)
-                    .from(tableName)
-                    .where(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_REQUEST_ID.eq(0))
-                    .fetchOne()
-                    .value1()
+            txHash = assertStatusOperation(txSubmitterTestModule, 0, RellTransactionStatus.PENDING)
+            assertThat(txHash).isNotNull()
         }
 
         // Assert anchoring event was emitted

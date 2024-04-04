@@ -192,16 +192,6 @@ class TransactionSubmitter(
                     pollPendingTransaction(txPending, currentBlockHeight)
                 } catch (e: Exception) {
                     logger.error(e) { "Failed to process pending transaction ${txPending.rowId}" }
-                    withWriteConnection(storage, chainId) {
-                        databaseOperations.recordTransactionError(
-                            it,
-                            txPending.rowId,
-                            null,
-                            "Failed to process pending transaction ${txPending.rowId}: ${e.message}",
-                            e.stackTraceToString()
-                        )
-                        true
-                    }
                 } finally {
 
                     try {
@@ -268,17 +258,9 @@ class TransactionSubmitter(
             try {
                 isTimeout(txPending.rowId, txPending.created, nodeTxVerificationTimeout)
             } catch (e: EvmTransactionTimeoutException) {
+                logger.warn { "Transaction ${txPending.rowId} timed out" }
+
                 txPending.status = PendingTxStatus.REVERTED
-                withWriteConnection(storage, chainId) {
-                    databaseOperations.recordTransactionError(
-                        it,
-                        txPending.rowId,
-                        null,
-                        e.message ?: "Timeout",
-                        e.stackTraceToString()
-                    )
-                    true
-                }
                 submitTxUpdates.add(EvmSubmitTransactionResult(txPending.rowId, RellTransactionStatus.QUEUED))
                 return
             }
@@ -306,15 +288,7 @@ class TransactionSubmitter(
         txPending.gasUsed = txReceipt.gasUsed
 
         if (txPending.status == PendingTxStatus.REVERTED) {
-            withWriteConnection(storage, chainId) {
-                databaseOperations.recordTransactionError(
-                    it,
-                    txPending.rowId,
-                    null,
-                    "Transaction was reverted"
-                )
-                true
-            }
+            logger.warn { "Transaction ${txPending.rowId} got reverted" }
         }
 
         logger.info { "Pending transaction ${txPending.rowId} verified at block number $currentBlockHeight: ${txPending.status} - block hash: ${txPending.blockHash}, effective gas price ${txPending.effectiveGasPrice}, gas usage: ${txPending.gasUsed}" }
@@ -337,37 +311,19 @@ class TransactionSubmitter(
                 !transaction.to.contains(txPending.contractAddress)
             ) {
                 txPending.status = PendingTxStatus.REVERTED
-                withWriteConnection(storage, chainId) {
-                    databaseOperations.recordTransactionError(
-                        it,
-                        txPending.rowId,
-                        null,
-                        "Transaction does not match original"
-                    )
-                    true
-                }
+                logger.error { "Transaction ${txPending.rowId} does not match original" }
             }
         }
     }
 
     private fun fetchTransactionReceipt(txHash: String, rowId: Long) =
-        try {
-            web3jRequestHandler.sendWeb3jRequest { it.ethGetTransactionReceipt(txHash) }
-        } catch (e: Exception) {
-            val errorMessage = "Failed to poll for receipt for request id $rowId: ${e.message}"
-            logger.error(e) { errorMessage }
-            withWriteConnection(storage, chainId) {
-                databaseOperations.recordTransactionError(
-                    it,
-                    rowId,
-                    null,
-                    errorMessage,
-                    e.stackTraceToString()
-                )
-                true
+            try {
+                web3jRequestHandler.sendWeb3jRequest { it.ethGetTransactionReceipt(txHash) }
+            } catch (e: Exception) {
+                val errorMessage = "Failed to poll for receipt for request id $rowId: ${e.message}"
+                logger.error(e) { errorMessage }
+                throw ProgrammerMistake(errorMessage, e)
             }
-            throw ProgrammerMistake(errorMessage, e)
-        }
 
     internal fun submitTransaction(transactionRequest: EvmSubmitTxRequest) {
         try {
@@ -376,17 +332,6 @@ class TransactionSubmitter(
 
             val errorMessage = e.message ?: "Unknown error"
             logger.error(e) { errorMessage }
-
-            withWriteConnection(storage, chainId) {
-                databaseOperations.recordTransactionError(
-                    it,
-                    transactionRequest.rowId,
-                    null,
-                    errorMessage,
-                    e.stackTraceToString()
-                )
-                true
-            }
             throw e
         }
     }
@@ -480,19 +425,8 @@ class TransactionSubmitter(
 
             } catch (e: Exception) {
 
-                val error = "Failed to send transaction ${txRequest.rowId}: ${e.message}"
+                val error = "Failed to send transaction ${txRequest.rowId} to $rpcUrl: ${e.message}"
                 logger.error { error }
-
-                withWriteConnection(storage, chainId) {
-                    databaseOperations.recordTransactionError(
-                        it,
-                        txRequest.rowId,
-                        rpcUrl,
-                        error,
-                        e.stackTraceToString()
-                    )
-                    true
-                }
             }
         }
 
@@ -606,6 +540,13 @@ class TransactionSubmitter(
             .filterValues { it.rowId == rowId }
             .keys
             .forEach { pendingTransactions.remove(it) }
+    }
+
+    fun removeSubmitTx(bctx: BlockEContext, requestId: Long) {
+
+        logger.info { "Removed submit transaction $requestId" }
+
+        databaseOperations.removeTransaction(bctx, requestId)
     }
 }
 

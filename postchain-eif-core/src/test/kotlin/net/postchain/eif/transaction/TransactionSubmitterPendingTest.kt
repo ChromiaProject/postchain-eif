@@ -4,14 +4,12 @@ import assertk.assertThat
 import assertk.assertions.isEqualTo
 import assertk.assertions.isNotNull
 import net.postchain.eif.Web3jRequestHandler
+import org.apache.logging.log4j.Level
 import org.junit.jupiter.api.Test
-import org.mockito.ArgumentMatchers.anyString
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.doThrow
-import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
-import org.mockito.kotlin.verify
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.methods.response.EthBlockNumber
@@ -50,13 +48,9 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         // Fails on getting transaction details
         ts.pollPendingTransactions()
 
-        verify(databaseOperations).recordTransactionError(
-            any(),
-            eq(0L),
-            eq(null),
-            eq("Failed to process pending transaction 0: Oh dear"),
-            anyString()
-        )
+        testLogAppender.assertEvent(Level.ERROR, "Failed to process pending transaction 0") {
+            it.toString() == "java.lang.RuntimeException: Oh dear"
+        }
     }
 
     @Test
@@ -81,13 +75,7 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
 
         assertThat(txPending.status).isEqualTo(PendingTxStatus.REVERTED)
 
-        verify(databaseOperations).recordTransactionError(
-            any(),
-            eq(txPending.rowId),
-            eq(null),
-            eq("Transaction does not match original"),
-            eq(null)
-        )
+        testLogAppender.assertError("Transaction 0 does not match original")
     }
 
     @Test
@@ -113,13 +101,7 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
 
         assertThat(txPending.status).isEqualTo(PendingTxStatus.REVERTED)
 
-        verify(databaseOperations).recordTransactionError(
-            any(),
-            eq(txPending.rowId),
-            eq(null),
-            eq("Transaction was reverted"),
-            eq(null)
-        )
+        testLogAppender.assertWarn("Transaction 0 got reverted")
     }
 
     @Test
