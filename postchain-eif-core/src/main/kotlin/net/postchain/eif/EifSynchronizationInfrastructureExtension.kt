@@ -4,7 +4,10 @@ import mu.KLogging
 import net.postchain.PostchainContext
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.exception.UserMistake
-import net.postchain.core.*
+import net.postchain.core.BlockchainConfiguration
+import net.postchain.core.BlockchainEngine
+import net.postchain.core.BlockchainProcess
+import net.postchain.core.SynchronizationInfrastructureExtension
 import net.postchain.eif.config.EifBlockchainConfig
 import net.postchain.eif.config.EvmBlockchainConfig
 import net.postchain.eif.config.EvmConfig

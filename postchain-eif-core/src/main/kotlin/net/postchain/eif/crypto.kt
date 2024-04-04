@@ -47,9 +47,9 @@ fun compressKey(pubKey: ByteArray): ByteArray {
 
 fun encodeSignature(r: BigInteger, s: BigInteger, v: Int): ByteArray {
     return Arrays.concatenate(
-        bigIntegerToBytes(r, 32),
-        bigIntegerToBytes(s, 32),
-        ByteBuffer.allocate(1).put(v.toByte()).array()
+            bigIntegerToBytes(r, 32),
+            bigIntegerToBytes(s, 32),
+            ByteBuffer.allocate(1).put(v.toByte()).array()
     )
 }
 

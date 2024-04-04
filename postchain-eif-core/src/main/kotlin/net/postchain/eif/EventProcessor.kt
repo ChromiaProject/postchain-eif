@@ -10,13 +10,19 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.slf4j.MDCContext
 import mu.KLogging
-import net.postchain.core.BlockchainEngine
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.hexStringToByteArray
 import net.postchain.concurrent.util.get
+import net.postchain.core.BlockchainEngine
 import net.postchain.core.Shutdownable
-import net.postchain.gtv.*
+import net.postchain.gtv.Gtv
+import net.postchain.gtv.GtvArray
+import net.postchain.gtv.GtvBigInteger
+import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvFactory.gtv
+import net.postchain.gtv.GtvInteger
+import net.postchain.gtv.GtvNull
+import net.postchain.gtv.GtvString
 import net.postchain.gtx.data.OpData
 import org.web3j.abi.EventEncoder
 import org.web3j.abi.datatypes.Event
@@ -26,7 +32,8 @@ import org.web3j.protocol.core.methods.response.EthLog
 import org.web3j.protocol.core.methods.response.Log
 import org.web3j.tx.Contract
 import java.math.BigInteger
-import java.util.*
+import java.util.LinkedList
+import java.util.Queue
 import java.util.stream.Collectors
 
 enum class EncodedBlock(val index: Int) {
@@ -227,8 +234,8 @@ class EvmEventProcessor(
 
                 if (opNetworkId != eventNetworkId || opBlockNumber != eventBlockNumber || opBlockHash != eventBlockHash) {
                     logger.error(
-                        "Received unexpected block $opBlockNumber with hash $opBlockHash in network $opNetworkId." +
-                                " Expected block $eventBlockNumber with hash $eventBlockHash in network $eventNetworkId"
+                            "Received unexpected block $opBlockNumber with hash $opBlockHash in network $opNetworkId." +
+                                    " Expected block $eventBlockNumber with hash $eventBlockHash in network $eventNetworkId"
                     )
                     return false
                 }
@@ -254,8 +261,8 @@ class EvmEventProcessor(
     @Synchronized
     override fun getEventData(): List<Array<Gtv>> {
         return eventBlocks.stream()
-            .takeWhile { it[EncodedBlock.NUMBER.index].asBigInteger() <= lastReadLogBlockHeight - readOffset }
-            .collect(Collectors.toList())
+                .takeWhile { it[EncodedBlock.NUMBER.index].asBigInteger() <= lastReadLogBlockHeight - readOffset }
+                .collect(Collectors.toList())
     }
 
     private fun eventBlockToGtv(eventBlock: Pair<EvmBlock, List<Log>>): Array<Gtv> {
@@ -263,13 +270,13 @@ class EvmEventProcessor(
             val matchingEvent = eventMap[event.topics[0]] ?: throw ProgrammerMistake("No matching event")
             val parameters = Contract.staticExtractEventParameters(matchingEvent, event)
             gtv(listOf(
-                gtv(event.transactionHash.substring(2).hexStringToByteArray()),
-                gtv(event.logIndex),
-                gtv(event.topics[0].substring(2).hexStringToByteArray()),
-                gtv(event.address.substring(2).hexStringToByteArray()),
-                gtv(matchingEvent.name),
-                gtv(parameters.indexedValues.map(TypeToGtvMapper::map)),
-                gtv(parameters.nonIndexedValues.map(TypeToGtvMapper::map))
+                    gtv(event.transactionHash.substring(2).hexStringToByteArray()),
+                    gtv(event.logIndex),
+                    gtv(event.topics[0].substring(2).hexStringToByteArray()),
+                    gtv(event.address.substring(2).hexStringToByteArray()),
+                    gtv(matchingEvent.name),
+                    gtv(parameters.indexedValues.map(TypeToGtvMapper::map)),
+                    gtv(parameters.nonIndexedValues.map(TypeToGtvMapper::map))
             ))
         }
         return arrayOf(
@@ -287,16 +294,18 @@ class EvmEventProcessor(
         }
 
         val blockHeight = block.asDict()["evm_block_height"]
-            ?: throw ProgrammerMistake("Last evm block has no height stored")
+                ?: throw ProgrammerMistake("Last evm block has no height stored")
 
         // Trying to be flexible here, don't care what the query gives us as long as it's a number
         return when (blockHeight) {
             is GtvBigInteger -> {
                 blockHeight.asBigInteger()
             }
+
             is GtvInteger -> {
                 BigInteger.valueOf(blockHeight.asInteger())
             }
+
             else -> throw ProgrammerMistake("Unexpected block height type: ${blockHeight.type}")
         }
     }

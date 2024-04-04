@@ -34,11 +34,11 @@ class EifEventOp(u: Unit, opdata: ExtOpData) : GTXOperation(opdata) {
 
     override fun apply(ctx: TxEContext): Boolean {
         ctx.emitEvent(
-            "eif_event",
-            gtv(
-                GtvInteger(data.args[0].asInteger()),
-                GtvByteArray(data.args[1].asByteArray())
-            )
+                "eif_event",
+                gtv(
+                        GtvInteger(data.args[0].asInteger()),
+                        GtvByteArray(data.args[1].asByteArray())
+                )
         )
 
         return true
@@ -54,14 +54,14 @@ class EifStateOp(u: Unit, opdata: ExtOpData) : GTXOperation(opdata) {
 
     override fun apply(ctx: TxEContext): Boolean {
         ctx.emitEvent(
-            "eif_state",
-            gtv(
-                gtv(data.args[0].asInteger()),
+                "eif_state",
                 gtv(
-                    GtvInteger(data.args[1].asInteger()),
-                    GtvByteArray(data.args[2].asByteArray())
+                        gtv(data.args[0].asInteger()),
+                        gtv(
+                                GtvInteger(data.args[1].asInteger()),
+                                GtvByteArray(data.args[2].asByteArray())
+                        )
                 )
-            )
         )
 
         return true
@@ -77,42 +77,43 @@ class EifTransferOp(u: Unit, opdata: ExtOpData) : GTXOperation(opdata) {
 
     override fun apply(ctx: TxEContext): Boolean {
         r.update(ctx.conn,
-            """INSERT INTO ${table_eth_event(ctx)}(block_number, block_hash, tnx_hash, log_index, 
+                """INSERT INTO ${table_eth_event(ctx)}(block_number, block_hash, tnx_hash, log_index, 
                 |event_signature, contract_address, from_address, to_address, value) 
                 |VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimMargin(),
-            data.args[0].asInteger(), data.args[1].asString(), data.args[2].asString(), data.args[3].asInteger(),
-            data.args[4].asString(), data.args[5].asString(), data.args[6].asString(), data.args[7].asString(), data.args[8].asBigInteger())
+                data.args[0].asInteger(), data.args[1].asString(), data.args[2].asString(), data.args[3].asInteger(),
+                data.args[4].asString(), data.args[5].asString(), data.args[6].asString(), data.args[7].asString(), data.args[8].asBigInteger())
         return true
     }
 }
 
 class EifTestModule : SimpleGTXModule<Unit>(Unit,
-    mapOf(
-        "eif_event" to ::EifEventOp,
-        "eif_state" to ::EifStateOp
-    ),
-    mapOf()
+        mapOf(
+                "eif_event" to ::EifEventOp,
+                "eif_state" to ::EifStateOp
+        ),
+        mapOf()
 ) {
     override fun initializeDB(ctx: EContext) {}
 }
 
 class EifTransferTestModule : SimpleGTXModule<Unit>(Unit,
-    mapOf(
-        "eif_event" to ::EifEventOp,
-        "eif_state" to ::EifStateOp,
-        "__eth_event" to ::EifTransferOp
-    ),
-    mapOf("get_last_eth_block" to { _, ctx, _ ->
-        val sql = "SELECT LIMIT 1 block_number, block_hash FROM ${table_eth_event(ctx)} ORDER BY block_number DESC"
-        val res = r.query(ctx.conn, sql, mapListHandler)
-        when (res.size) {
-            1 -> gtv(mutableMapOf(
-                "eth_block_height" to gtv(res[0]["block_number"] as BigInteger),
-                "eth_block_hash" to gtv(res[0]["block_hash"] as String)
-            ))
-            else -> GtvNull
-        }
-    })
+        mapOf(
+                "eif_event" to ::EifEventOp,
+                "eif_state" to ::EifStateOp,
+                "__eth_event" to ::EifTransferOp
+        ),
+        mapOf("get_last_eth_block" to { _, ctx, _ ->
+            val sql = "SELECT LIMIT 1 block_number, block_hash FROM ${table_eth_event(ctx)} ORDER BY block_number DESC"
+            val res = r.query(ctx.conn, sql, mapListHandler)
+            when (res.size) {
+                1 -> gtv(mutableMapOf(
+                        "eth_block_height" to gtv(res[0]["block_number"] as BigInteger),
+                        "eth_block_hash" to gtv(res[0]["block_hash"] as String)
+                ))
+
+                else -> GtvNull
+            }
+        })
 ) {
     override fun initializeDB(ctx: EContext) {
         val moduleName = this::class.qualifiedName!!

@@ -2,12 +2,13 @@
 package net.postchain.eif
 
 import net.postchain.PostchainContext
-import net.postchain.core.*
+import net.postchain.core.BlockchainProcess
+import net.postchain.core.SynchronizationInfrastructureExtension
 import net.postchain.gtx.GTXBlockchainConfiguration
 
 @Suppress("UNUSED_PARAMETER")
 class EifTestSynchronizationInfrastructureExtension(
-    postchainContext: PostchainContext
+        postchainContext: PostchainContext
 ) : SynchronizationInfrastructureExtension {
 
     override fun connectProcess(process: BlockchainProcess) {

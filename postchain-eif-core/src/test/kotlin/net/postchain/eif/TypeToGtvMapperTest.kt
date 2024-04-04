@@ -3,10 +3,22 @@ package net.postchain.eif
 import net.postchain.common.hexStringToByteArray
 import net.postchain.gtv.GtvBigInteger
 import net.postchain.gtv.GtvInteger
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertInstanceOf
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.web3j.abi.datatypes.*
-import org.web3j.abi.datatypes.generated.*
+import org.web3j.abi.datatypes.Address
+import org.web3j.abi.datatypes.Bool
+import org.web3j.abi.datatypes.DynamicArray
+import org.web3j.abi.datatypes.DynamicBytes
+import org.web3j.abi.datatypes.Int
+import org.web3j.abi.datatypes.Uint
+import org.web3j.abi.datatypes.Utf8String
+import org.web3j.abi.datatypes.generated.Bytes32
+import org.web3j.abi.datatypes.generated.Int64
+import org.web3j.abi.datatypes.generated.Int72
+import org.web3j.abi.datatypes.generated.Uint56
+import org.web3j.abi.datatypes.generated.Uint64
 import java.math.BigInteger
 import kotlin.math.pow
 

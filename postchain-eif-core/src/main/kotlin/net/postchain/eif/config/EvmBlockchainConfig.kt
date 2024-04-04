@@ -18,9 +18,9 @@ data class EvmBlockchainConfig(
         @DefaultValue(defaultLong = 0)
         val skipToHeight: Long,
         @Name("evm_read_offset")
-        @DefaultValue(defaultLong = 12)
+        @DefaultValue(defaultLong = 100)
         val evmReadOffset: Long,
         @Name("read_offset")
-        @DefaultValue(defaultLong = 100)
+        @DefaultValue(defaultLong = 2)
         val readOffset: Long
 )

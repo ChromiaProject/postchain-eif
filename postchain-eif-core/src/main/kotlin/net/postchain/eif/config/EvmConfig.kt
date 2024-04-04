@@ -39,12 +39,12 @@ data class EvmConfig(
                     config.getEnvOrLong(EVM_MIN_RETRY_DELAY, "evm.minRetryDelay", 500L),
                     config.getEnvOrLong(EVM_MAX_RETRY_DELAY, "evm.maxRetryDelay", 60_000L),
                     config.getEnvOrLong(EVM_DELAY_WHEN_NO_NEW_BLOCKS, "evm.delayWhenNoNewBlocks", 500L),
-                    config.getEnvOrLong(EVM_MAX_TRY_ERRORS,"evm.maxTryErrors", 10L)
+                    config.getEnvOrLong(EVM_MAX_TRY_ERRORS, "evm.maxTryErrors", 10L)
             )
         }
     }
 
-    fun toEnvironmentKeyValueMap(chain: String): Map<String, String> = buildMap{
+    fun toEnvironmentKeyValueMap(chain: String): Map<String, String> = buildMap {
         put("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_URLS", urls.joinToString(","))
         put("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_LAST_EVM_BLOCK_HEIGHT", lastEvmBlockHeight.toString())
         put(EVM_CONNECT_TIMEOUT, connectTimeout.toString())

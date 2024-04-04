@@ -4,7 +4,7 @@ import net.postchain.base.SpecialTransactionPosition
 import net.postchain.common.BlockchainRid
 import net.postchain.core.BlockEContext
 import net.postchain.crypto.CryptoSystem
-import net.postchain.gtx.*
+import net.postchain.gtx.GTXModule
 import net.postchain.gtx.data.OpData
 import net.postchain.gtx.special.GTXSpecialTxExtension
 
