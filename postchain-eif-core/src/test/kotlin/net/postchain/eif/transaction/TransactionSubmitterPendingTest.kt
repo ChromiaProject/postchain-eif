@@ -30,7 +30,7 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
 
         val web3jRequestHandler = mock<Web3jRequestHandler> {
             on { sendWeb3jRequest(requestFactory = any<(Web3j) -> Request<*, EthGetBalance>>()) } doThrow RuntimeException(
-                "Oh dear"
+                    "Oh dear"
             )
         }
         mockWeb3jRequest(web3jRequestHandler, EthGetTransactionReceipt::class, mockTransactionReceiptResponse(5, true))
@@ -38,9 +38,9 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         mockWeb3jRequest(web3jRequestHandler, EthBlockNumber::class, blockNumber)
 
         val ts = createTransactionSubmitter(
-            web3jRequestHandler,
-            mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
-            mock<ContractGasProvider>()
+                web3jRequestHandler,
+                mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
+                mock<ContractGasProvider>()
         )
 
         ts.addPendingTransaction(mkEvmPendingDbTx(5))
@@ -59,9 +59,9 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         val web3jRequestHandler = mock<Web3jRequestHandler>()
 
         val ts = createTransactionSubmitter(
-            web3jRequestHandler,
-            mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
-            mock<ContractGasProvider>()
+                web3jRequestHandler,
+                mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
+                mock<ContractGasProvider>()
         )
 
         val txPending = mkEvmPendingDbTx(10)
@@ -84,9 +84,9 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         val web3jRequestHandler = mock<Web3jRequestHandler>()
 
         val ts = createTransactionSubmitter(
-            web3jRequestHandler,
-            mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
-            mock<ContractGasProvider>()
+                web3jRequestHandler,
+                mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
+                mock<ContractGasProvider>()
         )
 
         val txPending = mkEvmPendingDbTx(5)
@@ -94,8 +94,8 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         mockWeb3jRequest(web3jRequestHandler, EthGetTransactionReceipt::class, mockTransactionReceiptResponse(5, false))
         mockWeb3jRequest(web3jRequestHandler, EthBlockNumber::class, mockBlockNumber(BigInteger.TEN))
         mockWeb3jRequest(web3jRequestHandler, EthTransaction::class, mockEthTransactionResponse(
-            "contractAddress",
-            "0x9329efad000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000101010101010101010101010101010101010101"
+                "contractAddress",
+                "0x9329efad000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000101010101010101010101010101010101010101"
         ))
         ts.pollPendingTransaction(txPending, BigInteger.valueOf(15))
 
@@ -110,9 +110,9 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         val web3jRequestHandler = mock<Web3jRequestHandler>()
 
         val ts = createTransactionSubmitter(
-            web3jRequestHandler,
-            mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
-            mock<ContractGasProvider>()
+                web3jRequestHandler,
+                mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
+                mock<ContractGasProvider>()
         )
 
         val txPending = mkEvmPendingDbTx()
@@ -135,8 +135,8 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         // Third poll with block number 10 - evm has built 5 blocks - lets verify everything
 //        mockWeb3jRequest(web3jRequestHandler, EthBlockNumber::class, mockBlockNumber(BigInteger.TEN))
         mockWeb3jRequest(web3jRequestHandler, EthTransaction::class, mockEthTransactionResponse(
-            "contractAddress",
-            "0x9329efad000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000101010101010101010101010101010101010101"
+                "contractAddress",
+                "0x9329efad000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000101010101010101010101010101010101010101"
         ))
         ts.pollPendingTransaction(txPending, BigInteger.valueOf(10))
 

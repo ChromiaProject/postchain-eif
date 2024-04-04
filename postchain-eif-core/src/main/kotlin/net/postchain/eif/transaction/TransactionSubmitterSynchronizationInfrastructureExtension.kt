@@ -43,10 +43,10 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
             if (ext is TransactionSubmitterSpecialTxExtension) {
 
                 ext.setConfig(
-                    postchainContext.appConfig.privKeyByteArray,
-                    postchainContext.appConfig.pubKeyByteArray,
-                    transactionSubmitterBlockchainConfig.txVerificationTime,
-                    !nodeIsReplica
+                        postchainContext.appConfig.privKeyByteArray,
+                        postchainContext.appConfig.pubKeyByteArray,
+                        transactionSubmitterBlockchainConfig.txVerificationTime,
+                        !nodeIsReplica
                 )
 
                 // Create the tx submitters only if we build blocks

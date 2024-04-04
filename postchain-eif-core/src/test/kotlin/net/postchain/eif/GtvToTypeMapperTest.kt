@@ -1,8 +1,14 @@
 package net.postchain.eif
 
 import net.postchain.common.toHex
-import net.postchain.gtv.*
-import org.junit.jupiter.api.Assertions.*
+import net.postchain.gtv.GtvArray
+import net.postchain.gtv.GtvBigInteger
+import net.postchain.gtv.GtvByteArray
+import net.postchain.gtv.GtvInteger
+import net.postchain.gtv.GtvString
+import org.junit.jupiter.api.Assertions.assertArrayEquals
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.Address

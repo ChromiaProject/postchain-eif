@@ -36,11 +36,11 @@ enum class EvmType {
 }
 
 data class AccountRegister(
-    var accountId: ByteArray = ByteArray(32),
-    val privKey: ByteArray,
-    val pubkey: ByteArray,
-    val evmAddress: ByteArray,
-    val balance: Long
+        var accountId: ByteArray = ByteArray(32),
+        val privKey: ByteArray,
+        val pubkey: ByteArray,
+        val evmAddress: ByteArray,
+        val balance: Long
 )
 
 enum class AuthType {
@@ -54,20 +54,20 @@ abstract class EifBaseIntegrationTest(evmType: EvmType, private val prependUrls:
     protected val evmContainer: DockerComposeContainer<*> = when (evmType) {
         EvmType.GETH -> {
             GethContainer().withExposedService(
-                "geth", 8545,
-                Wait.forLogMessage(".*HTTP server started.*\\s", 1)
+                    "geth", 8545,
+                    Wait.forLogMessage(".*HTTP server started.*\\s", 1)
             )
         }
 
         EvmType.BSC -> {
             BscContainer().withExposedService(
-                "geth", 8545,
-                Wait.forLogMessage(".*HTTP server started.*\\s", 1)
+                    "geth", 8545,
+                    Wait.forLogMessage(".*HTTP server started.*\\s", 1)
             )
         }
     }
     val credentials = Credentials
-        .create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
+            .create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
     val registerAccounts = mutableListOf<AccountRegister>()
     val snapshotHeights = mutableListOf<Long>()
     val tokenBridgeBinary = getBinaryFromArtifactResource("/artifacts/contracts/TokenBridge.sol/TokenBridge.json")
@@ -89,19 +89,19 @@ abstract class EifBaseIntegrationTest(evmType: EvmType, private val prependUrls:
         val evmHost = evmContainer.getServiceHost("geth", 8545)
         val evmPort = evmContainer.getServicePort("geth", 8545)
         web3j = Web3j.build(
-            HttpService(
-                "http://$evmHost:$evmPort"
-            )
+                HttpService(
+                        "http://$evmHost:$evmPort"
+                )
         )
 
         transactionManager = FastRawTransactionManager(
-            web3j,
-            credentials,
-            PollingTransactionReceiptProcessor(
                 web3j,
-                1000,
-                30
-            )
+                credentials,
+                PollingTransactionReceiptProcessor(
+                        web3j,
+                        1000,
+                        30
+                )
         )
 
         var urls = "http://$evmHost:$evmPort"
@@ -136,46 +136,46 @@ abstract class EifBaseIntegrationTest(evmType: EvmType, private val prependUrls:
 
     // Register asset on postchain
     fun registerAsset(
-        tokenName: String,
-        tokenSymbol: String,
-        tokenDecimal: Long,
-        tokenIconUrl: String,
-        bcRid: BlockchainRid,
-        sigMaker: SigMaker
+            tokenName: String,
+            tokenSymbol: String,
+            tokenDecimal: Long,
+            tokenIconUrl: String,
+            bcRid: BlockchainRid,
+            sigMaker: SigMaker
     ): ByteArray {
         val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
         b.addOperation(
-            "ft4.admin.register_asset",
-            gtv(tokenName), gtv(tokenSymbol), gtv(tokenDecimal), gtv(tokenIconUrl)
+                "ft4.admin.register_asset",
+                gtv(tokenName), gtv(tokenSymbol), gtv(tokenDecimal), gtv(tokenIconUrl)
         )
         return b.finish()
-            .sign(sigMaker)
-            .buildGtx()
-            .encode()
+                .sign(sigMaker)
+                .buildGtx()
+                .encode()
     }
 
     // Add new evm erc20 token
     fun addNewEvmErc20(
-        tokenAddress: ByteArray,
-        name: String,
-        symbol: String,
-        decimal: Long,
-        bcRid: BlockchainRid,
-        sigMaker: SigMaker
+            tokenAddress: ByteArray,
+            name: String,
+            symbol: String,
+            decimal: Long,
+            bcRid: BlockchainRid,
+            sigMaker: SigMaker
     ): ByteArray {
         val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
         b.addOperation(
-            "eif.ft4.add_new_evm_erc20",
-            gtv(networkId),
-            gtv(tokenAddress),
-            gtv(name),
-            gtv(symbol),
-            gtv(decimal)
+                "eif.ft4.add_new_evm_erc20",
+                gtv(networkId),
+                gtv(tokenAddress),
+                gtv(name),
+                gtv(symbol),
+                gtv(decimal)
         )
         return b.finish()
-            .sign(sigMaker)
-            .buildGtx()
-            .encode()
+                .sign(sigMaker)
+                .buildGtx()
+                .encode()
     }
 
     // Add new token mapping
@@ -183,23 +183,23 @@ abstract class EifBaseIntegrationTest(evmType: EvmType, private val prependUrls:
         val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
         b.addOperation("eif.ft4.add_new_token_mapping", gtv(networkId), gtv(tokenAddress), assetId)
         return b.finish()
-            .sign(sigMaker)
-            .buildGtx()
-            .encode()
+                .sign(sigMaker)
+                .buildGtx()
+                .encode()
     }
 
     // Register account on postchain
     fun registerAccount(
-        userPubkey: ByteArray,
-        userPriKey: ByteArray,
-        userEVMAddress: ByteArray,
-        sig: GtvArray,
-        bcRid: BlockchainRid
+            userPubkey: ByteArray,
+            userPriKey: ByteArray,
+            userEVMAddress: ByteArray,
+            sig: GtvArray,
+            bcRid: BlockchainRid
     ): ByteArray {
         val auth = gtv(
-            gtv(AuthType.S.ordinal.toLong()),
-            gtv(GtvArray(arrayOf(gtv("A"), gtv("T"))), gtv(userPubkey)),
-            GtvNull
+                gtv(AuthType.S.ordinal.toLong()),
+                gtv(GtvArray(arrayOf(gtv("A"), gtv("T"))), gtv(userPubkey)),
+                GtvNull
         )
 
         val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
@@ -207,39 +207,39 @@ abstract class EifBaseIntegrationTest(evmType: EvmType, private val prependUrls:
 
         val signer = cryptoSystem.buildSigMaker(KeyPair(userPubkey, userPriKey))
         return b.finish()
-            .sign(signer)
-            .buildGtx()
-            .encode()
+                .sign(signer)
+                .buildGtx()
+                .encode()
     }
 
     // Withdraw ft3 token on postchain
     fun withdrawOnPostchain(
-        userPubkey: ByteArray, userPriKey: ByteArray,
-        authId: Gtv, tokenAddress: ByteArray,
-        userEvmAddress: ByteArray, withdrawAmount: BigInteger, bcRid: BlockchainRid
+            userPubkey: ByteArray, userPriKey: ByteArray,
+            authId: Gtv, tokenAddress: ByteArray,
+            userEvmAddress: ByteArray, withdrawAmount: BigInteger, bcRid: BlockchainRid
     ): ByteArray {
         val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
         b.addOperation(
-            "eif.ft4.bridge_ft_token_to_evm",
-            authId,
-            gtv(networkId),
-            gtv(tokenAddress),
-            gtv(userEvmAddress),
-            gtv(withdrawAmount)
+                "eif.ft4.bridge_ft_token_to_evm",
+                authId,
+                gtv(networkId),
+                gtv(tokenAddress),
+                gtv(userEvmAddress),
+                gtv(withdrawAmount)
         )
         b.addOperation("nop", GtvInteger(System.currentTimeMillis()))
         val signer = cryptoSystem.buildSigMaker(KeyPair(userPubkey, userPriKey))
         return b.finish()
-            .sign(signer)
-            .buildGtx()
-            .encode()
+                .sign(signer)
+                .buildGtx()
+                .encode()
     }
 
     // Transfer ft3 token to another account
     fun transfer(
-        userPubkey: ByteArray, userPriKey: ByteArray,
-        accountId: Gtv, authDescriptorId: Hash, otherAccountId: Gtv,
-        assetId: Gtv, transferAmount: BigInteger, bcRid: BlockchainRid
+            userPubkey: ByteArray, userPriKey: ByteArray,
+            accountId: Gtv, authDescriptorId: Hash, otherAccountId: Gtv,
+            assetId: Gtv, transferAmount: BigInteger, bcRid: BlockchainRid
     ): ByteArray {
         val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
         b.addOperation("ft4.ft_auth", accountId, gtv(authDescriptorId))
@@ -247,13 +247,13 @@ abstract class EifBaseIntegrationTest(evmType: EvmType, private val prependUrls:
 
         val signer = cryptoSystem.buildSigMaker(KeyPair(userPubkey, userPriKey))
         return b.finish()
-            .sign(signer)
-            .buildGtx()
-            .encode()
+                .sign(signer)
+                .buildGtx()
+                .encode()
     }
 
     fun getRegisterMessage(evmAddress: String, disposableKey: String) =
-        "Create account for EVM wallet:\n${evmAddress}\n\nDisposable key:\n${disposableKey}"
+            "Create account for EVM wallet:\n${evmAddress}\n\nDisposable key:\n${disposableKey}"
 
     fun sendTransaction(contractAddress: String): EthSendTransaction? {
         return sendTransaction(contractAddress, "updateValidators", listOf("address[]"), listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))))

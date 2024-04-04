@@ -33,8 +33,8 @@ import java.util.concurrent.CompletableFuture
 
 @Testcontainers(disabledWithoutDocker = true)
 class EthereumEventProcessorIT : EifBaseIntegrationTest(
-    EvmType.GETH,
-    prependUrls = listOf("http://127.0.0.1:8888", "http://127.0.0.1:9999")
+        EvmType.GETH,
+        prependUrls = listOf("http://127.0.0.1:8888", "http://127.0.0.1:9999")
 ) {
 
     private val accountId = Bytes32("fc91c4abaff09f4c67a0ab84d4e9afd37c929978bea3fa1790403ab6ee85bf33"

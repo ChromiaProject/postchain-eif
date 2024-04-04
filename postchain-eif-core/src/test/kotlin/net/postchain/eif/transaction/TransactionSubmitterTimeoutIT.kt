@@ -69,7 +69,7 @@ class TransactionSubmitterTimeoutIT : EifBaseIntegrationTest(
         val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
 
         val sendResult =
-            sendTransaction(contractAddress)
+                sendTransaction(contractAddress)
 
         val evmSubmitTransactionRequest = mkEvmSubmitTxRellRequest(0, contractAddress, txHash = sendResult!!.transactionHash, functionName = "updateValidators-incorrect", status = RellTransactionStatus.PENDING)
 
@@ -79,8 +79,8 @@ class TransactionSubmitterTimeoutIT : EifBaseIntegrationTest(
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
             assertThat(withTxSubmitter(txSubmitterTestModule, 0) { _, _ -> true })
-                .isNotNull()
-                .isEqualTo(true)
+                    .isNotNull()
+                    .isEqualTo(true)
         }
 
         // Wait for timeout

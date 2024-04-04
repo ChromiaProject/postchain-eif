@@ -18,8 +18,8 @@ import java.math.BigInteger
 
 @Testcontainers(disabledWithoutDocker = true)
 class TransactionSubmitterSubmitRetryIT : EifBaseIntegrationTest(
-    EvmType.GETH,
-    prependUrls = listOf("http://127.0.0.1:1", "http://127.0.0.1:2")
+        EvmType.GETH,
+        prependUrls = listOf("http://127.0.0.1:1", "http://127.0.0.1:2")
 ) {
 
     @BeforeEach
@@ -39,12 +39,12 @@ class TransactionSubmitterSubmitRetryIT : EifBaseIntegrationTest(
         val encodedConstructor =
                 FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(BigInteger.ONE))))
         val contract = Contract.deployRemoteCall(
-            Validator::class.java,
-            web3j,
-            transactionManager,
-            gasProvider,
-            validatorBinary,
-            encodedConstructor
+                Validator::class.java,
+                web3j,
+                transactionManager,
+                gasProvider,
+                validatorBinary,
+                encodedConstructor
         ).send()
         val contractAddress = contract.contractAddress.substring(2)
 

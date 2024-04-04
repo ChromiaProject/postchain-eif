@@ -68,8 +68,8 @@ import java.security.MessageDigest
 @DisableIfTestFails
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 abstract class EifIntegrationTest(evmType: EvmType) : EifBaseIntegrationTest(
-    evmType,
-    prependUrls = listOf("http://127.0.0.1:8888", "http://127.0.0.1:9999")
+        evmType,
+        prependUrls = listOf("http://127.0.0.1:8888", "http://127.0.0.1:9999")
 ) {
 
     val logger = KotlinLogging.logger("test_logger")

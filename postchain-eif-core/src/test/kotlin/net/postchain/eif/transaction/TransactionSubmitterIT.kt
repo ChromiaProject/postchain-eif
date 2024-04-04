@@ -29,7 +29,7 @@ import java.math.BigInteger
 
 @Testcontainers(disabledWithoutDocker = true)
 class TransactionSubmitterIT : EifBaseIntegrationTest(
-    EvmType.GETH
+        EvmType.GETH
 ) {
 
     private lateinit var contractAddress: String
@@ -45,14 +45,14 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
 
         // Deploy validator contract
         val encodedConstructor =
-            FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(BigInteger.ONE))))
+                FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(BigInteger.ONE))))
         val contract = Contract.deployRemoteCall(
-            Validator::class.java,
-            web3j,
-            transactionManager,
-            gasProvider,
-            validatorBinary,
-            encodedConstructor
+                Validator::class.java,
+                web3j,
+                transactionManager,
+                gasProvider,
+                validatorBinary,
+                encodedConstructor
         ).send()
         contractAddress = contract.contractAddress.substring(2)
     }
@@ -78,9 +78,9 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
             assertStatusOperation(
-                txSubmitterTestModule,
-                txSubmit.rowId,
-                RellTransactionStatus.PENDING
+                    txSubmitterTestModule,
+                    txSubmit.rowId,
+                    RellTransactionStatus.PENDING
             )
         }
 
@@ -120,9 +120,9 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
             assertStatusOperation(
-                txSubmitterTestModule,
-                txSubmit.rowId,
-                RellTransactionStatus.PENDING
+                    txSubmitterTestModule,
+                    txSubmit.rowId,
+                    RellTransactionStatus.PENDING
             )
         }
 
@@ -140,9 +140,9 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
             assertStatusOperation(
-                txSubmitterTestModule,
-                txSubmit.rowId,
-                RellTransactionStatus.SUCCESS
+                    txSubmitterTestModule,
+                    txSubmit.rowId,
+                    RellTransactionStatus.SUCCESS
             )
             withUpdateEvmTransactionReceipt(txSubmitterTestModule, txSubmit.rowId) {
                 assertThat(it.size).isEqualTo(1)
@@ -181,7 +181,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
         val nodes = createNodes(4, "/net/postchain/eif/transaction/blockchain_config_4_nodes.xml")
 
         val allTxSubmitterTestModules =
-            nodes.map { it.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first() }
+                nodes.map { it.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first() }
 
         val txSubmit = mkEvmSubmitTxRellRequest(0, contractAddress)
 
@@ -206,17 +206,17 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
 
         // Make sure node[1] updates the status to PENDING with a tx hash
         withTxOperations(
-            allTxSubmitterTestModules[0],
-            TransactionSubmitterSpecialTxExtension.UPDATE_EVM_TRANSACTION_STATUS
+                allTxSubmitterTestModules[0],
+                TransactionSubmitterSpecialTxExtension.UPDATE_EVM_TRANSACTION_STATUS
         ) { operations ->
             val statusOperations = operations
-                .filter {
-                    it.args[0].asInteger() == txSubmit.rowId &&
-                            RellTransactionStatus.values()[it.args[1].asInteger()
-                                .toInt()] == RellTransactionStatus.PENDING &&
-                            it.args.size == 5
-                }
-                .map { it.args[2].asString() }
+                    .filter {
+                        it.args[0].asInteger() == txSubmit.rowId &&
+                                RellTransactionStatus.values()[it.args[1].asInteger()
+                                        .toInt()] == RellTransactionStatus.PENDING &&
+                                it.args.size == 5
+                    }
+                    .map { it.args[2].asString() }
 
             if (statusOperations.isNotEmpty()) statusOperations[0] else null
         }
@@ -236,22 +236,22 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
 
         // node[0] is the failing node - invalid rpc url
         nodeConfigOverrides[NodeSeqNumber(0)] =
-            MapConfiguration(
-                mutableMapOf(
-                    "ethereum.urls" to "http://127.0.0.1:1",
-                    "evm.healthCheckInterval" to -1
+                MapConfiguration(
+                        mutableMapOf(
+                                "ethereum.urls" to "http://127.0.0.1:1",
+                                "evm.healthCheckInterval" to -1
+                        )
                 )
-            )
 
         val nodes = createNodes(4, "/net/postchain/eif/transaction/blockchain_config_4_nodes.xml")
         val nodesExceptFirst = listOf(nodes[1], nodes[2], nodes[3])
 
         val allTxSubmitterTestModules =
-            nodes.map { it.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first() }
+                nodes.map { it.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first() }
         val txSubmitterTestModule0 = allTxSubmitterTestModules[0]
         val txSubmitterTestModule1 = allTxSubmitterTestModules[1]
         val allTxSubmitterTestModulesExceptFirst =
-            listOf(allTxSubmitterTestModules[0], allTxSubmitterTestModules[1], allTxSubmitterTestModules[2])
+                listOf(allTxSubmitterTestModules[0], allTxSubmitterTestModules[1], allTxSubmitterTestModules[2])
 
         val txSubmit = mkEvmSubmitTxRellRequest(0, contractAddress)
 
@@ -297,17 +297,17 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
 
         // Make sure node[1] updates the status to PENDING with a tx hash
         withTxOperations(
-            txSubmitterTestModule1,
-            TransactionSubmitterSpecialTxExtension.UPDATE_EVM_TRANSACTION_STATUS
+                txSubmitterTestModule1,
+                TransactionSubmitterSpecialTxExtension.UPDATE_EVM_TRANSACTION_STATUS
         ) { operations ->
             val statusOperations = operations
-                .filter {
-                    it.args[0].asInteger() == txSubmit.rowId &&
-                            RellTransactionStatus.values()[it.args[1].asInteger()
-                                .toInt()] == RellTransactionStatus.PENDING &&
-                            it.args.size == 5
-                }
-                .map { it.args[2].asString() }
+                    .filter {
+                        it.args[0].asInteger() == txSubmit.rowId &&
+                                RellTransactionStatus.values()[it.args[1].asInteger()
+                                        .toInt()] == RellTransactionStatus.PENDING &&
+                                it.args.size == 5
+                    }
+                    .map { it.args[2].asString() }
 
             if (statusOperations.isNotEmpty()) statusOperations[0] else null
         }

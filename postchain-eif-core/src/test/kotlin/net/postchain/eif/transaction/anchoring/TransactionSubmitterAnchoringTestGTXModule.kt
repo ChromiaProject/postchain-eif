@@ -46,18 +46,18 @@ class AnchorOperation(private val conf: TransactionSubmitterTestContext, private
     override fun apply(ctx: TxEContext): Boolean {
 
         val tx = EvmSubmitTxRellRequest(
-            0,
-            "39615b16b74589919c9ce1ea73f1fc5d53141a78", // TODO: Fetch contract address instead of hardcoding
-            "anchorBlock",
-            listOf("bytes", "bytes[]", "address[]"),
-            extOpData.args.toList(),
-            1337,
-            BigInteger.ONE,
-            BigInteger.valueOf(4000000000),
-            BlockchainRid.ZERO_RID.data,
-            System.currentTimeMillis(),
-            null,
-            RellTransactionStatus.QUEUED
+                0,
+                "39615b16b74589919c9ce1ea73f1fc5d53141a78", // TODO: Fetch contract address instead of hardcoding
+                "anchorBlock",
+                listOf("bytes", "bytes[]", "address[]"),
+                extOpData.args.toList(),
+                1337,
+                BigInteger.ONE,
+                BigInteger.valueOf(4000000000),
+                BlockchainRid.ZERO_RID.data,
+                System.currentTimeMillis(),
+                null,
+                RellTransactionStatus.QUEUED
         )
         conf.transactions.add(tx)
         conf.transactionsAvailableToTake.add(tx)

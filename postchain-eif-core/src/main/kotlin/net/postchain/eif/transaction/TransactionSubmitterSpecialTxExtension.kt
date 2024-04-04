@@ -53,9 +53,9 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     }
 
     override fun validateSpecialOperations(
-        position: SpecialTransactionPosition,
-        bctx: BlockEContext,
-        ops: List<OpData>
+            position: SpecialTransactionPosition,
+            bctx: BlockEContext,
+            ops: List<OpData>
     ): Boolean {
 
         if (!isNoOpValid(ops, bctx.height)) {
@@ -187,7 +187,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
             val submitTxUpdates = txSubmitter.getSubmitTxUpdates()
             submitTxUpdates.forEach { result ->
                 operations.add(
-                    buildTxUpdateOp(result.requestId, result.status, result.txHash)
+                        buildTxUpdateOp(result.requestId, result.status, result.txHash)
                 )
 
                 // Status QUEUE can be set multiple times due to retry - add a no op for them
@@ -206,14 +206,14 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
             txSubmitter.getVerifiedTransactions(txVerificationTime).forEach {
 
                 val rellStatus =
-                    if (it.status == PendingTxStatus.SUCCESS) RellTransactionStatus.SUCCESS else RellTransactionStatus.FAILURE
+                        if (it.status == PendingTxStatus.SUCCESS) RellTransactionStatus.SUCCESS else RellTransactionStatus.FAILURE
 
                 operations.add(
-                    buildTxReceiptOp(it)
+                        buildTxReceiptOp(it)
                 )
 
                 operations.add(
-                    buildTxUpdateOp(it.rowId, rellStatus)
+                        buildTxUpdateOp(it.rowId, rellStatus)
                 )
             }
         }
@@ -224,12 +224,12 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     private fun buildTxReceiptOp(txPending: EvmPendingTx): OpData {
 
         return OpData(
-            UPDATE_EVM_TRANSACTION_RECEIPT, arrayOf(
+                UPDATE_EVM_TRANSACTION_RECEIPT, arrayOf(
                 gtv(txPending.rowId),
                 gtv(txPending.blockHash ?: ""),
                 gtv(txPending.effectiveGasPrice ?: BigInteger.ZERO),
                 gtv(txPending.gasUsed ?: BigInteger.ZERO)
-            )
+        )
         )
     }
 
@@ -238,14 +238,14 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         val signature = createSignature(rowId, rellStatus)
 
         return OpData(
-            UPDATE_EVM_TRANSACTION_STATUS,
-            arrayOf(
-                gtv(rowId),
-                gtv(rellStatus.ordinal.toLong()),
-                if (txHash != null) gtv(txHash) else GtvNull,
-                gtv(signature.subjectID),
-                gtv(signature.data)
-            )
+                UPDATE_EVM_TRANSACTION_STATUS,
+                arrayOf(
+                        gtv(rowId),
+                        gtv(rellStatus.ordinal.toLong()),
+                        if (txHash != null) gtv(txHash) else GtvNull,
+                        gtv(signature.subjectID),
+                        gtv(signature.data)
+                )
         )
     }
 
@@ -303,7 +303,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
             withTxSubmitter(transaction.networkId) {
                 bctx.addAfterCommitHook { it.enqueue(EvmSubmitTxRequest.fromRell(transaction)) }
                 operations.add(
-                    buildTxUpdateOp(transaction.rowId, RellTransactionStatus.TAKEN)
+                        buildTxUpdateOp(transaction.rowId, RellTransactionStatus.TAKEN)
                 )
 
                 // Status TAKEN can be set multiple times due to retry - add a no op for them
@@ -373,8 +373,8 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     }
 
     private fun createSignature(value: Long, status: RellTransactionStatus) =
-        sigMaker.signDigest(signatureDataHash(value, status))
+            sigMaker.signDigest(signatureDataHash(value, status))
 
     private fun signatureDataHash(value: Long, status: RellTransactionStatus) =
-        gtv(gtv(value), gtv(status.ordinal.toLong())).merkleHash(GtvMerkleHashCalculator(cryptoSystem))
+            gtv(gtv(value), gtv(status.ordinal.toLong())).merkleHash(GtvMerkleHashCalculator(cryptoSystem))
 }

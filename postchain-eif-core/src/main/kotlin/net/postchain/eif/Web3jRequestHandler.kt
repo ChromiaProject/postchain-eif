@@ -15,19 +15,19 @@ import kotlin.math.min
 import kotlin.random.Random
 
 open class Web3jRequestHandler(
-    private val baseTimeout: Long,
-    private val maxTimeout: Long,
-    private val maxTryErrors: Long,
-    private val urls: List<String>,
-    private val web3jServices: List<Web3j>,
-    private val metrics: RpcUsageMetrics? = null
+        private val baseTimeout: Long,
+        private val maxTimeout: Long,
+        private val maxTryErrors: Long,
+        private val urls: List<String>,
+        private val web3jServices: List<Web3j>,
+        private val metrics: RpcUsageMetrics? = null
 ) : Closeable {
     companion object : KLogging() {
         const val DELAY_POWER_BASE = 1.2
     }
 
     open fun <T : Response<*>> sendWeb3jRequest(
-        requestFactory: (Web3j) -> Request<*, T>
+            requestFactory: (Web3j) -> Request<*, T>
     ): T {
         val requests = web3jServices.map(requestFactory)
         for (request in requests) {
@@ -50,7 +50,7 @@ open class Web3jRequestHandler(
     }
 
     suspend fun <T : Response<*>> sendWeb3jRequestWithRetry(
-        requestFactory: (Web3j) -> Request<*, T>
+            requestFactory: (Web3j) -> Request<*, T>
     ): T {
         val requests = web3jServices.map(requestFactory)
         val retryTimeouts = Array(requests.size) { baseTimeout }
@@ -84,7 +84,7 @@ open class Web3jRequestHandler(
                 coroutineContext.ensureActive()
                 delay(retryTimeouts[index])
                 retryTimeouts[currentIndex] =
-                    min((retryTimeouts[currentIndex].toDouble() * DELAY_POWER_BASE).toLong(), maxTimeout)
+                        min((retryTimeouts[currentIndex].toDouble() * DELAY_POWER_BASE).toLong(), maxTimeout)
             } else {
                 return response
             }

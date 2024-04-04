@@ -4,12 +4,12 @@ Configuration:
 
   Properties:
     Property:
-    - name: logs
-      value: "logs"
-    - name: filename
-      value: "log"
-    - name: fileExt
-      value: "log"
+      - name: logs
+        value: "logs"
+      - name: filename
+        value: "log"
+      - name: fileExt
+        value: "log"
 
   Appenders:
     Console:
@@ -48,22 +48,22 @@ Configuration:
     Root:
       level: warn
       AppenderRef:
-      - ref: ConsoleAppender
-      - ref: FileAppender
+        - ref: ConsoleAppender
+        - ref: FileAppender
 
     Logger:
 
-    - name: net.postchain
-      level: debug
-      additivity: false
-      AppenderRef:
-      - ref: ConsoleAppender
-      - ref: FileAppender
+      - name: net.postchain
+        level: debug
+        additivity: false
+        AppenderRef:
+          - ref: ConsoleAppender
+          - ref: FileAppender
 
-    - name: net.postchain.base.BaseBlockchainProcessManager
-      level: debug
-      additivity: false
-      AppenderRef:
-      - ref: ConsoleAppender
-      - ref: FileAppender
-        level: off
+      - name: net.postchain.base.BaseBlockchainProcessManager
+        level: debug
+        additivity: false
+        AppenderRef:
+          - ref: ConsoleAppender
+          - ref: FileAppender
+            level: off

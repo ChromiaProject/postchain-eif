@@ -13,10 +13,10 @@ interface TransactionSubmitterDatabaseOperations {
     fun recordTransactionHash(ctx: EContext, requestId: Long, txHash: String)
 
     fun recordTransactionGas(
-        ctx: EContext,
-        requestId: Long,
-        gasPrice: BigInteger,
-        gasLimit: BigInteger,
+            ctx: EContext,
+            requestId: Long,
+            gasPrice: BigInteger,
+            gasLimit: BigInteger,
     )
 
     fun setSubmitTxBCPersisted(ctx: EContext, requestId: Long)

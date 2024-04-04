@@ -23,19 +23,19 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
 
         val web3jRequestHandler = mock<Web3jRequestHandler> {
             on { sendWeb3jRequest(requestFactory = any<(Web3j) -> Request<*, EthGetBalance>>()) } doThrow RuntimeException(
-                "Oh dear"
+                    "Oh dear"
             )
         }
 
         val ts = createTransactionSubmitter(
-            web3jRequestHandler,
-            mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
-            mock<ContractGasProvider>()
+                web3jRequestHandler,
+                mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
+                mock<ContractGasProvider>()
         )
 
         val exception = assertThrows<RuntimeException>("Expected thrown exception") {
             ts.submitTransaction(
-                mkEvmSubmitTxRequest()
+                    mkEvmSubmitTxRequest()
             )
         }
         assertThat(exception.message).isEqualTo("Failed to get balance for request id 0: Oh dear")
@@ -48,26 +48,26 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         val web3jRequestHandler = mockBalanceAndEstimateGas(200, null)
         val gasProvider = mockGasProvider(5, 10)
         val transactionManagers =
-            mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear"))
+                mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear"))
 
         val ts = createTransactionSubmitter(
-            web3jRequestHandler,
-            transactionManagers,
-            gasProvider
+                web3jRequestHandler,
+                transactionManagers,
+                gasProvider
         )
 
         val exception = assertThrows<RuntimeException>("Expected thrown exception") {
             ts.submitTransaction(
-                mkEvmSubmitTxRequest()
+                    mkEvmSubmitTxRequest()
             )
         }
         assertThat(exception.message).isEqualTo("Failed to get estimated gas usage for request id 0: Failed to get gas estimate")
 
         verify(databaseOperations).recordTransactionGas(
-            any(),
-            eq(0L),
-            eq(BigInteger.valueOf(5)),
-            eq(BigInteger.valueOf(10))
+                any(),
+                eq(0L),
+                eq(BigInteger.valueOf(5)),
+                eq(BigInteger.valueOf(10))
         )
         testLogAppender.assertError("Failed to get estimated gas usage for request id 0: Failed to get gas estimate")
     }
@@ -109,26 +109,26 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         val web3jRequestHandler = mockBalanceAndEstimateGas(200, 10)
         val gasProvider = mockGasProvider(5, 10)
         val transactionManagers =
-            mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear"))
+                mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear"))
 
         val ts = createTransactionSubmitter(
-            web3jRequestHandler,
-            transactionManagers,
-            gasProvider
+                web3jRequestHandler,
+                transactionManagers,
+                gasProvider
         )
 
         val exception = assertThrows<RuntimeException>("Expected thrown exception") {
             ts.submitTransaction(
-                mkEvmSubmitTxRequest(4)
+                    mkEvmSubmitTxRequest(4)
             )
         }
         assertThat(exception.message).isEqualTo("Failed to send transaction to all 1 nodes")
 
         verify(databaseOperations).recordTransactionGas(
-            any(),
-            eq(0L),
-            eq(BigInteger.valueOf(5)),
-            eq(BigInteger.valueOf(10))
+                any(),
+                eq(0L),
+                eq(BigInteger.valueOf(5)),
+                eq(BigInteger.valueOf(10))
         )
 
         testLogAppender.assertError("Failed to send transaction 0 to http://127.0.0.1:9999: Oh dear")
@@ -141,28 +141,28 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         val web3jRequestHandler = mockBalanceAndEstimateGas(200, 10)
         val gasProvider = mockGasProvider(5, 10)
         val transactionManagers = mapOf(
-            createTransactionManager("http://evm-node-1:9999", "0xfrom", exception = "Oh dear"),
-            createTransactionManager("http://evm-node-2:9999", "0xfrom", hasErrorMsg = "Not found"),
+                createTransactionManager("http://evm-node-1:9999", "0xfrom", exception = "Oh dear"),
+                createTransactionManager("http://evm-node-2:9999", "0xfrom", hasErrorMsg = "Not found"),
         )
 
         val ts = createTransactionSubmitter(
-            web3jRequestHandler,
-            transactionManagers,
-            gasProvider
+                web3jRequestHandler,
+                transactionManagers,
+                gasProvider
         )
 
         val exception = assertThrows<RuntimeException>("Expected thrown exception") {
             ts.submitTransaction(
-                mkEvmSubmitTxRequest(4)
+                    mkEvmSubmitTxRequest(4)
             )
         }
         assertThat(exception.message).isEqualTo("Failed to send transaction to all 2 nodes")
 
         verify(databaseOperations).recordTransactionGas(
-            any(),
-            eq(0L),
-            eq(BigInteger.valueOf(5)),
-            eq(BigInteger.valueOf(10))
+                any(),
+                eq(0L),
+                eq(BigInteger.valueOf(5)),
+                eq(BigInteger.valueOf(10))
         )
 
         testLogAppender.assertError("Failed to send transaction 0 to http://evm-node-1:9999: Oh dear")

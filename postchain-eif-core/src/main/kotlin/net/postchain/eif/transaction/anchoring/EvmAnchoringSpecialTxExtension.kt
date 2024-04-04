@@ -144,7 +144,7 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
 
     private fun getCurrentEVMSignerList(bctx: BlockEContext) = systemAnchoringBrid?.let {
         module.query(bctx, GET_CURRENT_EVM_SIGNER_LIST_QUERY, gtv("blockchain_rid" to gtv(it)))
-                    .asArray()
-                    .map { signer -> signer.asByteArray() }
+                .asArray()
+                .map { signer -> signer.asByteArray() }
     } ?: throw ProgrammerMistake("Trying to fetch SAC signers without having blockchain rid")
 }

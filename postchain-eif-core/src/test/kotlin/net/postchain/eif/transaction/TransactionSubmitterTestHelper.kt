@@ -15,19 +15,19 @@ data class TxReceiptUpdateOpArg(val blockHash: String, val effectiveGasPrice: Lo
 
 // Evaluate sent receipt operations
 fun withUpdateEvmTransactionReceipt(
-    txSubmitterTestModule: TransactionSubmitterTestGTXModule,
-    rowId: Long,
-    op: (List<TxReceiptUpdateOpArg>) -> Unit
+        txSubmitterTestModule: TransactionSubmitterTestGTXModule,
+        rowId: Long,
+        op: (List<TxReceiptUpdateOpArg>) -> Unit
 ) {
     withTxOperations(txSubmitterTestModule, UPDATE_EVM_TRANSACTION_RECEIPT) { operations ->
         val receiptOperations = operations
-            .filter { it.args[0].asInteger() == rowId }
-            .map {
-                val blockHash = it.args[1].asString()
-                val effectiveGasPrice = it.args[2].asBigInteger().toLong()
-                val gasUsage = it.args[3].asBigInteger().toLong()
-                TxReceiptUpdateOpArg(blockHash, effectiveGasPrice, gasUsage)
-            }
+                .filter { it.args[0].asInteger() == rowId }
+                .map {
+                    val blockHash = it.args[1].asString()
+                    val effectiveGasPrice = it.args[2].asBigInteger().toLong()
+                    val gasUsage = it.args[3].asBigInteger().toLong()
+                    TxReceiptUpdateOpArg(blockHash, effectiveGasPrice, gasUsage)
+                }
 
         op(receiptOperations)
     }
@@ -36,29 +36,29 @@ fun withUpdateEvmTransactionReceipt(
 fun assertNoQueuedTxs(txSubmitterTestModule: TransactionSubmitterTestGTXModule) {
 
     assertThat(txSubmitterTestModule.conf.transactions.filter { it.status == RellTransactionStatus.QUEUED }
-        .count()).isEqualTo(0)
+            .count()).isEqualTo(0)
 }
 
 fun assertTransactionsByStatus(txSubmitterTestModule: TransactionSubmitterTestGTXModule, status: RellTransactionStatus, count: Int) {
 
     assertThat(txSubmitterTestModule.conf.transactions.filter { it.status == status }
-        .count()).isEqualTo(count)
+            .count()).isEqualTo(count)
 }
 
 // Evaluate sent transaction status
 fun assertStatusOperation(
-    txSubmitterTestModule: TransactionSubmitterTestGTXModule,
-    rowId: Long,
-    expectedStatus: RellTransactionStatus
+        txSubmitterTestModule: TransactionSubmitterTestGTXModule,
+        rowId: Long,
+        expectedStatus: RellTransactionStatus
 ): String? {
     return withTxOperations(
-        txSubmitterTestModule,
-        UPDATE_EVM_TRANSACTION_STATUS
+            txSubmitterTestModule,
+            UPDATE_EVM_TRANSACTION_STATUS
     ) { operations ->
         val requestOps = operations
-            .filter { it.args[0].asInteger() == rowId }
+                .filter { it.args[0].asInteger() == rowId }
         val statusOperations = requestOps
-            .map { RellTransactionStatus.values()[it.args[1].asInteger().toInt()] }
+                .map { RellTransactionStatus.values()[it.args[1].asInteger().toInt()] }
 
         assertThat(statusOperations).contains(expectedStatus)
 
@@ -76,24 +76,24 @@ fun assertStatusOperation(
 
 // Evaluate sent operations
 fun <RT> withTxOperations(
-    txSubmitterTestModule: TransactionSubmitterTestGTXModule,
-    operationName: String,
-    op: (List<ExtOpData>) -> RT?
+        txSubmitterTestModule: TransactionSubmitterTestGTXModule,
+        operationName: String,
+        op: (List<ExtOpData>) -> RT?
 ): RT? {
 
     val operations = txSubmitterTestModule.conf.operations
-        .filter { it.opName == operationName }
+            .filter { it.opName == operationName }
 
     return op(operations)
 }
 
 fun mkEvmSubmitTxRellRequest(
-    rowId: Long = 0,
-    contractAddress: String,
-    status: RellTransactionStatus = RellTransactionStatus.QUEUED,
-    created: Long = System.currentTimeMillis(),
-    txHash: String? = null,
-    functionName: String = "updateValidators",
+        rowId: Long = 0,
+        contractAddress: String,
+        status: RellTransactionStatus = RellTransactionStatus.QUEUED,
+        created: Long = System.currentTimeMillis(),
+        txHash: String? = null,
+        functionName: String = "updateValidators",
 ) = EvmSubmitTxRellRequest(
         rowId,
         contractAddress,
@@ -107,48 +107,48 @@ fun mkEvmSubmitTxRellRequest(
         created,
         txHash,
         status
-    )
+)
 
 fun mkEvmSubmitTxRequest(maxFeePerGas: Long = 4000000000) = EvmSubmitTxRequest(
-    EvmSubmitTxRequest(
-        EvmSubmitTxRellRequest(
-            0L,
-            "",
-            "function_name",
-            listOf(),
-            listOf(),
-            0L,
-            BigInteger.ONE,
-            BigInteger.valueOf(maxFeePerGas),
-            "".toByteArray(),
-            System.currentTimeMillis(),
-            null,
-            null,
+        EvmSubmitTxRequest(
+                EvmSubmitTxRellRequest(
+                        0L,
+                        "",
+                        "function_name",
+                        listOf(),
+                        listOf(),
+                        0L,
+                        BigInteger.ONE,
+                        BigInteger.valueOf(maxFeePerGas),
+                        "".toByteArray(),
+                        System.currentTimeMillis(),
+                        null,
+                        null,
+                )
         )
-    )
 )
 
 fun mkEvmPendingDbTx(blockNumber: Long? = null) = EvmPendingTx(
-    0,
-    1337,
-    "contractAddress",
-    "functionName",
-    listOf("address[]"),
-    listOf(GtvFactory.gtv(listOf(GtvFactory.gtv(ByteArray(20) { 1 })))),
-    "0x" + ByteArray(32){123}.toHex(),
-    System.currentTimeMillis(),
-    blockNumber = blockNumber?.let { BigInteger.valueOf(blockNumber) })
+        0,
+        1337,
+        "contractAddress",
+        "functionName",
+        listOf("address[]"),
+        listOf(GtvFactory.gtv(listOf(GtvFactory.gtv(ByteArray(20) { 1 })))),
+        "0x" + ByteArray(32) { 123 }.toHex(),
+        System.currentTimeMillis(),
+        blockNumber = blockNumber?.let { BigInteger.valueOf(blockNumber) })
 
 fun <T> withTxSubmitter(
-    txSubmitterTestModule: TransactionSubmitterTestGTXModule,
-    requestId: Long,
-    action: (TransactionSubmitter, EvmPendingTx) -> T
+        txSubmitterTestModule: TransactionSubmitterTestGTXModule,
+        requestId: Long,
+        action: (TransactionSubmitter, EvmPendingTx) -> T
 ): T? = withTxSubmitter(listOf(txSubmitterTestModule), requestId, action)
 
 fun <T> withTxSubmitter(
-    txSubmitterTestModules: List<TransactionSubmitterTestGTXModule>,
-    requestId: Long,
-    action: (TransactionSubmitter, EvmPendingTx) -> T
+        txSubmitterTestModules: List<TransactionSubmitterTestGTXModule>,
+        requestId: Long,
+        action: (TransactionSubmitter, EvmPendingTx) -> T
 ): T? {
 
     txSubmitterTestModules.forEach { txSubmitterTestModule ->

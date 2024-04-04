@@ -119,12 +119,12 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
 
     @OptIn(ExperimentalReflectionOnLambdas::class)
     fun <T : Response<*>> mockWeb3jRequest(
-        web3jRequestHandler: Web3jRequestHandler,
-        kClass: KClass<T>,
-        mock: T
+            web3jRequestHandler: Web3jRequestHandler,
+            kClass: KClass<T>,
+            mock: T
     ) {
 
-        Mockito.`when`(web3jRequestHandler.sendWeb3jRequest<T>(argThat {arg ->
+        Mockito.`when`(web3jRequestHandler.sendWeb3jRequest<T>(argThat { arg ->
             arg != null && arg.reflect()!!.returnType.arguments[1].type!!.classifier == kClass
         })).doAnswer {
             mock
@@ -132,10 +132,10 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
     }
 
     fun createTransactionManager(
-        url: String,
-        fromAddress: String,
-        exception: String? = null,
-        hasErrorMsg: String? = null
+            url: String,
+            fromAddress: String,
+            exception: String? = null,
+            hasErrorMsg: String? = null
     ): Pair<String, TransactionManager> {
 
         val transactionManager = mock<TransactionManager> {
@@ -143,13 +143,13 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
             if (exception != null) {
                 on {
                     sendEIP1559Transaction(
-                        ArgumentMatchers.anyLong(),
-                        any(),
-                        any(),
-                        any(),
-                        ArgumentMatchers.anyString(),
-                        ArgumentMatchers.anyString(),
-                        any()
+                            ArgumentMatchers.anyLong(),
+                            any(),
+                            any(),
+                            any(),
+                            ArgumentMatchers.anyString(),
+                            ArgumentMatchers.anyString(),
+                            any()
                     )
                 } doThrow (RuntimeException(exception))
             }
@@ -161,13 +161,13 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
                 }
                 on {
                     sendEIP1559Transaction(
-                        ArgumentMatchers.anyLong(),
-                        any(),
-                        any(),
-                        any(),
-                        ArgumentMatchers.anyString(),
-                        ArgumentMatchers.anyString(),
-                        any()
+                            ArgumentMatchers.anyLong(),
+                            any(),
+                            any(),
+                            any(),
+                            ArgumentMatchers.anyString(),
+                            ArgumentMatchers.anyString(),
+                            any()
                     )
                 } doReturn (result)
             }
@@ -214,9 +214,9 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
     }
 
     fun createTransactionSubmitter(
-        web3jRequestHandler: Web3jRequestHandler,
-        transactionManagers: Map<String, TransactionManager>,
-        gasProvider: ContractGasProvider
+            web3jRequestHandler: Web3jRequestHandler,
+            transactionManagers: Map<String, TransactionManager>,
+            gasProvider: ContractGasProvider
     ): TransactionSubmitter {
         return TransactionSubmitter(
                 web3jRequestHandler,

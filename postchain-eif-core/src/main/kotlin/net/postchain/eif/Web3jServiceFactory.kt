@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit
 object Web3jServiceFactory {
 
     fun buildServices(urls: List<String>, connectTimeout: Long, readTimeout: Long, writeTimeout: Long): List<Web3j> =
-        buildServicesMap(urls, connectTimeout, readTimeout, writeTimeout).map { it.value }
+            buildServicesMap(urls, connectTimeout, readTimeout, writeTimeout).map { it.value }
 
     fun buildServicesMap(urls: List<String>, connectTimeout: Long, readTimeout: Long, writeTimeout: Long): Map<String, Web3j> =
             urls.map { url ->

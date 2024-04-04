@@ -24,7 +24,7 @@ enum class PendingTxStatus {
 }
 
 fun DatabaseAccess.tableEvmTxSubmit(ctx: EContext) = tableName(ctx,
-    TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_TABLE_NAME
+        TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_TABLE_NAME
 )
 
 open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterDatabaseOperations {
@@ -78,17 +78,17 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
             val jooq = createJooq(ctx)
 
             jooq.insertInto(table(tableEvmTxSubmit(ctx)))
-                .set(EVM_TX_SUBMIT_COLUMN_REQUEST_ID, transactionRequest.rowId)
-                .set(EVM_TX_SUBMIT_COLUMN_CONTRACT, transactionRequest.contractAddress)
-                .set(EVM_TX_SUBMIT_COLUMN_FUNCTION, transactionRequest.functionName)
-                .set(EVM_TX_SUBMIT_COLUMN_PARAMETER_TYPES, transactionRequest.parameterTypes.joinToString(","))
-                .set(EVM_TX_SUBMIT_COLUMN_PARAMETER_VALUES, GtvEncoder.encodeGtv(GtvFactory.gtv(transactionRequest.parameterValues)))
-                .set(EVM_TX_SUBMIT_COLUMN_CREATED, transactionRequest.created)
-                .set(EVM_TX_SUBMIT_COLUMN_NETWORK_ID, networkId)
-                .set(EVM_TX_SUBMIT_COLUMN_MAX_PRIORITY_FEE_PER_GAS, transactionRequest.maxPriorityFeePerGas.longValueExact())
-                .set(EVM_TX_SUBMIT_COLUMN_MAX_FEE_PER_GAS, transactionRequest.maxFeePerGas.longValueExact())
-                .set(EVM_TX_SUBMIT_COLUMN_SENDER, transactionRequest.sender)
-                .execute()
+                    .set(EVM_TX_SUBMIT_COLUMN_REQUEST_ID, transactionRequest.rowId)
+                    .set(EVM_TX_SUBMIT_COLUMN_CONTRACT, transactionRequest.contractAddress)
+                    .set(EVM_TX_SUBMIT_COLUMN_FUNCTION, transactionRequest.functionName)
+                    .set(EVM_TX_SUBMIT_COLUMN_PARAMETER_TYPES, transactionRequest.parameterTypes.joinToString(","))
+                    .set(EVM_TX_SUBMIT_COLUMN_PARAMETER_VALUES, GtvEncoder.encodeGtv(GtvFactory.gtv(transactionRequest.parameterValues)))
+                    .set(EVM_TX_SUBMIT_COLUMN_CREATED, transactionRequest.created)
+                    .set(EVM_TX_SUBMIT_COLUMN_NETWORK_ID, networkId)
+                    .set(EVM_TX_SUBMIT_COLUMN_MAX_PRIORITY_FEE_PER_GAS, transactionRequest.maxPriorityFeePerGas.longValueExact())
+                    .set(EVM_TX_SUBMIT_COLUMN_MAX_FEE_PER_GAS, transactionRequest.maxFeePerGas.longValueExact())
+                    .set(EVM_TX_SUBMIT_COLUMN_SENDER, transactionRequest.sender)
+                    .execute()
         }
     }
 
@@ -97,9 +97,9 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
             val jooq = createJooq(ctx)
 
             jooq.update(table(tableEvmTxSubmit(ctx)))
-                .set(EVM_TX_SUBMIT_COLUMN_HASH, txHash)
-                .where(EVM_TX_SUBMIT_COLUMN_REQUEST_ID.eq(requestId))
-                .execute()
+                    .set(EVM_TX_SUBMIT_COLUMN_HASH, txHash)
+                    .where(EVM_TX_SUBMIT_COLUMN_REQUEST_ID.eq(requestId))
+                    .execute()
         }
     }
 
@@ -108,10 +108,10 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
             val jooq = createJooq(ctx)
 
             jooq.update(table(tableEvmTxSubmit(ctx)))
-                .set(EVM_TX_SUBMIT_COLUMN_MAX_GAS_PRICE, gasPrice.longValueExact())
-                .set(EVM_TX_SUBMIT_COLUMN_GAS_LIMIT, gasLimit.longValueExact())
-                .where(EVM_TX_SUBMIT_COLUMN_REQUEST_ID.eq(requestId))
-                .execute()
+                    .set(EVM_TX_SUBMIT_COLUMN_MAX_GAS_PRICE, gasPrice.longValueExact())
+                    .set(EVM_TX_SUBMIT_COLUMN_GAS_LIMIT, gasLimit.longValueExact())
+                    .where(EVM_TX_SUBMIT_COLUMN_REQUEST_ID.eq(requestId))
+                    .execute()
         }
     }
 
@@ -126,7 +126,7 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
         }
     }
 
-    override fun getQueuedTransactions(ctx: EContext, networkId: Long) : List<EvmSubmitTxRequest> {
+    override fun getQueuedTransactions(ctx: EContext, networkId: Long): List<EvmSubmitTxRequest> {
         DatabaseAccess.of(ctx).apply {
             val jooq = createJooq(ctx)
 

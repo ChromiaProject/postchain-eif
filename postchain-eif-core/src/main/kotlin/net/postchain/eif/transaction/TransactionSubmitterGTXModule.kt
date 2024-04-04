@@ -13,9 +13,9 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.security.Security
 
 class TransactionSubmitterGTXModule : SimpleGTXModule<Unit>(
-    Unit, mapOf(EVM_TX_NO_OP to { conf, opData: ExtOpData ->
-        EvmTxNoOp(conf, opData)
-    }), mapOf()
+        Unit, mapOf(EVM_TX_NO_OP to { conf, opData: ExtOpData ->
+    EvmTxNoOp(conf, opData)
+}), mapOf()
 ) {
 
     init {
@@ -38,7 +38,7 @@ class TransactionSubmitterGTXModule : SimpleGTXModule<Unit>(
 }
 
 class EvmTxNoOp(private val conf: Unit, private val extOpData: ExtOpData) :
-    GTXOperation(extOpData) {
+        GTXOperation(extOpData) {
     override fun checkCorrectness() {}
     override fun apply(ctx: TxEContext): Boolean {
         return true

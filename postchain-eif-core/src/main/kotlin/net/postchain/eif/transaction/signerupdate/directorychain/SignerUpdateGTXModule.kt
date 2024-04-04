@@ -20,7 +20,7 @@ import java.security.Security
 class SignerUpdateGTXModule : SimpleGTXModule<Unit>(
         Unit, mapOf(), mapOf(
         SIGNER_LIST_UPDATE_PROOF_QUERY to { _, ctx, args -> signerListUpdateProofQuery(ctx, args) }
-    )
+)
 ) {
 
     companion object {
