@@ -4,7 +4,7 @@ import net.postchain.common.data.Hash
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
 import net.postchain.crypto.Secp256K1CryptoSystem
-import net.postchain.eif.merkle.MerkleTestUtil.getMerkleProof
+import net.postchain.eif.MerkleProofUtil.getMerkleProof
 import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvDictionary
 import net.postchain.gtv.GtvEncoder
