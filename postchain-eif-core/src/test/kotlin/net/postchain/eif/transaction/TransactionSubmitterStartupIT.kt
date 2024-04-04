@@ -56,7 +56,7 @@ class TransactionSubmitterStartupIT : EifBaseIntegrationTest(
     @Test
     fun `verify continue pending txs on startup`() {
 
-        val node = createNodes(1, "/net/postchain/eif/transaction/blockchain_config_pending.xml")[0]
+        createNodes(1, "/net/postchain/eif/transaction/blockchain_config_pending.xml")[0]
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
