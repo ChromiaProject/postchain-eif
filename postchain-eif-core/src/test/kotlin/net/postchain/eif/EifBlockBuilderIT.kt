@@ -18,9 +18,13 @@ import net.postchain.devtools.IntegrationTestSetup
 import net.postchain.devtools.PostchainTestNode
 import net.postchain.devtools.testinfra.BaseTestInfrastructureFactory
 import net.postchain.eif.merkle.MerkleTestUtil.getMerkleProof
-import net.postchain.gtv.*
+import net.postchain.gtv.GtvByteArray
+import net.postchain.gtv.GtvDictionary
 import net.postchain.gtv.GtvFactory.gtv
+import net.postchain.gtv.GtvInteger
+import net.postchain.gtv.GtvNull
 import net.postchain.gtv.merkle.GtvMerkleHashCalculator
+import net.postchain.gtv.merkleHash
 import net.postchain.gtx.GtxBuilder
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -37,61 +41,61 @@ class EifBlockBuilderIT : IntegrationTestSetup() {
     fun makeEifEventOp(bcRid: BlockchainRid, num: Long): ByteArray {
         val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
         b.addOperation(
-            "eif_event",
-            gtv(num),
-            gtv(ds.digest(BigInteger.valueOf(num).toByteArray()))
+                "eif_event",
+                gtv(num),
+                gtv(ds.digest(BigInteger.valueOf(num).toByteArray()))
         )
         return b.finish()
-            .sign(sigMaker)
-            .buildGtx()
-            .encode()
+                .sign(sigMaker)
+                .buildGtx()
+                .encode()
     }
 
     fun makeEifStateOp(bcRid: BlockchainRid, num: Long): ByteArray {
         val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
         b.addOperation(
-            "eif_state",
-            gtv(num),
-            gtv(num),
-            gtv(ds.digest(BigInteger.valueOf(num).toByteArray()))
+                "eif_state",
+                gtv(num),
+                gtv(num),
+                gtv(ds.digest(BigInteger.valueOf(num).toByteArray()))
         )
         return b.finish()
-            .sign(sigMaker)
-            .buildGtx()
-            .encode()
+                .sign(sigMaker)
+                .buildGtx()
+                .encode()
     }
 
     fun makeNOPGTX(bcRid: BlockchainRid): ByteArray {
         val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
         b.addOperation("nop", gtv(42))
         return b.finish()
-            .sign(sigMaker)
-            .buildGtx()
-            .encode()
+                .sign(sigMaker)
+                .buildGtx()
+                .encode()
     }
 
     fun makeTestTx(id: Long, value: String, bcRid: BlockchainRid): ByteArray {
         val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
         b.addOperation("gtx_test", gtv(id), gtv(value))
         return b.finish()
-            .sign(sigMaker)
-            .buildGtx()
-            .encode()
+                .sign(sigMaker)
+                .buildGtx()
+                .encode()
     }
 
     fun makeTimeBTx(from: Long, to: Long?, bcRid: BlockchainRid): ByteArray {
         val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
         b.addOperation(
-            "timeb",
-            gtv(from),
-            if (to != null) gtv(to) else GtvNull
+                "timeb",
+                gtv(from),
+                if (to != null) gtv(to) else GtvNull
         )
         // Need to add a valid dummy operation to make the entire TX valid
         b.addOperation("gtx_test", gtv(1), gtv("true"))
         return b.finish()
-            .sign(sigMaker)
-            .buildGtx()
-            .encode()
+                .sign(sigMaker)
+                .buildGtx()
+                .encode()
     }
 
     @Test
@@ -105,7 +109,7 @@ class EifBlockBuilderIT : IntegrationTestSetup() {
         fun enqueueTx(data: ByteArray): Transaction? {
             try {
                 val tx = node.getBlockchainInstance().blockchainEngine.getConfiguration().getTransactionFactory()
-                    .decodeTransaction(data)
+                        .decodeTransaction(data)
                 node.getBlockchainInstance().blockchainEngine.getTransactionQueue().enqueue(tx)
                 return tx
             } catch (e: Exception) {
@@ -160,10 +164,10 @@ class EifBlockBuilderIT : IntegrationTestSetup() {
         val eifRootEvent = eifData?.sliceArray(0 until HASH_LENGTH)
         val eifRootState = eifData?.sliceArray(HASH_LENGTH until 2 * HASH_LENGTH)
         val eventData =
-            "00000000000000000000000000000000000000000000000000000000000000015fe7f977e71dba2ea1a68e21057beebb9be2ac30c6410aa38d4f3fbe41dcffd2".hexStringToByteArray()
+                "00000000000000000000000000000000000000000000000000000000000000015fe7f977e71dba2ea1a68e21057beebb9be2ac30c6410aa38d4f3fbe41dcffd2".hexStringToByteArray()
         val eventHash = ds.hash(ds.hash(ds.digest(eventData), EMPTY_HASH), EMPTY_HASH)
         val stateData =
-            "0000000000000000000000000000000000000000000000000000000000000002f2ee15ea639b73fa3db9b34a245bdfa015c260c598b211bf05a1ecc4b3e3b4f2".hexStringToByteArray()
+                "0000000000000000000000000000000000000000000000000000000000000002f2ee15ea639b73fa3db9b34a245bdfa015c260c598b211bf05a1ecc4b3e3b4f2".hexStringToByteArray()
         val stateHash = ds.hash(ds.hash(ds.digest(stateData), EMPTY_HASH), EMPTY_HASH)
         assertEquals(eventHash.toHex(), eifRootEvent!!.toHex())
         assertEquals(stateHash.toHex(), eifRootState!!.toHex())
@@ -352,7 +356,7 @@ class EifBlockBuilderIT : IntegrationTestSetup() {
         fun enqueueTx(data: ByteArray): Transaction? {
             try {
                 val tx = node.getBlockchainInstance().blockchainEngine.getConfiguration().getTransactionFactory()
-                    .decodeTransaction(data)
+                        .decodeTransaction(data)
                 node.getBlockchainInstance().blockchainEngine.getTransactionQueue().enqueue(tx)
                 return tx
             } catch (e: Exception) {
@@ -375,10 +379,10 @@ class EifBlockBuilderIT : IntegrationTestSetup() {
             val l = i.toLong()
             enqueueTx(makeEifEventOp(bcRid, l))
             val event = SimpleGtvEncoder.encodeGtv(
-                gtv(
-                    GtvInteger(l),
-                    GtvByteArray(ds.digest(BigInteger.valueOf(l).toByteArray()))
-                )
+                    gtv(
+                            GtvInteger(l),
+                            GtvByteArray(ds.digest(BigInteger.valueOf(l).toByteArray()))
+                    )
             )
             leafs.add(ds.digest(event))
         }
@@ -389,10 +393,10 @@ class EifBlockBuilderIT : IntegrationTestSetup() {
             val l = i.toLong()
             enqueueTx(makeEifStateOp(bcRid, l))
             val state = SimpleGtvEncoder.encodeGtv(
-                gtv(
-                    GtvInteger(l),
-                    GtvByteArray(ds.digest(BigInteger.valueOf(l).toByteArray()))
-                )
+                    gtv(
+                            GtvInteger(l),
+                            GtvByteArray(ds.digest(BigInteger.valueOf(l).toByteArray()))
+                    )
             )
             leafHashes[l] = ds.digest(state)
         }
@@ -437,12 +441,12 @@ class EifBlockBuilderIT : IntegrationTestSetup() {
         // Verify event merkle proof
         for (pos in 0..3) {
             val args = gtv(
-                "blockHeight" to gtv(currentBlockHeight),
-                "eventHash" to gtv(leafs[pos].toHex())
+                    "blockHeight" to gtv(currentBlockHeight),
+                    "eventHash" to gtv(leafs[pos].toHex())
             )
             val gtvProof = node.getBlockchainInstance().blockchainEngine.getBlockQueries().query(
-                "get_event_merkle_proof",
-                args
+                    "get_event_merkle_proof",
+                    args
             ).get().asDict()
 
             val merkleProofs = gtvProof["eventProof"]!!.asDict()["merkleProofs"]!!.asArray()
@@ -465,10 +469,10 @@ class EifBlockBuilderIT : IntegrationTestSetup() {
         val l = 16L
         enqueueTx(makeEifStateOp(bcRid, l))
         val state = SimpleGtvEncoder.encodeGtv(
-            gtv(
-                GtvInteger(l),
-                GtvByteArray(ds.digest(BigInteger.valueOf(l).toByteArray()))
-            )
+                gtv(
+                        GtvInteger(l),
+                        GtvByteArray(ds.digest(BigInteger.valueOf(l).toByteArray()))
+                )
         )
         leafHashes[l] = ds.digest(state)
 

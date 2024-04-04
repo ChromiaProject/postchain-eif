@@ -67,12 +67,3 @@ Configuration:
       - ref: ConsoleAppender
       - ref: FileAppender
         level: off
-
-    - name: net.postchain.network.x.DefaultXCommunicationManager
-      level: debug
-      additivity: false
-      AppenderRef:
-      - ref: ConsoleAppender
-      - ref: FileAppender
-
-

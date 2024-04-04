@@ -13,8 +13,8 @@ object GtvToEventMapper {
 
     private val supportedTypes = listOf("address", "bool", "bytes", "int", "string", "uint")
     private val supportedTypesExpression = supportedTypes
-        .joinToString("|", "^(", ")([0-9]{1,3})?(\\[\\])?\$")
-        .toRegex()
+            .joinToString("|", "^(", ")([0-9]{1,3})?(\\[\\])?\$")
+            .toRegex()
 
     fun map(gtv: Gtv): Event {
         val eventDict = gtv.asDict()

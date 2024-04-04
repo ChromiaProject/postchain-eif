@@ -55,16 +55,16 @@ class GtvToEventMapperTest {
     fun `All size suffixes can be matched`() {
         for (i in 1..32) {
             assertTypeNameIsSupported(
-                "bytes$i",
-                Class.forName("org.web3j.abi.datatypes.generated.Bytes$i").asSubclass(Type::class.java)
+                    "bytes$i",
+                    Class.forName("org.web3j.abi.datatypes.generated.Bytes$i").asSubclass(Type::class.java)
             )
             assertTypeNameIsSupported(
-                "int${i * 8}",
-                Class.forName("org.web3j.abi.datatypes.generated.Int${i * 8}").asSubclass(Type::class.java)
+                    "int${i * 8}",
+                    Class.forName("org.web3j.abi.datatypes.generated.Int${i * 8}").asSubclass(Type::class.java)
             )
             assertTypeNameIsSupported(
-                "uint${i * 8}",
-                Class.forName("org.web3j.abi.datatypes.generated.Uint${i * 8}").asSubclass(Type::class.java)
+                    "uint${i * 8}",
+                    Class.forName("org.web3j.abi.datatypes.generated.Uint${i * 8}").asSubclass(Type::class.java)
             )
         }
     }
@@ -106,17 +106,17 @@ class GtvToEventMapperTest {
 
     private fun eventWithInputType(typeName: String, anonymous: Boolean = false): Gtv {
         return gtv(
-            "anonymous" to gtv(anonymous),
-            "inputs" to gtv(
-                listOf(
-                    gtv(
-                        "indexed" to gtv(true),
-                        "type" to gtv(typeName)
-                    )
-                )
-            ),
-            "type" to gtv("event"),
-            "name" to gtv("TestEvent")
+                "anonymous" to gtv(anonymous),
+                "inputs" to gtv(
+                        listOf(
+                                gtv(
+                                        "indexed" to gtv(true),
+                                        "type" to gtv(typeName)
+                                )
+                        )
+                ),
+                "type" to gtv("event"),
+                "name" to gtv("TestEvent")
         )
     }
 

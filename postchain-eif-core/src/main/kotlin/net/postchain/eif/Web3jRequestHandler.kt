@@ -31,7 +31,7 @@ class Web3jRequestHandler(
         val requests = web3jServices.map(requestFactory)
         val retryTimeouts = Array(requests.size) { baseTimeout }
         var tryErrors = 0L
-        var index = if (requests.size > 1) Random.nextInt(0, requests.size-1) else 0
+        var index = if (requests.size > 1) Random.nextInt(0, requests.size - 1) else 0
         while (true) {
             val currentIndex = index
             val response = try {
