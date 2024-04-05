@@ -8,8 +8,8 @@ import net.postchain.core.BlockchainConfiguration
 import net.postchain.core.BlockchainEngine
 import net.postchain.core.BlockchainProcess
 import net.postchain.core.SynchronizationInfrastructureExtension
-import net.postchain.eif.config.EifBlockchainConfig
-import net.postchain.eif.config.EvmBlockchainConfig
+import net.postchain.eif.config.EifEventReceiverConfig
+import net.postchain.eif.config.EifEvmBlockchainConfig
 import net.postchain.eif.config.EvmConfig
 import net.postchain.eif.metrics.EifMetricsRegistry
 import net.postchain.eif.metrics.RpcUsageMetrics
@@ -33,11 +33,11 @@ class EifSynchronizationInfrastructureExtension(
             val exs = cfg.module.getSpecialTxExtensions()
             val ext = exs.find { it is EifSpecialTxExtension }
             if (ext is EifSpecialTxExtension) {
-                val eifBlockchainConfig = cfg.rawConfig["eif"]?.toObject<EifBlockchainConfig>()
+                val eventReceiverConfig = cfg.rawConfig["eif"]?.toObject<EifEventReceiverConfig>()
                         ?: throw UserMistake("No EIF config present")
 
                 eventProcessors[cfg.blockchainRid.toHex()] = mutableMapOf()
-                for ((evmBlockchainName, evmBlockchainConfig) in eifBlockchainConfig.chains) {
+                for ((evmBlockchainName, evmBlockchainConfig) in eventReceiverConfig.chains) {
                     if (evmBlockchainConfig.skipToHeight == 0L) {
                         logger.warn("Skip to height config is set to 0. Consider changing it to avoid redundant queries.")
                     }
@@ -66,24 +66,24 @@ class EifSynchronizationInfrastructureExtension(
         eventProcessors.clear()
     }
 
-    private fun initializeEventProcessor(cfg: BlockchainConfiguration, evmBlockchainConfig: EvmBlockchainConfig, engine: BlockchainEngine, evmConfig: EvmConfig): EventProcessor {
+    private fun initializeEventProcessor(cfg: BlockchainConfiguration, eifEvmBlockchainConfig: EifEvmBlockchainConfig, engine: BlockchainEngine, evmConfig: EvmConfig): EventProcessor {
         return if ("ignore".equals(evmConfig.urls, ignoreCase = true)) {
             logger.warn("EIF is running in disconnected mode. No events will be validated against ethereum.")
             NoOpEventProcessor()
         } else {
             val urls = evmConfig.urls.split(",").map { it.trim() }
             val web3jServices = Web3jServiceFactory.buildServices(evmConfig)
-            val events = evmBlockchainConfig.events.asArray().map(GtvToEventMapper::map)
-            val metrics = RpcUsageMetrics(cfg.chainID, cfg.blockchainRid, evmBlockchainConfig.networkId)
+            val events = eifEvmBlockchainConfig.events.asArray().map(GtvToEventMapper::map)
+            val metrics = RpcUsageMetrics(cfg.chainID, cfg.blockchainRid, eifEvmBlockchainConfig.networkId)
             EvmEventProcessor(
-                    evmBlockchainConfig.networkId,
-                    evmBlockchainConfig.contracts,
+                    eifEvmBlockchainConfig.networkId,
+                    eifEvmBlockchainConfig.contracts,
                     events,
-                    BigInteger.valueOf(evmBlockchainConfig.evmReadOffset),
-                    BigInteger.valueOf(evmBlockchainConfig.readOffset),
+                    BigInteger.valueOf(eifEvmBlockchainConfig.evmReadOffset),
+                    BigInteger.valueOf(eifEvmBlockchainConfig.readOffset),
                     evmConfig.maxReadAhead,
                     evmConfig.maxQueueSize,
-                    BigInteger.valueOf(evmBlockchainConfig.skipToHeight),
+                    BigInteger.valueOf(eifEvmBlockchainConfig.skipToHeight),
                     BigInteger.valueOf(evmConfig.lastEvmBlockHeight),
                     engine,
                     Web3jRequestHandler(evmConfig.minRetryDelay, evmConfig.maxRetryDelay, evmConfig.maxTryErrors, urls, web3jServices, metrics),
