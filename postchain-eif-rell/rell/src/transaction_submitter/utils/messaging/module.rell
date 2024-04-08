@@ -1,0 +1,12 @@
+// Note: unused in this chain but could be useful for other chains importing this module
+val evm_submit_transaction_topic = "G_evm_submit_transaction";
+
+struct evm_submit_transaction_message {
+    contract_address: text;
+    function_name: text;
+    parameter_types: list<text>;
+    parameter_values: list<gtv>;
+    network_id: integer;
+    max_priority_fee_per_gas: big_integer;
+    max_fee_per_gas: big_integer;
+}

@@ -93,6 +93,12 @@
             <artifactId>clikt-jvm</artifactId>
         </dependency>
 
+        <!-- Jooq -->
+        <dependency>
+            <groupId>org.jooq</groupId>
+            <artifactId>jooq</artifactId>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -236,6 +242,9 @@
                             <include>TokenBridge</include>
                             <include>TestToken</include>
                             <include>Validator</include>
+                            <include>Anchoring</include>
+                            <include>DirectoryChainValidator</include>
+                            <include>ManagedValidator</include>
                         </includes>
                     </contract>
                     <pathPrefixes>
@@ -247,6 +256,9 @@
                             <include>**/TokenBridge.json</include>
                             <include>**/TestToken.json</include>
                             <include>**/Validator.json</include>
+                            <include>**/Anchoring.json</include>
+                            <include>**/DirectoryChainValidator.json</include>
+                            <include>**/ManagedValidator.json</include>
                         </includes>
                     </abiSourceFiles>
                     <outputDirectory>

@@ -1,0 +1,77 @@
+@test module;
+
+import ^^.*;
+import ^.helper_operations.*;
+
+function test_query_transaction_status() {
+    val contract_address = "address";
+    val function_name = "myFunction";
+    val parameter_types = ["uint"];
+    val parameter_values = [(1).to_gtv()];
+    val network_id = 1;
+    val max_priority_fee_per_gas = 1;
+    val max_fee_per_gas = 4000000000;
+
+    val evm_transaction_id = get_evm_transaction_id(contract_address, function_name, parameter_types, parameter_values, network_id);
+
+    assert_null(get_transaction_status(evm_transaction_id));
+
+    rell.test.tx().op(create_evm_submit_transaction_operation(evm_submit_transaction_message(
+        contract_address = contract_address,
+        function_name = function_name,
+        parameter_types = parameter_types,
+        parameter_values = parameter_values,
+        network_id = network_id,
+        max_priority_fee_per_gas = max_priority_fee_per_gas,
+        max_fee_per_gas = max_fee_per_gas), x"")).run();
+
+    assert_equals(get_transaction_status(evm_transaction_id), transaction_status.QUEUED);
+
+    assert_equals(get_transaction_status_by_transaction_data(contract_address, function_name, parameter_types, parameter_values, network_id), transaction_status.QUEUED);
+}
+
+function test_query_transaction_receipt() {
+    val contract_address = "address";
+    val function_name = "myFunction";
+    val parameter_types = ["uint"];
+    val parameter_values = [(1).to_gtv()];
+    val network_id = 1;
+    val max_priority_fee_per_gas = 1;
+    val max_fee_per_gas = 4000000000;
+
+    val evm_transaction_id = get_evm_transaction_id(contract_address, function_name, parameter_types, parameter_values, network_id);
+
+    assert_null(get_transaction_status(evm_transaction_id));
+
+    rell.test.tx().op(create_evm_submit_transaction_operation(evm_submit_transaction_message(
+        contract_address = contract_address,
+        function_name = function_name,
+        parameter_types = parameter_types,
+        parameter_values = parameter_values,
+        network_id = network_id,
+        max_priority_fee_per_gas = max_priority_fee_per_gas,
+        max_fee_per_gas = max_fee_per_gas), x"")).run();
+
+    val evm_submit_transaction_rowid = evm_submit_transaction @ {}.rowid;
+
+    rell.test.tx().op(
+        update_evm_transaction_status_helper_op(evm_submit_transaction_rowid, transaction_status.SUCCESS),
+        update_evm_transaction_receipt_helper_op(
+            evm_submit_transaction_rowid,
+            "hash",
+            1L,
+            2L
+        )
+    ).run();
+
+    val expected_receipt = transaction_reciept_data(
+        block_hash = "hash",
+        effective_gas_price = 1L,
+        gas_usage = 2L
+    );
+
+    assert_equals(get_transaction_receipt_data(evm_transaction_id), expected_receipt);
+
+    assert_equals(get_transaction_receipt_data_by_transaction_data(contract_address, function_name, parameter_types, parameter_values, network_id), expected_receipt);
+}
+

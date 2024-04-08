@@ -2,6 +2,8 @@ package net.postchain.eif
 
 import net.postchain.common.data.Hash
 import net.postchain.common.data.KECCAK256
+import net.postchain.common.exception.ProgrammerMistake
+import net.postchain.common.toHex
 import net.postchain.crypto.*
 import org.bouncycastle.asn1.x9.X9IntegerConverter
 import org.bouncycastle.math.ec.ECAlgorithms
@@ -22,13 +24,25 @@ fun getEthereumAddress(compressedKey: ByteArray): ByteArray {
 
 /**
  * @param pubKey public key
- * @return uncompress public key (64 bytes)
+ * @return decompressed public key (64 bytes)
  */
 fun decompressKey(pubKey: ByteArray): ByteArray {
     if (pubKey.size == 64) {
         return pubKey
     }
     return CURVE.curve.decodePoint(pubKey).getEncoded(false).takeLast(64).toByteArray()
+}
+
+/**
+ * @param pubKey public key
+ * @return compressed public key (33 bytes)
+ */
+fun compressKey(pubKey: ByteArray): ByteArray {
+    if (pubKey.size == 33) {
+        return pubKey
+    }
+    val point = CURVE.curve.decodePoint(pubKey)
+    return point.getEncoded(true)
 }
 
 fun encodeSignature(r: BigInteger, s: BigInteger, v: Int): ByteArray {
@@ -61,7 +75,7 @@ fun encodeSignatureWithV(hash: ByteArray, signature: Signature): ByteArray {
 
 // implementation is based on BitcoinJ ECKey code
 // see https://github.com/bitcoinj/bitcoinj/blob/master/core/src/main/java/org/bitcoinj/core/ECKey.java
-fun ecrecover(recId: Int, message: ByteArray, r: BigInteger, s: BigInteger): ByteArray? {
+fun ecrecover(recId: Int, message: ByteArray, r: BigInteger, s: BigInteger, keepFirstByte: Boolean = false): ByteArray? {
     val n = CURVE_PARAMS.n
     // Let x = r + jn
     val i = BigInteger.valueOf((recId / 2).toLong())
@@ -103,7 +117,7 @@ fun ecrecover(recId: Int, message: ByteArray, r: BigInteger, s: BigInteger): Byt
 
         // For Ethereum we don't use first byte of the key
         val full = q.getEncoded(false)
-        full.takeLast(64).toByteArray()
+        return if (keepFirstByte) full else full.takeLast(64).toByteArray()
     } catch (e: Exception) {
         null
     }
@@ -118,6 +132,34 @@ fun ecrecover(recId: Int, message: ByteArray, r: BigInteger, s: BigInteger): Byt
 fun digest(bytes: ByteArray): Hash {
     val m = MessageDigest.getInstance(KECCAK256)
     return m.digest(bytes)
+}
+
+/**
+ * Extracts postchain signature format from signature encoded for verification on EVM using ecrecover
+ *
+ * @param evmSignature signature to convert
+ * @param digest signature digest
+ * @param expectedSigner expected subject of signature (on ethereum address format)
+ * @return The decoded signature together with signer
+ */
+fun decodeEVMEncodedSignature(evmSignature: ByteArray, digest: ByteArray, expectedSigner: ByteArray): Signature {
+    val recId = when (evmSignature[64]) {
+        27.toByte() -> 0
+        28.toByte() -> 1
+        else -> throw ProgrammerMistake("Invalid v value")
+    }
+
+    val (r, s) = secp256k1_decodeSignature(evmSignature)
+
+    val recoveredPubKey = ecrecover(recId, digest, r, s, true)
+            ?: throw ProgrammerMistake("Unable to recover public key")
+
+    if (!expectedSigner.contentEquals(getEthereumAddress(recoveredPubKey))) {
+        throw ProgrammerMistake("Recovered public key does not match expected signer ${expectedSigner.toHex()}")
+    }
+
+    val signer = compressKey(recoveredPubKey)
+    return Signature(signer, evmSignature)
 }
 
 /**
