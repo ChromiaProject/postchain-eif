@@ -2,10 +2,10 @@
 
 EVM Token Bridge blockchain configuration contains `snapshot` configuration. The `snapshot` has the following configuration properties:
 
-| Name                | Description                                             | Type | Required | Default |
-|---------------------|---------------------------------------------------------|------|----------|---------|
-| `levels_per_page`   | The number of levels per snapshot page                  | int  |          | 2       |
-| `snapshots_to_keep` | The number of snapshots kept after a block is finalized | int  |          | 0       |
+| Name                | Description                                                                                                                    | Type | Required | Default |
+|---------------------|--------------------------------------------------------------------------------------------------------------------------------|------|----------|---------|
+| `levels_per_page`   | The number of Merkle tree levels to be compressed into a single page                                                           | int  |          | 2       |
+| `snapshots_to_keep` | The number of account state snapshots that will be kept. A default value of 0 means all account state snapshots will be kept.  | int  |          | 0       |
 
 In addition, EVM Token Bridge blockchain configuration uses the `EifGTXModule` and `IcmfReceiverGTXModule` GTX modules and `IcmfReceiverSynchronizationInfrastructureExtension` synchronization extension. It also depends on the FT4, ICCF, and ICMF rell libraries. Note that the `config.icmf.receiver.local` parameter specifies the EVM Event Receiver blockchain RID and utilizes the `L_evm_block_events` message topic.
 
