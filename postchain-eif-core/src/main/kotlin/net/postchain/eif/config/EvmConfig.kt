@@ -26,6 +26,8 @@ data class EvmConfig(
         private const val EVM_DELAY_WHEN_NO_NEW_BLOCKS = "${EIF_CONFIG_ENV_PREFIX}EVM_DELAY_WHEN_NO_NEW_BLOCKS"
         private const val EVM_MAX_TRY_ERRORS = "${EIF_CONFIG_ENV_PREFIX}EVM_MAX_TRY_ERRORS"
 
+        private fun chainProperty(chain: String, key: String) = "${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_$key"
+
         @JvmStatic
         fun fromAppConfig(chain: String, config: AppConfig): EvmConfig {
             return EvmConfig(
@@ -36,10 +38,10 @@ data class EvmConfig(
                     config.getEnvOrLong(EVM_MAX_RETRY_DELAY, "evm.maxRetryDelay", 60_000L),
                     config.getEnvOrLong(EVM_DELAY_WHEN_NO_NEW_BLOCKS, "evm.delayWhenNoNewBlocks", 500L),
                     config.getEnvOrLong(EVM_MAX_TRY_ERRORS, "evm.maxTryErrors", 10L),
-                    config.getEnvOrListProperty("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_URLS", "$chain.urls", listOf()),
-                    config.getEnvOrLong("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_LAST_EVM_BLOCK_HEIGHT", "$chain.lastEvmBlockHeight", 0),
-                    config.getEnvOrLong("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_MAX_READ_AHEAD", "$chain.maxReadAhead", 2_000L),
-                    config.getEnvOrLong("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_MAX_QUEUE_SIZE", "$chain.maxQueueSize", 2_000L)
+                    config.getEnvOrListProperty(chainProperty(chain, "URLS"), "$chain.urls", listOf()),
+                    config.getEnvOrLong(chainProperty(chain, "LAST_EVM_BLOCK_HEIGHT"), "$chain.lastEvmBlockHeight", 0),
+                    config.getEnvOrLong(chainProperty(chain, "MAX_READ_AHEAD"), "$chain.maxReadAhead", 2_000L),
+                    config.getEnvOrLong(chainProperty(chain, "MAX_QUEUE_SIZE"), "$chain.maxQueueSize", 2_000L)
             )
         }
     }
@@ -52,9 +54,9 @@ data class EvmConfig(
         put(EVM_MAX_RETRY_DELAY, maxRetryDelay.toString())
         put(EVM_DELAY_WHEN_NO_NEW_BLOCKS, delayWhenNoNewBlocks.toString())
         put(EVM_MAX_TRY_ERRORS, maxTryErrors.toString())
-        put("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_URLS", urls.joinToString(","))
-        put("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_LAST_EVM_BLOCK_HEIGHT", lastEvmBlockHeight.toString())
-        put("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_MAX_READ_AHEAD", maxReadAhead.toString())
-        put("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_MAX_QUEUE_SIZE", maxQueueSize.toString())
+        put(chainProperty(chain, "URLS"), urls.joinToString(","))
+        put(chainProperty(chain, "LAST_EVM_BLOCK_HEIGHT"), lastEvmBlockHeight.toString())
+        put(chainProperty(chain, "MAX_READ_AHEAD"), maxReadAhead.toString())
+        put(chainProperty(chain, "MAX_QUEUE_SIZE"), maxQueueSize.toString())
     }
 }
