@@ -97,10 +97,23 @@ EVM Event Receiver node configuration has the following properties*:
 | `evm.delayWhenNoNewBlocks`    | Sleep timeout if no blocks received (milliseconds)                                                                                       | int          | 500     | `POSTCHAIN_EIF_EVM_DELAY_WHEN_NO_NEW_BLOCKS`   |
 | `evm.maxTryErrors`            | The maximum number of errors allowed per iteration before switching to an alternate EVM node URL. Used when multiple URLs are provided.  | int          | 10      | `POSTCHAIN_EIF_EVM_MAX_TRY_ERRORS`             |
 
-`*` To propagate the EVM Event Receiver node configuration to subnodes, add the following property to the master node's configuration::
+`*` Note that to run EIF on Master-Sub architecture you need to add the following properties:
 
 ```properties
 container.config-providers=net.postchain.eif.config.EifContainerConfigProvider
+# List of all the network configs that should be passed on to subnodes
+evm.chains=ethereum,bsc,sepolia
 ```
 
-or define the environment variable `POSTCHAIN_SUBNODE_CONFIG_PROVIDERS`.
+Example:
+```properties
+# sepolia network config
+sepolia.urls=https://eth-sepolia.g.alchemy.com/v2/<YOUR_API_KEY>
+sepolia.maxReadAhead=200
+sepolia.maxQueueSize=100
+
+# evm timeout settings (in seconds)
+evm.connectTimeout=300
+evm.readTimeout=300
+evm.writeTimeout=300
+```
