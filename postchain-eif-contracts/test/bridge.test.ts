@@ -396,7 +396,7 @@ describe("Token Bridge Test", () => {
                 await expect(bridge.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     maliciousEl2Proof)
-                ).to.be.revertedWith('Postchain: invalid EIF extra merkle proof')
+                ).to.be.revertedWith('Postchain: invalid extra merkle proof')
                 await expect(bridge.withdrawRequest(data, maliciousEventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     extraProof)
@@ -691,7 +691,7 @@ describe("Token Bridge Test", () => {
                 await expect(bridgeDelegator.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     maliciousEl2Proof)
-                ).to.be.revertedWith('Postchain: invalid EIF extra merkle proof')
+                ).to.be.revertedWith('Postchain: invalid extra merkle proof')
                 await expect(bridgeDelegator.withdrawRequest(data, maliciousEventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     extraProof)

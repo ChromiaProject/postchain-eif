@@ -1,0 +1,142 @@
+package net.postchain.eif.transaction
+
+import net.postchain.PostchainContext
+import net.postchain.base.data.DatabaseAccess
+import net.postchain.base.withReadConnection
+import net.postchain.common.BlockchainRid
+import net.postchain.common.exception.ProgrammerMistake
+import net.postchain.common.exception.UserMistake
+import net.postchain.core.BlockchainProcess
+import net.postchain.core.NODE_ID_READ_ONLY
+import net.postchain.core.SynchronizationInfrastructureExtension
+import net.postchain.eif.Web3jRequestHandler
+import net.postchain.eif.Web3jServiceFactory
+import net.postchain.eif.metrics.RpcUsageMetrics
+import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension
+import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.GET_SYSTEM_ANCHORING_BLOCKCHAIN_RID_QUERY
+import net.postchain.eif.transaction.config.EvmTransactionSubmitterConfig
+import net.postchain.eif.transaction.config.TransactionSubmitterBlockchainConfig
+import net.postchain.eif.transaction.signerupdate.EvmSignerUpdateSpecialTxExtension
+import net.postchain.gtv.GtvFactory.gtv
+import net.postchain.gtv.mapper.toObject
+import net.postchain.gtx.GTXModuleAware
+import org.web3j.crypto.Credentials
+import org.web3j.tx.RawTransactionManager
+import org.web3j.tx.gas.StaticGasProvider
+import java.math.BigInteger
+import java.util.LinkedList
+
+class TransactionSubmitterSynchronizationInfrastructureExtension(private val postchainContext: PostchainContext) : SynchronizationInfrastructureExtension {
+
+    private val transactionSubmitters = mutableMapOf<Long, TransactionSubmitter>()
+
+    override fun connectProcess(process: BlockchainProcess) {
+        val databaseOperations = TransactionSubmitterDatabaseOperationsImpl()
+        val blockchainConfig = process.blockchainEngine.getConfiguration()
+        val transactionSubmitterBlockchainConfig = blockchainConfig.rawConfig["transaction_submitter"]?.toObject<TransactionSubmitterBlockchainConfig>()
+                ?: throw UserMistake("No EIF config present")
+        val nodeIsReplica = blockchainConfig.blockchainContext.nodeID == NODE_ID_READ_ONLY
+
+        if (blockchainConfig is GTXModuleAware) {
+            val exs = blockchainConfig.module.getSpecialTxExtensions()
+            val ext = exs.find { it is TransactionSubmitterSpecialTxExtension }
+            if (ext is TransactionSubmitterSpecialTxExtension) {
+
+                ext.setConfig(
+                        postchainContext.appConfig.privKeyByteArray,
+                        postchainContext.appConfig.pubKeyByteArray,
+                        transactionSubmitterBlockchainConfig.txVerificationTime,
+                        !nodeIsReplica
+                )
+
+                // Create the tx submitters only if we build blocks
+                if (!nodeIsReplica) {
+                    for ((evmBlockchainName, networkBlockchainConfig) in transactionSubmitterBlockchainConfig.chains) {
+                        val networkId = networkBlockchainConfig.networkId
+                        val appConfig =
+                                EvmTransactionSubmitterConfig.fromAppConfig(evmBlockchainName, postchainContext.appConfig)
+                        val web3jServicesMap = Web3jServiceFactory.buildServicesMap(
+                                appConfig.urls,
+                                appConfig.connectTimeout,
+                                appConfig.readTimeout,
+                                appConfig.writeTimeout
+                        )
+                        val metrics =
+                                RpcUsageMetrics(blockchainConfig.chainID, blockchainConfig.blockchainRid, networkId)
+                        val web3jRequestHandler = Web3jRequestHandler(
+                                appConfig.minRetryDelay,
+                                appConfig.maxRetryDelay,
+                                appConfig.maxTryErrors,
+                                appConfig.urls,
+                                web3jServicesMap.map { it.value },
+                                metrics
+                        )
+
+                        val credentials = Credentials.create(appConfig.privateKey)
+                        val transactionManagers =
+                                web3jServicesMap.map { it.key to RawTransactionManager(it.value, credentials) }
+                                        .toMap()
+                        val gasProvider = StaticGasProvider(BigInteger.valueOf(networkBlockchainConfig.maxGasPrice), BigInteger.valueOf(transactionSubmitterBlockchainConfig.gasLimit))
+                        val nodeTxTimeout = transactionSubmitterBlockchainConfig.nodeTxTimeout
+                        val queue = LinkedList<EvmSubmitTxRequest>()
+                        withReadConnection(postchainContext.sharedStorage, process.blockchainEngine.chainID) {
+                            queue.addAll(databaseOperations.getQueuedTransactions(it, networkId))
+                        }
+                        val transactionSubmitter = TransactionSubmitter(
+                                web3jRequestHandler,
+                                transactionManagers,
+                                gasProvider,
+                                databaseOperations,
+                                postchainContext.sharedStorage,
+                                process.blockchainEngine.chainID,
+                                networkId,
+                                appConfig.txPollInterval,
+                                queue,
+                                BigInteger.valueOf(networkBlockchainConfig.minWalletBalance),
+                                appConfig.healthCheckInterval,
+                                nodeTxTimeout,
+                                transactionSubmitterBlockchainConfig.nodeTxVerificationTimeout,
+                                transactionSubmitterBlockchainConfig.nodeTxVerificationEvmBlocks,
+                        )
+                        transactionSubmitters[networkId] = transactionSubmitter
+                        ext.addTransactionSubmitter(transactionSubmitter, networkId)
+                    }
+
+                    withReadConnection(postchainContext.sharedStorage, process.blockchainEngine.chainID) {
+                        ext.addNewPendingTransactions(it)
+                    }
+                }
+            }
+
+            val anchoringExt = exs.find { it is EvmAnchoringSpecialTxExtension }
+            if (anchoringExt is EvmAnchoringSpecialTxExtension) {
+                anchoringExt.blockQueriesProvider = postchainContext.blockQueriesProvider
+                anchoringExt.systemAnchoringBrid = withReadConnection(postchainContext.sharedStorage, process.blockchainEngine.chainID) {
+                    val response = blockchainConfig.module.query(it, GET_SYSTEM_ANCHORING_BLOCKCHAIN_RID_QUERY, gtv(mapOf()))
+                    if (response.isNull()) {
+                        null
+                    } else {
+                        BlockchainRid(response.asByteArray())
+                    }
+                }
+            }
+
+            val signerUpdateExt = exs.find { it is EvmSignerUpdateSpecialTxExtension }
+            if (signerUpdateExt is EvmSignerUpdateSpecialTxExtension) {
+                signerUpdateExt.blockQueriesProvider = postchainContext.blockQueriesProvider
+                signerUpdateExt.directoryChainBrid = withReadConnection(postchainContext.sharedStorage, 0L) {
+                    val db = DatabaseAccess.of(it)
+                    db.getBlockchainRid(it) ?: throw ProgrammerMistake("No blockchain-rid found for chain 0")
+                }
+            }
+        }
+    }
+
+    override fun disconnectProcess(process: BlockchainProcess) {
+        transactionSubmitters.values.forEach { it.shutdown() }
+    }
+
+    override fun shutdown() {
+        transactionSubmitters.values.forEach { it.shutdown() }
+    }
+}

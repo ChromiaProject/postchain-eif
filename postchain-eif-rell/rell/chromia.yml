@@ -24,9 +24,46 @@ test:
   modules:
     - tests.utils
     - tests.ft4
+    - transaction_submitter.test
+    - transaction_submitter.anchoring.test
+    - transaction_submitter.signer_update.test
   moduleArgs:
     <<: *common_args
     <<: *rell_test_args
+    transaction_submitter:
+      manual_admins:
+        - x"02466d7fcae563e5cb09a0d1870bb580344804617879a14949cf22285f1bae3f27"
+      genesis_node: x"0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57"
+      directory_chain_config:
+        blockchain_rid: x"00000000000000000000000000000000"
+        validator_contracts:
+          - address: "directory_validator"
+            network_id: 5
+      system_anchoring_chain_config:
+        blockchain_rid: x"11111111111111111111111111111111"
+        anchoring_contracts:
+          - address: "anchoring"
+            validator_contract: "anchoring_validator"
+            network_id: 5
+      system_chain_bridges:
+        - blockchain_rid: x""
+          bridge_contracts:
+            - address: "address"
+              validator_contract: "validator"
+              network_id: 1
+            - address: "address1"
+              validator_contract: "validator"
+              network_id: 1337
+      contract_tx_rate_limit: 60000
+      tx_timeout: 86400000 #24h
+      node_retry_strategy: SUPERMAJORITY
+      network_configs:
+        - id: 1337
+          currency_symbol: "ETH"
+      system_max_priority_fee_per_gas: 1000000000
+      system_max_fee_per_gas: 4000000000
+    transaction_submitter.anchoring:
+      anchoring_interval: 3600000
 
 blockchains:
   event_receiver:
@@ -57,6 +94,73 @@ blockchains:
     moduleArgs:
       <<: *common_args
       <<: *rell_test_args
+  transaction_submitter:
+    module: transaction_submitter
+    moduleArgs:
+      transaction_submitter:
+        # TODO replace with real brids and contracts
+        manual_admins: [ ] # List of public keys that are allowed to reset failed signer list updates
+        genesis_node: x"0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57" # This will be the initial signer for system chains
+        directory_chain_config:
+          blockchain_rid: x"" # Replace with directory chain brid
+          validator_contracts:
+            - address: "directory_chain_validator"
+              network_id: 5
+        # Omit this to disable anchoring
+        system_anchoring_chain_config:
+          blockchain_rid: x"" # Replace with system anchoring chain brid
+          anchoring_contracts:
+            - address: "anchoring_contract"
+              validator_contract: "sac_validator_contract"
+              network_id: 5
+        # Here we can add all system chain bridges
+        system_chain_bridges: [ ]
+        #          - blockchain_rid: x"" # Replace with economy chain brid & contracts
+        #            bridge_contracts:
+        #              - address: "ec_bridge_contract"
+        #                validator_contract: "ec_validator_contract"
+        #                network_id: 5
+        contract_tx_rate_limit: 60000
+        tx_timeout: 86400000 #24h
+        node_retry_strategy: SUPERMAJORITY
+        network_configs:
+          - id: 1337
+            currency_symbol: "ETH"
+        system_max_priority_fee_per_gas: 1000000000
+        system_max_fee_per_gas: 4000000000
+      transaction_submitter.anchoring:
+        anchoring_interval: 3600000 # 1 per hour
+    config:
+      gtx:
+        modules:
+          - "net.postchain.eif.transaction.TransactionSubmitterGTXModule"
+          - "net.postchain.d1.icmf.IcmfReceiverGTXModule"
+          - "net.postchain.d1.icmf.IcmfSenderGTXModule"
+      transaction_submitter:
+        chains:
+          goerli:
+            network_id: 5
+            max_gas_price: 4100000000
+            min_wallet_balance: 100000000000
+        node_tx_timeout: 86400000 #24h
+        gas_limit: 9000000
+        node_tx_verification_evm_blocks: 10
+        tx_verification_time: 20000
+      sync_ext:
+        - "net.postchain.eif.transaction.TransactionSubmitterSynchronizationInfrastructureExtension"
+        - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"
+      icmf:
+        receiver:
+          directory-chain:
+            topics:
+              - L_signer_list_update
+          local:
+            - bc-rid: x"" # Replace with economy chain brid
+              topic: "L_bridge_mapping"
+          global:
+            topics:
+              - G_evm_submit_transaction
+
 
 compile:
   source: src
@@ -78,6 +182,5 @@ libs:
   icmf:
     registry: https://gitlab.com/chromaway/core/directory-chain
     path: src/messaging/icmf
-    tagOrBranch: 1.32.2
+    tagOrBranch: 1.35.0
     rid: x"19D6BC28D527E6D2239843608486A84F44EDCD244E253616F13D1C65893F35F6"
-    insecure: false

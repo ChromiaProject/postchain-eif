@@ -1,0 +1,332 @@
+import ^.*;
+
+val signer_list_update_topic = "L_signer_list_update";
+
+struct signer_list_update_message {
+    blockchain_rid: byte_array;
+    signers: byte_array;
+    confirmed_in_directory_at_height: integer;
+}
+
+enum signer_list_update_status {
+    QUEUED,
+    PENDING,
+    COMPLETED,
+    CANCELLED,
+    FAILED
+}
+
+entity signer_list_update {
+    index blockchain_rid: byte_array;
+    signers: byte_array;
+    confirmed_in_directory_at_height: integer;
+    index mutable status: signer_list_update_status = signer_list_update_status.QUEUED;
+}
+
+entity parked_directory_signer_list_update {
+    signers: byte_array;
+    confirmed_in_directory_at_height: integer;
+}
+
+entity signer_list_update_transaction {
+    key evm_submit_transaction, signer_list_update;
+}
+
+struct signer_list_update_data {
+    rowid: integer;
+    blockchain_rid: byte_array;
+    signers: byte_array;
+    confirmed_in_directory_at_height: integer;
+}
+
+struct signer_list_update_txs_data {
+    status: signer_list_update_status;
+    transactions: list<evm_submit_transaction_data>;
+}
+
+operation __enqueue_signer_update_transaction(
+    update_id: integer,
+    update_event: byte_array,
+    block_header_data: byte_array,
+    signatures: list<byte_array>,
+    signers: list<byte_array>,
+    extra_header_proof: byte_array,
+    proof: byte_array
+) {
+    enqueue_signer_update_transaction_impl(
+        update_id,
+        update_event,
+        block_header_data,
+        signatures,
+        signers,
+        extra_header_proof,
+        proof
+    );
+}
+
+function enqueue_signer_update_transaction_impl(
+    update_id: integer,
+    update_event: byte_array,
+    block_header_data: byte_array,
+    signatures: list<byte_array>,
+    signers: list<byte_array>,
+    extra_header_proof: byte_array,
+    proof: byte_array
+) {
+    val signer_list_update = signer_list_update @ { .rowid == rowid(update_id) };
+
+    val contracts = get_validator_contracts(signer_list_update.blockchain_rid);
+
+    for (contract in contracts) {
+        val transaction = add_transaction_to_queue(
+            contract.validator_contract,
+            "updateValidators",
+            ["bytes", "bytes", "bytes[]", "address[]", "bytes", "bytes"],
+            [
+                update_event.to_gtv(),
+                block_header_data.to_gtv(),
+                signatures.to_gtv(),
+                signers.to_gtv(),
+                extra_header_proof.to_gtv(),
+                proof.to_gtv()
+            ],
+            contract.network_id,
+            get_system_max_priority_fee_per_gas(),
+            get_system_max_fee_per_gas(),
+            chain_context.blockchain_rid
+        );
+
+        create signer_list_update_transaction ( transaction, signer_list_update );
+
+        log(
+            "Submitting signer update tx for blockchain %s on network %s.".format(
+                signer_list_update.blockchain_rid,
+                contract.network_id
+            )
+        );
+    }
+
+    signer_list_update.status = signer_list_update_status.PENDING;
+}
+
+query get_queued_signer_updates() = signer_list_update @* { .status == signer_list_update_status.QUEUED } ( 
+    signer_list_update_data (
+        rowid = .rowid.to_integer(),
+        blockchain_rid = .blockchain_rid,
+        signers = .signers,
+        confirmed_in_directory_at_height = .confirmed_in_directory_at_height
+    ) 
+);
+
+query get_current_evm_signer_list(blockchain_rid: byte_array): list<byte_array> {
+    val latest_confirmed_signers = current_evm_signer_list(blockchain_rid);
+    return if (latest_confirmed_signers != null)
+        list<byte_array>.from_gtv(gtv.from_bytes(latest_confirmed_signers))
+    else get_default_signers();
+}
+
+query is_chain_updatable_at_height(blockchain_rid: byte_array, update_height: integer) {
+    val directory_chain_rid = get_directory_chain_blockchain_rid();
+    if (blockchain_rid == directory_chain_rid) {
+        return (
+                signer_list_update @* {
+                    .blockchain_rid != directory_chain_rid and
+                    .status in [signer_list_update_status.QUEUED, signer_list_update_status.PENDING] and
+                    .confirmed_in_directory_at_height <= update_height
+                }
+        ).empty();
+    } else {
+        val latest_update = signer_list_update @? { .blockchain_rid == directory_chain_rid }
+            ( @omit @sort_desc .rowid, $ ) limit 1;
+        return latest_update == null or
+        latest_update.status == signer_list_update_status.COMPLETED or
+        latest_update.confirmed_in_directory_at_height >= update_height;
+    }
+}
+
+// Query for triggering alarm, monitor any blockchain of interest
+query latest_signer_list_update_status(blockchain_rid: byte_array): signer_list_update_status? {
+    return signer_list_update @? { blockchain_rid } ( @omit @sort_desc .rowid, .status ) limit 1;
+}
+
+// Use for debugging and information for re-submission
+query latest_signer_list_update_txs(blockchain_rid: byte_array): signer_list_update_txs_data? {
+    val latest_update = signer_list_update @? { blockchain_rid } ( @omit @sort_desc .rowid, $ ) limit 1;
+    if (latest_update == null) return null;
+
+    return signer_list_update_txs_data(
+        status = latest_update.status,
+        transactions = signer_list_update_transaction @* { .signer_list_update == latest_update } (
+            evm_submit_transaction_data (
+                row_id = .evm_submit_transaction.rowid.to_integer(),
+                contract_address = .evm_submit_transaction.contract_address,
+                function_name = .evm_submit_transaction.function_name,
+                parameter_types = .evm_submit_transaction.parameter_types.split("."),
+                parameter_values = list<gtv>.from_gtv(gtv.from_bytes(.evm_submit_transaction.parameter_values)),
+                network_id = .evm_submit_transaction.network_id,
+                max_priority_fee_per_gas = .evm_submit_transaction.max_priority_fee_per_gas,
+                max_fee_per_gas = .evm_submit_transaction.max_fee_per_gas,
+                sender = .evm_submit_transaction.sender,
+                status = .evm_submit_transaction.status,
+                created = .evm_submit_transaction.created,
+                tx_hash = .evm_submit_transaction.tx_hash,
+                processed_by = .evm_submit_transaction.processed_by
+            )
+        )
+    );
+}
+
+function current_evm_signer_list(
+    blockchain_rid: byte_array
+) = signer_list_update @? { 
+    .blockchain_rid == blockchain_rid and .status == signer_list_update_status.COMPLETED 
+} ( 
+    @omit @sort_desc .rowid,
+    .signers 
+) limit 1;
+
+@extend(receive_icmf_message)
+function handle_signer_update_message(sender: byte_array, topic: text, body: gtv) {
+    if (topic == signer_list_update_topic) {
+        val update_message = signer_list_update_message.from_gtv(body);
+
+        val is_directory_chain = is_directory_chain(update_message.blockchain_rid);
+        if (not is_directory_chain and
+        not has_bridge_mapping(update_message.blockchain_rid) and
+            not is_system_anchoring_chain(update_message.blockchain_rid)
+        )
+            return;
+
+        // Any queued update is pointless now, we may cancel it. The exception is directory chain updates since those are validated by directory contract itself
+        // TODO: If we implement https://chromaway.atlassian.net/browse/POS-1167 we may even be able to cancel txs that have been taken from queue
+        if (not is_directory_chain) {
+            val queued_update = signer_list_update @? {
+                .blockchain_rid == update_message.blockchain_rid,
+                .status == signer_list_update_status.QUEUED
+            };
+            if (queued_update != null) {
+                queued_update.status = signer_list_update_status.CANCELLED;
+            }
+        } else {
+            // If latest directory chain update is not completed we need to park this update
+            val latest_directory_update_status = latest_signer_list_update_status(update_message.blockchain_rid);
+            if (latest_directory_update_status != null and
+            latest_directory_update_status != signer_list_update_status.COMPLETED
+            ) {
+                create parked_directory_signer_list_update (
+                    signers = update_message.signers,
+                    confirmed_in_directory_at_height = update_message.confirmed_in_directory_at_height
+                );
+                return;
+            }
+        }
+
+        create signer_list_update (
+            blockchain_rid = update_message.blockchain_rid,
+            signers = update_message.signers,
+            confirmed_in_directory_at_height = update_message.confirmed_in_directory_at_height
+        );
+    }
+}
+
+// To register initial signers and manual overrides
+@extend(receive_icmf_message)
+function handle_bridge_mapping_messasge_signers(
+    sender: byte_array,
+    topic: text,
+    body: gtv
+) {
+    if (topic == bridge_mapping_topic) {
+        val bridge_mapping_message = bridge_mapping_message.from_gtv(body);
+
+        val current_signers_override = bridge_mapping_message.signers;
+        val current_signers = current_evm_signer_list(bridge_mapping_message.blockchain_rid);
+        if (current_signers_override != null and
+        current_signers != null and
+            current_signers_override != current_signers
+        ) {
+            create signer_list_update (
+                blockchain_rid = bridge_mapping_message.blockchain_rid,
+                signers = current_signers_override,
+                confirmed_in_directory_at_height = -1,
+                status = signer_list_update_status.COMPLETED
+            );
+        }
+    }
+}
+
+@extend(on_transaction_completed)
+function handle_completed_signer_transaction(
+    transaction: evm_submit_transaction,
+    status: transaction_status
+) {
+    val signer_list_update_tx = signer_list_update_transaction @? { .evm_submit_transaction == transaction };
+    if (signer_list_update_tx == null) return;
+
+    val signer_list_update = signer_list_update_tx.signer_list_update;
+
+    if (status == transaction_status.SUCCESS) {
+        log(
+            "Signer update for blockchain %s was successful on network %s.".format(
+                signer_list_update.blockchain_rid,
+                transaction.network_id
+            )
+        );
+
+        if ((signer_list_update_transaction @* {
+            signer_list_update,
+            .evm_submit_transaction != transaction,
+            .evm_submit_transaction.status != transaction_status.SUCCESS
+        }).empty()) {
+            // Now completed on all networks
+            signer_list_update.status = signer_list_update_status.COMPLETED;
+
+            dequeue_parked_update(signer_list_update.blockchain_rid);
+        }
+    } else {
+        log(
+            "Signer update for blockchain %s failed on network %s. Please submit manually.".format(
+                signer_list_update.blockchain_rid,
+                transaction.network_id
+            )
+        );
+        // This may only be failed on one network, user will have to figure out which one that needs manual intervention
+        // with the help of latest_signer_list_update_txs query
+        // Steps would be:
+        // 1. Update contract(s) on EVM
+        // 2. For dApp chains: Confirm that signers have been updated via update_bridge_lease in EC (optional, will silence alarm)
+        //    For directory chain: Confirm that signers have been updated via manually_resolve_failed_signer_update (required)
+        signer_list_update.status = signer_list_update_status.FAILED;
+    }
+}
+
+operation manually_resolve_failed_signer_update(blockchain_rid: byte_array) {
+    val manual_admins = get_manual_admins();
+    val signers = op_context.get_signers();
+    require(not signers.empty(), "No signers");
+    for (signer in signers) {
+        require(signer in manual_admins, "Signer is not a manual admin");
+    }
+
+    val latest_update = signer_list_update @? { blockchain_rid } ( @omit @sort_desc .rowid, $ ) limit 1;
+    require(latest_update, "Blockchain does not have any updates");
+    require(latest_update.status == signer_list_update_status.FAILED, "Latest update for blockchain is not failed");
+
+    dequeue_parked_update(blockchain_rid);
+
+    latest_update.status = signer_list_update_status.COMPLETED;
+}
+
+function dequeue_parked_update(blockchain_rid: byte_array) {
+    if (is_directory_chain(blockchain_rid)) {
+        val next_update = parked_directory_signer_list_update @? {} limit 1;
+        if (next_update != null) {
+            create signer_list_update (
+                blockchain_rid = blockchain_rid,
+                signers = next_update.signers,
+                confirmed_in_directory_at_height = next_update.confirmed_in_directory_at_height
+            );
+            delete next_update;
+        }
+    }
+}

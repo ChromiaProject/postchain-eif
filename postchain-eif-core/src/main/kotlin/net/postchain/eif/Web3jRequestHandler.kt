@@ -3,6 +3,7 @@ package net.postchain.eif
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import mu.KLogging
+import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.eif.metrics.RpcUsageMetrics
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.Request
@@ -13,7 +14,7 @@ import kotlin.coroutines.coroutineContext
 import kotlin.math.min
 import kotlin.random.Random
 
-class Web3jRequestHandler(
+open class Web3jRequestHandler(
         private val baseTimeout: Long,
         private val maxTimeout: Long,
         private val maxTryErrors: Long,
@@ -23,6 +24,29 @@ class Web3jRequestHandler(
 ) : Closeable {
     companion object : KLogging() {
         const val DELAY_POWER_BASE = 1.2
+    }
+
+    open fun <T : Response<*>> sendWeb3jRequest(
+            requestFactory: (Web3j) -> Request<*, T>
+    ): T {
+        val requests = web3jServices.map(requestFactory)
+        for (request in requests) {
+
+            try {
+                val response = request.send()
+
+                if (response.hasError()) {
+                    val errorMessage = "Web3J error code: ${response.error.code} and message: ${response.error.message}"
+                    throw ProgrammerMistake(errorMessage)
+                }
+
+                return response
+            } catch (e: Exception) {
+                logger.error("Web3j request failed: ${e.message}", e)
+            }
+        }
+
+        throw ProgrammerMistake("Failed to send web3j request to all ${web3jServices.size} nodes")
     }
 
     suspend fun <T : Response<*>> sendWeb3jRequestWithRetry(
@@ -59,7 +83,8 @@ class Web3jRequestHandler(
                 }
                 coroutineContext.ensureActive()
                 delay(retryTimeouts[index])
-                retryTimeouts[currentIndex] = min((retryTimeouts[currentIndex].toDouble() * DELAY_POWER_BASE).toLong(), maxTimeout)
+                retryTimeouts[currentIndex] =
+                        min((retryTimeouts[currentIndex].toDouble() * DELAY_POWER_BASE).toLong(), maxTimeout)
             } else {
                 return response
             }

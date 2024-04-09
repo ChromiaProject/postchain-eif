@@ -67,12 +67,11 @@ class EifSynchronizationInfrastructureExtension(
     }
 
     private fun initializeEventProcessor(cfg: BlockchainConfiguration, eifEvmBlockchainConfig: EifEvmBlockchainConfig, engine: BlockchainEngine, evmConfig: EvmConfig): EventProcessor {
-        return if ("ignore".equals(evmConfig.urls, ignoreCase = true)) {
+        return if ("ignore".equals(evmConfig.urls.first(), ignoreCase = true)) {
             logger.warn("EIF is running in disconnected mode. No events will be validated against ethereum.")
             NoOpEventProcessor()
         } else {
-            val urls = evmConfig.urls.split(",").map { it.trim() }
-            val web3jServices = Web3jServiceFactory.buildServices(evmConfig)
+            val web3jServices = Web3jServiceFactory.buildServices(evmConfig.urls, evmConfig.connectTimeout, evmConfig.readTimeout, evmConfig.writeTimeout)
             val events = eifEvmBlockchainConfig.events.asArray().map(GtvToEventMapper::map)
             val metrics = RpcUsageMetrics(cfg.chainID, cfg.blockchainRid, eifEvmBlockchainConfig.networkId)
             EvmEventProcessor(
@@ -86,7 +85,7 @@ class EifSynchronizationInfrastructureExtension(
                     BigInteger.valueOf(eifEvmBlockchainConfig.skipToHeight),
                     BigInteger.valueOf(evmConfig.lastEvmBlockHeight),
                     engine,
-                    Web3jRequestHandler(evmConfig.minRetryDelay, evmConfig.maxRetryDelay, evmConfig.maxTryErrors, urls, web3jServices, metrics),
+                    Web3jRequestHandler(evmConfig.minRetryDelay, evmConfig.maxRetryDelay, evmConfig.maxTryErrors, evmConfig.urls, web3jServices, metrics),
                     evmConfig.delayWhenNoNewBlocks
             )
         }
