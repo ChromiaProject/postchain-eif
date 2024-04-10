@@ -1,0 +1,73 @@
+// AbstractContractA.sol
+
+// SPDX-License-Identifier: GPL-3.0-only
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+import "./utils/TwoWeekDelay.sol"; // Assume TwoWeekDelay contract from previous examples
+
+interface ChromiaToken {
+    function transferFromChromia(address to, uint256 value, bytes32 refID) external returns (bool);
+
+    function transferToChromia(bytes32 to, uint256 value) external;
+
+    function changeMinter(address newMinter) external;
+}
+
+interface IDailyLimit {
+    function _updateDayAmount(uint withdrawAmount) external;
+}
+
+contract TokenMinter is TwoWeekDelay, Ownable {
+    IDailyLimit private dailyLimit;
+    address public tokenContractAddress;
+
+    // Address to which minter role will be transferred after delay
+    address public pendingNewOwner;
+    IDailyLimit public pendingNewDailyLimit;
+
+    constructor(address _tokenContractAddress, IDailyLimit _dailyLimit) Ownable(msg.sender) {
+        dailyLimit = _dailyLimit;
+        tokenContractAddress = _tokenContractAddress;
+    }
+
+    function setDailyLimit(IDailyLimit _dailyLimit) external onlyOwner {
+        if (address(pendingNewDailyLimit) != address(0)) {
+            resetDelayForFunction(this.setDailyLimit.selector);
+        }
+        startDelayedAction(this.setDailyLimit.selector);
+        pendingNewDailyLimit = _dailyLimit;
+    }
+
+    function finishSetDailyLimit() external onlyOwner {
+        finishDelayedAction(this.setDailyLimit.selector);
+        dailyLimit = pendingNewDailyLimit;
+        delete pendingNewDailyLimit;
+    }
+
+    // Function to mint tokens, can be called by derived contracts or specific addresses
+    function mint(address to, uint256 amount) external virtual {
+        ChromiaToken(tokenContractAddress).transferFromChromia(to, amount, 0x0);
+    }
+
+    // Function to mint tokens, can be called by derived contracts or specific addresses
+    function burn(uint256 amount) external virtual {
+        ChromiaToken(tokenContractAddress).transferToChromia(bytes32(0), amount);
+    }
+
+    function transferMintRole(address newOwner) external virtual onlyOwner {
+        if (pendingNewOwner != address(0)) {
+            resetDelayForFunction(this.transferMintRole.selector);
+        }
+        startDelayedAction(this.transferMintRole.selector);
+        pendingNewOwner = newOwner;
+    }
+
+    function finishTransferMintRole() external onlyOwner {
+        require(pendingNewOwner != address(0), "No pending owner");
+        finishDelayedAction(this.transferMintRole.selector);
+        ChromiaToken(tokenContractAddress).changeMinter(pendingNewOwner);
+        delete pendingNewOwner;
+    }
+}
