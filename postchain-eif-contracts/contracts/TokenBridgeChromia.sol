@@ -12,45 +12,31 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 // Internal libraries
 import "./Postchain.sol";
 import "./TokenBridge.sol";
+import "./TokenMinter.sol";
 
-interface ChromiaToken is IERC20 {
-    function transferFromChromia(address to, uint256 value, bytes32 refID) external returns (bool);
+interface ITokenMinter {
+    function burn(uint256 amount) external;
 
-    function transferToChromia(bytes32 to, uint256 value) external;
+    function mint(address to, uint256 amount) external;
 
-    function changeMinter(address newMinter) external;
-}
+    function transferMintRole(address newOwner) external;
 
-interface IDailyLimit {
-    function _updateDayAmount(uint withdrawAmount) external;
+    function finishTransferMintRole() external;
 }
 
 // This contract is upgradeable. This imposes restrictions on how storage layout can be modified once it is deployed
 // Some instructions are also not allowed. Read more at: https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable
 // Note: To enhance the security & decentralization, we should call transferOwnership() to external multi-sig owner after deploy the smart contract
 contract ChromiaTokenBridge is TokenBridge {
-    IDailyLimit private dailyLimit;
+    ITokenMinter public tokenMinter;
     using Postchain for bytes32;
     using MerkleProof for bytes32[];
     using SafeERC20 for IERC20;
 
-    function initialize(IValidator _validator, uint256 _withdrawOffset, IDailyLimit _dailyLimit) public initializer {
-        TokenBridge.initialize(_validator, _withdrawOffset);
-        dailyLimit = _dailyLimit;
-    }
-
-    function setDailyLimit(IDailyLimit _dailyLimit) external onlyOwner {
-        dailyLimit = _dailyLimit;
-    }
-
-    function changeMinter(ChromiaToken token, address newMinter) external onlyOwner {
-        token.changeMinter(newMinter);
-    }
-
     function deposit(IERC20 token, uint256 amount) public override isAllowToken(token) whenNotPaused returns (bool) {
         (string memory name, string memory symbol, uint8 decimals) = _getTokenInfo(token);
-        token.safeTransferFrom(msg.sender, address(this), amount);
-        ChromiaToken(address(token)).transferToChromia(bytes32(0), amount);
+        token.safeTransferFrom(msg.sender, address(tokenMinter), amount);
+        tokenMinter.burn(amount);
         emit DepositedERC20(msg.sender, token, networkId, amount, name, symbol, decimals);
         return true;
     }
@@ -63,9 +49,8 @@ contract ChromiaTokenBridge is TokenBridge {
         wd.status = Status.Withdrawn;
         uint value = wd.amount;
         wd.amount = 0;
-        dailyLimit._updateDayAmount(value);
         // only support user to withdraw the token that be funded enough on the EVM bridge
-        ChromiaToken(address(wd.token)).transferFromChromia(beneficiary, value, 0x0);
+        tokenMinter.mint(beneficiary, value);
         emit Withdrawal(beneficiary, wd.token, value);
     }
 
@@ -108,8 +93,7 @@ contract ChromiaTokenBridge is TokenBridge {
                 (ERC20AccountState)
             );
             if (accountState.amount > 0 && _allowedToken[accountState.token]) {
-                dailyLimit._updateDayAmount(accountState.amount);
-                ChromiaToken(address(accountState.token)).transferFromChromia(beneficiary, accountState.amount, 0x0);
+                tokenMinter.mint(beneficiary, accountState.amount);
             }
         }
 
