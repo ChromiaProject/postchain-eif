@@ -20,10 +20,6 @@ interface IValidator {
     ) external view returns (bool);
 }
 
-interface IDailyLimit {
-    function _updateDayAmount(uint withdrawAmount) external;
-}
-
 // This contract is upgradeable. This imposes restrictions on how storage layout can be modified once it is deployed
 // Some instructions are also not allowed. Read more at: https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable
 // Note: To enhance the security & decentralization, we should call transferOwnership() to external multi-sig owner after deploy the smart contract
@@ -33,9 +29,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
 
     using Postchain for bytes32;
     using MerkleProof for bytes32[];
-    using SafeERC20 for ChromiaToken;
+    using SafeERC20 for IERC20;
 
-    mapping(ChromiaToken => bool) public _allowedToken;
+    mapping(IERC20 => bool) public _allowedToken;
     mapping(bytes32 => Withdraw) public _withdraw;
     IValidator public validator;
     uint256 public networkId;
@@ -46,8 +42,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
 
     // Postchain/Chromia blockchain rid
     bytes32 private blockchainRid;
-
-    IDailyLimit private dailyLimit;
 
     // Each postchain event will be used to claim only one time.
     mapping(bytes32 => bool) private _events;
@@ -63,7 +57,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     }
 
     struct Withdraw {
-        ChromiaToken token;
+        IERC20 token;
         address beneficiary;
         uint256 amount;
         uint256 block_number;
@@ -76,7 +70,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     }
 
     struct ERC20AccountState {
-        ChromiaToken token;
+        IERC20 token;
         uint amount;
     }
 
@@ -87,27 +81,27 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
 
     event Initialize(IValidator indexed _validator, uint256 _withdrawOffset);
     event SetBlockchainRid(bytes32 rid);
-    event AllowToken(ChromiaToken indexed token);
+    event AllowToken(IERC20 indexed token);
     event TriggerMassExit(uint indexed height, bytes32 indexed blockRid);
     event PostponeMassExit();
     event UpdatedMassExitBlock(uint indexed height, bytes32 indexed blockRid);
     event PendingWithdraw(bytes32 indexed hash);
     event UnpendingWithdraw(bytes32 indexed hash);
-    event FundedERC20(address indexed sender, ChromiaToken indexed token, uint amount);
+    event FundedERC20(address indexed sender, IERC20 indexed token, uint amount);
     event DepositedERC20(
         address indexed sender,
-        ChromiaToken indexed token,
+        IERC20 indexed token,
         uint networkId,
         uint amount,
         string name,
         string symbol,
         uint8 decimals
     );
-    event WithdrawRequest(address indexed beneficiary, ChromiaToken indexed token, uint256 value, uint256 blockNumber);
-    event Withdrawal(address indexed beneficiary, ChromiaToken indexed token, uint256 value);
+    event WithdrawRequest(address indexed beneficiary, IERC20 indexed token, uint256 value, uint256 blockNumber);
+    event Withdrawal(address indexed beneficiary, IERC20 indexed token, uint256 value);
     event WithdrawalBySnapshot(address indexed beneficiary);
 
-    modifier isAllowToken(ChromiaToken token) {
+    modifier isAllowToken(IERC20 token) {
         require(_allowedToken[token], "TokenBridge: not allow token");
         _;
     }
@@ -117,7 +111,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         _;
     }
 
-    function initialize(IValidator _validator, uint256 _withdrawOffset, IDailyLimit _dailyLimit) public initializer {
+    function initialize(IValidator _validator, uint256 _withdrawOffset) public initializer {
         require(address(_validator) != address(0), "TokenBridge: validator address is invalid");
         __Ownable_init(_msgSender());
         __Pausable_init();
@@ -131,7 +125,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         validator = _validator;
         withdrawOffset = _withdrawOffset;
         emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
-        dailyLimit = _dailyLimit;
         emit Initialize(_validator, _withdrawOffset);
     }
 
@@ -153,15 +146,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         _unpause();
     }
 
-    function setDailyLimit(IDailyLimit _dailyLimit) public onlyOwner {
-        dailyLimit = _dailyLimit;
-    }
-
-    function changeMinter(ChromiaToken token, address newMinter) external onlyOwner {
-        token.changeMinter(newMinter);
-    }
-
-    function allowToken(ChromiaToken token) public onlyOwner {
+    function allowToken(IERC20 token) public onlyOwner {
         require(address(token) != address(0), "TokenBridge: token address is invalid");
         _allowedToken[token] = true;
         emit AllowToken(token);
@@ -171,7 +156,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
      * Note: the mass exit block should be the block at which snapshot was updated
      *          with state root was stored properly in the block header extra data.
      */
-
     function triggerMassExit(uint height, bytes32 blockRid) public onlyOwner {
         require(!isMassExit, "TokenBridge: mass exit already set");
         isMassExit = true;
@@ -210,10 +194,19 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         emit UnpendingWithdraw(_hash);
     }
 
-    function deposit(ChromiaToken token, uint256 amount) public isAllowToken(token) whenNotPaused returns (bool) {
+    /**
+     * @dev admin need to fund enough token for bridge; otherwise, user cannot claim
+     * and they might need to withdraw back to postchain.
+     */
+    function fund(IERC20 token, uint256 amount) public isAllowToken(token) onlyOwner returns (bool) {
+        token.safeTransferFrom(msg.sender, address(this), amount);
+        emit FundedERC20(msg.sender, token, amount);
+        return true;
+    }
+
+    function deposit(IERC20 token, uint256 amount) public virtual isAllowToken(token) whenNotPaused returns (bool) {
         (string memory name, string memory symbol, uint8 decimals) = _getTokenInfo(token);
         token.safeTransferFrom(msg.sender, address(this), amount);
-        token.transferToChromia(bytes32(0), amount);
         emit DepositedERC20(msg.sender, token, networkId, amount, name, symbol, decimals);
         return true;
     }
@@ -265,7 +258,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     function _updateWithdraw(bytes32 hash, bytes memory _event) internal returns (bool) {
         Withdraw storage wd = _withdraw[hash];
         {
-            (ChromiaToken token, address beneficiary, uint256 amount, uint256 netId) = hash.verifyEvent(_event);
+            (IERC20 token, address beneficiary, uint256 amount, uint256 netId) = hash.verifyEvent(_event);
             require(_allowedToken[token], "TokenBridge: not allow token");
             require(networkId == netId, "TokenBridge: incorrect network id");
             require(amount > 0, "TokenBridge: invalid amount to make request withdraw");
@@ -280,7 +273,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         return true;
     }
 
-    function withdraw(bytes32 _hash, address payable beneficiary) external whenNotPaused nonReentrant {
+    function withdraw(bytes32 _hash, address payable beneficiary) external virtual whenNotPaused nonReentrant {
         Withdraw storage wd = _withdraw[_hash];
         require(wd.beneficiary == beneficiary, "TokenBridge: no fund for the beneficiary");
         require(wd.block_number <= block.number, "TokenBridge: not mature enough to withdraw the fund");
@@ -288,9 +281,8 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         wd.status = Status.Withdrawn;
         uint value = wd.amount;
         wd.amount = 0;
-        dailyLimit._updateDayAmount(value);
         // only support user to withdraw the token that be funded enough on the EVM bridge
-        wd.token.transferFromChromia(beneficiary, value, 0x0);
+        wd.token.safeTransfer(beneficiary, value);
         emit Withdrawal(beneficiary, wd.token, value);
     }
 
@@ -321,7 +313,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         bytes[] memory sigs,
         address[] memory signers,
         Data.ExtraProofData memory extraProof
-    ) public whenMassExit whenNotPaused nonReentrant {
+    ) public virtual whenMassExit whenNotPaused nonReentrant {
         require(_snapshots[stateProof.leaf] == false, "TokenBridge: snapshot already used");
         require(stateProof.leaf == keccak256(snapshot), "TokenBridge: snapshot data is not correct");
         (uint height, bytes32 blockRid, , bytes32 stateRoot) = Postchain.verifyBlockHeader(
@@ -348,8 +340,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
                 (ERC20AccountState)
             );
             if (accountState.amount > 0 && _allowedToken[accountState.token]) {
-                dailyLimit._updateDayAmount(accountState.amount);
-                accountState.token.transferFromChromia(beneficiary, accountState.amount, 0x0);
+                accountState.token.safeTransfer(beneficiary, accountState.amount);
             }
         }
 
@@ -358,7 +349,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     }
 
     function _getTokenInfo(
-        ChromiaToken token
+        IERC20 token
     ) internal view returns (string memory name, string memory symbol, uint8 decimals) {
         // We don't know if this token supports metadata functions or not so we have to query and handle failure
         bool success;
@@ -383,7 +374,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
      * @notice this function will be use only in emergency case
      * by allow admin/owner (multi-sig wallet) to withdraw all the remaining balance after a specific period of time.
      */
-    function emergencyWithdraw(ChromiaToken token, address payable beneficiary) external onlyOwner {
+    function emergencyWithdraw(IERC20 token, address payable beneficiary) external virtual onlyOwner {
         require(address(token) != address(0), "TokenBridge: token address is invalid");
         require(beneficiary != address(0), "TokenBridge: beneficiary address is invalid");
         require(
@@ -392,7 +383,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         );
         uint tokenBalance = token.balanceOf(address(this));
         if (tokenBalance > 0) {
-            token.transferFromChromia(beneficiary, tokenBalance, 0x0);
+            token.safeTransfer(beneficiary, tokenBalance);
         }
     }
 }
