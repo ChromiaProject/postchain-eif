@@ -30,7 +30,7 @@ contract DailyLimit is Ownable {
     }
 
     function _updateDayAmount(uint amount) external {
-        require(parentContract == msg.sender, "Only parent contract can update daily limit");
+        require(parentContract == msg.sender, "DailyLimit: Only parent contract can update daily amount");
 
         if (block.timestamp > dayStart + 1 days) {
             dayStart = block.timestamp;
@@ -38,6 +38,6 @@ contract DailyLimit is Ownable {
         }
 
         dayAmount += amount;
-        require(dayAmount <= dayLimit, "TokenBridge: withdraw daily limit");
+        require(dayAmount <= dayLimit, "DailyLimit: withdraw daily limit");
     }
 }
