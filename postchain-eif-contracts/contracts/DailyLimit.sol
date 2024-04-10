@@ -24,23 +24,22 @@ contract DailyLimit is Ownable, TwoWeekDelay {
     // Function to modify the day limit
     function setDayLimit(uint _newDayLimit) external onlyOwner {
         if (_newDayLimit > dayLimit) {
-            if (pendingDayLimit == _newDayLimit) {
-                // If the new limit is higher and there is already a pending limit, execute it
-                finishDelayedAction(this.setDayLimit.selector);
-                dayLimit = _newDayLimit;
-                pendingDayLimit = 0;
-                emit DayLimitChanged(_newDayLimit);
-            } else {
-                // If the new limit is higher, start the two-week delay
-                resetDelayForFunction(this.setDayLimit.selector);
-                pendingDayLimit = _newDayLimit;
-                startDelayedAction(this.setDayLimit.selector);
-            }
+            // If the new limit is higher, start the two-week delay
+            resetDelayForFunction(this.setDayLimit.selector);
+            pendingDayLimit = _newDayLimit;
+            startDelayedAction(this.setDayLimit.selector);
         } else {
             // If the new limit is lower, apply immediately
             dayLimit = _newDayLimit;
             emit DayLimitChanged(_newDayLimit);
         }
+    }
+
+    function finishSetDayLimit() external {
+        finishDelayedAction(this.setDayLimit.selector);
+        dayLimit = pendingDayLimit;
+        pendingDayLimit = 0;
+        emit DayLimitChanged(dayLimit);
     }
 
     function setParentContract(address _parentContract) external onlyOwner {
