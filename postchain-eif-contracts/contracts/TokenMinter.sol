@@ -25,12 +25,17 @@ contract TokenMinter is TwoWeekDelay, Ownable {
     address public bridgeContractAddress;
 
     // Address to which minter role will be transferred after delay
-    address public pendingNewOwner;
+    address public pendingNewMinter;
     IDailyLimit public pendingNewDailyLimit;
 
-    constructor(address _tokenContractAddress, IDailyLimit _dailyLimit) Ownable(msg.sender) {
+    constructor(
+        address _tokenContractAddress,
+        IDailyLimit _dailyLimit,
+        address _bridgeContractAddress
+    ) Ownable(msg.sender) {
         dailyLimit = _dailyLimit;
         tokenContractAddress = _tokenContractAddress;
+        bridgeContractAddress = _bridgeContractAddress;
     }
 
     modifier onlyBridge() {
@@ -47,6 +52,7 @@ contract TokenMinter is TwoWeekDelay, Ownable {
     }
 
     function finishSetDailyLimit() external onlyOwner {
+        require(address(pendingNewDailyLimit) != address(0), "No pending daily limit");
         finishDelayedAction(this.setDailyLimit.selector);
         dailyLimit = pendingNewDailyLimit;
         delete pendingNewDailyLimit;
@@ -63,17 +69,17 @@ contract TokenMinter is TwoWeekDelay, Ownable {
     }
 
     function transferMintRole(address newOwner) external virtual onlyOwner {
-        if (pendingNewOwner != address(0)) {
+        if (pendingNewMinter != address(0)) {
             resetDelayForFunction(this.transferMintRole.selector);
         }
         startDelayedAction(this.transferMintRole.selector);
-        pendingNewOwner = newOwner;
+        pendingNewMinter = newOwner;
     }
 
     function finishTransferMintRole() external onlyOwner {
-        require(pendingNewOwner != address(0), "No pending owner");
+        require(pendingNewMinter != address(0), "No pending owner");
         finishDelayedAction(this.transferMintRole.selector);
-        ChromiaToken(tokenContractAddress).changeMinter(pendingNewOwner);
-        delete pendingNewOwner;
+        ChromiaToken(tokenContractAddress).changeMinter(pendingNewMinter);
+        delete pendingNewMinter;
     }
 }
