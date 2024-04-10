@@ -39,7 +39,7 @@ contract ChromiaTokenBridge is TokenBridge {
         dailyLimit = _dailyLimit;
     }
 
-    function setDailyLimit(IDailyLimit _dailyLimit) public onlyOwner {
+    function setDailyLimit(IDailyLimit _dailyLimit) external onlyOwner {
         dailyLimit = _dailyLimit;
     }
 
