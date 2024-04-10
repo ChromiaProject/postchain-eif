@@ -5,7 +5,7 @@ import net.postchain.gtv.mapper.DefaultValue
 import net.postchain.gtv.mapper.Name
 import net.postchain.gtv.mapper.RawGtv
 
-data class EvmBlockchainConfig(
+data class EifEvmBlockchainConfig(
         @RawGtv
         val rawGtv: Gtv,
         @Name("network_id")

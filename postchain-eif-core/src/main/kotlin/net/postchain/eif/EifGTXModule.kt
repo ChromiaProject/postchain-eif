@@ -13,7 +13,7 @@ import net.postchain.common.hexStringToByteArray
 import net.postchain.core.BlockchainConfiguration
 import net.postchain.core.EContext
 import net.postchain.crypto.Secp256K1CryptoSystem
-import net.postchain.eif.config.EifBlockchainConfig
+import net.postchain.eif.config.EifEventConsumerConfig
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvNull
@@ -51,7 +51,7 @@ class EifGTXModule : SimpleGTXModule<Config>(
     }
 
     override fun initializeContext(configuration: BlockchainConfiguration, postchainContext: PostchainContext) {
-        val snapshotConfig = configuration.rawConfig["eif"]?.toObject<EifBlockchainConfig>()?.snapshot
+        val snapshotConfig = configuration.rawConfig["eif"]?.toObject<EifEventConsumerConfig>()?.snapshot
         if (snapshotConfig != null) {
             conf.levelsPerPage = snapshotConfig.levelsPerPage.toInt()
             conf.snapshotsToKeep = snapshotConfig.snapshotsToKeep.toInt()
