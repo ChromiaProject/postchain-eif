@@ -700,7 +700,7 @@ describe("Token Bridge Test", () => {
         await dailyLimitOwner.setDayLimit(toDeposit.sub(1));
         await expect(
           bridge.withdraw(DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)), user.address),
-        ).to.be.revertedWith("TokenBridge: withdraw daily limit");
+        ).to.be.revertedWith("DailyLimit: withdraw daily limit");
         // Set the daily limit to more than withdraw amount, now user can withdraw
         await dailyLimitOwner.setDayLimit(toDeposit.add(1));
         await expect(
