@@ -41,13 +41,13 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     uint256 public emergencyTimestamp;
 
     // Postchain/Chromia blockchain rid
-    bytes32 private blockchainRid;
+    bytes32 internal blockchainRid;
 
     // Each postchain event will be used to claim only one time.
-    mapping(bytes32 => bool) private _events;
+    mapping(bytes32 => bool) internal _events;
 
     // Each account state snapshot will be used to claim only one time.
-    mapping(bytes32 => bool) private _snapshots;
+    mapping(bytes32 => bool) internal _snapshots;
 
     enum Status {
         Pending,
