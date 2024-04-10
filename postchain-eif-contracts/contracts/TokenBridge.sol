@@ -374,7 +374,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
      * @notice this function will be use only in emergency case
      * by allow admin/owner (multi-sig wallet) to withdraw all the remaining balance after a specific period of time.
      */
-    function emergencyWithdraw(IERC20 token, address payable beneficiary) external virtual onlyOwner {
+    function emergencyWithdraw(IERC20 token, address payable beneficiary) external onlyOwner {
         require(address(token) != address(0), "TokenBridge: token address is invalid");
         require(beneficiary != address(0), "TokenBridge: beneficiary address is invalid");
         require(

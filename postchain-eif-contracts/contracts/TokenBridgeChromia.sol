@@ -116,21 +116,4 @@ contract ChromiaTokenBridge is TokenBridge {
         _snapshots[stateProof.leaf] = true;
         emit WithdrawalBySnapshot(beneficiary);
     }
-
-    /**
-     * @notice this function will be use only in emergency case
-     * by allow admin/owner (multi-sig wallet) to withdraw all the remaining balance after a specific period of time.
-     */
-    function emergencyWithdraw(IERC20 token, address payable beneficiary) external override onlyOwner {
-        require(address(token) != address(0), "TokenBridge: token address is invalid");
-        require(beneficiary != address(0), "TokenBridge: beneficiary address is invalid");
-        require(
-            block.timestamp > emergencyTimestamp,
-            "TokenBridge: cannot do emergency withdrawal before setting timestamp"
-        );
-        uint tokenBalance = token.balanceOf(address(this));
-        if (tokenBalance > 0) {
-            ChromiaToken(address(token)).transferFromChromia(beneficiary, tokenBalance, 0x0);
-        }
-    }
 }
