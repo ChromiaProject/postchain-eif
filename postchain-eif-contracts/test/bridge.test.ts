@@ -2,9 +2,8 @@ import { ethers, upgrades, network } from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
 import {
-  Chromia__factory,
-  ChromiaTokenBridge__factory,
-  DailyLimit__factory,
+  TestToken__factory,
+  TokenBridge__factory,
   TokenBridgeDelegator__factory,
   Validator__factory,
   Migration__factory,
@@ -25,12 +24,10 @@ import {
 chai.use(solidity);
 const { expect } = chai;
 const WITHDRAW_OFFSET = "0x20";
-const DAILY_LIMIT = BigInt(1000000000000000000000000);
 describe("Token Bridge Test", () => {
   let tokenAddress: string;
   let bridgeAddress: string;
   let validatorAddress: string;
-  let dailyLimitAddress: string;
   let bridgeDelegatorAddress: string;
   let migrationAddress: string;
   let admin: SignerWithAddress;
@@ -45,8 +42,8 @@ describe("Token Bridge Test", () => {
     });
     const [deployer] = await ethers.getSigners();
     [admin, validator1, validator2, validator3] = await ethers.getSigners();
-    const tokenFactory = new Chromia__factory(deployer);
-    const tokenContract = await tokenFactory.deploy(admin.address, 0);
+    const tokenFactory = new TestToken__factory(deployer);
+    const tokenContract = await tokenFactory.deploy();
     tokenAddress = tokenContract.address;
     expect(await tokenContract.totalSupply()).to.eq(0);
 
@@ -54,10 +51,8 @@ describe("Token Bridge Test", () => {
     const validatorContract = await validatorFactory.deploy([validator1.address, validator2.address]);
     validatorAddress = validatorContract.address;
 
-    const bridgeFactory = new ChromiaTokenBridge__factory(admin);
-    const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_OFFSET, tokenAddress], {
-      initializer: "initialize(address,uint256,address)",
-    });
+    const bridgeFactory = new TokenBridge__factory(admin);
+    const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_OFFSET]);
     bridgeAddress = bridge.address;
 
     const bridgeDelegatorFactory = new TokenBridgeDelegator__factory(deployer);
@@ -67,12 +62,6 @@ describe("Token Bridge Test", () => {
     const migrationFactory = new Migration__factory(admin);
     const migration = await migrationFactory.deploy(validatorAddress, bridgeAddress);
     migrationAddress = migration.address;
-
-    const dailyLimitFactory = new DailyLimit__factory(admin);
-    const dailyLimitContract = await dailyLimitFactory.deploy(DAILY_LIMIT);
-    dailyLimitAddress = dailyLimitContract.address;
-    dailyLimitContract.setParentContract(bridgeAddress);
-    bridge.setDailyLimit(dailyLimitAddress);
 
     await expect(bridge.allowToken(constants.AddressZero)).to.be.revertedWith("TokenBridge: token address is invalid");
     await expect(bridge.allowToken(tokenAddress)).to.emit(bridge, "AllowToken").withArgs(tokenAddress);
@@ -108,36 +97,20 @@ describe("Token Bridge Test", () => {
       expect(await validator.getValidatorCount()).to.eq(3);
     });
   });
-  describe("ChromiaToken", async () => {
-    it("Admin can change minter", async () => {
-      const [deployer, user] = await ethers.getSigners();
-      const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
-      const bridge = new ChromiaTokenBridge__factory(deployer).attach(bridgeAddress);
-
-      const bridgeUser = new ChromiaTokenBridge__factory(user).attach(bridgeAddress);
-
-      await expect(tokenInstance.changeMinter(bridgeAddress)).to.emit(tokenInstance, "MinterSet");
-      await expect(bridgeUser.changeMinter(tokenAddress, deployer.address)).to.be.revertedWith(
-        "OwnableUnauthorizedAccount",
-      );
-      await expect(bridge.changeMinter(tokenAddress, deployer.address)).to.emit(tokenInstance, "MinterSet");
-      await expect(bridge.changeMinter(tokenAddress, bridgeAddress)).to.be.revertedWith("caller is not a minter");
-    });
-  });
 
   describe("Deposit", async () => {
     it("User can deposit ERC20 token to target smartcontract", async () => {
       const [deployer, user] = await ethers.getSigners();
-      const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
+      const tokenInstance = new TestToken__factory(deployer).attach(tokenAddress);
       const toMint = ethers.utils.parseEther("10000");
 
-      await tokenInstance.transferFromChromia(user.address, toMint, ethers.utils.formatBytes32String("test"));
+      await tokenInstance.mint(user.address, toMint);
       expect(await tokenInstance.totalSupply()).to.eq(toMint);
       expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint);
 
-      const bridge = new ChromiaTokenBridge__factory(user).attach(bridgeAddress);
+      const bridge = new TokenBridge__factory(user).attach(bridgeAddress);
       const toDeposit = ethers.utils.parseEther("100");
-      const tokenApproveInstance = new Chromia__factory(user).attach(tokenAddress);
+      const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress);
       const name = await tokenApproveInstance.name();
       const symbol = await tokenApproveInstance.symbol();
       await tokenApproveInstance.approve(bridgeAddress, toDeposit);
@@ -148,10 +121,10 @@ describe("Token Bridge Test", () => {
         toDeposit,
         name,
         symbol,
-        6, // Default decimals is 18, but chromia token has 6
+        18, // Default decimals is 18
       );
 
-      expect(await tokenInstance.balanceOf(bridge.address)).to.eq(0);
+      expect(await tokenInstance.balanceOf(bridge.address)).to.eq(toDeposit);
       expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint.sub(toDeposit));
     });
   });
@@ -159,16 +132,16 @@ describe("Token Bridge Test", () => {
   describe("Emergency Withdraw", async () => {
     it("Emergency Withdraw", async () => {
       const [deployer, user, beneficiary] = await ethers.getSigners();
-      const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
+      const tokenInstance = new TestToken__factory(deployer).attach(tokenAddress);
       const toMint = ethers.utils.parseEther("10000");
 
-      await tokenInstance.transferFromChromia(user.address, toMint, ethers.utils.formatBytes32String("test"));
+      await tokenInstance.mint(user.address, toMint);
       expect(await tokenInstance.totalSupply()).to.eq(toMint);
       expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint);
 
-      const bridge = new ChromiaTokenBridge__factory(user).attach(bridgeAddress);
+      const bridge = new TokenBridge__factory(user).attach(bridgeAddress);
       const toDeposit = ethers.utils.parseEther("100");
-      const tokenApproveInstance = new Chromia__factory(user).attach(tokenAddress);
+      const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress);
       await tokenApproveInstance.approve(bridgeAddress, toDeposit);
       await bridge.deposit(tokenAddress, toDeposit);
 
@@ -177,7 +150,7 @@ describe("Token Bridge Test", () => {
         "OwnableUnauthorizedAccount",
       );
 
-      const adminBridge = new ChromiaTokenBridge__factory(deployer).attach(bridgeAddress);
+      const adminBridge = new TokenBridge__factory(deployer).attach(bridgeAddress);
       // admin or owner cannot call emergencyWithdraw before setting time
       await expect(adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address)).to.be.revertedWith(
         "TokenBridge: cannot do emergency withdrawal before setting timestamp",
@@ -185,7 +158,7 @@ describe("Token Bridge Test", () => {
 
       // admin can call emergencyWithdraw after setting time
       expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(0);
-      expect(await tokenInstance.balanceOf(adminBridge.address)).to.eq(0);
+      expect(await tokenInstance.balanceOf(adminBridge.address)).to.eq(toDeposit);
       const nighttyDays = 90 * 24 * 60 * 60;
       const blockNum = await ethers.provider.getBlockNumber();
       const block = await ethers.provider.getBlock(blockNum);
@@ -197,9 +170,8 @@ describe("Token Bridge Test", () => {
       await expect(adminBridge.emergencyWithdraw(tokenAddress, constants.AddressZero)).to.be.revertedWith(
         "TokenBridge: beneficiary address is invalid",
       );
-      await tokenInstance.changeMinter(adminBridge.address);
       await adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address);
-      expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(0);
+      expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(toDeposit);
       expect(await tokenInstance.balanceOf(adminBridge.address)).to.eq(0);
     });
   });
@@ -207,23 +179,21 @@ describe("Token Bridge Test", () => {
   describe("Withdraw by normal user", async () => {
     it("User can request withdraw by providing properly proof data", async () => {
       const [deployer, user] = await ethers.getSigners();
-      const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
+      const tokenInstance = new TestToken__factory(deployer).attach(tokenAddress);
       const toMint = ethers.utils.parseEther("10000");
 
-      await tokenInstance.transferFromChromia(user.address, toMint, ethers.utils.formatBytes32String("test"));
+      await tokenInstance.mint(user.address, toMint);
       expect(await tokenInstance.totalSupply()).to.eq(toMint);
 
-      const bridgeOwner = new ChromiaTokenBridge__factory(deployer).attach(bridgeAddress);
-      const dailyLimitOwner = new DailyLimit__factory(deployer).attach(dailyLimitAddress);
-      const bridge = new ChromiaTokenBridge__factory(user).attach(bridgeAddress);
+      const bridgeOwner = new TokenBridge__factory(deployer).attach(bridgeAddress);
+      const bridge = new TokenBridge__factory(user).attach(bridgeAddress);
       const validatorAdmin = new Validator__factory(admin).attach(validatorAddress);
       const migration = new Migration__factory(admin).attach(migrationAddress);
       const toDeposit = ethers.utils.parseEther("100");
-      const tokenApproveInstance = new Chromia__factory(user).attach(tokenAddress);
+      const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress);
       await tokenApproveInstance.approve(bridgeAddress, toDeposit);
 
       await expect(bridge.pause()).to.be.revertedWith("OwnableUnauthorizedAccount");
-
       await expect(bridge.deposit(bridgeAddress, toDeposit)).to.be.revertedWith("TokenBridge: not allow token");
       await expect(bridgeOwner.pause()).to.emit(bridgeOwner, "Paused").withArgs(deployer.address);
       await expect(bridge.deposit(tokenAddress, toDeposit)).to.be.revertedWith("EnforcedPause()");
@@ -680,7 +650,7 @@ describe("Token Bridge Test", () => {
         await expect(bridgeOwner.unpendingWithdraw(hashEvent)).to.emit(bridge, "UnpendingWithdraw");
 
         expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint.sub(toDeposit));
-        expect(await tokenInstance.balanceOf(bridge.address)).to.eq(0);
+        expect(await tokenInstance.balanceOf(bridge.address)).to.eq(toDeposit);
         await expect(
           bridge.withdraw(
             DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
@@ -694,15 +664,6 @@ describe("Token Bridge Test", () => {
         ).to.be.revertedWith("EnforcedPause()");
         await expect(bridgeOwner.unpause()).to.emit(bridgeOwner, "Unpaused").withArgs(deployer.address);
         // now user can withdraw the fund
-        await tokenInstance.changeMinter(bridgeAddress);
-
-        // Set the daily limit to one less than withdraw amount
-        await dailyLimitOwner.setDayLimit(toDeposit.sub(1));
-        await expect(
-          bridge.withdraw(DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)), user.address),
-        ).to.be.revertedWith("DailyLimit: withdraw daily limit");
-        // Set the daily limit to more than withdraw amount, now user can withdraw
-        await dailyLimitOwner.setDayLimit(toDeposit.add(1));
         await expect(
           bridge.withdraw(DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)), user.address),
         )
@@ -720,14 +681,15 @@ describe("Token Bridge Test", () => {
   describe("Withdraw via smart contract", async () => {
     it("Integrate with smart contract", async () => {
       const [deployer, user] = await ethers.getSigners();
-      const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
+      const tokenInstance = new TestToken__factory(deployer).attach(tokenAddress);
       const toMint = ethers.utils.parseEther("10000");
-      await tokenInstance.transferFromChromia(bridgeDelegatorAddress, toMint, ethers.utils.formatBytes32String("test"));
+
+      await tokenInstance.mint(bridgeDelegatorAddress, toMint);
       expect(await tokenInstance.totalSupply()).to.eq(toMint);
 
-      const bridge = new ChromiaTokenBridge__factory(user).attach(bridgeAddress);
+      const bridge = new TokenBridge__factory(user).attach(bridgeAddress);
       const validatorAdmin = new Validator__factory(admin).attach(validatorAddress);
-      const bridgeOwner = new ChromiaTokenBridge__factory(admin).attach(bridgeAddress);
+      const bridgeOwner = new TokenBridge__factory(admin).attach(bridgeAddress);
       const bridgeDelegator = new TokenBridgeDelegator__factory(user).attach(bridgeDelegatorAddress);
       const toDeposit = ethers.utils.parseEther("100");
       await bridgeDelegator.approve(tokenAddress, bridgeAddress, toDeposit);
@@ -736,7 +698,6 @@ describe("Token Bridge Test", () => {
       let tx: ContractTransaction = await bridgeDelegator.deposit(tokenAddress, toDeposit);
       let receipt: ContractReceipt = await tx.wait();
       let logs = receipt.logs;
-
       if (logs !== undefined) {
         const blockNumber = hexZeroPad(intToHex(2), 32);
         const serialNumber = hexZeroPad(intToHex(2), 32);
@@ -1060,7 +1021,7 @@ describe("Token Bridge Test", () => {
         await expect(bridgeOwner.unpendingWithdraw(hashEvent)).to.emit(bridge, "UnpendingWithdraw");
 
         expect(await tokenInstance.balanceOf(bridgeDelegatorAddress)).to.eq(toMint.sub(toDeposit));
-        expect(await tokenInstance.balanceOf(bridge.address)).to.eq(0);
+        expect(await tokenInstance.balanceOf(bridge.address)).to.eq(toDeposit);
         await expect(
           bridgeDelegator.withdraw(
             DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
@@ -1068,7 +1029,6 @@ describe("Token Bridge Test", () => {
           ),
         ).to.be.revertedWith("TokenBridge: no fund for the beneficiary");
 
-        await tokenInstance.changeMinter(bridgeAddress);
         // now user can withdraw the fund
         await expect(
           bridgeDelegator.withdraw(
@@ -1093,8 +1053,8 @@ describe("Token Bridge Test", () => {
   describe("Mass Exit", async () => {
     it("only admin can manage mass exit", async () => {
       const [admin, other] = await ethers.getSigners();
-      let otherTokenBridge = new ChromiaTokenBridge__factory(other).attach(bridgeAddress);
-      let adminTokenBridge = new ChromiaTokenBridge__factory(admin).attach(bridgeAddress);
+      let otherTokenBridge = new TokenBridge__factory(other).attach(bridgeAddress);
+      let adminTokenBridge = new TokenBridge__factory(admin).attach(bridgeAddress);
       expect(await adminTokenBridge.isMassExit()).to.be.false;
       let node1 = hashGtvBytes32Leaf(
         DecodeHexStringToByteArray("977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795"),
@@ -1131,7 +1091,7 @@ describe("Token Bridge Test", () => {
   describe("Ownership", async () => {
     it("renounce ownership is not allowed", async () => {
       const [admin, other] = await ethers.getSigners();
-      let adminTokenBridge = new ChromiaTokenBridge__factory(admin).attach(bridgeAddress);
+      let adminTokenBridge = new TokenBridge__factory(admin).attach(bridgeAddress);
       await expect(adminTokenBridge.renounceOwnership()).to.be.revertedWith(
         "TokenBridge: renounce ownership is not allowed",
       );
