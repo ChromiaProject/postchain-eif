@@ -22,6 +22,7 @@ interface IDailyLimit {
 contract TokenMinter is TwoWeekDelay, Ownable {
     IDailyLimit private dailyLimit;
     address public tokenContractAddress;
+    address public bridgeContractAddress;
 
     // Address to which minter role will be transferred after delay
     address public pendingNewOwner;
@@ -30,6 +31,11 @@ contract TokenMinter is TwoWeekDelay, Ownable {
     constructor(address _tokenContractAddress, IDailyLimit _dailyLimit) Ownable(msg.sender) {
         dailyLimit = _dailyLimit;
         tokenContractAddress = _tokenContractAddress;
+    }
+
+    modifier onlyBridge() {
+        require(msg.sender == bridgeContractAddress, "Only bridge contract can call this function");
+        _;
     }
 
     function setDailyLimit(IDailyLimit _dailyLimit) external onlyOwner {
@@ -47,12 +53,12 @@ contract TokenMinter is TwoWeekDelay, Ownable {
     }
 
     // Function to mint tokens, can be called by derived contracts or specific addresses
-    function mint(address to, uint256 amount) external virtual {
+    function mint(address to, uint256 amount) external virtual onlyBridge {
         ChromiaToken(tokenContractAddress).transferFromChromia(to, amount, 0x0);
     }
 
     // Function to mint tokens, can be called by derived contracts or specific addresses
-    function burn(uint256 amount) external virtual {
+    function burn(uint256 amount) external virtual onlyBridge {
         ChromiaToken(tokenContractAddress).transferToChromia(bytes32(0), amount);
     }
 
