@@ -60,6 +60,6 @@ contract DailyLimit is TwoWeekDelay, Ownable2Step {
         }
 
         dayAmount += amount;
-        require(dayAmount <= dayLimit, "DailyLimit: withdraw daily limit");
+        require(dayAmount <= dayLimit, "DailyLimit: limit reached");
     }
 }
