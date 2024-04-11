@@ -42,13 +42,20 @@ entity evm_erc20_balance {
 
 entity token_mapping {
     key token: evm_erc20;
-    key asset: assets.asset;
+    index asset: assets.asset;
 }
 
-operation add_new_evm_erc20(network_id: integer, token_address: byte_array, name: text, symbol: text, decimals: integer, mass_exit_support: boolean = true) {
+operation add_new_evm_erc20(
+    network_id: integer,
+    token_address: byte_array,
+    name: text,
+    symbol: text,
+    decimals: integer,
+    mass_exit_support: boolean = true
+) {
     admin.require_admin();
     require(empty(evm_erc20 @? { network_id, .address == token_address }), "token already existed");
-    create evm_erc20(
+    create evm_erc20 (
         network_id,
         address = token_address,
         name,
@@ -72,11 +79,41 @@ operation add_new_token_mapping(network_id: integer, token_address: byte_array, 
     );
 
     require(
-        empty(token_mapping @? { token, asset }),
+        empty(token_mapping @? { token }),
         "Token was already mapped: " + token_address
     );
+    require(
+        not token
+            .mass_exit_support or token_mapping @* {
+            asset
+        } (
+            @sum 1
+        )[0] == 0,
+        "Token must have mass exit support disabled for many to one mapping"
+    );
 
-    create token_mapping(token, asset);
+    create token_mapping ( token, asset );
+}
+
+operation delete_token_mapping(network_id: integer, token_address: byte_array, asset_id: byte_array) {
+    admin.require_admin();
+
+    val token = require(
+        evm_erc20 @? { network_id, .address == token_address },
+        "Token does not exist: " + token_address
+    );
+
+    val asset = require(
+        assets.asset @? { .id == asset_id },
+        "Asset does not exist: " + asset_id
+    );
+
+    val mapping = require(
+        token_mapping @? { token, asset },
+        "Token was not mapped: " + token_address
+    );
+
+    delete mapping;
 }
 
 query get_erc20_withdrawal(network_id: integer, token_address: byte_array, beneficiary: byte_array) {
@@ -85,7 +122,17 @@ query get_erc20_withdrawal(network_id: integer, token_address: byte_array, benef
         return null;
     }
 
-    return evm_erc20_withdraw @* { network_id, token , beneficiary } (@sort_desc .serial, .network_id, token = .token.address, .beneficiary, .amount);
+    return evm_erc20_withdraw @* {
+        network_id,
+        token,
+        beneficiary
+    } (
+        @sort_desc .serial,
+        .network_id,
+        token = .token.address,
+        .beneficiary,
+        .amount
+    );
 }
 
 query evm_balance_of_erc20(network_id: integer, token_address: byte_array, beneficiary: byte_array): big_integer {
@@ -93,14 +140,15 @@ query evm_balance_of_erc20(network_id: integer, token_address: byte_array, benef
     if (empty(t)) {
         return 0;
     }
-    val b = evm_erc20_balance @? { network_id, .token == t, beneficiary } (.amount);
+    val b = evm_erc20_balance @? { network_id, .token == t, beneficiary } ( .amount );
     if (empty(b)) {
         return 0;
     }
     return b;
 }
 
-@extend(common.build_account_state_fn) function(
+@extend(common.build_account_state_fn)
+function(
     network_id: integer,
     beneficiary: byte_array,
     account: accounts.account?
@@ -169,7 +217,7 @@ query evm_balance_of_erc20(network_id: integer, token_address: byte_array, benef
             log("record the state into EIF for withdraw back to EVM chains later for beneficiary: " + beneficiary);
             deposit_ERC20(message.network_id, beneficiary, token_address, amount, name, symbol, decimals);
 
-            if(not(token.mass_exit_support)) return;
+            if (not(token.mass_exit_support)) return;
             val account_link = common.get_or_create_evm_account_link(message.network_id, beneficiary);
             val state = common.build_account_state(message.network_id, beneficiary, null);
             val state_data = common.state_data(
@@ -183,7 +231,7 @@ query evm_balance_of_erc20(network_id: integer, token_address: byte_array, benef
             log("mint postchain token for ft account: " + ft_account.id);
             assets.Unsafe.mint(ft_account, token_mapping!!.asset, amount);
 
-            if(not(token.mass_exit_support)) return;
+            if (not(token.mass_exit_support)) return;
             val ft_beneficiary = evm.evm_account @ { .account == ft_account } ( .address );
             val account_link = common.get_or_create_evm_account_link(token_mapping.token.network_id, ft_beneficiary);
             val state = common.build_account_state(message.network_id, ft_beneficiary, ft_account);
@@ -196,7 +244,13 @@ query evm_balance_of_erc20(network_id: integer, token_address: byte_array, benef
     }
 }
 
-operation deposit_ft_token(common.auth_id, network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
+operation deposit_ft_token(
+    common.auth_id,
+    network_id: integer,
+    token_address: byte_array,
+    beneficiary: byte_array,
+    amount: big_integer
+) {
     require(amount > 0, "amount should larger than 0");
     val token = require(evm_erc20 @? { network_id, .address == token_address }, "token is not support");
     val token_mapping = require(token_mapping @? { token }, "token is not support");
@@ -210,13 +264,33 @@ operation deposit_ft_token(common.auth_id, network_id: integer, token_address: b
     assets.Unsafe.burn(account, asset, amount);
 
     // update the postchain EIF state for equivalent account
-    deposit_ERC20(network_id, beneficiary, token_address, amount, token_mapping.token.name, token_mapping.token.symbol, token_mapping.token.decimals);
+    deposit_ERC20(
+        network_id,
+        beneficiary,
+        token_address,
+        amount,
+        token_mapping
+            .token
+            .name,
+        token_mapping
+            .token
+            .symbol,
+        token_mapping
+            .token
+            .decimals
+    );
 
     // update relevant account state
     update_account_state(account, asset);
 }
 
-operation bridge_ft_token_to_evm(common.auth_id, network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
+operation bridge_ft_token_to_evm(
+    common.auth_id,
+    network_id: integer,
+    token_address: byte_array,
+    beneficiary: byte_array,
+    amount: big_integer
+) {
     require(amount > 0, "amount should larger than 0");
     val token = require(evm_erc20 @? { network_id, .address == token_address }, "token is not supported");
     val token_mapping = require(token_mapping @? { token }, "token is not support");
@@ -230,10 +304,10 @@ operation bridge_ft_token_to_evm(common.auth_id, network_id: integer, token_addr
     assets.Unsafe.burn(account, asset, amount);
     update_account_state(account, asset);
 
-    update common.withdraw_stats(withdraw_count += 1);
+    update common.withdraw_stats ( withdraw_count += 1 );
     val next_serial = common.withdraw_stats.withdraw_count;
 
-    create evm_erc20_withdraw(
+    create evm_erc20_withdraw (
         serial = next_serial,
         network_id,
         token,
@@ -253,8 +327,17 @@ operation bridge_ft_token_to_evm(common.auth_id, network_id: integer, token_addr
 }
 
 // user can claim ft asset back to specific account id on postchain after deposit it into EIF
-operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer,
-                        r: byte_array, s: byte_array, v: integer, pk: text, account_id: byte_array) {
+operation claim_ERC20(
+    network_id: integer,
+    token_address: byte_array,
+    beneficiary: byte_array,
+    amount: big_integer,
+    r: byte_array,
+    s: byte_array,
+    v: integer,
+    pk: text,
+    account_id: byte_array
+) {
     require(amount > 0, "Must withdraw an amount larger than 0");
     val recovered_pubkey = crypto.eth_ecrecover(r, s, v, auth._evm_message_hash(pk));
     val eth_address = crypto.eth_pubkey_to_address(recovered_pubkey);
@@ -276,14 +359,14 @@ operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiar
     val balance = evm_erc20_balance @? { network_id, token, beneficiary };
     require_not_empty(balance, "No balance for this token");
     require(balance.amount >= amount, "Balance is too low");
-    update balance(.amount -= amount);
+    update balance ( .amount -= amount );
 
-    update common.withdraw_stats(withdraw_count += 1);
+    update common.withdraw_stats ( withdraw_count += 1 );
     val next_serial = common.withdraw_stats.withdraw_count;
 
     // net_id = 0 means withdraw from postchain snapshot state into ft account
     val net_id = 0;
-    create evm_erc20_withdraw(
+    create evm_erc20_withdraw (
         serial = next_serial,
         network_id = net_id,
         token,
@@ -304,8 +387,16 @@ operation claim_ERC20(network_id: integer, token_address: byte_array, beneficiar
     emit_withdraw(network_id, beneficiary, account, withdraw_info, token.mass_exit_support);
 }
 
-operation withdraw_ERC20(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer,
-                                                    r: byte_array, s: byte_array, v: integer, pk: text) {
+operation withdraw_ERC20(
+    network_id: integer,
+    token_address: byte_array,
+    beneficiary: byte_array,
+    amount: big_integer,
+    r: byte_array,
+    s: byte_array,
+    v: integer,
+    pk: text
+) {
     require(amount > 0, "Must withdraw an amount larger than 0");
 
     // ensure that the signer also control the beneficiary account
@@ -324,12 +415,12 @@ operation withdraw_ERC20(network_id: integer, token_address: byte_array, benefic
     val balance = evm_erc20_balance @? { network_id, token, beneficiary };
     require_not_empty(balance, "No balance for this token");
     require(balance.amount >= amount, "Balance is too low");
-    update balance(.amount -= amount);
+    update balance ( .amount -= amount );
 
-    update common.withdraw_stats(withdraw_count += 1);
+    update common.withdraw_stats ( withdraw_count += 1 );
     val next_serial = common.withdraw_stats.withdraw_count;
 
-    create evm_erc20_withdraw(
+    create evm_erc20_withdraw (
         serial = next_serial,
         network_id,
         token,
@@ -349,11 +440,19 @@ operation withdraw_ERC20(network_id: integer, token_address: byte_array, benefic
     emit_withdraw(network_id, beneficiary, account, withdraw_info, token.mass_exit_support);
 }
 
-function deposit_ERC20(network_id: integer, beneficiary: byte_array, token_address: byte_array, amount: big_integer, name: text, symbol: text, decimals: integer) {
+function deposit_ERC20(
+    network_id: integer,
+    beneficiary: byte_array,
+    token_address: byte_array,
+    amount: big_integer,
+    name: text,
+    symbol: text,
+    decimals: integer
+) {
     log("deposit_ERC20: " + token_address + " : " + beneficiary + " : " + name + " : " + amount);
     var token = evm_erc20 @? { network_id, .address == token_address };
     if (empty(token)) {
-        token = create evm_erc20(
+        token = create evm_erc20 (
             network_id,
             address = token_address,
             name,
@@ -364,14 +463,14 @@ function deposit_ERC20(network_id: integer, beneficiary: byte_array, token_addre
 
     val balance = evm_erc20_balance @? { network_id, token, beneficiary };
     if (empty(balance)) {
-        create evm_erc20_balance(
+        create evm_erc20_balance (
             network_id,
             token,
             beneficiary,
             amount
         );
     } else {
-        update balance (.amount += amount);
+        update balance ( .amount += amount );
     }
 }
 
@@ -389,13 +488,19 @@ function emit_withdraw(network_id: integer, beneficiary: byte_array, account: ac
     op_context.emit_event("eif_event", eth_event_data.to_gtv());
 }
 
-@extend(assets.after_transfer) function(from: accounts.account, to: accounts.account, assets.asset, amount: big_integer) {
+@extend(assets.after_transfer)
+function(
+    from: accounts.account,
+    to: accounts.account,
+    assets.asset,
+    amount: big_integer
+) {
     update_account_state(from, asset);
     update_account_state(to, asset);
 }
 
 function update_account_state(accounts.account, assets.asset) {
-    val token = token_mapping @? { .asset == asset } (.token);
+    val token = token_mapping @? { .asset == asset } ( .token ) limit 1;
     if (empty(token) or not(token.mass_exit_support)) {
         return;
     }
