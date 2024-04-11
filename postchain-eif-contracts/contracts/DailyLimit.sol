@@ -21,6 +21,11 @@ contract DailyLimit is Ownable, TwoWeekDelay {
         dayLimit = _dayLimit;
     }
 
+    modifier onlyParentContract() {
+        require(msg.sender == parentContract, "DailyLimit: Only parent contract can call this function");
+        _;
+    }
+
     // Function to modify the day limit
     function setDayLimit(uint _newDayLimit) external onlyOwner {
         if (_newDayLimit > dayLimit) {
@@ -35,7 +40,7 @@ contract DailyLimit is Ownable, TwoWeekDelay {
         }
     }
 
-    function finishSetDayLimit() external {
+    function finishSetDayLimit() external onlyOwner {
         finishDelayedAction(this.setDayLimit.selector);
         dayLimit = pendingDayLimit;
         pendingDayLimit = 0;
@@ -47,7 +52,7 @@ contract DailyLimit is Ownable, TwoWeekDelay {
         emit ParentContractChanged(_parentContract);
     }
 
-    function _updateDayAmount(uint amount) external {
+    function _updateDayAmount(uint amount) external onlyParentContract {
         require(parentContract == msg.sender, "DailyLimit: Only parent contract can update daily amount");
 
         if (block.timestamp > dayStart + 1 days) {
