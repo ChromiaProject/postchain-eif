@@ -55,10 +55,10 @@ contract TokenMinter is TwoWeekDelay, Ownable2Step {
         delete pendingNewDailyLimit;
     }
 
-    function transferMintRole(address newOwner) external onlyOwner {
+    function transferMintRole(address newMinter) external onlyOwner {
         if (pendingNewMinter != address(0)) resetDelayForFunction(this.transferMintRole.selector);
         startDelayedAction(this.transferMintRole.selector);
-        pendingNewMinter = newOwner;
+        pendingNewMinter = newMinter;
     }
 
     function finishTransferMintRole() external virtual onlyOwner {
