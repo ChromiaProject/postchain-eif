@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
-import "./utils/TwoWeekDelay.sol"; // Assume TwoWeekDelay contract from previous examples
+import "./utils/TwoWeekDelay.sol";
 
 interface ChromiaToken {
     function transferFromChromia(address to, uint256 value, bytes32 refID) external returns (bool);
