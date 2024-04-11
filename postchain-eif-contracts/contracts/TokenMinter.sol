@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 import "./utils/TwoWeekDelay.sol"; // Assume TwoWeekDelay contract from previous examples
 
@@ -19,7 +19,7 @@ interface IDailyLimit {
     function updateDayAmount(uint withdrawAmount) external;
 }
 
-contract TokenMinter is TwoWeekDelay, Ownable {
+contract TokenMinter is TwoWeekDelay, Ownable2Step {
     IDailyLimit private dailyLimit;
     address public tokenContractAddress;
     address public bridgeContractAddress;
