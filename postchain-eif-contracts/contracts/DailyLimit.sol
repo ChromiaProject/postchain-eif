@@ -31,7 +31,7 @@ contract DailyLimit is TwoWeekDelay, Ownable2Step {
         if (_newDayLimit > dayLimit) {
             // if we already have a pending change, reset it
             if (pendingDayLimit != 0) resetDelayForFunction(this.setDayLimit.selector);
-            // If the new limit is higher, start the two-week delay
+            // Set pending day limit and start the two-week delay
             pendingDayLimit = _newDayLimit;
             startDelayedAction(this.setDayLimit.selector);
         } else {
