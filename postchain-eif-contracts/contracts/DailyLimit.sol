@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "./utils/TwoWeekDelay.sol";
 
-contract DailyLimit is Ownable, TwoWeekDelay {
+contract DailyLimit is TwoWeekDelay, Ownable2Step {
     uint private dayStart; // Timestamp at which the day started
     uint private dayAmount; // Amount of tokens withdrawn so far
     uint private dayLimit; // Maximum amount of tokens that can be withdrawn in a day
@@ -29,23 +29,23 @@ contract DailyLimit is Ownable, TwoWeekDelay {
     // Function to modify the day limit
     function setDayLimit(uint _newDayLimit) external onlyOwner {
         if (_newDayLimit > dayLimit) {
-            if (pendingDayLimit == _newDayLimit) {
-                // If the new limit is higher and there is already a pending limit, execute it
-                finishDelayedAction(this.setDayLimit.selector);
-                dayLimit = _newDayLimit;
-                pendingDayLimit = 0;
-                emit DayLimitChanged(_newDayLimit);
-            } else {
-                // If the new limit is higher, start the two-week delay
-                resetDelayForFunction(this.setDayLimit.selector);
-                pendingDayLimit = _newDayLimit;
-                startDelayedAction(this.setDayLimit.selector);
-            }
+            // if we already have a pending change, reset it
+            if (pendingDayLimit != 0) resetDelayForFunction(this.setDayLimit.selector);
+            // If the new limit is higher, start the two-week delay
+            pendingDayLimit = _newDayLimit;
+            startDelayedAction(this.setDayLimit.selector);
         } else {
             // If the new limit is lower, apply immediately
             dayLimit = _newDayLimit;
             emit DayLimitChanged(_newDayLimit);
         }
+    }
+
+    function finishSetDayLimit() external onlyOwner {
+        finishDelayedAction(this.setDayLimit.selector);
+        dayLimit = pendingDayLimit;
+        delete pendingDayLimit;
+        emit DayLimitChanged(dayLimit);
     }
 
     function setParentContract(address _parentContract) external onlyOwner {

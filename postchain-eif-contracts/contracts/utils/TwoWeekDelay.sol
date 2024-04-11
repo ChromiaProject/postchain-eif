@@ -35,7 +35,7 @@ abstract contract TwoWeekDelay {
         require(block.timestamp >= requestTime + 2 weeks, "Two weeks delay has not passed.");
 
         // Clear the request time to reset the delay mechanism for this action
-        requestTimes[selector] = 0;
+        delete requestTimes[selector];
         emit DelayedActionExecuted(selector, block.timestamp);
         // Action-specific logic should follow this call in the inheriting contract.
     }
@@ -45,6 +45,6 @@ abstract contract TwoWeekDelay {
      * @param selector The function selector to reset.
      */
     function resetDelayForFunction(bytes4 selector) internal {
-        requestTimes[selector] = 0;
+        delete requestTimes[selector];
     }
 }
