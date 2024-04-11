@@ -39,7 +39,7 @@ contract TokenMinter is TwoWeekDelay, Ownable2Step {
     }
 
     modifier onlyBridge() {
-        require(msg.sender == bridgeContractAddress, "Only bridge contract can call this function");
+        require(msg.sender == bridgeContractAddress, "TokenMinter: Only bridge contract can call this function");
         _;
     }
 
@@ -50,10 +50,23 @@ contract TokenMinter is TwoWeekDelay, Ownable2Step {
     }
 
     function finishSetDailyLimit() external onlyOwner {
-        require(address(pendingNewDailyLimit) != address(0), "No pending daily limit");
+        require(address(pendingNewDailyLimit) != address(0), "TokenMinter: No pending daily limit");
         finishDelayedAction(this.setDailyLimit.selector);
         dailyLimit = pendingNewDailyLimit;
         delete pendingNewDailyLimit;
+    }
+
+    function transferMintRole(address newOwner) external onlyOwner {
+        if (pendingNewMinter != address(0)) resetDelayForFunction(this.transferMintRole.selector);
+        startDelayedAction(this.transferMintRole.selector);
+        pendingNewMinter = newOwner;
+    }
+
+    function finishTransferMintRole() external virtual onlyOwner {
+        require(pendingNewMinter != address(0), "TokenMinter: No pending owner");
+        finishDelayedAction(this.transferMintRole.selector);
+        ChromiaToken(tokenContractAddress).changeMinter(pendingNewMinter);
+        delete pendingNewMinter;
     }
 
     // Function to mint tokens, can be called by derived contracts or specific addresses
@@ -65,18 +78,5 @@ contract TokenMinter is TwoWeekDelay, Ownable2Step {
     // Function to mint tokens, can be called by derived contracts or specific addresses
     function burn(uint256 amount) external virtual onlyBridge {
         ChromiaToken(tokenContractAddress).transferToChromia(bytes32(0), amount);
-    }
-
-    function transferMintRole(address newOwner) external onlyOwner {
-        if (pendingNewMinter != address(0)) resetDelayForFunction(this.transferMintRole.selector);
-        startDelayedAction(this.transferMintRole.selector);
-        pendingNewMinter = newOwner;
-    }
-
-    function finishTransferMintRole() external virtual onlyOwner {
-        require(pendingNewMinter != address(0), "No pending owner");
-        finishDelayedAction(this.transferMintRole.selector);
-        ChromiaToken(tokenContractAddress).changeMinter(pendingNewMinter);
-        delete pendingNewMinter;
     }
 }
