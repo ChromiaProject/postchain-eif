@@ -32,6 +32,10 @@ contract ChromiaTokenBridge is TokenBridge {
     using MerkleProof for bytes32[];
     using SafeERC20 for IERC20;
 
+    function setTokenMinter(ITokenMinter _tokenMinter) external onlyOwner {
+        tokenMinter = _tokenMinter;
+    }
+
     function deposit(IERC20 token, uint256 amount) public override isAllowToken(token) whenNotPaused returns (bool) {
         (string memory name, string memory symbol, uint8 decimals) = _getTokenInfo(token);
         token.safeTransferFrom(msg.sender, address(tokenMinter), amount);
