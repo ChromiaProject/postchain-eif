@@ -11,19 +11,8 @@ import {
   TokenMinter__factory,
 } from "../src/types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { BytesLike, hexZeroPad, keccak256 } from "ethers/lib/utils";
-import { ContractReceipt, ContractTransaction } from "ethers";
-import { intToHex } from "ethjs-util";
 import { constants } from "ethers";
-import {
-  DecodeHexStringToByteArray,
-  hashGtvBytes32Leaf,
-  hashGtvBytes64Leaf,
-  hashGtvIntegerLeaf,
-  postchainMerkleNodeHash,
-} from "./utils";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
-import exp from "constants";
 
 chai.use(solidity);
 const { expect } = chai;
