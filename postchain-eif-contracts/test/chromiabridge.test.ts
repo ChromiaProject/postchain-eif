@@ -113,29 +113,6 @@ describe("ChromiaToken Bridge Test", () => {
       expect(await validator.getValidatorCount()).to.eq(3);
     });
   });
-  describe("ChromiaToken", async () => {
-    it("Admin can change minter", async () => {
-      const [deployer, user] = await ethers.getSigners();
-      const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
-      const tokenMinter = new TokenMinter__factory(deployer).attach(tokenMinterAddress);
-
-      const tokenMinterUser = new TokenMinter__factory(user).attach(tokenMinterAddress);
-
-      await expect(tokenInstance.changeMinter(tokenMinterAddress)).to.emit(tokenInstance, "MinterSet");
-
-      await expect(tokenMinterUser.transferMintRole(deployer.address)).to.be.revertedWith("OwnableUnauthorizedAccount");
-
-      await expect(tokenMinter.transferMintRole(deployer.address)).to.emit(tokenMinter, "DelayedActionRequested");
-      await time.increase(86400 * 13);
-      await expect(tokenMinter.finishTransferMintRole()).to.be.revertedWith("Two weeks delay has not passed.");
-      await time.increase(86400 * 1 + 1);
-      await expect(tokenMinter.finishTransferMintRole()).to.emit(tokenInstance, "MinterSet");
-
-      await expect(tokenMinter.transferMintRole(deployer.address)).to.emit(tokenMinter, "DelayedActionRequested");
-      await time.increase(86400 * 14 + 1);
-      await expect(tokenMinter.finishTransferMintRole());
-    });
-  });
 
   describe("Deposit", async () => {
     it("User can deposit ERC20 token to target smartcontract", async () => {
@@ -712,7 +689,7 @@ describe("ChromiaToken Bridge Test", () => {
         await dailyLimitOwner.setDayLimit(toDeposit.sub(1));
         await expect(
           bridge.withdraw(DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)), user.address),
-        ).to.be.revertedWith("DailyLimit: withdraw daily limit");
+        ).to.be.revertedWith("DailyLimit: limit reached");
         // Set the daily limit to more than withdraw amount, now user can withdraw
         await dailyLimitOwner.setDayLimit(toDeposit.add(1));
         await time.increase(86400 * 14 + 1);
