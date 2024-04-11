@@ -30,7 +30,7 @@ contract DailyLimit is Ownable, TwoWeekDelay {
     function setDayLimit(uint _newDayLimit) external onlyOwner {
         if (_newDayLimit > dayLimit) {
             // If the new limit is higher, start the two-week delay
-            resetDelayForFunction(this.setDayLimit.selector);
+            if (pendingDayLimit != 0) resetDelayForFunction(this.setDayLimit.selector);
             pendingDayLimit = _newDayLimit;
             startDelayedAction(this.setDayLimit.selector);
         } else {
