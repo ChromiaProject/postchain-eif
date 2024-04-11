@@ -16,7 +16,7 @@ interface ChromiaToken {
 }
 
 interface IDailyLimit {
-    function _updateDayAmount(uint withdrawAmount) external;
+    function updateDayAmount(uint withdrawAmount) external;
 }
 
 contract TokenMinter is TwoWeekDelay, Ownable {
@@ -60,6 +60,7 @@ contract TokenMinter is TwoWeekDelay, Ownable {
 
     // Function to mint tokens, can be called by derived contracts or specific addresses
     function mint(address to, uint256 amount) external virtual onlyBridge {
+        dailyLimit.updateDayAmount(amount);
         ChromiaToken(tokenContractAddress).transferFromChromia(to, amount, 0x0);
     }
 
