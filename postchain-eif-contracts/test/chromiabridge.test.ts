@@ -8,6 +8,7 @@ import {
   TokenBridgeDelegator__factory,
   Validator__factory,
   Migration__factory,
+  TokenMinter__factory,
 } from "../src/types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BytesLike, hexZeroPad, keccak256 } from "ethers/lib/utils";
@@ -21,6 +22,7 @@ import {
   hashGtvIntegerLeaf,
   postchainMerkleNodeHash,
 } from "./utils";
+import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 chai.use(solidity);
 const { expect } = chai;
@@ -31,6 +33,7 @@ describe("ChromiaToken Bridge Test", () => {
   let bridgeAddress: string;
   let validatorAddress: string;
   let dailyLimitAddress: string;
+  let tokenMinterAddress: string;
   let bridgeDelegatorAddress: string;
   let migrationAddress: string;
   let admin: SignerWithAddress;
@@ -55,9 +58,7 @@ describe("ChromiaToken Bridge Test", () => {
     validatorAddress = validatorContract.address;
 
     const bridgeFactory = new ChromiaTokenBridge__factory(admin);
-    const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_OFFSET, tokenAddress], {
-      initializer: "initialize(address,uint256,address)",
-    });
+    const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_OFFSET]);
     bridgeAddress = bridge.address;
 
     const bridgeDelegatorFactory = new TokenBridgeDelegator__factory(deployer);
@@ -71,8 +72,12 @@ describe("ChromiaToken Bridge Test", () => {
     const dailyLimitFactory = new DailyLimit__factory(admin);
     const dailyLimitContract = await dailyLimitFactory.deploy(DAILY_LIMIT);
     dailyLimitAddress = dailyLimitContract.address;
-    dailyLimitContract.setParentContract(bridgeAddress);
-    bridge.setDailyLimit(dailyLimitAddress);
+
+    const tokenMinterFactory = new TokenMinter__factory(admin);
+    const tokenMinterContract = await tokenMinterFactory.deploy(dailyLimitAddress, tokenAddress, bridgeAddress);
+    tokenMinterAddress = tokenMinterContract.address;
+    dailyLimitContract.setParentContract(tokenMinterAddress);
+    bridge.setTokenMinter(tokenMinterAddress);
 
     await expect(bridge.allowToken(constants.AddressZero)).to.be.revertedWith("TokenBridge: token address is invalid");
     await expect(bridge.allowToken(tokenAddress)).to.emit(bridge, "AllowToken").withArgs(tokenAddress);
@@ -112,16 +117,23 @@ describe("ChromiaToken Bridge Test", () => {
     it("Admin can change minter", async () => {
       const [deployer, user] = await ethers.getSigners();
       const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
-      const bridge = new ChromiaTokenBridge__factory(deployer).attach(bridgeAddress);
+      const tokenMinter = new TokenMinter__factory(deployer).attach(tokenMinterAddress);
 
-      const bridgeUser = new ChromiaTokenBridge__factory(user).attach(bridgeAddress);
+      const tokenMinterUser = new TokenMinter__factory(user).attach(tokenMinterAddress);
 
-      await expect(tokenInstance.changeMinter(bridgeAddress)).to.emit(tokenInstance, "MinterSet");
-      await expect(bridgeUser.changeMinter(tokenAddress, deployer.address)).to.be.revertedWith(
-        "OwnableUnauthorizedAccount",
-      );
-      await expect(bridge.changeMinter(tokenAddress, deployer.address)).to.emit(tokenInstance, "MinterSet");
-      await expect(bridge.changeMinter(tokenAddress, bridgeAddress)).to.be.revertedWith("caller is not a minter");
+      await expect(tokenInstance.changeMinter(tokenMinterAddress)).to.emit(tokenInstance, "MinterSet");
+
+      await expect(tokenMinterUser.transferMintRole(deployer.address)).to.be.revertedWith("OwnableUnauthorizedAccount");
+
+      await expect(tokenMinter.transferMintRole(deployer.address)).to.emit(tokenMinter, "DelayedActionRequested");
+      await time.increase(86400 * 13);
+      await expect(tokenMinter.finishTransferMintRole()).to.be.revertedWith("Two weeks delay has not passed.");
+      await time.increase(86400 * 1 + 1);
+      await expect(tokenMinter.finishTransferMintRole()).to.emit(tokenInstance, "MinterSet");
+
+      await expect(tokenMinter.transferMintRole(deployer.address)).to.emit(tokenMinter, "DelayedActionRequested");
+      await time.increase(86400 * 14 + 1);
+      await expect(tokenMinter.finishTransferMintRole());
     });
   });
 
@@ -197,7 +209,7 @@ describe("ChromiaToken Bridge Test", () => {
       await expect(adminBridge.emergencyWithdraw(tokenAddress, constants.AddressZero)).to.be.revertedWith(
         "TokenBridge: beneficiary address is invalid",
       );
-      await tokenInstance.changeMinter(adminBridge.address);
+      await tokenInstance.changeMinter(tokenMinterAddress);
       await adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address);
       expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(0);
       expect(await tokenInstance.balanceOf(adminBridge.address)).to.eq(0);
@@ -694,7 +706,7 @@ describe("ChromiaToken Bridge Test", () => {
         ).to.be.revertedWith("EnforcedPause()");
         await expect(bridgeOwner.unpause()).to.emit(bridgeOwner, "Unpaused").withArgs(deployer.address);
         // now user can withdraw the fund
-        await tokenInstance.changeMinter(bridgeAddress);
+        await tokenInstance.changeMinter(tokenMinterAddress);
 
         // Set the daily limit to one less than withdraw amount
         await dailyLimitOwner.setDayLimit(toDeposit.sub(1));
@@ -703,6 +715,8 @@ describe("ChromiaToken Bridge Test", () => {
         ).to.be.revertedWith("DailyLimit: withdraw daily limit");
         // Set the daily limit to more than withdraw amount, now user can withdraw
         await dailyLimitOwner.setDayLimit(toDeposit.add(1));
+        await time.increase(86400 * 14 + 1);
+        await dailyLimitOwner.finishSetDayLimit();
         await expect(
           bridge.withdraw(DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)), user.address),
         )
@@ -1068,7 +1082,7 @@ describe("ChromiaToken Bridge Test", () => {
           ),
         ).to.be.revertedWith("TokenBridge: no fund for the beneficiary");
 
-        await tokenInstance.changeMinter(bridgeAddress);
+        await tokenInstance.changeMinter(tokenMinterAddress);
         // now user can withdraw the fund
         await expect(
           bridgeDelegator.withdraw(
