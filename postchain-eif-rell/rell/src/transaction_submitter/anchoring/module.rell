@@ -1,0 +1,46 @@
+import ^.*;
+
+object anchoring {
+    mutable previous_anchoring_time: timestamp = 0;
+    mutable previous_anchored_height: integer = -1;
+}
+
+struct module_args {
+    anchoring_interval: integer = -1; // -1 to disable anchoring
+}
+
+operation __anchor_system_anchoring_block(block_header_data: byte_array, signatures: list<byte_array>, signers: list<byte_array>) {
+    handle_anchor_block(block_header_data, signatures, signers);
+}
+
+function handle_anchor_block(block_header_data: byte_array, signatures: list<byte_array>, signers: list<byte_array>) {
+    val anchoring_contracts = get_anchoring_contracts();
+
+    for (anchoring_contract in anchoring_contracts) {
+        add_transaction_to_queue(
+            anchoring_contract.address,
+            "anchorBlock",
+            ["bytes", "bytes[]", "address[]"],
+            [block_header_data.to_gtv(), signatures.to_gtv(), signers.to_gtv()],
+            anchoring_contract.network_id,
+            get_system_max_priority_fee_per_gas(),
+            get_system_max_fee_per_gas(),
+            chain_context.blockchain_rid
+        );
+    }
+
+    // Height is at index 5 in the array, height is padded with zeros to fit 32 bytes, we only need the final 8
+    val anchor_height = integer.from_hex(block_header_data.sub(5 * 32 + 24, 6 * 32).to_hex());
+    anchoring.previous_anchored_height = anchor_height;
+    anchoring.previous_anchoring_time = op_context.last_block_time;
+
+    log("Submitted EVM txs to anchor system anchoring chain block at height %s".format(anchor_height));
+}
+
+query should_anchor_system_anchoring_block(): boolean {
+    if (chain_context.args.anchoring_interval == -1) return false;
+
+    return get_last_blocktime() - anchoring.previous_anchoring_time > chain_context.args.anchoring_interval;
+}
+
+query get_previously_anchored_system_anchoring_block_height() = anchoring.previous_anchored_height;

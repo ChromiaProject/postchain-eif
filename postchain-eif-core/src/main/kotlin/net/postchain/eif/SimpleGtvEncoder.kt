@@ -1,8 +1,10 @@
 package net.postchain.eif
 
 import net.postchain.common.hexStringToByteArray
-import net.postchain.gtv.*
-import java.lang.IllegalArgumentException
+import net.postchain.gtv.GtvArray
+import net.postchain.gtv.GtvBigInteger
+import net.postchain.gtv.GtvByteArray
+import net.postchain.gtv.GtvInteger
 
 object SimpleGtvEncoder {
 
@@ -16,7 +18,7 @@ object SimpleGtvEncoder {
      */
     fun encodeGtv(v: GtvArray): ByteArray {
         val a = v.asArray()
-        var out = ByteArray(0){0}
+        var out = ByteArray(0) { 0 }
         a.forEach {
             out = when (it) {
                 is GtvArray -> {
@@ -27,12 +29,14 @@ object SimpleGtvEncoder {
                     }
                     out
                 }
+
                 is GtvByteArray -> {
                     if (it.bytearray.size != 32) {
                         throw IllegalArgumentException("invalid byte array length")
                     }
                     out.plus(it.bytearray)
                 }
+
                 is GtvInteger -> {
                     val num = it.asInteger().toString(16).padStart(64, '0').hexStringToByteArray()
                     if (num.size != 32) {
@@ -40,6 +44,7 @@ object SimpleGtvEncoder {
                     }
                     out.plus(num)
                 }
+
                 is GtvBigInteger -> {
                     val num = it.asBigInteger().toString(16).padStart(64, '0').hexStringToByteArray()
                     if (num.size != 32) {
@@ -47,6 +52,7 @@ object SimpleGtvEncoder {
                     }
                     out.plus(num)
                 }
+
                 else -> {
                     throw IllegalArgumentException("input data type was not supported")
                 }

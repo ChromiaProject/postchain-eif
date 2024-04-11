@@ -1,12 +1,13 @@
 @mount('eif.ft4')
 module;
 
-import ^^.event_receiver.messaging.*;
+import ^^.eif_event_receiver_chain.messaging.*;
 
-import ^.main;
 import ^.common;
-import ^.utils;
 import ^.evm;
+import ^.main;
+import ^.messaging;
+import ^.utils;
 
 import lib.ft4.admin;
 import lib.ft4.accounts;
@@ -187,8 +188,7 @@ function(
     return [0: state];
 }
 
-@extend(main.handle_evm_block)
-function (message: evm_block_message) {
+@extend(messaging.handle_evm_block) function (message: evm_block_message) {
     for (event in message.events) {
         if (event.name != "DepositedERC20") {
             continue;
@@ -474,14 +474,8 @@ function deposit_ERC20(
     }
 }
 
-function emit_withdraw(
-    network_id: integer,
-    beneficiary: byte_array,
-    account: accounts.account?,
-    eth_event_data: list<gtv>,
-    emit_state: boolean
-) {
-    if (emit_state) {
+function emit_withdraw(network_id: integer, beneficiary: byte_array, account: accounts.account?, eth_event_data: list<gtv>, emit_state: boolean) {
+    if(emit_state) {
         val account_link = common.get_or_create_evm_account_link(network_id, beneficiary);
         val state = common.build_account_state(network_id, beneficiary, account);
         val state_data = common.state_data(

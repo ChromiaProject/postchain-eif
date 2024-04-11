@@ -24,7 +24,7 @@
             <plugin>
                 <groupId>net.postchain.rell</groupId>
                 <artifactId>rell-maven-plugin</artifactId>
-                <version>0.11.6</version>
+                <version>${rell.maven.plugin.version}</version>
                 <executions>
                     <execution>
                         <id>rell install</id>

@@ -2,7 +2,13 @@ package net.postchain.eif
 
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
-import net.postchain.gtv.*
+import net.postchain.gtv.Gtv
+import net.postchain.gtv.GtvArray
+import net.postchain.gtv.GtvBigInteger
+import net.postchain.gtv.GtvByteArray
+import net.postchain.gtv.GtvInteger
+import net.postchain.gtv.GtvNull
+import net.postchain.gtv.GtvString
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -36,7 +42,7 @@ class SimpleGtvEncoderTest {
 
     @Test
     fun testSimpleEncodeGtvArrayError_Invalid_Data_Type() {
-        val gtvArray = Array<Gtv>(3) {GtvNull}
+        val gtvArray = Array<Gtv>(3) { GtvNull }
         gtvArray[0] = GtvByteArray("c89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6".toByteArray())
         gtvArray[1] = GtvString("2")
         gtvArray[2] = GtvByteArray("2a80e1ef1d7842f27f2e6be0972bb708b9a135c38860dbe73c27c3486c34f4de".toByteArray())
@@ -47,7 +53,7 @@ class SimpleGtvEncoderTest {
 
     @Test
     fun testSimpleEncodeGtvArrayError_Invalid_Data_Length() {
-        val gtvArray = Array<Gtv>(3) {GtvNull}
+        val gtvArray = Array<Gtv>(3) { GtvNull }
         gtvArray[0] = GtvByteArray("00000000c89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6".toByteArray())
         gtvArray[1] = GtvInteger(2L)
         gtvArray[2] = GtvByteArray("2a80e1ef1d7842f27f2e6be0972bb708b9a135c38860dbe73c27c3486c34f4de".toByteArray())

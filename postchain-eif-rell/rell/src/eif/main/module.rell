@@ -1,15 +1,3 @@
 module;
 
-import ^^.event_receiver.messaging.*;
-import lib.icmf.receiver.{ receive_icmf_message };
-
-@extend(receive_icmf_message)
-function (sender: byte_array, topic: text, body: gtv) {
-    when (topic) {
-        evm_block_events_topic -> handle_evm_block(evm_block_message.from_gtv(body));
-        else -> log("Unexpected ICMF topic %s".format(topic));
-    }
-}
-
-@extendable
-function handle_evm_block(evm_block: evm_block_message) {}
+import ^.ft4.*;

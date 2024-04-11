@@ -1,6 +1,5 @@
 package net.postchain.eif
 
-import net.postchain.eif.config.EvmConfig
 import okhttp3.OkHttpClient
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.http.HttpService
@@ -9,25 +8,29 @@ import org.web3j.protocol.ipc.WindowsIpcService
 import java.util.concurrent.TimeUnit
 
 object Web3jServiceFactory {
-    fun buildServices(evmConfig: EvmConfig): List<Web3j> =
-            evmConfig.urls.split(",").map { it.trim() }.map { url ->
+
+    fun buildServices(urls: List<String>, connectTimeout: Long, readTimeout: Long, writeTimeout: Long): List<Web3j> =
+            buildServicesMap(urls, connectTimeout, readTimeout, writeTimeout).map { it.value }
+
+    fun buildServicesMap(urls: List<String>, connectTimeout: Long, readTimeout: Long, writeTimeout: Long): Map<String, Web3j> =
+            urls.map { url ->
                 val web3jService = if (url == "") {
-                    HttpService(createOkHttpClient(evmConfig))
+                    HttpService(createOkHttpClient(connectTimeout, readTimeout, writeTimeout))
                 } else if (url.startsWith("http")) {
-                    HttpService(url, createOkHttpClient(evmConfig), false)
+                    HttpService(url, createOkHttpClient(connectTimeout, readTimeout, writeTimeout), false)
                 } else if (System.getProperty("os.name").lowercase().startsWith("win")) {
                     WindowsIpcService(url)
                 } else {
                     UnixIpcService(url)
                 }
-                Web3j.build(web3jService)
-            }
+                url to Web3j.build(web3jService)
+            }.toMap()
 
-    private fun createOkHttpClient(evmConfig: EvmConfig): OkHttpClient {
+    private fun createOkHttpClient(connectTimeout: Long, readTimeout: Long, writeTimeout: Long): OkHttpClient {
         val builder: OkHttpClient.Builder = OkHttpClient.Builder()
-        builder.connectTimeout(evmConfig.connectTimeout, TimeUnit.SECONDS)
-        builder.readTimeout(evmConfig.readTimeout, TimeUnit.SECONDS) // Sets the socket timeout too
-        builder.writeTimeout(evmConfig.writeTimeout, TimeUnit.SECONDS)
+        builder.connectTimeout(connectTimeout, TimeUnit.SECONDS)
+        builder.readTimeout(readTimeout, TimeUnit.SECONDS) // Sets the socket timeout too
+        builder.writeTimeout(writeTimeout, TimeUnit.SECONDS)
         return builder.build()
     }
 }

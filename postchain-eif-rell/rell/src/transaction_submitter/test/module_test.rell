@@ -1,0 +1,340 @@
+@test module;
+
+import ^^.*;
+import ^.helper_operations.*;
+
+struct module_args {
+    network_configs: gtv = list<network_config>().to_gtv();
+}
+
+struct network_config {
+    id: integer;
+    currency_symbol: text;
+}
+
+function test_create_evm_submit_transaction() {
+
+    rell.test.tx().op(create_evm_submit_transaction_operation(evm_submit_transaction_message(
+        contract_address = "address",
+        function_name = "myFunction",
+        parameter_types = list(),
+        parameter_values = list(),
+        network_id = 1,
+        max_priority_fee_per_gas = 1,
+        max_fee_per_gas = 4000000000
+    ), x"")).run();
+
+    val evm_submit_transaction = evm_submit_transaction @? {};
+
+    assert_not_null(evm_submit_transaction);
+}
+
+function test_not_whitelisted_contracts_are_ignored(){
+
+    rell.test.tx().op(create_evm_submit_transaction_operation(evm_submit_transaction_message(
+        contract_address = "invalid_address",
+        function_name = "myFunction",
+        parameter_types = list(),
+        parameter_values = list(),
+        network_id = 1,
+        max_priority_fee_per_gas = 1,
+        max_fee_per_gas = 4000000000), x"")).run();
+
+    val evm_submit_transaction = evm_submit_transaction @? {};
+
+    assert_null(evm_submit_transaction);
+}
+
+function test_fetch_oldest_queued_transactions_per_contract() {
+    rell.test.block().run();
+    rell.test.tx().op(
+        create_evm_submit_transaction_op("address","myFunction1"),
+        create_evm_submit_transaction_op("address1","myFunction2", 1337)
+    ).run();
+
+    rell.test.tx().op(
+        create_evm_submit_transaction_op("address","myFunction3"),
+        create_evm_submit_transaction_op("address1","myFunction4", 1337)
+    ).run();
+
+    val evm_submit_transaction = fetch_oldest_queued_transactions_per_contract();
+
+    assert_true(evm_submit_transaction.size() == 2);
+    assert_true(evm_submit_transaction[0].contract_address == "address");
+    assert_true(evm_submit_transaction[0].function_name == "myFunction1");
+    assert_true(evm_submit_transaction[1].contract_address == "address1");
+    assert_true(evm_submit_transaction[1].function_name == "myFunction2");
+}
+
+function test_fetch_oldest_queued_transactions_per_contract_and_taken_by() {
+
+    // Submit 2 transactions
+    rell.test.set_next_block_time(1);
+    rell.test.block().run();
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(
+            x"00",
+            "address",
+            "myFunction-1",
+            transaction_status.QUEUED,
+            get_last_blocktime()),
+        create_test_evm_submit_transaction(
+            x"01",
+            "address1",
+            "myFunction-2",
+            transaction_status.QUEUED,
+            get_last_blocktime(),
+            1337)
+    ).run();
+
+    assert_equals(fetch_oldest_queued_transactions_per_contract().size(), 2);
+
+    // Take one
+    rell.test.tx().op(
+        update_evm_transaction_status_op(1, transaction_status.TAKEN, x"01")
+    ).sign(rell.test.keypairs.alice).run();
+
+    assert_equals(fetch_oldest_queued_transactions_per_contract().size(), 1);
+}
+
+function test_fetch_oldest_queued_transactions_per_contract_and_rate_limit() {
+
+    // Submit 2 transactions
+    rell.test.set_next_block_time(1);
+    rell.test.block().run();
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(
+            x"00",
+            "address",
+            "myFunction-1",
+            transaction_status.QUEUED,
+            get_last_blocktime()),
+        create_test_evm_submit_transaction(
+            x"01",
+            "address",
+            "myFunction-1",
+            transaction_status.QUEUED,
+            get_last_blocktime())
+    ).run();
+
+    assert_equals(fetch_oldest_queued_transactions_per_contract().size(), 1);
+
+    // Take one
+    rell.test.tx().op(
+        update_evm_transaction_status_op(1, transaction_status.TAKEN, x"01")
+    ).sign(rell.test.keypairs.alice).run();
+
+    assert_equals(fetch_oldest_queued_transactions_per_contract().size(), 0);
+
+    rell.test.set_next_block_time(70001);
+    rell.test.block().run();
+
+    assert_equals(fetch_oldest_queued_transactions_per_contract().size(), 1);
+}
+
+function test_fail_transactions_with_enough_retries_strategy_all() {
+
+    // Submit 2 transactions - 1 not to be touched, 1 to be failed
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "address", "myFunction-0", transaction_status.QUEUED, 1),
+        create_test_evm_submit_transaction(x"01", "address", "myFunction-1", transaction_status.QUEUED, 1),
+        add_transaction_taken_by(x"01", rell.test.keypairs.alice.pub),
+        fail_transactions_with_enough_retries_op(node_retry_strategy.ALL)
+    ).sign(rell.test.keypairs.alice).run();
+
+    assert_equals(evm_submit_transaction @ { .id == x"00"} (.status), transaction_status.QUEUED);
+    assert_equals(evm_submit_transaction @ { .id == x"01"} (.status), transaction_status.FAILURE);
+
+    // Taken entities cleaned up
+    assert_true(empty(evm_submit_transaction_taken_by @* {}));
+}
+
+function test_fail_transactions_with_enough_retries_strategy_supermajority() {
+
+    // Submit 1 transactions - 1 with super majority and 1 without
+    rell.test.set_next_block_time(1);
+    rell.test.block().run();
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "address", "myFunction-0", transaction_status.QUEUED, 1),
+        create_test_evm_submit_transaction(x"01", "address", "myFunction-1", transaction_status.QUEUED, 1),
+        add_transaction_taken_by(x"01", rell.test.keypairs.alice.pub),
+        fail_transactions_with_enough_retries_op(node_retry_strategy.SUPERMAJORITY)
+    ).sign(rell.test.keypairs.alice).run();
+
+    assert_equals(evm_submit_transaction @ { .id == x"00"} (.status), transaction_status.QUEUED);
+    assert_equals(evm_submit_transaction @ { .id == x"01"} (.status), transaction_status.FAILURE);
+
+    // Taken entities cleaned up
+    assert_true(empty(evm_submit_transaction_taken_by @* {}));
+}
+
+function test_is_supermajority() {
+
+    assert_true(is_supermajority(0, 0));
+    assert_false(is_supermajority(0, 1));
+    assert_false(is_supermajority(0, 3));
+    assert_false(is_supermajority(1, 3));
+    assert_false(is_supermajority(2, 3));
+    assert_true(is_supermajority(3, 3));
+    assert_true(is_supermajority(30, 3));
+    assert_false(is_supermajority(2, 4));
+    assert_true(is_supermajority(3, 4));
+    assert_false(is_supermajority(5, 8));
+    assert_true(is_supermajority(6, 8));
+    assert_false(is_supermajority(40, 60));
+    assert_true(is_supermajority(41, 60));
+}
+
+function test_timeout_evm_transaction(){
+    rell.test.set_next_block_time(1);
+    rell.test.block().run();
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+    ).run();
+
+    rell.test.set_next_block_time(86400000);
+    rell.test.block().run();
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"01", "address1","myFunction", transaction_status.QUEUED, 86400000, 1337)
+    ).run();
+    rell.test.block().run();
+
+    val tx = evm_submit_transaction @ {.status == transaction_status.FAILURE};
+    assert_true(tx.contract_address == "address");
+}
+
+function test_get_currency_symbol() {
+    val currency_symbol = get_currency_symbol(1337);
+
+    assert_equals(currency_symbol, "ETH");
+}
+
+function test_update_evm_transaction_status_taken_to_pending() {
+
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+    ).run();
+
+    val tx_row_id = evm_submit_transaction @ { } ( .rowid );
+
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"01"),
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.PENDING, x"01", tx_hash = "00")
+    ).run();
+
+    assert_equals(evm_submit_transaction @ { tx_row_id } ( .processed_by ), x"01");
+}
+
+function test_update_evm_transaction_status_taken_to_queued() {
+
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+    ).run();
+
+    val tx_row_id = evm_submit_transaction @ { } ( .rowid );
+
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"01"),
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.QUEUED, x"01")
+    ).run();
+
+    assert_equals(evm_submit_transaction @ { tx_row_id } ( .processed_by ), x"");
+}
+
+function test_update_evm_transaction_status_taken_only_once() {
+
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+    ).run();
+
+    val tx_row_id = evm_submit_transaction @ { } ( .rowid );
+
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"01"),
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.QUEUED, x"01")
+    ).run();
+
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"01")
+    ).run_must_fail();
+}
+
+function test_update_evm_transaction_status_rejects() {
+
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+    ).run();
+
+    val tx_row_id = evm_submit_transaction @ { } ( .rowid );
+
+    // Taken by 01
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"01")
+    ).run();
+
+    // 02 not allowed to take it
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"02")
+    ).run_must_fail();
+
+    // 02 not allowed to set it to QUEUED
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.QUEUED, x"02")
+    ).run_must_fail();
+
+    // 02 not allowed to set it to PENDING
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.PENDING, x"02")
+    ).run_must_fail();
+}
+
+function test_update_evm_transaction_status_tx_hash() {
+
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+    ).run();
+
+    val tx_row_id = evm_submit_transaction @ { } ( .rowid );
+
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"01"),
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.PENDING, x"01", tx_hash = "00")
+    ).run();
+
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.PENDING, x"01", tx_hash = "01")
+    ).run_must_fail("Transaction hash can only be set once");
+
+    assert_equals(evm_submit_transaction @ { tx_row_id } ( .tx_hash ), "00");
+}
+
+function test_update_evm_transaction_status_SUCCESS() {
+
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+    ).run();
+
+    val tx_row_id = evm_submit_transaction @ { } ( .rowid );
+    val tx_id = evm_submit_transaction @ { } ( .id );
+
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"01"),
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.PENDING, x"01", tx_hash = "00")
+    ).run();
+
+    rell.test.tx().op(
+        update_evm_transaction_receipt_helper_op(tx_row_id, "hash", 2L, 3L)
+    ).run();
+
+    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.SUCCESS, x"01", tx_hash = "01")
+    ).run();
+
+    val expected = evm_transaction_submitter_cost(
+        id = tx_id,
+        processed_by = x"01",
+        cost = 6L,
+        currency_symbol = "ETH");
+
+    assert_events(("icmf_message",(topic = evm_transaction_submitter_cost_topic, body = expected.to_gtv()).to_gtv_pretty()));
+}

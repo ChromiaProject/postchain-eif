@@ -1,0 +1,81 @@
+
+entity evm_submit_transaction {
+    key id: byte_array;
+    contract_address: text;
+    function_name: text;
+    parameter_types: text;
+    parameter_values: byte_array;
+    network_id: integer;
+    currency_symbol: text;
+    max_priority_fee_per_gas: big_integer;
+    max_fee_per_gas: big_integer;
+    sender: byte_array;
+    index mutable status: transaction_status;
+    index created: timestamp;
+    index mutable taken_timestamp: timestamp;
+    mutable block_hash: text = "";
+    mutable effective_gas_price: big_integer = -1;
+    mutable gas_usage: big_integer = -1;
+    mutable tx_hash: text = "";
+    mutable processed_by: pubkey = x"";
+}
+
+entity evm_submit_transaction_taken_by {
+    key transaction: evm_submit_transaction, provider: pubkey;
+}
+
+struct evm_submit_transaction_data {
+    row_id: integer;
+    contract_address: text;
+    function_name: text;
+    parameter_types: list<text>;
+    parameter_values: list<gtv>;
+    network_id: integer;
+    max_priority_fee_per_gas: big_integer;
+    max_fee_per_gas: big_integer;
+    sender: byte_array;
+    status: transaction_status;
+    created: timestamp;
+    tx_hash: text? = null;
+    processed_by: pubkey;
+}
+
+enum transaction_status {
+    QUEUED,
+    TAKEN,
+    PENDING,
+    SUCCESS,
+    FAILURE
+}
+
+enum node_retry_strategy {
+    ALL,
+    SUPERMAJORITY
+}
+
+struct module_args {
+    genesis_node: byte_array;
+    system_chain_bridges: gtv;
+    directory_chain_config: gtv;
+    system_anchoring_chain_config: gtv?;
+    contract_tx_rate_limit: big_integer;
+    tx_timeout: big_integer;
+    node_retry_strategy;
+    network_configs: gtv = list<network_config>().to_gtv();
+    manual_admins: gtv;
+    system_max_priority_fee_per_gas: integer;
+    system_max_fee_per_gas: integer;
+}
+
+struct network_config {
+    id: integer;
+    currency_symbol: text;
+}
+
+struct evm_transaction_submitter_cost {
+    id: byte_array;
+    processed_by: pubkey;
+    cost: big_integer;
+    currency_symbol: text;
+}
+

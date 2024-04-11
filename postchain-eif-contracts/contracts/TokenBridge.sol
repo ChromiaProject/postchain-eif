@@ -11,10 +11,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 // Internal libraries
 import "./Postchain.sol";
-
-interface IValidator {
-    function isValidSignatures(bytes32 hash, bytes[] memory signatures, address[] memory signers) external view returns (bool);
-}
+import "./IValidator.sol";
 
 // This contract is upgradeable. This imposes restrictions on how storage layout can be modified once it is deployed
 // Some instructions are also not allowed. Read more at: https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable
@@ -81,7 +78,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     event AllowToken(IERC20 indexed token);
     event TriggerMassExit(uint indexed height, bytes32 indexed blockRid);
     event PostponeMassExit();
-    event UpdatedMassExitBlock(uint indexed height, bytes32 indexed blockRid);
     event PendingWithdraw(bytes32 indexed hash);
     event UnpendingWithdraw(bytes32 indexed hash);
     event FundedERC20(address indexed sender, IERC20 indexed token, uint amount);
@@ -113,11 +109,10 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         networkId = id;
         validator = _validator;
         withdrawOffset = _withdrawOffset;
-        emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
         emit Initialize(_validator, _withdrawOffset);
     }
 
-    function renounceOwnership() public override onlyOwner {
+    function renounceOwnership() public override view onlyOwner {
         revert("TokenBridge: renounce ownership is not allowed");
     }
 
@@ -149,6 +144,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         require(!isMassExit, "TokenBridge: mass exit already set");
         isMassExit = true;
         massExitBlock = PostchainBlock(height, blockRid);
+        emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
         emit TriggerMassExit(height, blockRid);
     }
 
@@ -156,15 +152,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         isMassExit = false;
         massExitBlock = PostchainBlock(0, bytes32(0));
         emit PostponeMassExit();
-    }
-
-    /**
-     * Note: the mass exit block should be the block at which snapshot was updated
-     *          with state root was stored properly in the block header extra data.
-     */
-    function updateMassExitBlock(uint height, bytes32 blockRid) onlyOwner whenMassExit public {
-        massExitBlock = PostchainBlock(height, blockRid);
-        emit UpdatedMassExitBlock(height, blockRid);
     }
 
     function pendingWithdraw(bytes32 _hash) onlyOwner public {
@@ -225,7 +212,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         require(blockchainRid != bytes32(0), "TokenBridge: blockchain rid is not set");
         require(_events[eventProof.leaf] == false, "TokenBridge: event hash was already used");
         {
-            (uint height, bytes32 blockRid, bytes32 eventRoot, ) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
+            require(Hash.hashGtvBytes64Leaf(extraProof.leaf) == extraProof.hashedLeaf, "Postchain: invalid EIF extra data");
+            (uint height, bytes32 blockRid) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
+            bytes32 eventRoot = _bytesToBytes32(extraProof.leaf, 0);
             if (isMassExit) {
                 require(height <= massExitBlock.height, "TokenBridge: cannot withdraw request after the mass exit block height");
             }
@@ -296,7 +285,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     ) whenMassExit whenNotPaused nonReentrant public  {
         require(_snapshots[stateProof.leaf] == false, "TokenBridge: snapshot already used");
         require(stateProof.leaf == keccak256(snapshot), "TokenBridge: snapshot data is not correct");
-        (uint height, bytes32 blockRid, , bytes32 stateRoot) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
+        require(Hash.hashGtvBytes64Leaf(extraProof.leaf) == extraProof.hashedLeaf, "Postchain: invalid EIF extra data");
+        (uint height, bytes32 blockRid) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
+        bytes32 stateRoot = _bytesToBytes32(extraProof.leaf, 32);
         require(blockRid == massExitBlock.blockRid && height == massExitBlock.height, "TokenBridge: snapshot block should be the same with mass exit block");
         if (!validator.isValidSignatures(blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
         if (!MerkleProof.verify(stateProof.merkleProofs, stateProof.leaf, stateProof.position, stateRoot)) revert("TokenBridge: invalid merkle proof");
@@ -339,16 +330,26 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
 
     /**
      * @notice this function will be use only in emergency case
-     * by allow admin/owner (multi-sig wallet) to withdraw all the remaining balance after a specific period of time.
+     * by allow admin/owner (multi-sig wallet) to withdraw all the remaining balance after a specific period of time
+     * has passed since mass exit.
      */
-    function emergencyWithdraw(IERC20 token, address payable beneficiary) external onlyOwner {
+    function emergencyWithdraw(IERC20 token, address payable beneficiary) external onlyOwner whenMassExit {
         require(address(token) != address(0), "TokenBridge: token address is invalid");
         require(beneficiary != address(0), "TokenBridge: beneficiary address is invalid");
-        require(block.timestamp > emergencyTimestamp, "TokenBridge: cannot do emergency withdrawal before setting timestamp");
+        require(block.timestamp >= emergencyTimestamp, "TokenBridge: cannot do emergency withdrawal until 90 days after mass exit");
         uint tokenBalance = token.balanceOf(address(this));
         if (tokenBalance > 0) {
             token.safeTransfer(beneficiary, tokenBalance);
         }
+    }
+
+    function _bytesToBytes32(bytes memory b, uint offset) internal pure returns (bytes32) {
+        bytes32 out;
+
+        for (uint i = 0; i < 32; i++) {
+            out |= bytes32(b[offset + i] & 0xFF) >> (i * 8);
+        }
+        return out;
     }
 }
 

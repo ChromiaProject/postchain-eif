@@ -5,7 +5,7 @@ import net.postchain.gtv.merkle.proof.MerkleProofElement
 import net.postchain.gtv.merkle.proof.ProofHashedLeaf
 import net.postchain.gtv.merkle.proof.ProofNode
 import net.postchain.gtv.merkle.proof.ProofValueLeaf
-import java.util.*
+import java.util.LinkedList
 
 object ProofTreeParser {
 
@@ -32,8 +32,8 @@ object ProofTreeParser {
                 currentNode = right
             } else {
                 throw ProgrammerMistake(
-                    "Expected one side to be ${ProofHashedLeaf::class.simpleName}" +
-                            " but was left: ${left::class.simpleName} and right: ${right::class.simpleName}"
+                        "Expected one side to be ${ProofHashedLeaf::class.simpleName}" +
+                                " but was left: ${left::class.simpleName} and right: ${right::class.simpleName}"
                 )
             }
         }
