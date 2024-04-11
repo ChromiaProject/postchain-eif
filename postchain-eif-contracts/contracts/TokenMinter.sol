@@ -26,6 +26,7 @@ contract TokenMinter is TwoWeekDelay, Ownable2Step {
 
     // Address to which minter role will be transferred after delay
     address public pendingNewMinter;
+    // New daily limit to be set after delay
     IDailyLimit public pendingNewDailyLimit;
 
     constructor(
