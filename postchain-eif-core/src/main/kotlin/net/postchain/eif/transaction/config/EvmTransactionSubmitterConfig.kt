@@ -1,6 +1,5 @@
 package net.postchain.eif.transaction.config
 
-import net.postchain.common.exception.UserMistake
 import net.postchain.config.app.AppConfig
 
 data class EvmTransactionSubmitterConfig(
@@ -37,8 +36,7 @@ data class EvmTransactionSubmitterConfig(
                     config.getEnvOrLong(EVM_MAX_RETRY_DELAY, "evm.maxRetryDelay", 60_000L),
                     config.getEnvOrLong(EVM_MIN_RETRY_DELAY, "evm.minRetryDelay", 500L),
                     config.getEnvOrLong(EVM_MAX_TRY_ERRORS, "evm.maxTryErrors", 10L),
-                    config.getEnvOrString("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_PRIVATE_KEY", "$chain.privateKey")
-                            ?: throw UserMistake("Missing private key for chain $chain"),
+                    config.getEnvOrString("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_PRIVATE_KEY", "$chain.privateKey", config.privKey),
                     config.getEnvOrLong(EVM_TX_POLL_INTERVAL, "evm.txPollInterval", 10_000L),
                     config.getEnvOrLong(EVM_HEALTHCHECK_INTERVAL, "evm.healthCheckInterval", 60_000L)
             )
