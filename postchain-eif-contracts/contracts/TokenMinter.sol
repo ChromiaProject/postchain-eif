@@ -44,9 +44,7 @@ contract TokenMinter is TwoWeekDelay, Ownable {
     }
 
     function setDailyLimit(IDailyLimit _dailyLimit) external onlyOwner {
-        if (address(pendingNewDailyLimit) != address(0)) {
-            resetDelayForFunction(this.setDailyLimit.selector);
-        }
+        if (address(pendingNewDailyLimit) != address(0)) resetDelayForFunction(this.setDailyLimit.selector);
         startDelayedAction(this.setDailyLimit.selector);
         pendingNewDailyLimit = _dailyLimit;
     }
@@ -70,9 +68,7 @@ contract TokenMinter is TwoWeekDelay, Ownable {
     }
 
     function transferMintRole(address newOwner) external onlyOwner {
-        if (pendingNewMinter != address(0)) {
-            resetDelayForFunction(this.transferMintRole.selector);
-        }
+        if (pendingNewMinter != address(0)) resetDelayForFunction(this.transferMintRole.selector);
         startDelayedAction(this.transferMintRole.selector);
         pendingNewMinter = newOwner;
     }
