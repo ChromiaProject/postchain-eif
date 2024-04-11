@@ -30,8 +30,8 @@ contract TokenMinter is TwoWeekDelay, Ownable2Step {
     IDailyLimit public pendingNewDailyLimit;
 
     constructor(
-        address _tokenContractAddress,
         IDailyLimit _dailyLimit,
+        address _tokenContractAddress,
         address _bridgeContractAddress
     ) Ownable(msg.sender) {
         dailyLimit = _dailyLimit;
