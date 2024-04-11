@@ -44,7 +44,7 @@ contract DailyLimit is Ownable, TwoWeekDelay {
     function finishSetDayLimit() external onlyOwner {
         finishDelayedAction(this.setDayLimit.selector);
         dayLimit = pendingDayLimit;
-        pendingDayLimit = 0;
+        delete pendingDayLimit;
         emit DayLimitChanged(dayLimit);
     }
 
