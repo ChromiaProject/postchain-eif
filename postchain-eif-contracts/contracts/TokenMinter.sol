@@ -68,7 +68,7 @@ contract TokenMinter is TwoWeekDelay, Ownable {
         ChromiaToken(tokenContractAddress).transferToChromia(bytes32(0), amount);
     }
 
-    function transferMintRole(address newOwner) external virtual onlyOwner {
+    function transferMintRole(address newOwner) external onlyOwner {
         if (pendingNewMinter != address(0)) {
             resetDelayForFunction(this.transferMintRole.selector);
         }
@@ -76,7 +76,7 @@ contract TokenMinter is TwoWeekDelay, Ownable {
         pendingNewMinter = newOwner;
     }
 
-    function finishTransferMintRole() external onlyOwner {
+    function finishTransferMintRole() external virtual onlyOwner {
         require(pendingNewMinter != address(0), "No pending owner");
         finishDelayedAction(this.transferMintRole.selector);
         ChromiaToken(tokenContractAddress).changeMinter(pendingNewMinter);
