@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "./utils/TwoWeekDelay.sol";
 
-contract DailyLimit is Ownable, TwoWeekDelay {
+contract DailyLimit is TwoWeekDelay, Ownable2Step {
     uint private dayStart; // Timestamp at which the day started
     uint private dayAmount; // Amount of tokens withdrawn so far
     uint private dayLimit; // Maximum amount of tokens that can be withdrawn in a day
