@@ -53,7 +53,7 @@ contract DailyLimit is Ownable, TwoWeekDelay {
         emit ParentContractChanged(_parentContract);
     }
 
-    function _updateDayAmount(uint amount) external onlyParentContract {
+    function updateDayAmount(uint amount) external onlyParentContract {
         if (block.timestamp > dayStart + 1 days) {
             dayStart = block.timestamp;
             dayAmount = 0;
