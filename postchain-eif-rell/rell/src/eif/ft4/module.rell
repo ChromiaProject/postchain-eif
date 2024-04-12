@@ -254,21 +254,24 @@ function(
     }
 }
 
+@extend(auth.auth_handler)
+function () = auth.add_auth_handler(
+    scope = rell.meta(deposit_ft_token).mount_name,
+    flags = ["T"]
+);
+
 operation deposit_ft_token(
-    common.auth_id,
     network_id: integer,
     token_address: byte_array,
     beneficiary: byte_array,
     amount: big_integer
 ) {
+    val account = auth.authenticate();
+
     require(amount > 0, "amount should larger than 0");
     val token = require(evm_erc20 @? { network_id, .address == token_address }, "token is not support");
     val token_mapping = require(token_mapping @? { token }, "token is not support");
     val asset = require(assets.asset @? { .id == token_mapping.asset.id }, "asset does not exist");
-
-    val account = accounts.account @ { .id == auth_id.account_id };
-    val account_auth_descriptor = accounts.auth_descriptor_by_id(account, auth_id.auth_descriptor_id);
-    auth._ft_auth(["T"], account, account_auth_descriptor);
 
     // burn ft token of the account
     assets.Unsafe.burn(account, asset, amount);
@@ -294,21 +297,24 @@ operation deposit_ft_token(
     update_account_state(account, asset);
 }
 
+@extend(auth.auth_handler)
+function () = auth.add_auth_handler(
+    scope = rell.meta(bridge_ft_token_to_evm).mount_name,
+    flags = ["T"]
+);
+
 operation bridge_ft_token_to_evm(
-    common.auth_id,
     network_id: integer,
     token_address: byte_array,
     beneficiary: byte_array,
     amount: big_integer
 ) {
+    val account = auth.authenticate();
+
     require(amount > 0, "amount should larger than 0");
     val token = require(evm_erc20 @? { network_id, .address == token_address }, "token is not supported");
     val token_mapping = require(token_mapping @? { token }, "token is not support");
     val asset = require(assets.asset @? { .id == token_mapping.asset.id }, "asset does not exist");
-
-    val account = accounts.account @ { .id == auth_id.account_id };
-    val account_auth_descriptor = accounts.auth_descriptor_by_id(account, auth_id.auth_descriptor_id);
-    auth._ft_auth(["T"], account, account_auth_descriptor);
 
     // burn ft token of the account and update relevant account state
     assets.Unsafe.burn(account, asset, amount);
