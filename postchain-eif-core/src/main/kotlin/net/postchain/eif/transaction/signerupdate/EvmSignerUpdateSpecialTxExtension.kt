@@ -5,6 +5,7 @@ import net.postchain.base.SpecialTransactionPosition
 import net.postchain.base.snapshot.SimpleDigestSystem
 import net.postchain.common.BlockchainRid
 import net.postchain.common.data.KECCAK256
+import net.postchain.common.toHex
 import net.postchain.concurrent.util.get
 import net.postchain.core.BlockEContext
 import net.postchain.core.block.BlockQueriesProvider
@@ -22,6 +23,7 @@ import net.postchain.gtv.merkle.GtvMerkleHashCalculator
 import net.postchain.gtx.GTXModule
 import net.postchain.gtx.data.OpData
 import net.postchain.gtx.special.GTXSpecialTxExtension
+import org.web3j.abi.datatypes.Address
 import java.security.MessageDigest
 
 class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
@@ -154,8 +156,13 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
             }
 
             val evmSignatures = op.args[3].asArray().map { it.asByteArray() }
-            val evmSigners = op.args[4].asArray().map { it.asByteArray() }
-            if (!evmBlockHeaderValidator.verifyEVMSignatures(decodedHeader, evmSignatures, evmSigners)) {
+            val evmSigners = op.args[4].asArray().toList()
+            if (evmSigners.distinct().sortedBy { Address(it.asByteArray().toHex()).toUint().value } != evmSigners) {
+                logger.warn("Validation failed. Signers are duplicated or out of order")
+                return false
+            }
+
+            if (!evmBlockHeaderValidator.verifyEVMSignatures(decodedHeader, evmSignatures, evmSigners.map { it.asByteArray() })) {
                 logger.warn("Validation failed. Signature mismatch")
                 return false
             }
