@@ -3,6 +3,7 @@
 // libs
 import lib.icmf.test.{ test_icmf_message };
 import lib.ft4.auth;
+import auth_ext: lib.ft4.auth.external;
 import lib.ft4.admin;
 import lib.ft4.accounts;
 import lib.ft4.assets;

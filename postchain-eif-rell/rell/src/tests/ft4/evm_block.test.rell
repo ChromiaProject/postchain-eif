@@ -143,10 +143,10 @@ function test_evm_block() {
     assert_equals(last_block.evm_block_hash, block_hash);
 
     // // bridge some ft3 token to evm
-    val auth_id = common.auth_id(account_id = ft_account.id, auth_descriptor_id = auth_descriptor.hash());
-    rell.test.tx().op(
-            ft4.bridge_ft_token_to_evm(auth_id, network_id, token_address, user_evm_address, amount / 2)
-        ).sign(user_privkey).run();
+    rell.test.tx()
+        .op(auth_ext.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(ft4.bridge_ft_token_to_evm(network_id, token_address, user_evm_address, amount / 2))
+        .sign(user_privkey).run();
 
     val withdraw_info = list<gtv>();
     withdraw_info.add((1).to_gtv());
@@ -169,9 +169,10 @@ function test_evm_block() {
     assert_equals(ft_balance_2, amount / 2);
 
     // user can also deposit from ft3 account to EIF
-    rell.test.tx().op(
-            ft4.deposit_ft_token(auth_id, network_id, token_address, user_evm_address, amount / 4)
-        ).sign(user_privkey).run();
+    rell.test.tx()
+        .op(auth_ext.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(ft4.deposit_ft_token(network_id, token_address, user_evm_address, amount / 4))
+        .sign(user_privkey).run();
 
     val state_3 = list<gtv>();
     state_3.add(to_32_byte_array(user_evm_address).to_gtv());
@@ -407,10 +408,10 @@ function test_no_mass_exit() {
     assert_equals(last_block.evm_block_hash, block_hash);
 
     // // bridge some ft3 token to evm
-    val auth_id = common.auth_id(account_id = ft_account.id, auth_descriptor_id = auth_descriptor.hash());
-    rell.test.tx().op(
-        ft4.bridge_ft_token_to_evm(auth_id, network_id, token_address, user_evm_address, amount/2)
-    ).sign(user_privkey).run();
+    rell.test.tx()
+        .op(auth_ext.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(ft4.bridge_ft_token_to_evm(network_id, token_address, user_evm_address, amount/2))
+        .sign(user_privkey).run();
 
     val withdraw_info = list<gtv>();
     withdraw_info.add((1).to_gtv());
@@ -424,9 +425,10 @@ function test_no_mass_exit() {
     assert_equals(ft_balance_2, amount/2);
 
     // user can also deposit from ft3 account to EIF
-    rell.test.tx().op(
-        ft4.deposit_ft_token(auth_id, network_id, token_address, user_evm_address, amount/4)
-    ).sign(user_privkey).run();
+    rell.test.tx()
+        .op(auth_ext.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(ft4.deposit_ft_token(network_id, token_address, user_evm_address, amount/4))
+        .sign(user_privkey).run();
 
     assert_events();
 

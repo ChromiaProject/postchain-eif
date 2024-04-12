@@ -15,11 +15,6 @@ object withdraw_stats {
     mutable withdraw_count: integer = 0;
 }
 
-struct auth_id {
-    account_id: byte_array;
-    auth_descriptor_id: byte_array;
-}
-
 struct state_data {
     state_n: integer;
     account: list<gtv>;
