@@ -8,12 +8,14 @@ import net.postchain.base.snapshot.EventPageStore
 import net.postchain.base.snapshot.LeafStore
 import net.postchain.common.data.Hash
 import net.postchain.common.exception.ProgrammerMistake
+import net.postchain.common.toHex
 import net.postchain.core.BlockEContext
 import net.postchain.core.TxEContext
 import net.postchain.eif.getEthereumAddress
 import net.postchain.eif.transaction.signerupdate.EvmTypeEncoder.encodeSignerUpdateEvent
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvByteArray
+import org.web3j.abi.datatypes.Address
 
 class EvmSignerUpdateBlockBuilderExtension(private val ds: DigestSystem, private val levelsPerPage: Int) : BaseBlockBuilderExtension, TxEventSink {
 
@@ -46,7 +48,9 @@ class EvmSignerUpdateBlockBuilderExtension(private val ds: DigestSystem, private
         if (type == SIGNER_LIST_UPDATE_EVENT) {
             val event = data.asArray()
             val encodedEvent = encodeSignerUpdateEvent(event[0].asByteArray(), event[1].asArray()
-                    .map { getEthereumAddress(it.asByteArray()) })
+                    .map { getEthereumAddress(it.asByteArray()) }
+                    .sortedBy { Address(it.toHex()).toUint().value }
+            )
             val hash = ds.digest(encodedEvent)
             store.writeEvent(ctxt, SIGNER_LIST_UPDATE_TABLE_PREFIX, events.size.toLong(), hash, encodedEvent)
             events.add(hash)

@@ -7,8 +7,10 @@ import net.postchain.base.BaseBlockWitness
 import net.postchain.base.SpecialTransactionPosition
 import net.postchain.base.gtv.BlockHeaderData
 import net.postchain.common.BlockchainRid
+import net.postchain.common.toHex
 import net.postchain.core.BlockEContext
 import net.postchain.core.BlockRid
+import net.postchain.crypto.KeyPair
 import net.postchain.crypto.Secp256K1CryptoSystem
 import net.postchain.eif.encodeBlockHeaderDataForEVM
 import net.postchain.eif.encodeSignatureWithV
@@ -32,6 +34,7 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
+import org.web3j.abi.datatypes.Address
 import java.security.Security
 
 class EvmAnchoringValidationTest {
@@ -40,11 +43,13 @@ class EvmAnchoringValidationTest {
     private val hashCalculator = GtvMerkleHashCalculator(cryptoSystem)
     private val mockContext: BlockEContext = mock {}
     private val systemAnchoringBrid = BlockchainRid.ZERO_RID
-    private val systemAnchoringSigner = cryptoSystem.generateKeyPair()
+    private val systemAnchoringSigner1 = cryptoSystem.generateKeyPair()
+    private val systemAnchoringSigner2 = cryptoSystem.generateKeyPair()
+    private val systemAnchoringSigners: List<KeyPair>
     private val module: GTXModule = mock {
         on { query(mockContext, SHOULD_ANCHOR_SYSTEM_ANCHORING_BLOCK_QUERY, gtv(mapOf())) } doReturn gtv(1)
         on { query(mockContext, GET_PREVIOUSLY_ANCHORED_SYSTEM_ANCHORING_BLOCK_HEIGHT_QUERY, gtv(mapOf())) } doReturn gtv(-1)
-        on { query(mockContext, GET_CURRENT_EVM_SIGNER_LIST_QUERY, gtv(mapOf("blockchain_rid" to gtv(systemAnchoringBrid)))) } doReturn gtv(listOf(gtv(systemAnchoringSigner.pubKey.data)))
+        on { query(mockContext, GET_CURRENT_EVM_SIGNER_LIST_QUERY, gtv(mapOf("blockchain_rid" to gtv(systemAnchoringBrid)))) } doReturn gtv(listOf(gtv(systemAnchoringSigner1.pubKey.data), gtv(systemAnchoringSigner2.pubKey.data)))
         on { query(mockContext, GET_SYSTEM_ANCHORING_BLOCKCHAIN_RID_QUERY, gtv(mapOf())) } doReturn gtv(systemAnchoringBrid)
     }
 
@@ -54,6 +59,15 @@ class EvmAnchoringValidationTest {
     private lateinit var signatures: List<GtvByteArray>
     private lateinit var signers: List<GtvByteArray>
     private lateinit var rawDummyBlock: ByteArray
+
+    init {
+        // We add this provider so that we can get keccak-256 message digest instances
+        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
+            Security.addProvider(BouncyCastleProvider())
+        }
+        systemAnchoringSigners = listOf(systemAnchoringSigner1, systemAnchoringSigner2)
+                .sortedBy { Address(getEthereumAddress(it.pubKey.data).toHex()).toUint().value }
+    }
 
     @BeforeEach
     fun setup() {
@@ -68,9 +82,9 @@ class EvmAnchoringValidationTest {
         val dummyPrevBlockRid = BlockRid(systemAnchoringBrid.data)
         val dummyBlock = makeBlockHeader(systemAnchoringBrid, dummyPrevBlockRid, 0)
         val dummyBlockRid = dummyBlock.toGtv().merkleHash(hashCalculator)
-        val witness = BaseBlockWitness.fromSignatures(
-                arrayOf(cryptoSystem.buildSigMaker(systemAnchoringSigner).signDigest(dummyBlockRid))
-        )
+        val witness = BaseBlockWitness.fromSignatures(systemAnchoringSigners.map {
+            cryptoSystem.buildSigMaker(it).signDigest(dummyBlockRid)
+        }.toTypedArray())
         rawDummyBlock = GtvEncoder.encodeGtv(dummyBlock.toGtv())
 
         blockHeaderData = encodeBlockHeaderDataForEVM(dummyBlockRid, BlockHeaderData.fromBinary(rawDummyBlock), hashCalculator)
@@ -128,9 +142,9 @@ class EvmAnchoringValidationTest {
     fun `Wrong signature digest`() {
         val incorrectDigest = ByteArray(32) { 2 }
 
-        val incorrectWitness = BaseBlockWitness.fromSignatures(
-                arrayOf(cryptoSystem.buildSigMaker(systemAnchoringSigner).signDigest(incorrectDigest))
-        )
+        val incorrectWitness = BaseBlockWitness.fromSignatures(systemAnchoringSigners.map {
+            cryptoSystem.buildSigMaker(it).signDigest(incorrectDigest)
+        }.toTypedArray())
 
         val incorrectSignatures = incorrectWitness.getSignatures().map {
             gtv(encodeSignatureWithV(incorrectDigest, it))
@@ -139,6 +153,19 @@ class EvmAnchoringValidationTest {
         assertThat(sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
                 ANCHOR_SYSTEM_ANCHORING_BLOCK_OP,
                 arrayOf(gtv(blockHeaderData), gtv(incorrectSignatures), gtv(signers))
+        )))).isFalse()
+    }
+
+    @Test
+    fun `Wrong signer order or duplicates`() {
+        assertThat(sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
+                ANCHOR_SYSTEM_ANCHORING_BLOCK_OP,
+                arrayOf(gtv(blockHeaderData), gtv(signatures.reversed()), gtv(signers.reversed()))
+        )))).isFalse()
+
+        assertThat(sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
+                ANCHOR_SYSTEM_ANCHORING_BLOCK_OP,
+                arrayOf(gtv(blockHeaderData), gtv(signatures + signatures.last()), gtv(signers + signers.last()))
         )))).isFalse()
     }
 

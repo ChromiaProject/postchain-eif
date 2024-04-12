@@ -6,10 +6,12 @@ import net.postchain.base.SpecialTransactionPosition
 import net.postchain.base.gtv.BlockHeaderData
 import net.postchain.common.BlockchainRid
 import net.postchain.common.exception.ProgrammerMistake
+import net.postchain.common.toHex
 import net.postchain.concurrent.util.get
 import net.postchain.core.BlockEContext
 import net.postchain.core.block.BlockQueriesProvider
 import net.postchain.crypto.CryptoSystem
+import net.postchain.eif.EifSignature
 import net.postchain.eif.decodeBlockHeaderDataFromEVM
 import net.postchain.eif.encodeBlockHeaderDataForEVM
 import net.postchain.eif.encodeSignatureWithV
@@ -20,6 +22,7 @@ import net.postchain.gtv.merkle.GtvMerkleHashCalculator
 import net.postchain.gtx.GTXModule
 import net.postchain.gtx.data.OpData
 import net.postchain.gtx.special.GTXSpecialTxExtension
+import org.web3j.abi.datatypes.Address
 
 class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
 
@@ -67,12 +70,12 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
 
             val blockHeaderData = encodeBlockHeaderDataForEVM(lastBlock.header.blockRID, BlockHeaderData.fromBinary(lastBlock.header.rawData), hashCalculator)
             val signatures = blockWitness.getSignatures().map {
-                gtv(encodeSignatureWithV(lastBlock.header.blockRID, it))
-            }
-            val signers = blockWitness.getSignatures().map {
-                gtv(getEthereumAddress(it.subjectID))
-            }
-            listOf(OpData(ANCHOR_SYSTEM_ANCHORING_BLOCK_OP, arrayOf(gtv(blockHeaderData), gtv(signatures), gtv(signers))))
+                EifSignature(
+                        sig = encodeSignatureWithV(lastBlock.header.blockRID, it),
+                        pubkey = getEthereumAddress(it.subjectID)
+                )
+            }.sortedBy { Address(it.pubkey.toHex()).toUint().value }
+            listOf(OpData(ANCHOR_SYSTEM_ANCHORING_BLOCK_OP, arrayOf(gtv(blockHeaderData), gtv(signatures.map { gtv(it.sig) }), gtv(signatures.map { gtv(it.pubkey) }))))
         } else {
             listOf()
         }
@@ -128,11 +131,16 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
         }
 
         val evmSignatures = anchoringOp.args[1].asArray().map { it.asByteArray() }
-        val evmSigners = anchoringOp.args[2].asArray().map { it.asByteArray() }
+        val evmSigners = anchoringOp.args[2].asArray().toList()
+        if (evmSigners.distinct().sortedBy { Address(it.asByteArray().toHex()).toUint().value } != evmSigners) {
+            logger.warn("Validation failed. Signers are duplicated or out of order")
+            return false
+        }
+
         if (!evmBlockHeaderValidator.verifyEVMSignaturesAndCompareAgainstCurrentEVMSignerList(
                         decodedHeader,
                         evmSignatures,
-                        evmSigners,
+                        evmSigners.map { it.asByteArray() },
                         getCurrentEVMSignerList(bctx)
                 )) {
             logger.warn("Validation failed. Signature mismatch.")
