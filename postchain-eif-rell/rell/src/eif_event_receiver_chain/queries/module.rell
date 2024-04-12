@@ -1,0 +1,7 @@
+module;
+
+import ^.model.*;
+
+query get_last_evm_block(network_id: integer) {
+    return evm_block @? { network_id } ( @sort_desc .evm_block_height, .evm_block_hash ) limit 1;
+}

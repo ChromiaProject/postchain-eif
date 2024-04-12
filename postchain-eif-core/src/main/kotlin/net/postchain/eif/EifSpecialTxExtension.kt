@@ -4,18 +4,18 @@ import net.postchain.base.SpecialTransactionPosition
 import net.postchain.common.BlockchainRid
 import net.postchain.core.BlockEContext
 import net.postchain.crypto.CryptoSystem
-import net.postchain.gtx.*
+import net.postchain.gtx.GTXModule
 import net.postchain.gtx.data.OpData
 import net.postchain.gtx.special.GTXSpecialTxExtension
 
 const val OP_EVM_BLOCK = "__evm_block"
 
 class EifSpecialTxExtension : GTXSpecialTxExtension {
-    private var needEifTnx: Boolean = false
-    private val rops = setOf(OP_EVM_BLOCK)
-    override fun getRelevantOps() = rops
 
+    private var needEifTnx: Boolean = false
     private val processors = mutableMapOf<Long, EventProcessor>()
+
+    override fun getRelevantOps() = setOf(OP_EVM_BLOCK)
 
     fun addEventProcessor(networkID: Long, processor: EventProcessor) {
         processors[networkID] = processor

@@ -1,0 +1,71 @@
+module;
+
+import ^^.*;
+
+operation create_evm_submit_transaction_operation(evm_submit_transaction_message: evm_submit_transaction_message, sender: byte_array){
+    create_evm_submit_transaction(evm_submit_transaction_message, sender);
+}
+
+operation create_evm_submit_transaction_op(contract_address: text, function_name: text, network_id: integer = 1){
+    create_evm_submit_transaction(evm_submit_transaction_message(
+        contract_address = contract_address,
+        function_name = function_name,
+        parameter_types = list(),
+        parameter_values = list(),
+        network_id = network_id,
+        max_priority_fee_per_gas = 1,
+        max_fee_per_gas = 4000000000), x"");
+}
+
+operation update_evm_transaction_status_helper_op(row_id: rowid, status: transaction_status) {
+    update evm_submit_transaction @ { .rowid == row_id } (.status = status);
+}
+
+operation update_evm_transaction_receipt_helper_op(row_id: rowid, block_hash: text, effective_gas_price: big_integer, gas_usage: big_integer) {
+    update evm_submit_transaction @ { .rowid == row_id } (.block_hash = block_hash, .effective_gas_price = effective_gas_price, .gas_usage = gas_usage);
+}
+
+operation update_evm_transaction_status_op(row_id: integer, status: transaction_status, signer: pubkey, tx_hash: text? = null) {
+
+    update_evm_transaction_status(row_id, status, tx_hash, signer);
+}
+
+operation sete_evm_transaction_status(row_id: integer, status: transaction_status) {
+
+    update evm_submit_transaction @ { .rowid == rowid(row_id) } ( .status = status );
+}
+
+operation add_transaction_taken_by(id: byte_array, pubkey) {
+
+    val transaction = evm_submit_transaction @ { .id == id };
+    create evm_submit_transaction_taken_by(transaction, pubkey);
+}
+
+operation fail_transactions_with_enough_retries_op(node_retry_strategy) {
+    fail_transactions_with_enough_retries(node_retry_strategy);
+}
+
+operation create_test_evm_submit_transaction(id: byte_array, contract_address: text, function_name: text, status: transaction_status, created: timestamp, network_id: integer = 1) {
+    create evm_submit_transaction (
+        id = id,
+        contract_address = contract_address,
+        function_name = function_name,
+        parameter_types = "",
+        parameter_values = list<text>().to_gtv().to_bytes(),
+        network_id = network_id,
+        currency_symbol = "ETH",
+        max_priority_fee_per_gas = 1,
+        max_fee_per_gas = 4000000000,
+        sender = x"",
+        status = status,
+        created = created,
+        taken_timestamp = 0);
+}
+
+operation timeout_evm_transactions_op(){
+    timeout_evm_transactions();
+}
+
+operation bridge_mapping_message_op(bridge_mapping_message) {
+    handle_bridge_mapping_message(x"", bridge_mapping_topic, bridge_mapping_message.to_gtv());
+}

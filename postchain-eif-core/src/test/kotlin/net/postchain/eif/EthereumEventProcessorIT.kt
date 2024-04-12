@@ -2,8 +2,6 @@ package net.postchain.eif
 
 import assertk.assertThat
 import assertk.assertions.containsExactly
-import com.google.gson.GsonBuilder
-import com.google.gson.JsonObject
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
 import net.postchain.core.BlockchainEngine
@@ -15,79 +13,45 @@ import net.postchain.gtv.GtvNull
 import net.postchain.gtx.data.OpData
 import org.awaitility.Awaitility
 import org.awaitility.Duration
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
-import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.abi.datatypes.generated.Uint256
-import org.web3j.crypto.Credentials
 import org.web3j.protocol.Web3j
-import org.web3j.protocol.http.HttpService
 import org.web3j.tx.Contract.deployRemoteCall
-import org.web3j.tx.FastRawTransactionManager
-import org.web3j.tx.TransactionManager
-import org.web3j.tx.gas.DefaultGasProvider
-import org.web3j.tx.response.PollingTransactionReceiptProcessor
 import java.math.BigInteger
 import java.util.concurrent.CompletableFuture
 
 @Testcontainers(disabledWithoutDocker = true)
-class EthereumEventProcessorIT {
+class EthereumEventProcessorIT : EifBaseIntegrationTest(
+        EvmType.GETH,
+        prependUrls = listOf("http://127.0.0.1:8888", "http://127.0.0.1:9999")
+) {
 
-    private val gethContainer = GethContainer()
-            .withExposedService(
-                    "geth", 8545,
-                    Wait.forLogMessage(".*HTTP server started.*\\s", 1)
-            )
-
-    private val gasProvider = DefaultGasProvider()
-
-    // This could be any private key but value must match in /geth-compose/geth/key.txt
-    // and the address created must be added to /geth-compose/geth/test.json
-    private val credentials = Credentials
-            .create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
     private val accountId = Bytes32("fc91c4abaff09f4c67a0ab84d4e9afd37c929978bea3fa1790403ab6ee85bf33"
             .hexStringToByteArray())
     private val validatorContract = Address("0x0000000000000000000000000000000000000001")
     private var url = "http://localhost:8545"
     private var web3jServices = mutableListOf<Web3j>()
-    private lateinit var transactionManager: TransactionManager
-
-    private val tokenBridgeBinary = getBinaryFromArtifactResource("/artifacts/contracts/TokenBridge.sol/TokenBridge.json")
-    private val testTokenBinary = getBinaryFromArtifactResource("/artifacts/contracts/token/TestToken.sol/TestToken.json")
 
     @BeforeEach
-    fun setup() {
-        gethContainer.start()
+    override fun setup() {
 
-        val gethHost = gethContainer.getServiceHost("geth", 8545)
-        val gethPort = gethContainer.getServicePort("geth", 8545)
+        super.setup()
+
+        val gethHost = evmContainer.getServiceHost("geth", 8545)
+        val gethPort = evmContainer.getServicePort("geth", 8545)
         url = "http://$gethHost:$gethPort"
-        web3jServices.add(Web3j.build(HttpService(url)))
-
-        transactionManager = FastRawTransactionManager(
-                web3jServices[0],
-                credentials,
-                PollingTransactionReceiptProcessor(
-                        web3jServices[0],
-                        1000,
-                        30
-                )
-        )
-    }
-
-    @AfterEach
-    fun tearDown() {
-        web3jServices.forEach { it.shutdown() }
-        gethContainer.stop()
+        web3jServices.add(web3j)
     }
 
     @Test
@@ -255,11 +219,5 @@ class EthereumEventProcessorIT {
                 }
 
         evmEventProcessor.shutdown()
-    }
-
-    private fun getBinaryFromArtifactResource(resourcePath: String): String {
-        val artifactFile = javaClass.getResource(resourcePath)?.readText()
-        val artifactJson = GsonBuilder().create().fromJson(artifactFile, JsonObject::class.java)
-        return artifactJson.get("bytecode").asString
     }
 }

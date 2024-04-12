@@ -1,14 +1,10 @@
 module;
 
-/* For testing */
-import ^.eif.evm;
-import ^.eif.ft4;
-//import ^.eif.originals;
-import ^.eif.common;
-import ^.eif.utils;
-import ^.lib.ft4.ft4_basic_dev.*;
+import ^.eif_event_receiver_connector;
+import ^.eif.main;
+import lib.ft4.ft4_basic_dev.*;
 
-/* For release */
+/* Originals */
 //import dip.dip_basic.*;
 //import ft3.ft3_basic.*;
 //import originals.originals_basic.*;

@@ -1,0 +1,7 @@
+module;
+
+import ^^.*;
+
+operation anchor_block_op(block_header_data: byte_array, signatures: list<byte_array>, signers: list<byte_array>) {
+    handle_anchor_block(block_header_data, signatures, signers);
+}

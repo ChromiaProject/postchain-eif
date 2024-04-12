@@ -1,0 +1,302 @@
+import .anchoring.*;
+import .signer_update.*;
+
+import .utils.messaging.*;
+import .utils.*;
+
+import lib.icmf.*;
+import lib.icmf.receiver.{ receive_icmf_message };
+
+function timeout_evm_transactions() {
+    val timeout_timestamp = get_last_blocktime() - chain_context.args.tx_timeout;
+    val row_ids = evm_submit_transaction @* { .status != transaction_status.SUCCESS and .status != transaction_status.FAILURE and .created < timeout_timestamp } ( .rowid );
+    for (row_id in row_ids) {
+        update evm_submit_transaction @ { row_id } (status = transaction_status.FAILURE);
+    }
+}
+
+@extend(receive_icmf_message)
+function handle_icmf_message(sender: byte_array, topic: text, body: gtv) {
+    if (topic == evm_submit_transaction_topic) {
+        create_evm_submit_transaction(evm_submit_transaction_message.from_gtv(body), sender);
+    }
+}
+
+operation __update_evm_transaction_status(row_id: integer, status: transaction_status, tx_hash: text?, signer: pubkey, signed_row_id: byte_array) {
+    update_evm_transaction_status(row_id, status, tx_hash, signer);
+}
+
+operation __update_evm_transaction_receipt(row_id: integer, block_hash: text, effective_gas_price: big_integer, gas_usage: big_integer) {
+    update evm_submit_transaction @ { rowid(row_id) } ( .block_hash = block_hash, .effective_gas_price = effective_gas_price, .gas_usage = gas_usage );
+}
+
+operation __begin_block(height: integer) {
+    timeout_evm_transactions();
+    fail_transactions_with_enough_retries(chain_context.args.node_retry_strategy);
+}
+
+function create_evm_submit_transaction(evm_submit_transaction_message: evm_submit_transaction_message, sender: byte_array) {
+    val mapped_bridge_contract = get_bridge_contract(sender, evm_submit_transaction_message.network_id);
+    val contract_address = evm_submit_transaction_message.contract_address;
+    if (mapped_bridge_contract == null or contract_address != mapped_bridge_contract) {
+        log("Contract %s does not match mapped contract %s for blockchain. Ignoring tx request."
+            .format(contract_address, mapped_bridge_contract));
+        return;
+    }
+
+    add_transaction_to_queue(
+        contract_address,
+        evm_submit_transaction_message.function_name,
+        evm_submit_transaction_message.parameter_types,
+        evm_submit_transaction_message.parameter_values,
+        evm_submit_transaction_message.network_id,
+        evm_submit_transaction_message.max_priority_fee_per_gas,
+        evm_submit_transaction_message.max_fee_per_gas,
+        sender
+    );
+}
+
+function add_transaction_to_queue(contract_address: text, function_name: text, parameter_types: list<text>, parameter_values: list<gtv>, network_id: integer, max_priority_fee_per_gas: big_integer, max_fee_per_gas: big_integer, sender: byte_array): evm_submit_transaction {
+    val evm_transaction_id = get_evm_transaction_id(
+        contract_address,
+        function_name,
+        parameter_types,
+        parameter_values,
+        network_id
+    );
+
+    var currency_symbol = get_currency_symbol(network_id);
+
+    return create evm_submit_transaction(
+        id = evm_transaction_id,
+        contract_address = contract_address,
+        function_name = function_name,
+        parameter_types = join_text_list(parameter_types),
+        parameter_values = parameter_values.to_gtv().to_bytes(),
+        network_id = network_id,
+        currency_symbol = currency_symbol,
+        max_priority_fee_per_gas = max_priority_fee_per_gas,
+        max_fee_per_gas = max_fee_per_gas,
+        sender = sender,
+        status = transaction_status.QUEUED,
+        created = op_context.last_block_time,
+        taken_timestamp = 0
+    );
+}
+
+function get_currency_symbol(network_id: integer) {
+    var currency_symbol = "";
+    val network_configs = list<network_config>.from_gtv_pretty(chain_context.args.network_configs);
+    for (network_config in network_configs) {
+        if (network_config.id == network_id) {
+            currency_symbol = network_config.currency_symbol;
+        }
+    }
+    return currency_symbol;
+}
+
+query fetch_oldest_queued_transactions_per_contract(exclude_taken_by_key: pubkey? = null) {
+    val result = list<evm_submit_transaction_data>();
+    val contract_addresses_with_eligible_queued_transaction =
+        evm_submit_transaction @* {
+            .status == transaction_status.QUEUED,
+            .rowid not in evm_submit_transaction_taken_by @* { .provider == exclude_taken_by_key ?: x"" } ( .transaction.rowid )
+    } ( @group .contract_address, @omit @min .created );
+
+    val last_blocktime = get_last_blocktime();
+    for (contract_address in contract_addresses_with_eligible_queued_transaction) {
+        val latest_taken_transaction_timestamp = evm_submit_transaction @? {
+            .status == transaction_status.TAKEN,
+            .contract_address == contract_address
+        } ( @max .taken_timestamp ) ?: chain_context.args.contract_tx_rate_limit.to_integer() * -1;
+        if (last_blocktime - latest_taken_transaction_timestamp >= chain_context.args.contract_tx_rate_limit) {
+            val evm_submit_transaction = evm_submit_transaction @ {
+                .status == transaction_status.QUEUED,
+                .contract_address == contract_address,
+                .rowid not in evm_submit_transaction_taken_by @* { .provider == exclude_taken_by_key ?: x"" } ( .transaction.rowid )
+            } (
+                evm_submit_transaction_data(
+                    row_id = .rowid.to_integer(),
+                    contract_address = .contract_address,
+                    function_name = .function_name,
+                    parameter_types = .parameter_types.split("."),
+                    parameter_values = list<gtv>.from_gtv(gtv.from_bytes(.parameter_values)),
+                    network_id = .network_id,
+                    max_priority_fee_per_gas = .max_priority_fee_per_gas,
+                    max_fee_per_gas = .max_fee_per_gas,
+                    sender = .sender,
+                    status = .status,
+                    created = .created,
+                    tx_hash = .tx_hash,
+                    processed_by = .processed_by))
+            limit 1;
+            result.add(evm_submit_transaction);
+        }
+    }
+
+    return result;
+}
+
+query get_transaction(row_id: integer): evm_submit_transaction_data {
+
+    return evm_submit_transaction @ { rowid(row_id) } (evm_submit_transaction_data(
+        row_id = .rowid.to_integer(),
+        contract_address = .contract_address,
+        function_name = .function_name,
+        parameter_types = .parameter_types.split("."),
+        parameter_values = list<gtv>.from_gtv(gtv.from_bytes(.parameter_values)),
+        network_id = .network_id,
+        max_priority_fee_per_gas = .max_priority_fee_per_gas,
+        max_fee_per_gas = .max_fee_per_gas,
+        sender = .sender,
+        status = .status,
+        created = .created,
+        tx_hash = .tx_hash,
+        processed_by = .processed_by));
+}
+
+query get_transactions(): list<evm_submit_transaction_data> {
+
+    return evm_submit_transaction @* {} (evm_submit_transaction_data(
+        row_id = .rowid.to_integer(),
+        contract_address = .contract_address,
+        function_name = .function_name,
+        parameter_types = .parameter_types.split("."),
+        parameter_values = list<gtv>.from_gtv(gtv.from_bytes(.parameter_values)),
+        network_id = .network_id,
+        max_priority_fee_per_gas = .max_priority_fee_per_gas,
+        max_fee_per_gas = .max_fee_per_gas,
+        sender = .sender,
+        status = .status,
+        created = .created,
+        tx_hash = .tx_hash,
+        processed_by = .processed_by));
+}
+
+query get_pending_transactions(): list<evm_submit_transaction_data> {
+
+    return evm_submit_transaction @* { .status == transaction_status.PENDING } (evm_submit_transaction_data(
+        row_id = .rowid.to_integer(),
+        contract_address = .contract_address,
+        function_name = .function_name,
+        parameter_types = .parameter_types.split("."),
+        parameter_values = list<gtv>.from_gtv(gtv.from_bytes(.parameter_values)),
+        network_id = .network_id,
+        max_priority_fee_per_gas = .max_priority_fee_per_gas,
+        max_fee_per_gas = .max_fee_per_gas,
+        sender = .sender,
+        status = .status,
+        created = .created,
+        tx_hash = .tx_hash,
+        processed_by = .processed_by));
+}
+
+query get_evm_transaction_status(row_id: integer): transaction_status? {
+    return evm_submit_transaction @? { rowid(row_id) }.status;
+}
+
+function fail_transactions_with_enough_retries(strategy: node_retry_strategy) {
+
+    val signers = extract_number_of_signers_from_current_configuration();
+
+    val transactions = (evm_submit_transaction, evm_submit_transaction_taken_by) @* {
+        evm_submit_transaction.status == transaction_status.QUEUED,
+        evm_submit_transaction_taken_by.transaction == evm_submit_transaction
+    } ( @group evm_submit_transaction.rowid, @sum providers = 1 );
+
+    for (transaction in transactions) {
+        if (strategy == node_retry_strategy.ALL and transaction.providers >= signers) {
+            update_evm_transaction_status(transaction.rowid.to_integer(), transaction_status.FAILURE);
+            log("Transaction %s failed - all available nodes failed to execute transaction".format(transaction.rowid));
+        } else if (strategy == node_retry_strategy.SUPERMAJORITY and is_supermajority(transaction.providers, signers)) {
+            update_evm_transaction_status(transaction.rowid.to_integer(), transaction_status.FAILURE);
+            log("Transaction %s failed - A supermajority of nodes failed to execute transaction".format(transaction.rowid));
+        }
+    }
+}
+
+function is_supermajority(value: integer, max: integer): boolean {
+    val required = max - (max - 1) / 3;
+    return value >= required;
+}
+
+function join_text_list(components: list<text>) {
+    if(components.empty()) {
+        return "";
+    }
+    var result = components[0];
+    if(components.size() > 1){
+        for (i in range(1, components.size())) {
+            result = result + "." + components[i];
+        }
+    }
+    return result;
+}
+
+function get_last_blocktime() {
+    return block @ {} (@max .timestamp) ?: 0;
+}
+
+function update_evm_transaction_status(row_id: integer, status: transaction_status, tx_hash: text? = null, signer: pubkey = x"") {
+
+    val transaction = evm_submit_transaction @ { rowid(row_id) };
+
+    if (status == transaction_status.TAKEN) {
+
+        require(transaction.processed_by == x"", "Transaction can't be taken while processed by other node");
+        require(evm_submit_transaction_taken_by @? { .transaction.rowid == rowid(row_id), signer } == null, "Each node can only process one transaction once");
+
+        transaction.taken_timestamp = get_last_blocktime();
+        transaction.processed_by = signer;
+        create evm_submit_transaction_taken_by(transaction, signer);
+
+    } else if (status == transaction_status.QUEUED) {
+
+        require(transaction.processed_by == signer, "Only the node currently processing the transaction can change the status back to QUEUE");
+
+        transaction.processed_by = x"";
+
+    } else if (status == transaction_status.PENDING) {
+
+        require(transaction.processed_by == signer, "Only the node currently processing the transaction can change the status to PENDING");
+        require(tx_hash, "Status PENDING requires providing transaction hash");
+
+        if (tx_hash != transaction.tx_hash) {
+            require(transaction.tx_hash == "", "Transaction hash can only be set once");
+            transaction.tx_hash = tx_hash;
+        }
+
+        transaction.processed_by = signer;
+
+    } else if (status == transaction_status.SUCCESS or status == transaction_status.FAILURE) {
+        delete evm_submit_transaction_taken_by @* { .transaction == transaction };
+        if (transaction.gas_usage > 0) {
+            send_message(evm_transaction_submitter_cost_topic,
+                evm_transaction_submitter_cost(
+                    id = transaction.id,
+                    processed_by = transaction.processed_by,
+                    cost = transaction.gas_usage * transaction.effective_gas_price,
+                    currency_symbol = transaction.currency_symbol).to_gtv());
+        }
+        on_transaction_completed(transaction, status);
+    }
+
+    transaction.status = status;
+}
+
+function get_default_signers() = [chain_context.args.genesis_node];
+
+function get_manual_admins() = set<byte_array>.from_gtv(chain_context.args.manual_admins);
+
+function get_system_max_priority_fee_per_gas() = chain_context.args.system_max_priority_fee_per_gas;
+
+function get_system_max_fee_per_gas() = chain_context.args.system_max_fee_per_gas;
+
+val evm_transaction_submitter_cost_topic = ICMF_TOPIC_GLOBAL_PREFIX + "evm_transaction_submitter_cost_topic";
+
+function extract_number_of_signers_from_current_configuration(): integer {
+    val config = map<text, gtv>.from_gtv(chain_context.raw_config);
+    return list<byte_array>.from_gtv(config["signers"]).size();
+}
+
+@extendable function on_transaction_completed(transaction: evm_submit_transaction, status: transaction_status) {}

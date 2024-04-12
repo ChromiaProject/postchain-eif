@@ -24,13 +24,15 @@
 
     <properties>
         <revision>dev</revision>
-        <postchain.version>3.15.4</postchain.version>
-        <rell.version>0.13.5</rell.version>
+        <postchain.version>3.15.11</postchain.version>
+        <rell.version>0.13.10</rell.version>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <kotlin.compiler.jvmTarget>17</kotlin.compiler.jvmTarget>
         <testcontainers.version>1.16.2</testcontainers.version>
         <junit.pioneer.version>2.2.0</junit.pioneer.version>
+        <rell.maven.plugin.version>0.11.9</rell.maven.plugin.version>
+        <web3j.version>4.11.1</web3j.version>
     </properties>
 
     <dependencyManagement>
@@ -46,7 +48,7 @@
             <dependency>
                 <groupId>org.web3j</groupId>
                 <artifactId>core</artifactId>
-                <version>4.10.3</version>
+                <version>${web3j.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.squareup.okhttp3</groupId>
@@ -92,7 +94,7 @@
                 <plugin>
                     <groupId>org.jetbrains.kotlin</groupId>
                     <artifactId>kotlin-maven-plugin</artifactId>
-                    <version>1.8.21</version>
+                    <version>1.9.23</version>
                 </plugin>
 
                 <plugin>
@@ -125,6 +127,11 @@
                             <suppressionFile>dependencies-suppression.xml</suppressionFile>
                         </suppressionFiles>
                     </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>net.postchain.rell</groupId>
+                    <artifactId>rell-maven-plugin</artifactId>
+                    <version>${rell.maven.plugin.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>
@@ -202,7 +209,23 @@
                 <enabled>false</enabled>
             </snapshots>
         </repository>
+        <!-- Needed for web3j -->
+        <repository>
+            <id>consensys</id>
+            <name>Consensys repository</name>
+            <url>https://artifacts.consensys.net/public/maven/maven/</url>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
     </repositories>
+
+    <pluginRepositories>
+        <pluginRepository>
+            <id>rellmaven</id>
+            <url>https://gitlab.com/api/v4/projects/37668820/packages/maven</url>
+        </pluginRepository>
+    </pluginRepositories>
 
     <distributionManagement>
         <repository>

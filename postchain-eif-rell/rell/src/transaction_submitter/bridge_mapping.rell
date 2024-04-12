@@ -1,0 +1,127 @@
+val bridge_mapping_topic = "L_bridge_mapping";
+
+struct bridge_mapping_message {
+    blockchain_rid: byte_array;
+    validator_contract: text;
+    bridge_contract: text;
+    evm_network_id: integer;
+    deleted: boolean;
+    signers: byte_array?;
+}
+
+struct system_chain_bridges {
+    blockchain_rid: byte_array;
+    bridge_contracts: list<system_chain_bridge_contract>;
+}
+
+struct system_chain_bridge_contract {
+    address: text;
+    validator_contract: text;
+    network_id: integer;
+}
+
+entity blockchain_bridge_contract {
+    key blockchain_rid: byte_array, network_id: integer;
+    mutable address: text;
+    mutable validator_contract: text;
+}
+
+@extend(receive_icmf_message)
+function handle_bridge_mapping_message(sender: byte_array, topic: text, body: gtv) {
+    if (topic == bridge_mapping_topic) {
+        val bridge_mapping_message = bridge_mapping_message.from_gtv(body);
+
+        val current_mapping = blockchain_bridge_contract @? {
+            .blockchain_rid == bridge_mapping_message.blockchain_rid and .network_id == bridge_mapping_message.evm_network_id
+        };
+        if (bridge_mapping_message.deleted) {
+            delete current_mapping;
+            return;
+        }
+
+        if (current_mapping == null) {
+            create blockchain_bridge_contract (
+                blockchain_rid = bridge_mapping_message.blockchain_rid,
+                network_id = bridge_mapping_message.evm_network_id,
+                address = bridge_mapping_message.bridge_contract,
+                validator_contract = bridge_mapping_message.validator_contract
+            );
+        } else {
+            current_mapping.address = bridge_mapping_message.bridge_contract;
+            current_mapping.validator_contract = bridge_mapping_message.validator_contract;
+        }
+    }
+}
+
+function get_bridge_contract(blockchain_rid: byte_array, network_id: integer): text? {
+    val system_chain_contract = get_system_chain_bridge_contract(blockchain_rid, network_id)?.address;
+
+    return system_chain_contract ?: blockchain_bridge_contract @? { blockchain_rid, network_id }.address;
+}
+
+function get_validator_contract(blockchain_rid: byte_array, network_id: integer): text? {
+    val system_chain_validator_contract = get_system_chain_validator_contract(blockchain_rid, network_id);
+    if (system_chain_validator_contract != null) return system_chain_validator_contract;
+
+    val system_chain_bridge_validator_contract = get_system_chain_bridge_contract(blockchain_rid, network_id)
+        ?.validator_contract;
+
+    return system_chain_bridge_validator_contract ?: blockchain_bridge_contract @? {
+        blockchain_rid,
+        network_id
+    }.validator_contract;
+}
+
+function get_validator_contracts(blockchain_rid: byte_array): list<(validator_contract: text, network_id: integer)> {
+    val system_chain_validator_contracts = get_system_chain_validator_contracts(blockchain_rid);
+    if (system_chain_validator_contracts != null) return system_chain_validator_contracts;
+
+    val system_chain_bridge_contracts = get_system_chain_bridge_contracts(blockchain_rid);
+
+    if (system_chain_bridge_contracts != null) {
+        val validator_contracts = list<(validator_contract: text, network_id: integer)>();
+        for (mapping in system_chain_bridge_contracts) {
+            validator_contracts.add((validator_contract = mapping.validator_contract, network_id = mapping.network_id));
+        }
+        return validator_contracts;
+    }
+
+    return blockchain_bridge_contract @* { blockchain_rid } ( .validator_contract, .network_id );
+}
+
+function get_system_chain_bridge_contracts(blockchain_rid: byte_array): list<system_chain_bridge_contract>? {
+    val chains = list<system_chain_bridges>.from_gtv_pretty(chain_context.args.system_chain_bridges);
+
+    for (chain in chains) {
+        if (chain.blockchain_rid == blockchain_rid) {
+            return chain.bridge_contracts;
+        }
+    }
+    return null;
+}
+
+function get_system_chain_bridge_contract(
+    blockchain_rid: byte_array,
+    network_id: integer
+): system_chain_bridge_contract? {
+    val bridge_contracts = get_system_chain_bridge_contracts(blockchain_rid);
+    if (bridge_contracts == null) return null;
+
+    for (bridge_contract in bridge_contracts) {
+        if (bridge_contract.network_id == network_id) return bridge_contract;
+    }
+
+    return null;
+}
+
+function has_bridge_mapping(blockchain_rid: byte_array): boolean {
+    val chains = list<system_chain_bridges>.from_gtv_pretty(chain_context.args.system_chain_bridges);
+
+    for (chain in chains) {
+        if (chain.blockchain_rid == blockchain_rid) {
+            return true;
+        }
+    }
+
+    return not (blockchain_bridge_contract @* { blockchain_rid }).empty();
+}
