@@ -7,7 +7,6 @@ import {
   DailyLimit__factory,
   TokenBridgeDelegator__factory,
   Validator__factory,
-  Migration__factory,
   TokenMinter__factory,
 } from "../src/types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
