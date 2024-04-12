@@ -62,10 +62,22 @@ contract TokenMinter is TwoWeekDelay, Ownable2Step {
     }
 
     function finishTransferMintRole() external virtual onlyOwner {
-        require(pendingNewMinter != address(0), "TokenMinter: No pending owner");
+        require(pendingNewMinter != address(0), "TokenMinter: No pending minter");
         finishDelayedAction(this.transferMintRole.selector);
         ChromiaToken(tokenContractAddress).changeMinter(pendingNewMinter);
         delete pendingNewMinter;
+    }
+
+    function transferOwnership(address newOwner) public override onlyOwner {
+        if (pendingOwner() != address(0)) resetDelayForFunction(this.transferOwnership.selector);
+        startDelayedAction(this.transferOwnership.selector);
+        super.transferOwnership(newOwner);
+    }
+
+    function acceptOwnership() public override {
+        require(pendingOwner() != address(0), "TokenMinter: No pending owner");
+        finishDelayedAction(this.transferOwnership.selector);
+        super.acceptOwnership();
     }
 
     // Function to mint tokens, can be called by derived contracts or specific addresses
