@@ -67,6 +67,18 @@ task("deploy:chromiabridge")
           address: validator.address,
           constructorArguments: [validators],
         });
+        await hre.run("verify:verify", {
+          address: token.address,
+          constructorArguments: [signerAddress, 0],
+        });
+        await hre.run("verify:verify", {
+          address: dailyLimit.address,
+          constructorArguments: [DAILY_LIMIT],
+        });
+        await hre.run("verify:verify", {
+          address: tokenMinter.address,
+          constructorArguments: [dailyLimit.address, token.address, bridge.address],
+        });
       } catch (e) {
         console.log(e);
       }
