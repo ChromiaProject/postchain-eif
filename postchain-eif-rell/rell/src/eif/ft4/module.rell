@@ -116,7 +116,15 @@ operation delete_token_mapping(network_id: integer, token_address: byte_array, a
     delete mapping;
 }
 
-query get_erc20_withdrawal(network_id: integer, token_address: byte_array, beneficiary: byte_array) {
+struct erc20_withdrawal_info {
+    serial: integer;
+    network_id: integer;
+    token_address: byte_array;
+    beneficiary: byte_array;
+    amount: big_integer;
+}
+
+query get_erc20_withdrawal(network_id: integer, token_address: byte_array, beneficiary: byte_array): list<erc20_withdrawal_info>? {
     val token = evm_erc20 @? { network_id, .address == token_address };
     if (empty(token)) {
         return null;
@@ -126,12 +134,14 @@ query get_erc20_withdrawal(network_id: integer, token_address: byte_array, benef
         network_id,
         token,
         beneficiary
-    } (
-        @sort_desc .serial,
-        .network_id,
-        token = .token.address,
-        .beneficiary,
-        .amount
+    } (@sort_desc @omit .serial,
+        erc20_withdrawal_info(
+            .serial,
+            .network_id,
+            token_address = .token.address,
+            .beneficiary,
+            .amount
+        )
     );
 }
 
