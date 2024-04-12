@@ -65,10 +65,6 @@ describe("ChromiaToken Bridge Test", () => {
     const bridgeDelegator = await bridgeDelegatorFactory.deploy(bridgeAddress);
     bridgeDelegatorAddress = bridgeDelegator.address;
 
-    const migrationFactory = new Migration__factory(admin);
-    const migration = await migrationFactory.deploy(validatorAddress, bridgeAddress);
-    migrationAddress = migration.address;
-
     const dailyLimitFactory = new DailyLimit__factory(admin);
     const dailyLimitContract = await dailyLimitFactory.deploy(DAILY_LIMIT);
     dailyLimitAddress = dailyLimitContract.address;
@@ -213,7 +209,6 @@ describe("ChromiaToken Bridge Test", () => {
       const dailyLimitOwner = new DailyLimit__factory(deployer).attach(dailyLimitAddress);
       const bridge = new ChromiaTokenBridge__factory(user).attach(bridgeAddress);
       const validatorAdmin = new Validator__factory(admin).attach(validatorAddress);
-      const migration = new Migration__factory(admin).attach(migrationAddress);
       const toDeposit = ethers.utils.parseEther("100");
       const tokenApproveInstance = new Chromia__factory(user).attach(tokenAddress);
       await tokenApproveInstance.approve(bridgeAddress, toDeposit);

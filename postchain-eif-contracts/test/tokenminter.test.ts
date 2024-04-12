@@ -55,10 +55,6 @@ describe("TokenMinter test", () => {
     const bridgeDelegator = await bridgeDelegatorFactory.deploy(bridgeAddress);
     bridgeDelegatorAddress = bridgeDelegator.address;
 
-    const migrationFactory = new Migration__factory(admin);
-    const migration = await migrationFactory.deploy(validatorAddress, bridgeAddress);
-    migrationAddress = migration.address;
-
     const dailyLimitFactory = new DailyLimit__factory(admin);
     const dailyLimitContract = await dailyLimitFactory.deploy(DAILY_LIMIT);
     dailyLimitAddress = dailyLimitContract.address;
