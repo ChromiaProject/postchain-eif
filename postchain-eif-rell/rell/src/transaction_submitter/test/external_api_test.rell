@@ -94,7 +94,7 @@ function test_get_blockchains_with_bridge_and_anomaly_detection() {
         )
     ).run();
 
-    assert_equals(get_blockchains_with_bridge_and_anomaly_detection(), [    bridge_anomaly_detector_data(
+    assert_equals(get_blockchains_with_bridge_and_anomaly_detection(), [bridge_anomaly_detector_data(
         blockchain_rid = test_brid,
         evm_network_id = test_network,
         bridge_contract = bridge_contract
