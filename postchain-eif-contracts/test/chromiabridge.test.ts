@@ -180,7 +180,14 @@ describe("ChromiaToken Bridge Test", () => {
       const adminBridge = new ChromiaTokenBridge__factory(deployer).attach(bridgeAddress);
       // admin or owner cannot call emergencyWithdraw before setting time
       await expect(adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address)).to.be.revertedWith(
-        "TokenBridge: cannot do emergency withdrawal before setting timestamp",
+        "TokenBridge: mass exit was not triggered yet",
+      );
+
+      await adminBridge.triggerMassExit(1, new Uint8Array(32));
+
+      // admin or owner cannot call emergencyWithdraw before emergency timestamp has passed
+      await expect(adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address)).to.be.revertedWith(
+        "TokenBridge: cannot do emergency withdrawal until 90 days after mass exit",
       );
 
       // admin can call emergencyWithdraw after setting time
@@ -222,10 +229,9 @@ describe("ChromiaToken Bridge Test", () => {
       const tokenApproveInstance = new Chromia__factory(user).attach(tokenAddress);
       await tokenApproveInstance.approve(bridgeAddress, toDeposit);
 
-      await expect(bridge.pause()).to.be.revertedWith("OwnableUnauthorizedAccount");
-
+      await expect(bridgeOwner.pause()).to.be.revertedWith("TokenBridge: sender is not a validator.");
       await expect(bridge.deposit(bridgeAddress, toDeposit)).to.be.revertedWith("TokenBridge: not allow token");
-      await expect(bridgeOwner.pause()).to.emit(bridgeOwner, "Paused").withArgs(deployer.address);
+      await expect(bridge.pause()).to.emit(bridge, "Paused").withArgs(user.address);
       await expect(bridge.deposit(tokenAddress, toDeposit)).to.be.revertedWith("EnforcedPause()");
       await bridgeOwner.unpause();
       let tx: ContractTransaction = await bridge.deposit(tokenAddress, toDeposit);
@@ -525,7 +531,7 @@ describe("ChromiaToken Bridge Test", () => {
             validators,
             maliciousEl2Proof,
           ),
-        ).to.be.revertedWith("Postchain: invalid EIF extra merkle proof");
+        ).to.be.revertedWith("Postchain: invalid extra merkle proof");
         await expect(
           bridge.withdrawRequest(
             data,
@@ -580,7 +586,7 @@ describe("ChromiaToken Bridge Test", () => {
           ),
         ).to.be.revertedWith("Validator: signer is not validator");
 
-        await expect(bridgeOwner.pause()).to.emit(bridgeOwner, "Paused").withArgs(deployer.address);
+        await expect(bridge.pause()).to.emit(bridge, "Paused").withArgs(user.address);
         await expect(
           bridge.withdrawRequest(
             data,
@@ -612,14 +618,9 @@ describe("ChromiaToken Bridge Test", () => {
           "SetBlockchainRid",
         );
 
-        await validatorAdmin.updateValidators([validator1.address, validator2.address]);
-        await validatorAdmin.transferOwnership(migrationAddress);
-        await migration.acceptValidatorOwnership();
         let blockNum = await ethers.provider.getBlockNumber();
         await expect(
-          migration.withdrawRequest(
-            validators,
-            [validator1.address, validator2.address],
+          bridge.withdrawRequest(
             data,
             eventProof,
             DecodeHexStringToByteArray(blockHeader),
@@ -628,14 +629,8 @@ describe("ChromiaToken Bridge Test", () => {
             extraProof,
           ),
         )
-          .to.be.emit(bridge, "WithdrawRequest")
-          .withArgs(user.address, tokenAddress, toDeposit, blockNum + 1);
-
-        await migration.transferValidatorOwnership(admin.address);
-        validatorAdmin.acceptOwnership();
-        expect(await validatorAdmin.getValidatorCount()).to.eq(2);
-        await validatorAdmin.updateValidators(validators);
-        expect(await validatorAdmin.getValidatorCount()).to.eq(3);
+          .to.emit(bridge, "WithdrawRequest")
+          .withArgs(user.address, tokenAddress, toDeposit, height, blockRid);
 
         await expect(
           bridge.withdrawRequest(
@@ -688,7 +683,7 @@ describe("ChromiaToken Bridge Test", () => {
           ),
         ).to.be.revertedWith("TokenBridge: no fund for the beneficiary");
 
-        await expect(bridgeOwner.pause()).to.emit(bridgeOwner, "Paused").withArgs(deployer.address);
+        await expect(bridge.pause()).to.emit(bridge, "Paused").withArgs(user.address);
         await expect(
           bridge.withdraw(DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)), user.address),
         ).to.be.revertedWith("EnforcedPause()");
@@ -944,7 +939,7 @@ describe("ChromiaToken Bridge Test", () => {
             validators,
             maliciousEl2Proof,
           ),
-        ).to.be.revertedWith("Postchain: invalid EIF extra merkle proof");
+        ).to.be.revertedWith("Postchain: invalid extra merkle proof");
         await expect(
           bridgeDelegator.withdrawRequest(
             data,
@@ -1017,7 +1012,7 @@ describe("ChromiaToken Bridge Test", () => {
           ),
         )
           .to.emit(bridge, "WithdrawRequest")
-          .withArgs(bridgeDelegatorAddress, tokenAddress, toDeposit, blockNum + 1);
+          .withArgs(bridgeDelegatorAddress, tokenAddress, toDeposit, height, blockRid);
 
         await expect(
           bridgeDelegator.withdrawRequest(
@@ -1112,14 +1107,6 @@ describe("ChromiaToken Bridge Test", () => {
       expect(await adminTokenBridge.isMassExit()).to.be.true;
       expect((await adminTokenBridge.massExitBlock()).blockRid).to.be.equal(blockRid);
       expect((await adminTokenBridge.massExitBlock()).height).to.be.equal(100);
-
-      // update mass exit block
-      await expect(adminTokenBridge.updateMassExitBlock(200, blockRid)).to.emit(
-        adminTokenBridge,
-        "UpdatedMassExitBlock",
-      );
-      expect((await adminTokenBridge.massExitBlock()).blockRid).to.be.equal(blockRid);
-      expect((await adminTokenBridge.massExitBlock()).height).to.be.equal(200);
 
       // postpone mass exit
       await expect(otherTokenBridge.postponeMassExit()).to.be.revertedWith("OwnableUnauthorizedAccount");
