@@ -82,7 +82,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     event UnpendingWithdraw(bytes32 indexed hash);
     event FundedERC20(address indexed sender, IERC20 indexed token, uint amount);
     event DepositedERC20(address indexed sender, IERC20 indexed token, uint networkId, uint amount, string name, string symbol, uint8 decimals);
-    event WithdrawRequest(address indexed beneficiary, IERC20 indexed token, uint256 value, uint256 blockNumber);
+    event WithdrawRequest(address indexed beneficiary, IERC20 indexed token, uint256 value, uint height, bytes32 blockRid);
     event Withdrawal(address indexed beneficiary, IERC20 indexed token, uint256 value);
     event WithdrawalBySnapshot(address indexed beneficiary);
 
@@ -93,6 +93,11 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
 
     modifier whenMassExit() {
         require(isMassExit, "TokenBridge: mass exit was not triggered yet");
+        _;
+    }
+
+    modifier onlyValidator() {
+        require(validator.isValidator(msg.sender),  "TokenBridge: sender is not a validator.");
         _;
     }
 
@@ -122,7 +127,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         emit SetBlockchainRid(rid);
     }
 
-    function pause() onlyOwner public {
+    function pause() onlyValidator public {
         _pause();
     }
 
@@ -198,8 +203,8 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         address[] memory signers,
         Data.ExtraProofData memory extraProof
     ) external whenNotPaused nonReentrant {
-        _withdrawRequest(eventProof, blockHeader, sigs, signers, extraProof);
-        _events[eventProof.leaf] = _updateWithdraw(eventProof.leaf, _event); // mark the event hash was already used.
+        (uint height, bytes32 blockRid) = _withdrawRequest(eventProof, blockHeader, sigs, signers, extraProof);
+        _events[eventProof.leaf] = _updateWithdraw(eventProof.leaf, _event, height, blockRid); // mark the event hash was already used.
     }
 
     function _withdrawRequest(
@@ -208,23 +213,23 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         bytes[] memory sigs,
         address[] memory signers,
         Data.ExtraProofData memory extraProof
-    ) internal view {
+    ) internal view returns (uint, bytes32) {
         require(blockchainRid != bytes32(0), "TokenBridge: blockchain rid is not set");
         require(_events[eventProof.leaf] == false, "TokenBridge: event hash was already used");
-        {
-            require(Hash.hashGtvBytes64Leaf(extraProof.leaf) == extraProof.hashedLeaf, "Postchain: invalid EIF extra data");
-            (uint height, bytes32 blockRid) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
-            bytes32 eventRoot = _bytesToBytes32(extraProof.leaf, 0);
-            if (isMassExit) {
-                require(height <= massExitBlock.height, "TokenBridge: cannot withdraw request after the mass exit block height");
-            }
-            if (!validator.isValidSignatures(blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
-            if (!MerkleProof.verify(eventProof.merkleProofs, eventProof.leaf, eventProof.position, eventRoot)) revert("TokenBridge: invalid merkle proof");
+
+        require(Hash.hashGtvBytes64Leaf(extraProof.leaf) == extraProof.hashedLeaf, "Postchain: invalid EIF extra data");
+        (uint height, bytes32 blockRid) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
+        bytes32 eventRoot = _bytesToBytes32(extraProof.leaf, 0);
+        if (isMassExit) {
+            require(height <= massExitBlock.height, "TokenBridge: cannot withdraw request after the mass exit block height");
         }
-        return;
+        if (!validator.isValidSignatures(blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
+        if (!MerkleProof.verify(eventProof.merkleProofs, eventProof.leaf, eventProof.position, eventRoot)) revert("TokenBridge: invalid merkle proof");
+
+        return (height, blockRid);
     }
 
-    function _updateWithdraw(bytes32 hash, bytes memory _event) internal returns (bool) {
+    function _updateWithdraw(bytes32 hash, bytes memory _event, uint height, bytes32 blockRid) internal returns (bool) {
         Withdraw storage wd = _withdraw[hash];
         {
             (IERC20 token, address beneficiary, uint256 amount, uint256 netId) = hash.verifyEvent(_event);
@@ -237,7 +242,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
             wd.block_number = block.number + withdrawOffset;
             wd.status = Status.Withdrawable;
             _withdraw[hash] = wd;
-            emit WithdrawRequest(beneficiary, token, amount, block.number);
+            emit WithdrawRequest(beneficiary, token, amount, height, blockRid);
         }
         return true;
     }

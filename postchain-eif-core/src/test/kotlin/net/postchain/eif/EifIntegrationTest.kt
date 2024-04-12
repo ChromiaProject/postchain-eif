@@ -23,6 +23,7 @@ import net.postchain.devtools.PostchainTestNode.Companion.DEFAULT_CHAIN_IID
 import net.postchain.eif.contracts.TestToken
 import net.postchain.eif.contracts.TokenBridge
 import net.postchain.eif.contracts.Validator
+import net.postchain.eif.transaction.TransactionSubmitter
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvEncoder
@@ -36,9 +37,7 @@ import org.awaitility.Awaitility
 import org.awaitility.Duration
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertArrayEquals
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.MethodOrderer
@@ -59,6 +58,11 @@ import org.web3j.crypto.Sign
 import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.exceptions.TransactionException
 import org.web3j.tx.Contract
+import org.web3j.tx.FastRawTransactionManager
+import org.web3j.tx.Transfer
+import org.web3j.tx.response.PollingTransactionReceiptProcessor
+import org.web3j.utils.Convert
+import java.math.BigDecimal
 import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
@@ -647,6 +651,57 @@ abstract class EifIntegrationTest(evmType: EvmType) : EifBaseIntegrationTest(
                         "accountNumber" to accountNumber
                 )).get()
         assertNotNull(latestState)
+    }
+
+    @Order(11)
+    @Test
+    fun `pause token bridge contract`() {
+        Transfer(web3j, transactionManager).sendFunds(
+                node0EvmAddress.value,
+                BigDecimal.valueOf(400), Convert.Unit.ETHER).send()
+
+        val nodeTransactionManager = FastRawTransactionManager(
+                web3j,
+                Credentials.create(node.appConfig.privKey),
+                PollingTransactionReceiptProcessor(
+                        web3j,
+                        1000,
+                        30
+                )
+        )
+
+        val pauseFunctionData = TransactionSubmitter.encodeFunction("pause", listOf(), listOf())
+        val gasLimitPauseFunction = gasProvider.getGasLimit(pauseFunctionData)
+        val gasPricePauseFunction = gasProvider.getGasPrice(pauseFunctionData)
+
+        nodeTransactionManager.sendTransaction(
+                gasPricePauseFunction,
+                gasLimitPauseFunction,
+                bridge.contractAddress,
+                pauseFunctionData,
+                BigInteger.ZERO
+        )
+
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            sealBlock()
+            assertTrue(bridge.paused().send().value)
+        }
+
+        val unpauseFunctionData = TransactionSubmitter.encodeFunction("unpause", listOf(), listOf())
+        val gasLimitUnpauseFunction = gasProvider.getGasLimit(unpauseFunctionData)
+        val gasPriceUnpauseFunction = gasProvider.getGasPrice(unpauseFunctionData)
+
+        transactionManager.sendTransaction(
+                gasPriceUnpauseFunction,
+                gasLimitUnpauseFunction,
+                bridge.contractAddress,
+                unpauseFunctionData,
+                BigInteger.ZERO
+        )
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            sealBlock()
+            assertFalse(bridge.paused().send().value)
+        }
     }
 
     fun sealBlock() {
