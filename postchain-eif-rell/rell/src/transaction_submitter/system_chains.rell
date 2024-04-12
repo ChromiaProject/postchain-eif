@@ -1,0 +1,120 @@
+struct directory_chain_config {
+    blockchain_rid: byte_array;
+    validator_contracts: list<directory_chain_validator_contract>;
+}
+
+struct directory_chain_validator_contract {
+    address: text;
+    network_id: integer;
+}
+
+struct system_anchoring_chain_config {
+    blockchain_rid: byte_array;
+    anchoring_contracts: list<system_anchoring_chain_contracts>;
+}
+
+struct system_anchoring_chain_contracts {
+    address: text;
+    validator_contract: text;
+    network_id: integer;
+}
+
+function is_directory_chain(blockchain_rid: byte_array) =
+    blockchain_rid == directory_chain_config.from_gtv_pretty(chain_context.args.directory_chain_config).blockchain_rid;
+
+function is_system_anchoring_chain(blockchain_rid: byte_array): boolean {
+    val system_anchoring_config_args = chain_context.args.system_anchoring_chain_config;
+    return system_anchoring_config_args != null and system_anchoring_chain_config
+        .from_gtv_pretty(system_anchoring_config_args)
+        .blockchain_rid == blockchain_rid;
+}
+
+function get_system_chain_validator_contract(blockchain_rid: byte_array, network_id: integer): text? {
+    val directory_chain_config = directory_chain_config.from_gtv_pretty(chain_context.args.directory_chain_config);
+
+    if (blockchain_rid == directory_chain_config.blockchain_rid) {
+        for (validator_contract in directory_chain_config.validator_contracts) {
+            if (validator_contract.network_id == network_id) return validator_contract.address;
+        }
+    }
+
+    val system_anchoring_config_args = chain_context.args.system_anchoring_chain_config;
+    if (system_anchoring_config_args != null) {
+        val system_anchoring_chain_config = system_anchoring_chain_config.from_gtv_pretty(system_anchoring_config_args);
+
+        if (blockchain_rid == system_anchoring_chain_config.blockchain_rid) {
+            for (contract in system_anchoring_chain_config.anchoring_contracts) {
+                if (contract.network_id == network_id) return text_without_0x(contract.validator_contract);
+            }
+        }
+    }
+
+    return null;
+}
+
+function get_system_chain_validator_contracts(
+    blockchain_rid: byte_array
+): list<(validator_contract: text, network_id: integer)>? {
+    val directory_chain_config = directory_chain_config.from_gtv_pretty(chain_context.args.directory_chain_config);
+
+    if (blockchain_rid == directory_chain_config.blockchain_rid) {
+        val validator_contracts = list<(validator_contract: text, network_id: integer)>();
+        for (validator_contract in directory_chain_config.validator_contracts) {
+            validator_contracts.add((
+                validator_contract = validator_contract.address,
+                network_id = validator_contract.network_id
+            ));
+        }
+        return validator_contracts;
+    }
+
+    val system_anchoring_config_args = chain_context.args.system_anchoring_chain_config;
+    if (system_anchoring_config_args != null) {
+        val system_anchoring_chain_config = system_anchoring_chain_config.from_gtv_pretty(system_anchoring_config_args);
+
+        val validator_contracts = list<(validator_contract: text, network_id: integer)>();
+        if (blockchain_rid == system_anchoring_chain_config.blockchain_rid) {
+            for (contract in system_anchoring_chain_config.anchoring_contracts) {
+                validator_contracts.add((
+                    validator_contract = text_without_0x(contract.validator_contract),
+                    network_id = contract.network_id
+                ));
+            }
+        }
+        return validator_contracts;
+    }
+
+    return null;
+}
+
+function get_anchoring_contracts(): list<(address: text, network_id: integer)> {
+    val anchoring_contracts = list<(address: text, network_id: integer)>();
+
+    val system_anchoring_config_args = chain_context.args.system_anchoring_chain_config;
+    if (system_anchoring_config_args != null) {
+        val system_anchoring_chain_config = system_anchoring_chain_config.from_gtv_pretty(system_anchoring_config_args);
+
+        for (contract in system_anchoring_chain_config.anchoring_contracts) {
+            anchoring_contracts.add((address = text_without_0x(contract.address), network_id = contract.network_id));
+        }
+    }
+
+    return anchoring_contracts;
+}
+
+query get_directory_chain_blockchain_rid() =
+    directory_chain_config.from_gtv_pretty(chain_context.args.directory_chain_config).blockchain_rid;
+
+query get_system_anchoring_blockchain_rid(): byte_array? {
+    val system_anchoring_config_args = chain_context.args.system_anchoring_chain_config;
+    return if (system_anchoring_config_args != null)
+        system_anchoring_chain_config.from_gtv_pretty(system_anchoring_config_args).blockchain_rid
+    else null;
+}
+
+function text_without_0x(value: text) {
+    if (value.starts_with("0x")) {
+        return value.sub(2);
+    }
+    return value;
+}

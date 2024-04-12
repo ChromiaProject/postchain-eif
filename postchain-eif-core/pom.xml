@@ -52,6 +52,11 @@
             <type>tar.gz</type>
         </dependency>
         <dependency>
+            <groupId>net.postchain</groupId>
+            <artifactId>postchain-eif-rell</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk18on</artifactId>
         </dependency>
@@ -86,6 +91,12 @@
         <dependency>
             <groupId>com.github.ajalt.clikt</groupId>
             <artifactId>clikt-jvm</artifactId>
+        </dependency>
+
+        <!-- Jooq -->
+        <dependency>
+            <groupId>org.jooq</groupId>
+            <artifactId>jooq</artifactId>
         </dependency>
 
         <!-- Test -->
@@ -220,9 +231,9 @@
             </plugin>
 
             <plugin>
-                <groupId>com.github.longdt</groupId>
+                <groupId>org.web3j</groupId>
                 <artifactId>web3j-maven-plugin</artifactId>
-                <version>4.8.10</version>
+                <version>4.11.1</version>
                 <configuration>
                     <packageName>net.postchain.eif.contracts</packageName>
                     <nativeJavaType>false</nativeJavaType>
@@ -231,6 +242,9 @@
                             <include>TokenBridge</include>
                             <include>TestToken</include>
                             <include>Validator</include>
+                            <include>Anchoring</include>
+                            <include>DirectoryChainValidator</include>
+                            <include>ManagedValidator</include>
                         </includes>
                     </contract>
                     <pathPrefixes>
@@ -242,6 +256,9 @@
                             <include>**/TokenBridge.json</include>
                             <include>**/TestToken.json</include>
                             <include>**/Validator.json</include>
+                            <include>**/Anchoring.json</include>
+                            <include>**/DirectoryChainValidator.json</include>
+                            <include>**/ManagedValidator.json</include>
                         </includes>
                     </abiSourceFiles>
                     <outputDirectory>
@@ -259,6 +276,29 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <!--
+            <plugin>
+                <groupId>net.postchain.rell</groupId>
+                <artifactId>rell-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>eif-dapp-build</id>
+                        <phase>generate-test-resources</phase>
+                        <goals>
+                            <goal>rell-compile</goal>
+                        </goals>
+                        <configuration>
+                            <rootFolder>${project.basedir}/..</rootFolder>
+                            <source>postchain-eif-rell/rell/src/</source>
+                            <configFile>postchain-eif-core/src/test/resources/net/postchain/eif/chromia.yml</configFile>
+                            <target>postchain-eif-core/target/test-classes/net/postchain/eif/</target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            -->
+
         </plugins>
     </build>
 

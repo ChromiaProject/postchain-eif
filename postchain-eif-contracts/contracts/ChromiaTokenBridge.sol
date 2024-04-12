@@ -72,11 +72,9 @@ contract ChromiaTokenBridge is TokenBridge {
     ) public override whenMassExit whenNotPaused nonReentrant {
         require(_snapshots[stateProof.leaf] == false, "TokenBridge: snapshot already used");
         require(stateProof.leaf == keccak256(snapshot), "TokenBridge: snapshot data is not correct");
-        (uint height, bytes32 blockRid, , bytes32 stateRoot) = Postchain.verifyBlockHeader(
-            blockchainRid,
-            blockHeader,
-            extraProof
-        );
+        require(Hash.hashGtvBytes64Leaf(extraProof.leaf) == extraProof.hashedLeaf, "Postchain: invalid EIF extra data");
+        (uint height, bytes32 blockRid) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
+        bytes32 stateRoot = _bytesToBytes32(extraProof.leaf, 32);
         require(
             blockRid == massExitBlock.blockRid && height == massExitBlock.height,
             "TokenBridge: snapshot block should be the same with mass exit block"

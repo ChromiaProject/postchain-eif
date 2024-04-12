@@ -2,7 +2,8 @@
 
 package net.postchain.eif
 
-import net.postchain.base.*
+import net.postchain.base.BaseBlockBuilderExtension
+import net.postchain.base.TxEventSink
 import net.postchain.base.data.BaseBlockBuilder
 import net.postchain.base.snapshot.DigestSystem
 import net.postchain.base.snapshot.EventPageStore
@@ -10,11 +11,12 @@ import net.postchain.base.snapshot.LeafStore
 import net.postchain.base.snapshot.SnapshotPageStore
 import net.postchain.common.data.Hash
 import net.postchain.common.exception.ProgrammerMistake
-import net.postchain.core.*
+import net.postchain.core.BlockEContext
+import net.postchain.core.TxEContext
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvByteArray
-import java.util.*
+import java.util.TreeMap
 
 const val EIF_EVENT = "eif_event"
 const val EIF_STATE = "eif_state"
@@ -22,7 +24,8 @@ const val EIF_STATE = "eif_state"
 class EifBlockBuilderExtension(
         private val ds: DigestSystem,
         private val levelsPerPage: Int,
-        private val snapshotsToKeep: Int): BaseBlockBuilderExtension, TxEventSink {
+        private val snapshotsToKeep: Int
+) : BaseBlockBuilderExtension, TxEventSink {
 
     private lateinit var bctx: BlockEContext
     lateinit var store: LeafStore
@@ -77,10 +80,10 @@ class EifBlockBuilderExtension(
      * hash using keccak256. (state_n, hash) pairs are submitted to updateSnapshot
      * during finalization
      */
-    private fun emitEifState(state_n: Long, state: GtvArray) {
+    private fun emitEifState(stateN: Long, state: GtvArray) {
         val data = SimpleGtvEncoder.encodeGtv(state)
         val hash = ds.digest(data)
-        states[state_n] = hash
-        store.writeState(bctx, PREFIX, state_n, data)
+        states[stateN] = hash
+        store.writeState(bctx, PREFIX, stateN, data)
     }
 }

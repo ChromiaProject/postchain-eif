@@ -1,0 +1,16 @@
+struct evm_transaction_unique_identifier_data {
+    contract_address: text;
+    function_name: text;
+    parameter_types: list<text>;
+    parameter_values: list<gtv>;
+    network_id: integer;
+}
+
+function get_evm_transaction_id(contract_address: text, function_name: text, parameter_types: list<text>, parameter_values: list<gtv>, network_id: integer) =
+    evm_transaction_unique_identifier_data(
+        contract_address = contract_address,
+        function_name = function_name,
+        parameter_types = parameter_types,
+        parameter_values = parameter_values,
+        network_id = network_id
+    ).to_gtv_pretty().hash();

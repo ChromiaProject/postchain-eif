@@ -1,0 +1,13 @@
+module;
+
+import icmf: lib.icmf.receiver.{ receive_icmf_message };
+import ^.eif_event_receiver_chain.messaging.*;
+import ^.eif.messaging.*;
+
+@extend(icmf.receive_icmf_message)
+function (sender: byte_array, topic: text, body: gtv) {
+    when (topic) {
+        evm_block_events_topic -> handle_evm_block(evm_block_message.from_gtv(body));
+        else -> log("Unexpected ICMF topic %s".format(topic));
+    }
+}
