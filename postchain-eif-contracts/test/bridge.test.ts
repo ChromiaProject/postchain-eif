@@ -178,9 +178,9 @@ describe("Token Bridge Test", () => {
             const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
 
-            await expect(bridge.pause()).to.be.revertedWith('OwnableUnauthorizedAccount')
+            await expect(bridgeOwner.pause()).to.be.revertedWith('TokenBridge: sender is not a validator.')
             await expect(bridge.deposit(bridgeAddress, toDeposit)).to.be.revertedWith('TokenBridge: not allow token')
-            await expect(bridgeOwner.pause()).to.emit(bridgeOwner, "Paused").withArgs(deployer.address)
+            await expect(bridge.pause()).to.emit(bridge, "Paused").withArgs(user.address)
             await expect(bridge.deposit(tokenAddress, toDeposit)).to.be.revertedWith('EnforcedPause()')
             await bridgeOwner.unpause()
             let tx: ContractTransaction = await bridge.deposit(tokenAddress, toDeposit)
@@ -434,7 +434,7 @@ describe("Token Bridge Test", () => {
                     extraProof)
                 ).to.be.revertedWith('Validator: signer is not validator')
 
-                await expect(bridgeOwner.pause()).to.emit(bridgeOwner, "Paused").withArgs(deployer.address)
+                await expect(bridge.pause()).to.emit(bridge, "Paused").withArgs(user.address)
                 await expect(bridge.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     extraProof)
@@ -455,7 +455,7 @@ describe("Token Bridge Test", () => {
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     extraProof)
                 ).to.emit(bridge, "WithdrawRequest")
-                    .withArgs(user.address, tokenAddress, toDeposit, blockNum+1)
+                    .withArgs(user.address, tokenAddress, toDeposit, height, blockRid)
 
                 await expect(bridge.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
@@ -494,7 +494,7 @@ describe("Token Bridge Test", () => {
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
                     deployer.address)).to.be.revertedWith('TokenBridge: no fund for the beneficiary')
 
-                await expect(bridgeOwner.pause()).to.emit(bridgeOwner, "Paused").withArgs(deployer.address)
+                await expect(bridge.pause()).to.emit(bridge, "Paused").withArgs(user.address)
                 await expect(bridge.withdraw(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
                     user.address)).to.be.revertedWith('EnforcedPause()')
@@ -733,7 +733,7 @@ describe("Token Bridge Test", () => {
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
                     extraProof)
                 ).to.emit(bridge, "WithdrawRequest")
-                .withArgs(bridgeDelegatorAddress, tokenAddress, toDeposit, blockNum+1)
+                .withArgs(bridgeDelegatorAddress, tokenAddress, toDeposit, height, blockRid)
 
                 await expect(bridgeDelegator.withdrawRequest(data, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators,
