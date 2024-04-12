@@ -94,6 +94,28 @@ describe("TokenMinter test", () => {
       await time.increase(86400 * 14 + 1);
       await expect(tokenMinter.finishTransferMintRole()).to.be.revertedWith("caller is not a minter");
     });
+    it("Admin can change owner", async () => {
+      const [deployer, user] = await ethers.getSigners();
+      const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
+      const tokenMinter = new TokenMinter__factory(deployer).attach(tokenMinterAddress);
+      const tokenMinterUser = new TokenMinter__factory(user).attach(tokenMinterAddress);
+
+      await expect(tokenMinterUser.transferOwnership(deployer.address)).to.be.revertedWith(
+        "OwnableUnauthorizedAccount",
+      );
+
+      await expect(tokenMinter.transferOwnership(user.address)).to.emit(tokenMinter, "DelayedActionRequested");
+      await time.increase(86400 * 13);
+      await expect(tokenMinterUser.acceptOwnership()).to.be.revertedWith("Two weeks delay has not passed.");
+      await time.increase(86400 * 1 + 1);
+      await expect(tokenMinter.acceptOwnership()).to.be.revertedWith("OwnableUnauthorizedAccount");
+      await expect(tokenMinterUser.acceptOwnership()).to.emit(tokenMinter, "OwnershipTransferred");
+
+      await expect(tokenMinter.transferOwnership(deployer.address)).to.be.revertedWith("OwnableUnauthorizedAccount");
+      await expect(tokenMinterUser.transferOwnership(deployer.address)).to.emit(tokenMinter, "DelayedActionRequested");
+      await time.increase(86400 * 14 + 1);
+      await expect(tokenMinter.acceptOwnership()).to.emit(tokenMinter, "OwnershipTransferred");
+    });
 
     it("Admin can set daily limit", async () => {
       const [deployer, user] = await ethers.getSigners();
