@@ -1,0 +1,71 @@
+@mount('eif.data')
+module;
+
+import ^.utils;
+import lib.ft4.accounts;
+
+entity evm_account_link {
+    network_id: integer;
+    state_n: integer;
+    evm_beneficiary: byte_array;
+    key network_id, state_n, evm_beneficiary;
+}
+
+
+
+object withdraw_stats {
+    mutable withdraw_count: integer = 0;
+}
+
+struct state_data {
+    state_n: integer;
+    account: list<gtv>;
+}
+
+struct state_address_dto {
+    state_n: integer;
+    evm_address: byte_array;
+}
+
+query get_network_accounts(network_id: integer): list<state_address_dto> {
+    var accounts = evm_account_link @* { .network_id == network_id };
+    val accounts_dto = list<state_address_dto>();
+    for (account in accounts) {
+        accounts_dto.add(state_address_dto(state_n=account.state_n, evm_address=account.evm_beneficiary));
+    }
+    return accounts_dto;
+}
+
+function get_or_create_evm_account_link(network_id: integer, beneficiary: byte_array): evm_account_link {
+    val account = evm_account_link @? { network_id, beneficiary };
+    if (empty(account)) {
+        val last_state_n = evm_account_link @? { } ( @sort_desc .state_n ) limit 1;
+        val next_state_n = if (empty(last_state_n)) 1 else (last_state_n + 1);
+
+        return create evm_account_link (
+            network_id,
+            state_n = next_state_n,
+            beneficiary
+        );
+    }
+
+    return account;
+}
+
+function build_account_state(network_id: integer, beneficiary: byte_array, account: accounts.account?) {
+    val state = list<gtv>();
+    state.add(byte_array.from_hex(utils.to_zero_padded_hex(beneficiary)).to_gtv());
+    val state_map = build_account_state_fn(network_id, beneficiary, account);
+    for (k in state_map.keys().sorted()) {
+        state.add_all(state_map[k]);
+    }
+    
+    return state;
+}
+
+@extendable
+function build_account_state_fn(
+    network_id: integer,
+    beneficiary: byte_array,
+    account: accounts.account?
+): map<integer, list<gtv>>;

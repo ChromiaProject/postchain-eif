@@ -1,4 +1,5 @@
 @mount('eif.utils')
 module;
 
+// TODO: extend byte array instead
 function to_zero_padded_hex(array: byte_array) = "000000000000000000000000" + array.to_hex();

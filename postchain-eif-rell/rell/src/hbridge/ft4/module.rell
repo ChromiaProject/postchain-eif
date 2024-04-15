@@ -1,0 +1,272 @@
+module;
+
+import messaging: lib.eif.messaging;
+import common: lib.eif.common;
+import utils: lib.eif.utils;
+
+namespace ft4 {
+    import lib.ft4.accounts;
+    import lib.ft4.assets;
+    import lib.ft4.auth;
+    import lib.ft4.version;
+}
+
+import a_s_transfer: lib.ft4.accounts.strategies.transfer;
+
+enum bridge_mode {
+    native,
+    foreign
+}
+
+// link between ERC20 token and FT4 asset
+entity evm_erc20 {
+    network_id: integer;
+    address: byte_array; // contract address
+    key network_id, address;
+    bridge_mode;
+    index ft4.assets.asset;
+    key virtual_blockchain_rid: byte_array; // virtual blockchain RID derived from network_id and address
+}
+
+function compute_virtual_blockchain_rid (network_id: integer, address: byte_array): byte_array {
+    return ("EVM", network_id, address).hash();
+}
+
+// TODO: function which registers evm_erc20
+
+// withdrawal from EVM to FT4, seems to be useful for queries?
+entity evm_erc20_withdraw {
+    key serial: integer;
+    network_id: integer;
+    index token: evm_erc20;
+    index beneficiary: byte_array;
+    amount: big_integer;
+}
+
+// TODO: this is common for EIF
+struct event_data {
+    tnx_hash: byte_array;
+    log_index: integer;
+    signature: byte_array;
+    contract_address: byte_array;
+    name: text;
+    indexed_values: list<gtv>;
+    non_indexed_values: list<gtv>;
+}
+
+// one EVM account might be linked to one FT4 account
+entity evm_account_link {
+    key address: byte_array;
+    index ft4.accounts.account;
+}
+
+// potential account_id
+entity pending_deposit {
+    key recipient_id: byte_array;
+    key address: byte_array;
+    network_id: integer;
+    token: evm_erc20;
+    index a_s_transfer.account_creation_transfer;
+}
+
+// function which deducts balance from the account in a smart way:
+//  * burn when bridge is in foreign mode
+//  * transfer to pool account when bridge is in native mode
+function bridge_deduct_balance (ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
+    ft4.assets.Unsafe.burn(account, asset, amount);
+}
+
+// function which increase balance of the account in a smart way:
+//  * mint when bridge is in foreign mode
+//  * transfer froim pool account when bridge is in native mode
+function bridge_increase_balance (ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
+    ft4.assets.Unsafe.mint(account, asset, amount);
+}
+
+
+
+// accounts might be linked either after account registration, or explicitly (e.g. when account_id
+// is not derived from EVM address
+function _link_evm_account (address: byte_array, account: ft4.accounts.account) {
+    create evm_account_link (.address = address, .account = account);
+    val address_hash = address.hash();
+
+    // there's a possibility that the account_id is different from address hash
+    // collect funds from the pool account here
+    for (account_creation_transfer in a_s_transfer.account_creation_transfer @* {
+        .recipient_id == address_hash, .state == a_s_transfer.account_creation_state.pending
+    })
+    {
+        val pending = pending_deposit @? { account_creation_transfer }; // TODO: perhaps iterate pending_deposit instead
+        if (empty(pending)) {
+            // weird
+            continue;
+        }
+        val pool_account = a_s_transfer.ensure_pool_account(chain_context.blockchain_rid);
+        ft4.assets.Unsafe.transfer(
+            pool_account,
+            account,
+            account_creation_transfer.asset,
+            account_creation_transfer.amount);
+
+        account_creation_transfer.state = account_creation_state.done;
+        account_creation_transfer.final_tx_rid = op_context.transaction.tx_rid;
+        account_creation_transfer.final_op_index = op_context.op_index;
+        delete pending;
+    }
+}
+
+// TODO: auth_handler for link_evm_account
+operation link_evm_account(address: byte_array) {
+    val account = ft4.auth.authenticate();
+
+    // note: this would require ft4.evm_signatures operation
+    // I'm not sure how to request it from the client
+    ft4.auth.verify_signers([address]);
+
+    // perhaps it would be better if we allow just ft4.evm_auth
+    // with an auth_descriptor which
+    // is single-signature EVM address. Or both?
+
+    _link_evm_account(address, account);
+}
+
+@extend(ft4.accounts.strategies.after_register_account)
+function (ft4.accounts.account) {
+    val pending = pending_deposit @? { .recipient_id == this.account_id };
+    if (pending) {
+        // note: We assume it's impossible to register an account with account_id matching
+        // the address of the pending deposit without proper signature and stuff
+        _link_evm_account(pending.address, account);
+        delete pending;
+    }
+}
+
+function find_ft4_account_for_address(address: byte_array): ft4.accounts.account? {
+    return evm_account_link @? { address } .account;
+}
+
+// return deposit if we cannot credit it to the account
+function bounce_deposit_event(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
+    log("deposit event bounced");
+    emit_withdraw_event(network_id, erc20.address, beneficiary, amount);
+}
+
+@extend(messaging.handle_evm_block)
+function (evm_block: evm_block_message) {
+    for (event in evm_block.events) {
+        process_event(evm_block.network_id, evm_block.height, evm_block.hash, event);
+    }
+}
+
+function process_event(network_id: integer, evm_block_height: integer, evm_block_hash: byte_array, event: event_data) {
+    if (event.name != "DepositedERC20") return;
+
+    val beneficiary = byte_array.from_gtv(event.indexed_values[0]);
+    val token_address = byte_array.from_gtv(event.indexed_values[1]);
+    val amount = big_integer.from_gtv(event.non_indexed_values[1]);
+
+    val erc20 = evm_erc20 @? { .network_id == network_id, .address == token_address };
+    if (erc20 == null) {
+        log.error("ERC20 token not found");
+        bounce_deposit_event(network_id, token_address, beneficiary, amount);
+        return;
+    }
+
+    val ft4_account = find_ft4_account_for_address(beneficiary);
+    if (empty(ft4_account)) {
+        // create account_creation_transfer to allow the account to be registered later
+        // note: we don't want to call create_on_transfer because it fails when requirements are not meant.
+        // we want to bounce instead
+        val sender_blockchain_rid = erc20.virtual_blockchain_rid;
+        val sender_id = beneficiary.hash();
+        val recipient_id = beneficiary.hash();
+
+        val rules = ft4.strategies.transfer.find_allowed_rules(
+            from_chain = sender_blockchain_rid,
+            from_id = sender_id,
+            to_id = recipient_id,
+            asset = asset,
+            amount = amount
+        );
+
+        if (empty(rules)) {
+            log.error("No rules found for transfer");
+            bounce_deposit_event(network_id, token_address, beneficiary, amount);
+            return;
+        }
+
+        bridge_increase_balance(a_s_trasfer.ensure_pool_account(op_context.blockchain_rid),
+            erc20.asset, amount);
+
+        val creation = create ft4.strategies.transfer.account_creation_transfer(
+            op_context.transaction, op_index = op_context.op_index,
+            sender_blockchain_rid, sender_id, recipient_id, erc20.asset, amount,
+            rules = rules.to_gtv().to_bytes(),
+            timestamp = utils.latest_time()
+        );
+
+        create pending_deposit(recipient_id, beneficiary, creation, network_id, erc20);
+    } else {
+        bridge_increase_balance(ft4_account, erc20.asset, amount);
+    }
+}
+
+function emit_withdraw_event(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
+    val next_serial = common.event_counter.counter + 1;
+    common.event_counter.counter = next_serial;
+
+    create evm_erc20_withdraw (
+        .serial = next_serial,
+        .network_id = network_id,
+        .token = erc20,
+        .beneficiary = beneficiary,
+        .amount = amount
+    );
+
+    val withdraw_info = [
+        next_serial.to_gtv(),
+        network_id.to_gtv(),
+        // TODO: extend byte_array to 32 bytes without going through hex
+        byte_array.from_hex(u.to_zero_padded_hex(token_address)).to_gtv(),
+        byte_array.from_hex(u.to_zero_padded_hex(beneficiary)).to_gtv(),
+        amount.to_gtv()
+    ];
+
+    op_context.emit_event("eif_event", withdraw_info.to_gtv());
+}
+
+// TODO: auth_handler
+operation bridge_ft4_token_to_evm(network_id: integer, ft4_asset: assets.asset, amount: big_integer, beneficiary: byte_array) {
+    val erc20 = evm_erc20 @? { .network_id == network_id, .asset == ft4_asset };
+    require(erc20, "ERC20 token not found");
+
+    val from_account = ft4.auth.authenticate();
+
+    require(evm_account_link @? { .account == from_account, .address == beneficiary },
+        "Can only withdraw to your own account");
+
+    bridge_deduct_balance(from_account, erc20.asset, amount);
+
+    emit_withdraw_event(network_id, erc20.address, beneficiary, amount);
+}
+
+
+// if account was not created, we can recall the deposit back to EVM
+// note: we do not check authorization. after a time-out the deposit can be recalled by anyone,
+// and it goes back to where it came from. this simplifies the flow
+operation recall_pending_deposit(address: byte_array) {
+    val pending = pending_deposit @ { .address == address };
+    val creation = pending.account_creation_transfer;
+
+    val (asset, amount) = recall_transfer(
+        creation.sender_blockchain_rid,
+        creation.sender_id,
+        creation.transaction.tx_rid, creation.op_index);
+
+    bridge_deduct_balance(a_s_trasfer.ensure_pool_account(op_context.blockchain_rid), asset, amount);
+
+    emit_withdraw_event(pending.network_id, pending.token.address, address, amount);
+
+    delete pending;
+}
