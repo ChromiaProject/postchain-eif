@@ -233,9 +233,8 @@ function emit_withdraw_event(network_id: integer, token_address: byte_array, ben
     val withdraw_info = [
         next_serial.to_gtv(),
         network_id.to_gtv(),
-        // TODO: extend byte_array to 32 bytes without going through hex
-        byte_array.from_hex(utils.to_zero_padded_hex(token_address)).to_gtv(),
-        byte_array.from_hex(utils.to_zero_padded_hex(beneficiary)).to_gtv(),
+        utils.zero_pad(token_address).to_gtv(),
+        utils.zero_pad(beneficiary).to_gtv(),
         amount.to_gtv()
     ];
 

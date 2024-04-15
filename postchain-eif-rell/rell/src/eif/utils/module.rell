@@ -2,4 +2,4 @@
 module;
 
 // TODO: extend byte array instead
-function to_zero_padded_hex(array: byte_array) = "000000000000000000000000" + array.to_hex();
+function zero_pad(array: byte_array): byte_array = byte_array.from_hex("000000000000000000000000" + array.to_hex());
