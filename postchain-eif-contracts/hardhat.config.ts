@@ -55,7 +55,7 @@ const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
   networks: {
     localhost: {
-      url: "http://127.0.0.1:8545"
+      url: "http://127.0.0.1:8545",
     },
     hardhat: {
       accounts: {
@@ -88,7 +88,7 @@ const config: HardhatUserConfig = {
       },
       chainId: chainIds.mumbai,
       url: "https://polygon-mumbai.g.alchemy.com/v2/HY9dxoQq2MBbyMd-LSmnHujDe231wKgz",
-    }
+    },
   },
   paths: {
     artifacts: "./src/artifacts",
@@ -97,16 +97,35 @@ const config: HardhatUserConfig = {
     tests: "./test",
   },
   solidity: {
-    compilers: [{
-      version: "0.8.20",
-      settings: {
-        // Disable the optimizer when debugging
-        // https://hardhat.org/hardhat-network/#solidity-optimizer-support
-        optimizer: {
-          enabled: true,
-          runs: 800,
-        }
-      }}
+    compilers: [
+      {
+        version: "0.8.20",
+        settings: {
+          // Disable the optimizer when debugging
+          // https://hardhat.org/hardhat-network/#solidity-optimizer-support
+          optimizer: {
+            enabled: true,
+            runs: 100,
+          },
+        },
+      },
+      {
+        version: "0.8.24",
+        settings: {
+          // Disable the optimizer when debugging
+          // https://hardhat.org/hardhat-network/#solidity-optimizer-support
+          optimizer: {
+            enabled: true,
+            runs: 100,
+          },
+        },
+      },
+      {
+        version: "0.5.2",
+      },
+      {
+        version: "0.5.8",
+      },
     ],
   },
   etherscan: {
@@ -123,8 +142,8 @@ const config: HardhatUserConfig = {
   },
   abiExporter: {
     runOnCompile: true,
-    clear: true
-  }
+    clear: true,
+  },
 };
 
 export default config;

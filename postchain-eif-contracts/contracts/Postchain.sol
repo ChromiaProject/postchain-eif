@@ -35,7 +35,7 @@ library Postchain {
         Event memory evt = abi.decode(_event, (Event));
         bytes32 hash = keccak256(_event);
         if (hash != _hash) {
-            revert('Postchain: invalid event');
+            revert("Postchain: invalid event");
         }
         return (evt.token, evt.beneficiary, evt.amount, evt.networkId);
     }
@@ -59,41 +59,33 @@ library Postchain {
     ) internal pure returns (BlockHeaderData memory) {
         BlockHeaderData memory header = abi.decode(blockHeader, (BlockHeaderData));
 
-        bytes32 node12 = sha256(abi.encodePacked(
+        bytes32 node12 = sha256(
+            abi.encodePacked(
                 uint8(0x00),
                 Hash.hashGtvBytes32Leaf(header.blockchainRid),
                 Hash.hashGtvBytes32Leaf(header.previousBlockRid)
-            ));
+            )
+        );
 
-        bytes32 node34 = sha256(abi.encodePacked(
-                uint8(0x00),
-                header.merkleRootHashHashedLeaf,
-                Hash.hashGtvIntegerLeaf(header.timestamp)
-            ));
+        bytes32 node34 = sha256(
+            abi.encodePacked(uint8(0x00), header.merkleRootHashHashedLeaf, Hash.hashGtvIntegerLeaf(header.timestamp))
+        );
 
-        bytes32 node56 = sha256(abi.encodePacked(
-                uint8(0x00),
-                Hash.hashGtvIntegerLeaf(header.height),
-                header.dependenciesHashedLeaf
-            ));
+        bytes32 node56 = sha256(
+            abi.encodePacked(uint8(0x00), Hash.hashGtvIntegerLeaf(header.height), header.dependenciesHashedLeaf)
+        );
 
-        bytes32 node1234 = sha256(abi.encodePacked(
-                uint8(0x00),
-                node12,
-                node34
-            ));
+        bytes32 node1234 = sha256(abi.encodePacked(uint8(0x00), node12, node34));
 
-        bytes32 node5678 = sha256(abi.encodePacked(
-                uint8(0x00),
-                node56,
-                header.extraDataHashedLeaf
-            ));
+        bytes32 node5678 = sha256(abi.encodePacked(uint8(0x00), node56, header.extraDataHashedLeaf));
 
-        bytes32 blockRid = sha256(abi.encodePacked(
+        bytes32 blockRid = sha256(
+            abi.encodePacked(
                 uint8(0x7), // Gtv merkle tree Array Root Node prefix
                 node1234,
                 node5678
-            ));
+            )
+        );
 
         if (blockRid != header.blockRid) revert("Postchain: invalid block header");
         return header;

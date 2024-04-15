@@ -1,4 +1,4 @@
-import { ethers, upgrades, network} from "hardhat";
+import { ethers, upgrades, network } from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
 import { TestToken__factory, TokenBridge__factory, TokenBridgeDelegator__factory, Validator__factory } from "../src/types";
@@ -7,7 +7,13 @@ import { BytesLike, hexZeroPad, keccak256 } from "ethers/lib/utils";
 import { ContractReceipt, ContractTransaction } from "ethers";
 import { intToHex } from "ethjs-util";
 import { constants } from "ethers";
-import { DecodeHexStringToByteArray, hashGtvBytes32Leaf, hashGtvBytes64Leaf, hashGtvIntegerLeaf, postchainMerkleNodeHash} from "./utils"
+import {
+  DecodeHexStringToByteArray,
+  hashGtvBytes32Leaf,
+  hashGtvBytes64Leaf,
+  hashGtvIntegerLeaf,
+  postchainMerkleNodeHash,
+} from "./utils";
 
 chai.use(solidity);
 const { expect } = chai;
