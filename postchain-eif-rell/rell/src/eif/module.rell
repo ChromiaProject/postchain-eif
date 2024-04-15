@@ -1,0 +1,3 @@
+module;
+
+import ^.eif_event_receiver_connector;

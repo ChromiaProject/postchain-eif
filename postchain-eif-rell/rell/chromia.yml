@@ -75,8 +75,8 @@ blockchains:
           - "net.postchain.d1.icmf.IcmfSenderGTXModule"
       sync_ext:
         - "net.postchain.eif.EifSynchronizationInfrastructureExtension"
-  eif:
-    module: main
+  hbridge:
+    module: hbridge.ft4
     config:
       gtx:
         modules:
@@ -94,6 +94,9 @@ blockchains:
     moduleArgs:
       <<: *common_args
       <<: *rell_test_args
+      lib.ft4.accounts.strategies.transfer:
+        rules: [] # TODO specify transfer strategy rules
+
   transaction_submitter:
     module: transaction_submitter
     moduleArgs:
@@ -165,13 +168,14 @@ blockchains:
 compile:
   source: src
   target: target
-  rellVersion: 0.13.5
+  rellVersion: 0.13.10
 libs:
   ft4:
     registry: https://bitbucket.org/chromawallet/ft3-lib
     path: rell/src/lib/ft4
-    tagOrBranch: v0.5.0r
-    rid: x"125809B57980D6E36C07210D0541E7BCAD86A66F324FC1C0DA9CA7D1F8D5A720"
+    # TODO use this when released: tagOrBranch: v0.7.0r
+    tagOrBranch: hbridge
+    rid: x"FD27ABFA0CEA9B460EA4CEADE8993915B52F2D0437D923969B902422A908CD19"
     insecure: false
   iccf:
     registry: https://gitlab.com/chromaway/core/directory-chain
@@ -184,3 +188,4 @@ libs:
     path: src/messaging/icmf
     tagOrBranch: 1.35.0
     rid: x"19D6BC28D527E6D2239843608486A84F44EDCD244E253616F13D1C65893F35F6"
+    insecure: false
