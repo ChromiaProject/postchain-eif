@@ -15,6 +15,8 @@ include:
         - "*/target/surefire-reports/TEST-*.xml"
         - "*/target/failsafe-reports/TEST-*.xml"
     expire_in: 1 week
+  before_script:
+    - git config --global url."https://".insteadOf ssh://
 
 stages:
   - build
@@ -71,7 +73,9 @@ build:
       - postchain-eif-core/logs/
 
 dependency-check:
-  extends: .maven-dependency-check
+  extends:
+    - .setup
+    - .maven-dependency-check
   stage: dependency-check
   interruptible: true
   rules:
