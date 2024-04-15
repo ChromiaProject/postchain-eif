@@ -66,6 +66,7 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
             }
 
             val signerUpdateEvent = EvmTypeEncoder.encodeSignerUpdateEvent(
+                    update.serial,
                     update.blockchainRid,
                     GtvDecoder.decodeGtv(update.signers).asArray().map { getEthereumAddress(it.asByteArray()) }
             )
@@ -134,6 +135,7 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
 
             val updateEvent = op.args[1].asByteArray()
             val expectedUpdateEvent = EvmTypeEncoder.encodeSignerUpdateEvent(
+                    correspondingUpdate.serial,
                     correspondingUpdate.blockchainRid,
                     GtvDecoder.decodeGtv(correspondingUpdate.signers).asArray().map { getEthereumAddress(it.asByteArray()) }
             )

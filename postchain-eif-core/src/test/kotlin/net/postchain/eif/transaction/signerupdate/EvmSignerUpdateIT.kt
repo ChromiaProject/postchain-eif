@@ -90,13 +90,14 @@ class EvmSignerUpdateIT : EifBaseIntegrationTest(
         val updatedSigner = cryptoSystem.generateKeyPair()
         val tx = (node.getBlockchainInstance(0).blockchainEngine.getConfiguration().getTransactionFactory() as GTXTransactionFactory).build(
                 Gtx(GtxBody(directoryChainBrid, listOf(
-                        GtxOp(MOCK_SIGNER_UPDATE_OP, gtv(chainToUpdateBrid.data), gtv(gtv(updatedSigner.pubKey.data)))
+                        GtxOp(MOCK_SIGNER_UPDATE_OP, gtv(1), gtv(chainToUpdateBrid.data), gtv(gtv(updatedSigner.pubKey.data)))
                 ), listOf()), listOf())
         )
         buildBlock(0, tx)
 
         txSubmitterModule.addSignerUpdate(EvmSignerUpdate(
                 0,
+                1,
                 chainToUpdateBrid.data,
                 GtvEncoder.encodeGtv(gtv(gtv(updatedSigner.pubKey.data))),
                 3
@@ -117,13 +118,14 @@ class EvmSignerUpdateIT : EifBaseIntegrationTest(
         val updatedSigner = cryptoSystem.generateKeyPair()
         val tx = (node.getBlockchainInstance(0).blockchainEngine.getConfiguration().getTransactionFactory() as GTXTransactionFactory).build(
                 Gtx(GtxBody(directoryChainBrid, listOf(
-                        GtxOp(MOCK_SIGNER_UPDATE_OP, gtv(directoryChainBrid.data), gtv(gtv(updatedSigner.pubKey.data)))
+                        GtxOp(MOCK_SIGNER_UPDATE_OP, gtv(1), gtv(directoryChainBrid.data), gtv(gtv(updatedSigner.pubKey.data)))
                 ), listOf()), listOf())
         )
         buildBlock(0, tx)
 
         txSubmitterModule.addSignerUpdate(EvmSignerUpdate(
                 0,
+                1,
                 directoryChainBrid.data,
                 GtvEncoder.encodeGtv(gtv(gtv(updatedSigner.pubKey.data))),
                 3

@@ -54,9 +54,10 @@ class MockSignerUpdateOperation(private val extOpData: ExtOpData) : GTXOperation
     override fun checkCorrectness() {}
 
     override fun apply(ctx: TxEContext): Boolean {
-        val blockchainRid = extOpData.args[0]
-        val signers = extOpData.args[1]
-        ctx.emitEvent(SIGNER_LIST_UPDATE_EVENT, gtv(blockchainRid, signers))
+        val serial = extOpData.args[0]
+        val blockchainRid = extOpData.args[1]
+        val signers = extOpData.args[2]
+        ctx.emitEvent(SIGNER_LIST_UPDATE_EVENT, gtv(serial, blockchainRid, signers))
         return true
     }
 }
