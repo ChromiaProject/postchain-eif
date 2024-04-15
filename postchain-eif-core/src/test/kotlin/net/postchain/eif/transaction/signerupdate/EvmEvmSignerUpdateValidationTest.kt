@@ -59,6 +59,7 @@ class EvmEvmSignerUpdateValidationTest {
         on { query(mockContext, EvmSignerUpdateSpecialTxExtension.GET_QUEUED_SIGNER_UPDATES_QUERY, GtvFactory.gtv(mapOf())) } doReturn GtvFactory.gtv(GtvObjectMapper.toGtvDictionary(
                 EvmSignerUpdate(
                         0,
+                        1,
                         updatedBrid.data,
                         GtvEncoder.encodeGtv(GtvFactory.gtv(GtvFactory.gtv(udpatedSigner.pubKey.data))),
                         0
@@ -93,7 +94,7 @@ class EvmEvmSignerUpdateValidationTest {
         sut.init(module, 1, BlockchainRid(ByteArray(32) { 1 }), cryptoSystem)
         sut.directoryChainBrid = directoryChainBrid
 
-        signerUpdateEvent = encodeSignerUpdateEvent(updatedBrid.data, listOf(getEthereumAddress(udpatedSigner.pubKey.data)))
+        signerUpdateEvent = encodeSignerUpdateEvent(1, updatedBrid.data, listOf(getEthereumAddress(udpatedSigner.pubKey.data)))
         val signerUpdateEventHash = keccakDigest.digest(signerUpdateEvent)
         val signerUpdateProofTreeRootHash = keccakDigest.hash(signerUpdateEventHash, EMPTY_HASH)
 
@@ -223,6 +224,7 @@ class EvmEvmSignerUpdateValidationTest {
         whenever(module.query(mockContext, EvmSignerUpdateSpecialTxExtension.GET_QUEUED_SIGNER_UPDATES_QUERY, GtvFactory.gtv(mapOf()))).doReturn(
                 GtvFactory.gtv(GtvObjectMapper.toGtvDictionary(EvmSignerUpdate(
                         0,
+                        1,
                         updatedBrid.data,
                         GtvEncoder.encodeGtv(GtvFactory.gtv(GtvFactory.gtv(cryptoSystem.generateKeyPair().pubKey.data))),
                         0

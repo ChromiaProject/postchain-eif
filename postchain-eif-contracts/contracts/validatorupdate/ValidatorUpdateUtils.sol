@@ -5,13 +5,14 @@ import "../Data.sol";
 
 library ValidatorUpdateUtils {
     struct ValidatorUpdate {
+        uint serial;
         bytes32 blockchainRid;
         address[] validators;
     }
 
     function decodeValidatorUpdate(bytes memory update) internal pure returns (ValidatorUpdate memory) {
-        (bytes32 brid, address[] memory updatedValidators) = abi.decode(update, (bytes32, address[]));
-        return ValidatorUpdate(brid, updatedValidators);
+        (uint serial, bytes32 brid, address[] memory updatedValidators) = abi.decode(update, (uint, bytes32, address[]));
+        return ValidatorUpdate(serial, brid, updatedValidators);
     }
 
     function decodeExtraProof(bytes memory extraProofData) internal pure returns (Data.ExtraProofData memory) {

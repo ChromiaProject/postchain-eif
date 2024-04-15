@@ -82,9 +82,10 @@ function test_directory_parked_signer_update() {
     rell.test.tx().op(
         signer_update_message_op(
             signer_list_update_message(
+                serial = 2,
                 blockchain_rid = test_directory_chain_brid,
                 signers = new_parked_signers.to_gtv().to_bytes(),
-                2
+                confirmed_in_directory_at_height = 2
             )
         )
     ).run();
@@ -120,9 +121,10 @@ function trigger_signer_update(new_signers: list<byte_array>): signer_list_updat
     rell.test.tx().op(
             signer_update_message_op(
                 signer_list_update_message(
+                    serial = 1,
                     blockchain_rid = test_directory_chain_brid,
                     signers = new_signers.to_gtv().to_bytes(),
-                    1
+                    confirmed_in_directory_at_height = 1
                 )
             )
         ).run();
