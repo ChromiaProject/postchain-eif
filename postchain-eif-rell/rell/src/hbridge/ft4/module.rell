@@ -117,7 +117,12 @@ function _link_evm_account (address: byte_array, account: ft4.accounts.account) 
     }
 }
 
-// TODO: auth_handler for link_evm_account
+@extend(ft4.auth.auth_handler)
+function () = ft4.auth.add_auth_handler(
+    scope = rell.meta(link_evm_account).mount_name,
+    flags = ["A"]
+);
+
 operation link_evm_account(address: byte_array) {
     val account = ft4.auth.authenticate();
 
@@ -237,7 +242,12 @@ function emit_withdraw_event(network_id: integer, token_address: byte_array, ben
     op_context.emit_event("eif_event", withdraw_info.to_gtv());
 }
 
-// TODO: auth_handler
+@extend(ft4.auth.auth_handler)
+function () = ft4.auth.add_auth_handler(
+    scope = rell.meta(bridge_ft4_token_to_evm).mount_name,
+    flags = ["T"]
+);
+
 operation bridge_ft4_token_to_evm(network_id: integer, ft4_asset: ft4.assets.asset, amount: big_integer, beneficiary: byte_array) {
     val erc20 = erc20_asset @? { .network_id == network_id, .asset == ft4_asset };
     require(erc20, "ERC20 token not found");
