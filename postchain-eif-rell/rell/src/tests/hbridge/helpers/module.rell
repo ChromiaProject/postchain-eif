@@ -1,0 +1,14 @@
+module;
+
+import lib.ft4.assets;
+import hbridge: hbridge.ft4;
+
+operation register_erc20_asset(
+    network_id: integer,
+    token_address: byte_array,
+    asset_id: byte_array,
+    hbridge.bridge_mode
+) {
+    val asset = assets.Asset(asset_id);
+    hbridge.register_erc20_asset(network_id, token_address, asset, bridge_mode);
+}

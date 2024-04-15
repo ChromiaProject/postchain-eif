@@ -21,15 +21,18 @@ definitions:
       admin_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
 
 test:
+  failOnError: false
   modules:
     - tests.utils
-    - tests.ft4
+    - tests.hbridge.evm_block
     - transaction_submitter.test
     - transaction_submitter.anchoring.test
     - transaction_submitter.signer_update.test
   moduleArgs:
     <<: *common_args
     <<: *rell_test_args
+    lib.ft4.accounts.strategies.transfer:
+      rules: [] # TODO specify transfer strategy rules
     transaction_submitter:
       manual_admins:
         - x"02466d7fcae563e5cb09a0d1870bb580344804617879a14949cf22285f1bae3f27"

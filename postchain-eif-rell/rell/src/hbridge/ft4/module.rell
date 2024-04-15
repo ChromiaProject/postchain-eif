@@ -247,7 +247,8 @@ function () = ft4.auth.add_auth_handler(
     flags = ["T"]
 );
 
-operation bridge_ft4_token_to_evm(network_id: integer, ft4_asset: ft4.assets.asset, amount: big_integer, beneficiary: byte_array) {
+operation bridge_ft4_token_to_evm(network_id: integer, asset_id: byte_array, amount: big_integer, beneficiary: byte_array) {
+    val ft4_asset = ft4.assets.Asset(asset_id);
     val erc20 = erc20_asset @? { .network_id == network_id, .asset == ft4_asset };
     require(erc20, "ERC20 token not found");
 
