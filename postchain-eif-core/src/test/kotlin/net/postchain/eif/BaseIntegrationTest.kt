@@ -71,6 +71,8 @@ abstract class EifBaseIntegrationTest(evmType: EvmType, private val prependUrls:
     val registerAccounts = mutableListOf<AccountRegister>()
     val snapshotHeights = mutableListOf<Long>()
     val tokenBridgeBinary = getBinaryFromArtifactResource("/artifacts/contracts/TokenBridge.sol/TokenBridge.json")
+    val tokenBridgeWithSnapshotWithdrawBinary =
+            getBinaryFromArtifactResource("/artifacts/contracts/TokenBridgeWithSnapshotWithdraw.sol/TokenBridgeWithSnapshotWithdraw.json")
     val testTokenBinary = getBinaryFromArtifactResource("/artifacts/contracts/token/TestToken.sol/TestToken.json")
     val validatorBinary = getBinaryFromArtifactResource("/artifacts/contracts/Validator.sol/Validator.json")
 

@@ -3,7 +3,7 @@
 package net.postchain.eif
 
 import net.postchain.common.toHex
-import net.postchain.eif.contracts.TokenBridge
+import net.postchain.eif.contracts.TokenBridgeWithSnapshotWithdraw
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.DynamicArray
 import org.web3j.abi.datatypes.DynamicBytes
@@ -15,7 +15,7 @@ import org.web3j.abi.datatypes.generated.Uint256
  */
 fun EventMerkleProof.web3EventData() = DynamicBytes(eventData)
 
-fun EventMerkleProof.web3EventProof() = TokenBridge.Proof(
+fun EventMerkleProof.web3EventProof() = TokenBridgeWithSnapshotWithdraw.Proof(
         Bytes32(this.eventProof!!.leaf),
         // Don't delete !! to help the compiler with a smart cast, otherwise you will get
         // `Smart cast to '...' is impossible, because '...' is a public API property declared in different module
@@ -29,7 +29,7 @@ fun EventMerkleProof.web3Signatures() = DynamicArray(DynamicBytes::class.java, b
 
 fun EventMerkleProof.web3Signers() = DynamicArray(Address::class.java, blockWitness!!.map { Address(it.pubkey.toHex()) })
 
-fun EventMerkleProof.web3ExtraProofData() = TokenBridge.ExtraProofData(
+fun EventMerkleProof.web3ExtraProofData() = TokenBridgeWithSnapshotWithdraw.ExtraProofData(
         DynamicBytes(extraMerkleProof!!.leaf),
         Bytes32(extraMerkleProof!!.hashedLeaf),
         Uint256(extraMerkleProof!!.position),
@@ -42,7 +42,7 @@ fun EventMerkleProof.web3ExtraProofData() = TokenBridge.ExtraProofData(
  */
 fun AccountStateMerkleProof.web3StateData() = DynamicBytes(stateData)
 
-fun AccountStateMerkleProof.web3StateProof() = TokenBridge.Proof(
+fun AccountStateMerkleProof.web3StateProof() = TokenBridgeWithSnapshotWithdraw.Proof(
         Bytes32(stateProof!!.leaf),
         Uint256(stateProof!!.position),
         DynamicArray(Bytes32::class.java, stateProof!!.merkleProofs.map { Bytes32(it) })
@@ -54,7 +54,7 @@ fun AccountStateMerkleProof.web3Signatures() = DynamicArray(DynamicBytes::class.
 
 fun AccountStateMerkleProof.web3Signers() = DynamicArray(Address::class.java, blockWitness!!.map { Address(it.pubkey.toHex()) })
 
-fun AccountStateMerkleProof.web3ExtraProofData() = TokenBridge.ExtraProofData(
+fun AccountStateMerkleProof.web3ExtraProofData() = TokenBridgeWithSnapshotWithdraw.ExtraProofData(
         DynamicBytes(extraMerkleProof!!.leaf),
         Bytes32(extraMerkleProof!!.hashedLeaf),
         Uint256(extraMerkleProof!!.position),
