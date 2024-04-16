@@ -4,6 +4,7 @@ import net.postchain.base.data.DatabaseAccess
 import net.postchain.base.snapshot.EventPageStore
 import net.postchain.base.snapshot.SimpleDigestSystem
 import net.postchain.common.data.KECCAK256
+import net.postchain.common.exception.UserMistake
 import net.postchain.core.EContext
 import net.postchain.crypto.Secp256K1CryptoSystem
 import net.postchain.eif.EvmMerkleProofBuilder
@@ -50,12 +51,14 @@ class SignerUpdateGTXModule : SimpleGTXModule<Unit>(
 fun signerListUpdateProofQuery(ctx: EContext, args: Gtv): Gtv {
     val argsDict = args.asDict()
     val eventHash = argsDict["signerUpdateHash"]!!.asByteArray()
-    val db = DatabaseAccess.of(ctx)
 
-    return db.getEvent(ctx, SIGNER_LIST_UPDATE_TABLE_PREFIX, eventHash)?.let { eventInfo ->
-        val eventPageStore = EventPageStore(ctx, SignerUpdateGTXModule.LEVELS_PER_PAGE, SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)), SIGNER_LIST_UPDATE_TABLE_PREFIX)
-        val eventMerkleProof = EvmMerkleProofBuilder(eventPageStore, Secp256K1CryptoSystem(), listOf(SIGNER_LIST_UPDATE_EXTRA_HEADER))
-                .build(ctx, eventInfo.blockHeight, eventInfo.data, eventHash, eventInfo.pos)
-        GtvObjectMapper.toGtvDictionary(eventMerkleProof)
-    } ?: GtvNull
+    val db = DatabaseAccess.of(ctx)
+    val eventInfo = db.getEvent(ctx, SIGNER_LIST_UPDATE_TABLE_PREFIX, eventHash) ?: return GtvNull
+    val blockRid = db.getBlockRID(ctx, eventInfo.blockHeight)
+            ?: throw UserMistake("No block at height ${eventInfo.blockHeight}")
+
+    val eventPageStore = EventPageStore(ctx, SignerUpdateGTXModule.LEVELS_PER_PAGE, SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)), SIGNER_LIST_UPDATE_TABLE_PREFIX)
+    val eventMerkleProof = EvmMerkleProofBuilder(eventPageStore, Secp256K1CryptoSystem(), listOf(SIGNER_LIST_UPDATE_EXTRA_HEADER))
+            .build(ctx, eventInfo.blockHeight, blockRid, eventInfo.data, eventHash, eventInfo.pos)
+    return GtvObjectMapper.toGtvDictionary(eventMerkleProof)
 }
