@@ -75,21 +75,21 @@ entity pending_deposit {
 // function which deducts balance from the account in a smart way:
 //  * burn when bridge is in foreign mode
 //  * transfer to pool account when bridge is in native mode
-function bridge_deduct_balance (ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
+function bridge_deduct_balance(ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
     ft4.assets.Unsafe.burn(account, asset, amount);
 }
 
 // function which increase balance of the account in a smart way:
 //  * mint when bridge is in foreign mode
 //  * transfer from pool account when bridge is in native mode
-function bridge_increase_balance (ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
+function bridge_increase_balance(ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
     ft4.assets.Unsafe.mint(account, asset, amount);
 }
 
 // accounts might be linked either after account registration, or explicitly (e.g. when account_id
 // is not derived from EVM address
-function _link_evm_account (address: byte_array, account: ft4.accounts.account) {
-    create evm_account_link (.address = address, .account = account);
+function _link_evm_account(address: byte_array, account: ft4.accounts.account) {
+    create evm_account_link(.address = address, .account = account);
     val address_hash = address.hash();
 
     // there's a possibility that the account_id is different from address hash

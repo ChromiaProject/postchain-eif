@@ -1,0 +1,181 @@
+function test_deposit_foreign_token_from_ethereum_with_already_linked_account() {
+    val ft_asset = register_foreign_asset();
+
+    val auth_descriptor = create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val account_id = auth_descriptor.hash();
+    rell.test.tx().op(
+        admin.register_account(auth_descriptor)
+    ).sign(admin_privkey).run();
+    val ft_account = accounts.Account(account_id);
+
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+    link_account(
+        rell.test.keypairs.eve,
+        rell.test.keypairs.alice,
+        account_id,
+        auth_descriptor.hash()
+    );
+
+    val amount = 10000000000000000000L;
+
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), 0L);
+
+    deposit_from_ethereum(evm_address, amount);
+
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
+
+    run_block_after_timeout();
+    rell.test.tx()
+        .op(hbridge.recall_pending_deposit(evm_address))
+        .nop()
+        .run_must_fail("No records found");
+}
+
+function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_linking_once_but_not_twice() {
+    val ft_asset = register_foreign_asset();
+
+    val auth_descriptor = create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val account_id = auth_descriptor.hash();
+    rell.test.tx().op(
+        admin.register_account(auth_descriptor)
+    ).sign(admin_privkey).run();
+    val ft_account = accounts.Account(account_id);
+
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+
+    val amount = 10000000000000000000L;
+
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), 0L);
+
+    deposit_from_ethereum(evm_address, amount);
+
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), 0L);
+
+    link_account(
+        rell.test.keypairs.eve,
+        rell.test.keypairs.alice,
+        account_id,
+        auth_descriptor.hash()
+    );
+
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
+
+    assert_fails("duplicate key value violates unique constraint",
+        link_account(
+            rell.test.keypairs.eve,
+            rell.test.keypairs.alice,
+            account_id,
+            auth_descriptor.hash(),
+            *
+        )
+    );
+
+    val auth_descriptor2 = create_auth_descriptor(rell.test.pubkeys.bob, ["A", "T"]);
+    val account_id2 = auth_descriptor2.hash();
+    rell.test.tx().op(
+        admin.register_account(auth_descriptor2)
+    ).sign(admin_privkey).run();
+    assert_fails("duplicate key value violates unique constraint",
+        link_account(
+            rell.test.keypairs.eve,
+            rell.test.keypairs.bob,
+            account_id2,
+            auth_descriptor2.hash(),
+            *
+        )
+    );
+
+    run_block_after_timeout();
+    rell.test.tx()
+        .op(hbridge.recall_pending_deposit(evm_address))
+        .nop()
+        .run_must_fail("No records found");
+}
+
+function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_registering_account() {
+    val ft_asset = register_foreign_asset();
+
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+
+    val amount = 10000000000000000000L;
+
+    deposit_from_ethereum(evm_address, amount);
+
+    val recipient_id = evm_address.hash();
+    log("recipient_id: %s".format(recipient_id));
+
+    assert_true("open" in create_on_transfer.get_pending_transfer_strategies(recipient_id));
+
+    val auth_descriptor = create_auth_descriptor(evm_address, ["A", "T"]);
+
+    val op1 = open.ras_transfer_open(auth_descriptor);
+    val op2 = strategies_ext.register_account();
+    val message = strategies_ext.get_register_account_message(
+        op1.to_gtx_operation(),
+        op2.to_gtx_operation()
+    );
+    val signature = test_utils.evm_sign(message, rell.test.privkeys.eve);
+    rell.test.tx()
+        .op(auth_ext.evm_signatures([evm_address], [signature]))
+        .op(op1)
+        .op(op2)
+        .nop()
+        .run();
+
+    assert_true(empty(create_on_transfer.get_pending_transfer_strategies(recipient_id)));
+
+    val ft_account = accounts.Account(recipient_id);
+
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
+
+    val op = hbridge.link_evm_account(evm_address);
+    val message2 = create_auth_message(auth_ext.get_auth_message_template(op.name, op.args.to_gtv()));
+    val signature2 = test_utils.evm_sign(message2, rell.test.privkeys.eve);
+    rell.test.tx()
+        .op(auth_ext.evm_signatures([evm_address], [signature2]))
+        .op(auth_ext.evm_auth(recipient_id, auth_descriptor.hash(), [signature2]))
+        .op(op)
+        .nop()
+        .run_must_fail("duplicate key value violates unique constraint");
+
+    run_block_after_timeout();
+    rell.test.tx()
+        .op(hbridge.recall_pending_deposit(evm_address))
+        .nop()
+        .run_must_fail("No records found");
+}
+
+function test_can_recall_unclaimed_deposit_from_ethereum_after_timeout_once_but_not_twice() {
+    val ft_asset = register_foreign_asset();
+
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+
+    val amount = 10000000000000000000L;
+
+    deposit_from_ethereum(evm_address, amount);
+
+    rell.test.tx()
+        .op(hbridge.recall_pending_deposit(evm_address))
+        .nop()
+        .run_must_fail("This transfer has not timed out yet");
+
+    run_block_after_timeout();
+    rell.test.tx()
+        .op(hbridge.recall_pending_deposit(evm_address))
+        .nop()
+        .run();
+
+    val other_withdraw_info = [
+        (1).to_gtv(),
+        network_id.to_gtv(),
+        to_32_byte_array(token_address).to_gtv(),
+        to_32_byte_array(evm_address).to_gtv(),
+        amount.to_gtv()
+    ];
+    assert_events(("eif_event", other_withdraw_info.to_gtv_pretty()));
+
+    rell.test.tx()
+        .op(hbridge.recall_pending_deposit(evm_address))
+        .nop()
+        .run_must_fail("No records found");
+}

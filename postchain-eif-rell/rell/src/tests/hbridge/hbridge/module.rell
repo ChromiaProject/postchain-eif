@@ -7,6 +7,9 @@ import lib.ft4.admin;
 import lib.ft4.accounts;
 import lib.ft4.assets;
 import lib.ft4.utils;
+import strategies_ext: lib.ft4.accounts.strategies.external;
+import create_on_transfer: lib.ft4.accounts.strategies.transfer;
+import lib.ft4.accounts.strategies.transfer.open;
 import test_utils: lib.ft4.test.utils;
 
 // event_receiver
@@ -32,104 +35,6 @@ val token_decimal = 6;
 val token_icon_url = "https://chromaway.com/chr";
 val network_id = 1;
 
-function test_deposit_foreign_ERC20_token_from_ethereum_with_already_linked_account() {
-    val ft_asset = register_foreign_asset();
-
-    val auth_descriptor = create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
-    val account_id = auth_descriptor.hash();
-    rell.test.tx().op(
-        admin.register_account(auth_descriptor)
-    ).sign(admin_privkey).run();
-    val ft_account = accounts.Account(account_id);
-
-    val evm_address = link_account(
-        rell.test.keypairs.eve,
-        rell.test.keypairs.alice,
-        account_id,
-        auth_descriptor.hash()
-    );
-
-    val amount = 10000000000000000000L;
-
-    assert_equals(assets.get_asset_balance(ft_account, ft_asset), 0L);
-
-    deposit_from_ethereum(evm_address, amount);
-
-    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
-}
-
-function test_withdraw_foreign_ERC20_token_to_ethereum_with_already_linked_account() {
-    val ft_asset = register_foreign_asset();
-
-    val auth_descriptor = create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
-    val account_id = auth_descriptor.hash();
-    rell.test.tx().op(
-        admin.register_account(auth_descriptor)
-    ).sign(admin_privkey).run();
-    val ft_account = accounts.Account(account_id);
-
-    val evm_address = link_account(
-        rell.test.keypairs.eve,
-        rell.test.keypairs.alice,
-        account_id,
-        auth_descriptor.hash()
-    );
-
-    val amount = 10000000000000000000L;
-
-    rell.test.tx().op(
-        admin.mint(account_id, ft_asset.id, amount)
-    ).sign(admin_privkey).run();
-
-    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
-
-    rell.test.tx()
-        .op(auth_ext.ft_auth(ft_account.id, auth_descriptor.hash()))
-        .op(hbridge.bridge_ft4_token_to_evm(network_id, ft_asset.id, amount / 2, evm_address))
-        .sign(rell.test.keypairs.alice).run();
-
-    val withdraw_info = [
-        (1).to_gtv(),
-        network_id.to_gtv(),
-        to_32_byte_array(token_address).to_gtv(),
-        to_32_byte_array(evm_address).to_gtv(),
-        (amount / 2).to_gtv()
-    ];
-    assert_events(("eif_event", withdraw_info.to_gtv_pretty()));
-
-    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount / 2);
-}
-
-function test_can_recall_unclaimed_deposit_from_ethereum_once_but_not_twice() {
-    val ft_asset = register_foreign_asset();
-
-    val bogus_evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.frank);
-
-    val amount = 10000000000000000000L;
-    
-    deposit_from_ethereum(bogus_evm_address, amount);
-
-    run_block_after_timeout();
-    rell.test.tx()
-        .op(hbridge.recall_pending_deposit(bogus_evm_address))
-        .nop()
-    .run();
-
-    val other_withdraw_info = [
-        (1).to_gtv(),
-        network_id.to_gtv(),
-        to_32_byte_array(token_address).to_gtv(),
-        to_32_byte_array(bogus_evm_address).to_gtv(),
-        amount.to_gtv()
-    ];
-    assert_events(("eif_event", other_withdraw_info.to_gtv_pretty()));
-
-    rell.test.tx()
-        .op(hbridge.recall_pending_deposit(bogus_evm_address))
-        .nop()
-    .run_must_fail("No records found");
-}
-
 function to_32_byte_array(evm_address: byte_array): byte_array {
     return byte_array.from_hex("000000000000000000000000" + evm_address.to_hex());
 }
@@ -153,7 +58,7 @@ function link_account(
         ft_keypair: rell.test.keypair,
         account_id: byte_array,
         auth_descriptor_id: byte_array
-): byte_array {
+) {
     val evm_address = crypto.eth_pubkey_to_address(evm_keypair.pub);
     val op = hbridge.link_evm_account(evm_address);
     val message = create_auth_message(auth_ext.get_auth_message_template(op.name, op.args.to_gtv()));
@@ -162,9 +67,9 @@ function link_account(
         .op(auth_ext.evm_signatures([evm_address], [signature]))
         .op(auth_ext.ft_auth(account_id, auth_descriptor_id))
         .op(op)
+        .nop()
         .sign(ft_keypair).run();
     assert_not_null(hbridge.evm_account_link @? { .address == evm_address });
-    return evm_address;
 }
 
 function deposit_from_ethereum(sender_address: byte_array, amount: big_integer) {
