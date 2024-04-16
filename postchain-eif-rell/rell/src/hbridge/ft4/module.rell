@@ -125,15 +125,7 @@ function () = ft4.auth.add_auth_handler(
 
 operation link_evm_account(address: byte_array) {
     val account = ft4.auth.authenticate();
-
-    // note: this would require ft4.evm_signatures operation
-    // I'm not sure how to request it from the client
     ft4.auth.verify_signers([address]);
-
-    // perhaps it would be better if we allow just ft4.evm_auth
-    // with an auth_descriptor which
-    // is single-signature EVM address. Or both?
-
     _link_evm_account(address, account);
 }
 
