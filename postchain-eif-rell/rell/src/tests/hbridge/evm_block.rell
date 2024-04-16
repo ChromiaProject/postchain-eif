@@ -6,6 +6,8 @@ import auth_ext: lib.ft4.auth.external;
 import lib.ft4.admin;
 import lib.ft4.accounts;
 import lib.ft4.assets;
+import lib.ft4.utils;
+import test_utils: lib.ft4.test.utils;
 import lib.ft4.accounts.{ auth_descriptor, auth_type };
 
 // event_receiver
@@ -31,7 +33,7 @@ function test_evm_block() {
     val user_privkey = x"71b5b7f8de0661af934a5e4612f3d0ba183e639bdf4e7452fb6457ed3cfbc825";
     val other_pubkey = "03229b4671a77dbf70bd8cfb375a034a2c331cf638607d883ee4a11dd4194f7af2";
     val other_privkey = x"89496a99e123e26ce7a65c0d810f3b49fbea1661522948f29f696ead84426c75";
-    val user_evm_address = x"e105ba42b66d08ac7ca7fc48c583599044a6dab3";
+    val user_evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
     val other_evm_address = x"661683e5d36e83b38b1a20247ba6f5c410dc165d";
     val event_name = "DepositedERC20";
     val amount = 10000000000000000000L;
@@ -55,11 +57,19 @@ function test_evm_block() {
         null.to_gtv()
     );
     val account_id = auth_descriptor.hash();
-    val sig = auth.signature(
-        r = x"39b0c8c44a10d0fd70c0ed0e833cf6d93818ae1b10777857eb868516932796dc",
-        s = x"44de8f297cce55c3da8401dd77269d0baf978f60e97ebc5717d4c8eeaed3bea9",
-        v = 28
-    );
+
+    rell.test.tx().op(
+        admin.register_account(auth_descriptor)
+    ).sign(admin_privkey).run();
+
+    val op = hbridge.link_evm_account(user_evm_address);
+    val message = create_auth_message(auth_ext.get_auth_message_template(op.name, op.args.to_gtv()));
+    val signature = test_utils.evm_sign(message, rell.test.privkeys.eve);
+    rell.test.tx()
+        .op(auth_ext.evm_signatures([user_evm_address], [signature]))
+        .op(auth_ext.ft_auth(account_id, auth_descriptor.hash()))
+        .op(op)
+        .sign(user_privkey).run();
 
     val ft_asset = assets.Asset(asset_id);
     val evm_account = hbridge.evm_account_link @ { .address == user_evm_address };
@@ -168,26 +178,69 @@ function test_evm_block() {
     // TODO get EVM balance val balance = assets.get_asset_balance(ft_asset);
     // assert_equals(balance, amount);
 
-    // withdraw erc20 token from EIF to EVM chain
-    val r = x"51a57dc379195ee8ebefb17a6d187c6133ad19f32a322b0bf1cb606af6cedd59";
-    val s = x"4382248996dae4277e9804c7972f545e8552a983d918491a05e26d963f47ebfe";
-    val v = 1;
-
-    val withdraw_amount = amount - 1000000;
-    rell.test.tx().op(
-        hbridge.recall_pending_deposit(other_evm_address)
-    ).sign(other_privkey).run();
+    run_block_after_timeout();
+    rell.test.tx()
+        .op(hbridge.recall_pending_deposit(other_evm_address))
+        .nop()
+    .run();
 
     val other_withdraw_info = list<gtv>();
-    other_withdraw_info.add((3).to_gtv());
+    other_withdraw_info.add((2).to_gtv());
     other_withdraw_info.add(network_id.to_gtv());
     other_withdraw_info.add(to_32_byte_array(token_address).to_gtv());
     other_withdraw_info.add(to_32_byte_array(other_evm_address).to_gtv());
-    other_withdraw_info.add((withdraw_amount).to_gtv());
+    other_withdraw_info.add((amount).to_gtv());
 
-    assert_events( ("eif_event", other_withdraw_info.to_gtv_pretty()));
+    assert_events(("eif_event", other_withdraw_info.to_gtv_pretty()));
+
+    rell.test.tx()
+        .op(hbridge.recall_pending_deposit(other_evm_address))
+        .nop()
+    .run_must_fail("No records found");
 }
 
 function to_32_byte_array(evm_address: byte_array): byte_array {
     return byte_array.from_hex("000000000000000000000000" + evm_address.to_hex());
+}
+
+function run_block_after_timeout() {
+    rell.test.set_next_block_time(rell.test.last_block_time + (utils.MILLISECONDS_PER_DAY * 10) + 1);
+    rell.test.block().run();
+}
+
+struct account_data {
+    ft_auth: () -> rell.test.op;
+    accounts.account;
+    auth_descriptor_id: byte_array;
+    rell.test.keypair;
+}
+
+// Copied from https://bitbucket.org/chromawallet/ft3-lib/src/fc5087434a964a28efcff8792519d898bbe3a258/rell/src/tests/assets/utils.rell#utils.rell-252
+function create_auth_message(template: text, account_data: account_data? = null) {
+    var message = template.replace(
+        auth.BLOCKCHAIN_RID_PLACEHOLDER,
+        chain_context.blockchain_rid.to_hex().upper_case()
+    );
+
+    if (account_data??) {
+        val nonce = accounts.account_auth_descriptor @ {
+            account_data.account,
+            .id == account_data.auth_descriptor_id
+        }.ctr;
+
+        message = message
+            .replace(
+                auth.ACCOUNT_ID_PLACEHOLDER,
+                account_data.account.id.to_hex().upper_case()
+            )
+            .replace(
+                auth.AUTH_DESCRIPTOR_ID_PLACEHOLDER,
+                account_data.auth_descriptor_id.to_hex().upper_case()
+            )
+            .replace(auth.NONCE_PLACEHOLDER, nonce.to_text());
+    } else {
+        message = message.replace(auth.NONCE_PLACEHOLDER, "0");
+    }
+
+    return message;
 }
