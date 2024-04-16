@@ -27,7 +27,7 @@ test:
   failOnError: false
   modules:
     - tests.utils
-    - tests.hbridge.evm_block
+    - tests.hbridge.hbridge
     - transaction_submitter.test
     - transaction_submitter.anchoring.test
     - transaction_submitter.signer_update.test
