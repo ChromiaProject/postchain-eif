@@ -33,13 +33,14 @@ function register_erc20_asset(
     network_id: integer,
     token_address: byte_array,
     ft4.assets.asset,
-    bridge_mode
+    mode: bridge_mode
 ) {
+    require(mode == bridge_mode.foreign, "native mode not supported yet");
     require(empty(erc20_asset @? { network_id, token_address }), "token already exists");
     create erc20_asset (
         network_id,
         token_address = token_address,
-        bridge_mode,
+        mode,
         asset,
         virtual_blockchain_rid = compute_virtual_blockchain_rid(network_id, token_address)
     );
