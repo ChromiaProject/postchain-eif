@@ -38,6 +38,16 @@ function test_withdraw_foreign_ERC20_token_to_ethereum_with_already_linked_accou
     ];
     assert_events(("eif_event", withdraw_info.to_gtv_pretty()));
 
+    assert_equals(hbridge.get_erc20_withdrawal(network_id, token_address, evm_address), [
+        struct<hbridge.erc20_withdraw>(
+            serial = 1,
+            network_id,
+            token_address,
+            beneficiary = evm_address,
+            amount / 2
+        )
+    ]);
+
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount / 2);
 }
 

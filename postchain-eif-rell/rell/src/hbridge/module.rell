@@ -49,7 +49,7 @@ function register_erc20_asset(
 function compute_virtual_blockchain_rid(network_id: integer, token_address: byte_array): byte_array =
     ("EVM", network_id, token_address).hash();
 
-// withdrawal from EVM to FT4, seems to be useful for queries?
+// withdrawal from EVM to FT4
 entity erc20_withdraw {
     key serial: integer;
     network_id: integer;
@@ -87,8 +87,8 @@ function bridge_increase_balance(ft4.accounts.account, ft4.assets.asset, amount:
     ft4.assets.Unsafe.mint(account, asset, amount);
 }
 
-// accounts might be linked either after account registration, or explicitly (e.g. when account_id
-// is not derived from EVM address
+// accounts might be linked either after account registration, or explicitly
+// (e.g. when account_id is not derived from EVM address)
 function _link_evm_account(address: byte_array, account: ft4.accounts.account) {
     create evm_account_link(.address = address, .account = account);
     val address_hash = address.hash();
@@ -163,7 +163,7 @@ function process_event(network_id: integer, evm_block_height: integer, evm_block
     val ft4_account = find_ft4_account_for_address(beneficiary);
     if (empty(ft4_account)) {
         // create account_creation_transfer to allow the account to be registered later
-        // note: we don't want to call create_on_transfer because it fails when requirements are not meant.
+        // note: we don't want to call create_on_transfer because it fails when requirements are not met.
         // we want to bounce instead
         val sender_blockchain_rid = erc20.virtual_blockchain_rid;
         val sender_id = beneficiary.hash();

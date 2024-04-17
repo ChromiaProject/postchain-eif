@@ -50,6 +50,12 @@ function register_foreign_asset(): assets.asset {
         helpers.register_erc20_asset(network_id, token_address, asset_id, hbridge.bridge_mode.foreign)
     ).run();
 
+    assert_equals(
+        hbridge.get_erc20_for_asset(asset_id),
+        [hbridge.erc20_info(network_id, token_address, hbridge.bridge_mode.foreign,
+            virtual_blockchain_rid = hbridge.compute_virtual_blockchain_rid(network_id, token_address))]
+    );
+
     return assets.Asset(asset_id);
 }
 
@@ -70,6 +76,9 @@ function link_account(
         .nop()
         .sign(ft_keypair).run();
     assert_not_null(hbridge.evm_account_link @? { .address == evm_address });
+
+    assert_equals(hbridge.get_account_for_address(evm_address), account_id);
+    assert_equals(hbridge.get_addresses_for_account(account_id), [evm_address]);
 }
 
 function deposit_from_ethereum(sender_address: byte_array, amount: big_integer) {
