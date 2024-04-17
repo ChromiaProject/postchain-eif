@@ -84,6 +84,10 @@ class EifGTXModule : SimpleGTXModule<Config>(
 
 }
 
+/**
+ * The `get_event_block_height()` query returns the block height of the withdrawal event by given event hash
+ *   - eventHash: GtvByteArray -- withdrawal event hash
+ */
 @Suppress("UNUSED_PARAMETER")
 fun eventBlockHeightQuery(config: Config, ctx: EContext, args: Gtv): Gtv {
     val argsDict = args.asDict()
@@ -93,6 +97,12 @@ fun eventBlockHeightQuery(config: Config, ctx: EContext, args: Gtv): Gtv {
     return gtv(eventInfo.blockHeight)
 }
 
+/**
+ * The `get_event_merkle_proof()` query returns withdrawal event confirmation proof by given event hash
+ *   - eventHash: GtvByteArray -- withdrawal event hash
+ *   - signers: GtvArray<GtvByteArray> -- `signers` component of the alternative block witness; usually used when signers change after a transfer to EVM has been initiated
+ *   - signatures: GtvArray<GtvByteArray> -- `signatures` component of the alternative block witness; usually used when signers change after a transfer to EVM has been initiated
+ */
 fun eventMerkleProofQuery(config: Config, ctx: EContext, args: Gtv): Gtv {
     val argsDict = args.asDict()
     val eventHash = argsDict["eventHash"]!!.asString().hexStringToByteArray()
@@ -128,8 +138,11 @@ internal fun validateSignatures(blockRid: ByteArray, signers: Array<out Gtv>?, s
 }
 
 /**
- * blockHeight should be the latest block height that the global snapshot was updated.
- * That mean the block header's extra data should contain the state root hash as well.
+ * The `get_account_state_merkle_proof()` query returns an account state confirmation proof as of `blockHeight` by the given `accountNumber`
+ *   - blockHeight: GtvInteger -- specifies the latest block height at which the global snapshot was updated; the corresponding block header's extra data must also contain the state root hash
+ *   - accountNumber: GtvInteger -- the EVM account link ID
+ *   - signers: GtvArray<GtvByteArray> -- `signers` component of the alternative block witness; usually used when signers change after a transfer to EVM has been initiated
+ *   - signatures: GtvArray<GtvByteArray> -- `signatures` component of the alternative block witness; usually used when signers change after a transfer to EVM has been initiated
  */
 fun accountStateMerkleProofQuery(config: Config, ctx: EContext, args: Gtv): Gtv {
     val argsDict = args.asDict()
