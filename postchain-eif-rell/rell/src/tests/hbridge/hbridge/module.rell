@@ -19,7 +19,7 @@ import eif_event_receiver_chain.test.helpers.*;
 import eif_event_receiver_connector.*;
 
 import eif.common;
-import hbridge: hbridge.ft4;
+import hbridge;
 
 import ^.helpers;
 

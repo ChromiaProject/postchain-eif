@@ -1,7 +1,7 @@
 module;
 
 import lib.ft4.assets;
-import hbridge: hbridge.ft4;
+import hbridge;
 
 operation register_erc20_asset(
     network_id: integer,

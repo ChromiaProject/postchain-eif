@@ -90,7 +90,7 @@ blockchains:
       sync_ext:
         - "net.postchain.eif.EifSynchronizationInfrastructureExtension"
   hbridge:
-    module: hbridge.ft4
+    module: hbridge
     config:
       gtx:
         modules:
@@ -189,7 +189,7 @@ libs:
     path: rell/src/lib/ft4
     # TODO use this when released: tagOrBranch: v0.7.0r
     tagOrBranch: hbridge
-    rid: x"FD27ABFA0CEA9B460EA4CEADE8993915B52F2D0437D923969B902422A908CD19"
+    rid: x"044FFAB3E3352C91C6A8704667F4DA0BAA42631A80D7F5A51D09AC2BD2DB79E4"
     insecure: false
   iccf:
     registry: https://gitlab.com/chromaway/core/directory-chain
