@@ -19,6 +19,30 @@ enum bridge_mode {
     foreign
 }
 
+// withdrawal from EVM to FT4
+entity erc20_withdraw {
+    key serial: integer;
+    network_id: integer;
+    token_address: byte_array;
+    index network_id, token_address;
+    index beneficiary: byte_array;
+    amount: big_integer;
+}
+
+// one EVM account might be linked to one FT4 account
+entity evm_account_link {
+    key address: byte_array;
+    index ft4.accounts.account;
+}
+
+// potential account_id
+entity pending_deposit {
+    key sender_address: byte_array;
+    key recipient_id: byte_array;
+    token: erc20_asset;
+    index ft4.transfer_strategy.account_creation_transfer;
+}
+
 // link between ERC20 token and FT4 asset
 entity erc20_asset {
     network_id: integer;
@@ -49,59 +73,30 @@ function register_erc20_asset(
 function compute_virtual_blockchain_rid(network_id: integer, token_address: byte_array): byte_array =
     ("EVM", network_id, token_address).hash();
 
-// withdrawal from EVM to FT4
-entity erc20_withdraw {
-    key serial: integer;
-    network_id: integer;
-    token_address: byte_array;
-    index network_id, token_address;
-    index beneficiary: byte_array;
-    amount: big_integer;
-}
-
-// one EVM account might be linked to one FT4 account
-entity evm_account_link {
-    key address: byte_array;
-    index ft4.accounts.account;
-}
-
-// potential account_id
-entity pending_deposit {
-    key sender_address: byte_array;
-    key recipient_id: byte_array;
-    token: erc20_asset;
-    index ft4.transfer_strategy.account_creation_transfer;
-}
-
-// function which deducts balance from the account in a smart way:
-//  * burn when bridge is in foreign mode
-//  * transfer to pool account when bridge is in native mode
-function bridge_deduct_balance(ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
-    ft4.assets.Unsafe.burn(account, asset, amount);
-}
-
-// function which increase balance of the account in a smart way:
-//  * mint when bridge is in foreign mode
-//  * transfer from pool account when bridge is in native mode
-function bridge_increase_balance(ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
-    ft4.assets.Unsafe.mint(account, asset, amount);
+@extend(ft4.strategies.after_register_account)
+function (ft4.accounts.account) {
+    val pending = pending_deposit @? { .recipient_id == account.id };
+    if (pending != null) {
+        // note: We assume it's impossible to register an account with account_id matching
+        // the address of the pending deposit without proper signature and stuff
+        _link_evm_account(pending.sender_address, account);
+        delete pending;
+    }
 }
 
 // accounts might be linked either after account registration, or explicitly
 // (e.g. when account_id is not derived from EVM address)
 function _link_evm_account(address: byte_array, account: ft4.accounts.account) {
-    create evm_account_link(.address = address, .account = account);
+    create evm_account_link(address, account);
     val address_hash = address.hash();
 
     // there's a possibility that the account_id is different from address hash
     // collect funds from the pool account here
     for (account_creation_transfer in ft4.transfer_strategy.account_creation_transfer @* {
         .recipient_id == address_hash, .state == ft4.transfer_strategy.account_creation_state.pending
-    })
-    {
+    }) {
         val pending = pending_deposit @? { account_creation_transfer }; // TODO: perhaps iterate pending_deposit instead
-        if (empty(pending)) {
-            // weird
+        if (empty(pending)) { // weird
             continue;
         }
         val pool_account = ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid);
@@ -118,25 +113,8 @@ function _link_evm_account(address: byte_array, account: ft4.accounts.account) {
     }
 }
 
-@extend(ft4.strategies.after_register_account)
-function (ft4.accounts.account) {
-    val pending = pending_deposit @? { .recipient_id == account.id };
-    if (pending != null) {
-        // note: We assume it's impossible to register an account with account_id matching
-        // the address of the pending deposit without proper signature and stuff
-        _link_evm_account(pending.sender_address, account);
-        delete pending;
-    }
-}
-
 function find_ft4_account_for_address(address: byte_array): ft4.accounts.account? {
     return evm_account_link @? { address } .account;
-}
-
-// return deposit if we cannot credit it to the account
-function bounce_deposit_event(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
-    log("deposit event bounced");
-    emit_withdraw_event(network_id, token_address, beneficiary, amount);
 }
 
 @extend(messaging.handle_evm_block)
@@ -199,6 +177,12 @@ function process_event(network_id: integer, evm_block_height: integer, evm_block
     }
 }
 
+// return deposit if we cannot credit it to the account
+function bounce_deposit_event(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
+    log("deposit event bounced");
+    emit_withdraw_event(network_id, token_address, beneficiary, amount);
+}
+
 function emit_withdraw_event(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
     val next_serial = common.event_counter.counter + 1;
     common.event_counter.counter = next_serial;
@@ -220,4 +204,18 @@ function emit_withdraw_event(network_id: integer, token_address: byte_array, ben
     ];
 
     op_context.emit_event("eif_event", withdraw_info.to_gtv());
+}
+
+// function which deducts balance from the account in a smart way:
+//  * burn when bridge is in foreign mode
+//  * transfer to pool account when bridge is in native mode
+function bridge_deduct_balance(ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
+    ft4.assets.Unsafe.burn(account, asset, amount);
+}
+
+// function which increase balance of the account in a smart way:
+//  * mint when bridge is in foreign mode
+//  * transfer from pool account when bridge is in native mode
+function bridge_increase_balance(ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
+    ft4.assets.Unsafe.mint(account, asset, amount);
 }
