@@ -133,7 +133,7 @@ function process_event(network_id: integer, evm_block_height: integer, evm_block
 
     val erc20 = erc20_asset @? { network_id, token_address };
     if (erc20 == null) {
-        log("ERC20 token not found");
+        log("deposit event bounced: ERC20 token not found");
         bounce_deposit_event(network_id, token_address, beneficiary, amount);
         return;
     }
@@ -156,7 +156,7 @@ function process_event(network_id: integer, evm_block_height: integer, evm_block
         );
 
         if (empty(rules)) {
-            log("No rules found for transfer");
+            log("deposit event bounced: no rules found for transfer");
             bounce_deposit_event(network_id, token_address, beneficiary, amount);
             return;
         }
@@ -179,7 +179,6 @@ function process_event(network_id: integer, evm_block_height: integer, evm_block
 
 // return deposit if we cannot credit it to the account
 function bounce_deposit_event(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
-    log("deposit event bounced");
     emit_withdraw_event(network_id, token_address, beneficiary, amount);
 }
 
