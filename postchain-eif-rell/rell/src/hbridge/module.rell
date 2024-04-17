@@ -73,46 +73,6 @@ function register_erc20_asset(
 function compute_virtual_blockchain_rid(network_id: integer, token_address: byte_array): byte_array =
     ("EVM", network_id, token_address).hash();
 
-@extend(ft4.strategies.after_register_account)
-function (ft4.accounts.account) {
-    val pending = pending_deposit @? { .recipient_id == account.id };
-    if (pending != null) {
-        // note: We assume it's impossible to register an account with account_id matching
-        // the address of the pending deposit without proper signature and stuff
-        _link_evm_account(pending.sender_address, account);
-        delete pending;
-    }
-}
-
-// accounts might be linked either after account registration, or explicitly
-// (e.g. when account_id is not derived from EVM address)
-function _link_evm_account(address: byte_array, account: ft4.accounts.account) {
-    create evm_account_link(address, account);
-    val address_hash = address.hash();
-
-    // there's a possibility that the account_id is different from address hash
-    // collect funds from the pool account here
-    for (account_creation_transfer in ft4.transfer_strategy.account_creation_transfer @* {
-        .recipient_id == address_hash, .state == ft4.transfer_strategy.account_creation_state.pending
-    }) {
-        val pending = pending_deposit @? { account_creation_transfer }; // TODO: perhaps iterate pending_deposit instead
-        if (empty(pending)) { // weird
-            continue;
-        }
-        val pool_account = ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid);
-        ft4.assets.Unsafe.transfer(
-            pool_account,
-            account,
-            account_creation_transfer.asset,
-            account_creation_transfer.amount);
-
-        account_creation_transfer.state = ft4.transfer_strategy.account_creation_state.done;
-        account_creation_transfer.final_tx_rid = op_context.transaction.tx_rid;
-        account_creation_transfer.final_op_index = op_context.op_index;
-        delete pending;
-    }
-}
-
 function find_ft4_account_for_address(address: byte_array): ft4.accounts.account? {
     return evm_account_link @? { address } .account;
 }
@@ -174,6 +134,46 @@ function process_event(network_id: integer, evm_block_height: integer, evm_block
         create pending_deposit(sender_address = beneficiary, recipient_id, creation, erc20);
     } else {
         bridge_increase_balance(ft4_account, erc20.asset, amount);
+    }
+}
+
+@extend(ft4.strategies.after_register_account)
+function (ft4.accounts.account) {
+    val pending = pending_deposit @? { .recipient_id == account.id };
+    if (pending != null) {
+        // note: We assume it's impossible to register an account with account_id matching
+        // the address of the pending deposit without proper signature and stuff
+        _link_evm_account(pending.sender_address, account);
+        delete pending;
+    }
+}
+
+// accounts might be linked either after account registration, or explicitly
+// (e.g. when account_id is not derived from EVM address)
+function _link_evm_account(address: byte_array, account: ft4.accounts.account) {
+    create evm_account_link(address, account);
+    val address_hash = address.hash();
+
+    // there's a possibility that the account_id is different from address hash
+    // collect funds from the pool account here
+    for (account_creation_transfer in ft4.transfer_strategy.account_creation_transfer @* {
+        .recipient_id == address_hash, .state == ft4.transfer_strategy.account_creation_state.pending
+    }) {
+        val pending = pending_deposit @? { account_creation_transfer }; // TODO: perhaps iterate pending_deposit instead
+        if (empty(pending)) { // weird
+            continue;
+        }
+        val pool_account = ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid);
+        ft4.assets.Unsafe.transfer(
+            pool_account,
+            account,
+            account_creation_transfer.asset,
+            account_creation_transfer.amount);
+
+        account_creation_transfer.state = ft4.transfer_strategy.account_creation_state.done;
+        account_creation_transfer.final_tx_rid = op_context.transaction.tx_rid;
+        account_creation_transfer.final_op_index = op_context.op_index;
+        delete pending;
     }
 }
 
