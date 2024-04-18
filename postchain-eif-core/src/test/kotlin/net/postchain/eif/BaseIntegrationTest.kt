@@ -1,7 +1,5 @@
 package net.postchain.eif
 
-import com.google.gson.GsonBuilder
-import com.google.gson.JsonObject
 import net.postchain.common.BlockchainRid
 import net.postchain.common.data.Hash
 import net.postchain.common.hexStringToByteArray
@@ -70,11 +68,11 @@ abstract class EifBaseIntegrationTest(evmType: EvmType, private val prependUrls:
             .create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
     val registerAccounts = mutableListOf<AccountRegister>()
     val snapshotHeights = mutableListOf<Long>()
-    val tokenBridgeBinary = getBinaryFromArtifactResource("/artifacts/contracts/TokenBridge.sol/TokenBridge.json")
+    val tokenBridgeBinary = getBinaryFromArtifactResource("/net/postchain/eif/contracts/TokenBridge.bin")
     val tokenBridgeWithSnapshotWithdrawBinary =
-            getBinaryFromArtifactResource("/artifacts/contracts/TokenBridgeWithSnapshotWithdraw.sol/TokenBridgeWithSnapshotWithdraw.json")
-    val testTokenBinary = getBinaryFromArtifactResource("/artifacts/contracts/token/TestToken.sol/TestToken.json")
-    val validatorBinary = getBinaryFromArtifactResource("/artifacts/contracts/Validator.sol/Validator.json")
+            getBinaryFromArtifactResource("/net/postchain/eif/contracts/TokenBridgeWithSnapshotWithdraw.bin")
+    val testTokenBinary = getBinaryFromArtifactResource("/net/postchain/eif/contracts/TestToken.bin")
+    val validatorBinary = getBinaryFromArtifactResource("/net/postchain/eif/contracts/Validator.bin")
 
     lateinit var web3j: Web3j
     lateinit var transactionManager: TransactionManager
@@ -125,9 +123,7 @@ abstract class EifBaseIntegrationTest(evmType: EvmType, private val prependUrls:
 
     // get smart contract binary from resource
     fun getBinaryFromArtifactResource(resourcePath: String): String {
-        val artifactFile = javaClass.getResource(resourcePath)?.readText()
-        val artifactJson = GsonBuilder().create().fromJson(artifactFile, JsonObject::class.java)
-        return artifactJson.get("bytecode").asString
+        return javaClass.getResource(resourcePath)?.readText()!!
     }
 
     /**

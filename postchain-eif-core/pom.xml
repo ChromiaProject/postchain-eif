@@ -45,14 +45,6 @@
         </dependency>
         <dependency>
             <groupId>net.postchain</groupId>
-            <artifactId>postchain-eif-contracts</artifactId>
-            <version>${project.version}</version>
-            <classifier>sources</classifier>
-            <scope>provided</scope>
-            <type>tar.gz</type>
-        </dependency>
-        <dependency>
-            <groupId>net.postchain</groupId>
             <artifactId>postchain-eif-rell</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -176,25 +168,6 @@
             </plugin>
 
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <phase>generate-resources</phase>
-                        <goals>
-                            <goal>unpack-dependencies</goal>
-                        </goals>
-                        <configuration>
-                            <classifier>sources</classifier>
-                            <includeArtifactIds>postchain-eif-contracts</includeArtifactIds>
-                            <includeTypes>tar.gz</includeTypes>
-                            <outputDirectory>${project.build.directory}</outputDirectory>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>
                 <version>3.0.0</version>
@@ -220,9 +193,7 @@
                         <configuration>
                             <resources>
                                 <resource>
-                                    <directory>
-                                        target/postchain-eif-contracts
-                                    </directory>
+                                    <directory>target/generated-test-resources</directory>
                                 </resource>
                             </resources>
                         </configuration>
@@ -251,23 +222,23 @@
                     <pathPrefixes>
                         <pathPrefix>@openzeppelin=../node_modules/@openzeppelin</pathPrefix>
                     </pathPrefixes>
-                    <abiSourceFiles>
-                        <directory>${project.build.directory}/postchain-eif-contracts/abi</directory>
+                    <soliditySourceFiles>
+                        <directory>${project.parent.basedir}/postchain-eif-contracts/contracts</directory>
                         <includes>
-                            <include>**/TokenBridge.json</include>
-                            <include>**/TokenBridgeWithSnapshotWithdraw.json</include>
-                            <include>**/TestToken.json</include>
-                            <include>**/Validator.json</include>
-                            <include>**/Anchoring.json</include>
-                            <include>**/DirectoryChainValidator.json</include>
-                            <include>**/ManagedValidator.json</include>
+                            <include>TokenBridge.sol</include>
+                            <include>TokenBridgeWithSnapshotWithdraw.sol</include>
+                            <include>**/TestToken.sol</include>
+                            <include>**/Validator.sol</include>
+                            <include>**/Anchoring.sol</include>
+                            <include>**/DirectoryChainValidator.sol</include>
+                            <include>**/ManagedValidator.sol</include>
                         </includes>
-                    </abiSourceFiles>
+                    </soliditySourceFiles>
                     <outputDirectory>
-                        <abi>${project.basedir}/target/generated-test-resources</abi>
+                        <bin>${project.basedir}/target/generated-test-resources</bin>
                         <java>${project.basedir}/target/generated-test-sources</java>
                     </outputDirectory>
-                    <outputFormat>java,abi</outputFormat>
+                    <outputFormat>java,bin</outputFormat>
                 </configuration>
                 <executions>
                     <execution>

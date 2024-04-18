@@ -68,7 +68,7 @@ class EvmSignerUpdateIT : EifBaseIntegrationTest(
 
         // Deploy directory chain validator contract
         val encodedDirectoryValidatorConstructor = FunctionEncoder.encodeConstructor(listOf(Bytes32(directoryChainBrid.data), DynamicArray(Address::class.java, Address(getEthereumAddress(node.appConfig.pubKeyByteArray).toHex()))))
-        val directoryChainValidatorBinary = getBinaryFromArtifactResource("/artifacts/contracts/validatorupdate/DirectoryChainValidator.sol/DirectoryChainValidator.json")
+        val directoryChainValidatorBinary = getBinaryFromArtifactResource("/net/postchain/eif/contracts/DirectoryChainValidator.bin")
         directoryValidatorContract = Contract.deployRemoteCall(DirectoryChainValidator::class.java, web3j, transactionManager, gasProvider, directoryChainValidatorBinary, encodedDirectoryValidatorConstructor).send()
 
         txSubmitterModule = node.getModules(txSubmitterChain).filterIsInstance<TransactionSubmitterSignerUpdateGTXModule>().first()
@@ -82,7 +82,7 @@ class EvmSignerUpdateIT : EifBaseIntegrationTest(
         // Deploy chain to update validator contract
         val initialSigner = cryptoSystem.generateKeyPair()
         val chainToUpdateBrid = BlockchainRid(ByteArray(32) { 1 })
-        val managedValidatorBinary = getBinaryFromArtifactResource("/artifacts/contracts/validatorupdate/ManagedValidator.sol/ManagedValidator.json")
+        val managedValidatorBinary = getBinaryFromArtifactResource("/net/postchain/eif/contracts/ManagedValidator.bin")
         val encodedValidatorConstructor = FunctionEncoder.encodeConstructor(listOf(Bytes32(chainToUpdateBrid.data), DynamicArray(Address::class.java, Address(getEthereumAddress(initialSigner.pubKey.data).toHex())), Address(directoryValidatorContract.contractAddress)))
         val validatorContract = Contract.deployRemoteCall(ManagedValidator::class.java, web3j, transactionManager, gasProvider, managedValidatorBinary, encodedValidatorConstructor).send()
 
