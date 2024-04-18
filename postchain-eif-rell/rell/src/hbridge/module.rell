@@ -143,13 +143,12 @@ function (ft4.accounts.account) {
     if (pending != null) {
         // note: We assume it's impossible to register an account with account_id matching
         // the address of the pending deposit without proper signature and stuff
-        _link_evm_account(pending.sender_address, account);
+        create evm_account_link(pending.sender_address, account);
         delete pending;
     }
 }
 
-// accounts might be linked either after account registration, or explicitly
-// (e.g. when account_id is not derived from EVM address)
+// accounts might be linked explicitly (e.g. when account_id is not derived from EVM address)
 function _link_evm_account(address: byte_array, account: ft4.accounts.account) {
     create evm_account_link(address, account);
     val address_hash = address.hash();
