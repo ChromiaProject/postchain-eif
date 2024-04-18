@@ -15,8 +15,6 @@ include:
         - "*/target/surefire-reports/TEST-*.xml"
         - "*/target/failsafe-reports/TEST-*.xml"
     expire_in: 1 week
-  before_script:
-    - git config --global url."https://".insteadOf ssh://
 
 stages:
   - build
