@@ -82,11 +82,10 @@ This document describes errors that might occur during work with the Token Bridg
 
 * `TokenBridge: block signature is invalid`
 * Check the withdrawal event data on the Chromia side. *)
-* One of the reasons for this error is that the Chromia validator set might have changed on the EVM side after the withdrawal event proof was built. You can compare the cluster signer list where your dapp is running with the validator set hosted in the `IValidator` contract of the Token Bridge. If they mismatch, you must re-confirm the withdrawal event proof against the latest cluster signers on the Chromia side:
+* One of the reasons for this error is that the Chromia validator set might have changed on the EVM side after the withdrawal event proof was built. You can compare the cluster signer list where your dapp is running with the validator list hosted in the `IValidator` contract of the Token Bridge. If they mismatch, you must re-confirm the withdrawal event proof against the latest cluster signers on the Chromia side:
   * Fetch the actual cluster signer list where your dapp is running on the Chromia side (`pmc cluster info`).
   * For each signer, fetch and verify the signature of the block where the withdrawal event was initiated (`GET /blocks/{blockchainRid}/confirm/{blockRid}`).
-  * Encode the received signatures and build a new withdrawal event proof.
-  * Then, request the withdrawal again.
+  * Re-request the withdrawal confirmation proof by passing the `signers` and `signatures` values to the `get_event_merkle_proof()` query.
   * For more details, see the `withdraw token to evm()` integration test in `./postchain-eif-core/src/test/kotlin/net/postchain/eif/EifIntegrationTest.kt` 
 
 

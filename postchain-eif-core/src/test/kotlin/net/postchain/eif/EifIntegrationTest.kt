@@ -16,7 +16,6 @@ import net.postchain.concurrent.util.get
 import net.postchain.core.BlockRid
 import net.postchain.core.block.BlockQueries
 import net.postchain.crypto.KeyPair
-import net.postchain.crypto.Signature
 import net.postchain.crypto.devtools.KeyPairHelper
 import net.postchain.devtools.PostchainTestNode
 import net.postchain.devtools.PostchainTestNode.Companion.DEFAULT_CHAIN_IID
@@ -37,7 +36,11 @@ import org.awaitility.Awaitility
 import org.awaitility.Duration
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertArrayEquals
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.MethodOrderer
@@ -417,21 +420,17 @@ abstract class EifIntegrationTest(evmType: EvmType) : EifBaseIntegrationTest(
         val eventBlockHeight = blockQuery.query("get_event_block_height",
                 gtv("eventHash" to gtv(eventHash.toHex()))
         ).get().asInteger()
-
         val blockRid = nodes[0].getRestApiModel(bcRid)?.getBlock(eventBlockHeight, true)!!.rid
-        val signature0 = nodes[0].getRestApiModel(bcRid)?.confirmBlock(BlockRid(blockRid))!!
-        assertThat(cryptoSystem.verifyDigest(blockRid, signature0.toSignature())).isEqualTo(true)
-        val signature1 = nodes[1].getRestApiModel(bcRid)?.confirmBlock(BlockRid(blockRid))!!
-        assertThat(cryptoSystem.verifyDigest(blockRid, signature1.toSignature())).isEqualTo(true)
-        val signatures = listOf(
-                EifSignature(
-                        encodeSignatureWithV(blockRid, Signature(signature0.subjectID, signature0.data)),
-                        getEthereumAddress(signature0.subjectID)),
-                EifSignature(
-                        encodeSignatureWithV(blockRid, Signature(signature1.subjectID, signature1.data)),
-                        getEthereumAddress(signature1.subjectID))
-        ).sortedBy { it.pubkey.toHex() }
-        val eventProof2 = eventProof.copy(blockWitness = signatures)
+        val newBlockWitness = listOf(
+                nodes[0].getRestApiModel(bcRid)?.confirmBlock(BlockRid(blockRid))!!,
+                nodes[1].getRestApiModel(bcRid)?.confirmBlock(BlockRid(blockRid))!!
+        )
+
+        val eventProof2 = blockQuery.query("get_event_merkle_proof", gtv(
+                "eventHash" to gtv(eventHash.toHex()),
+                "signers" to gtv(newBlockWitness.map { gtv(it.subjectID) }),
+                "signatures" to gtv(newBlockWitness.map { gtv(it.data) }),
+        )).get().toObject<EventMerkleProof>()
 
         logger.info { "\trequesting withdrawal using the new confirmation proof" }
         val receipt = bridge.withdrawRequest(
