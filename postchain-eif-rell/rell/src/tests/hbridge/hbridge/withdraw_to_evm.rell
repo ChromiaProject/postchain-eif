@@ -29,24 +29,7 @@ function test_withdraw_foreign_ERC20_token_to_ethereum_with_already_linked_accou
         .op(hbridge.bridge_ft4_token_to_evm(network_id, ft_asset.id, amount / 2, evm_address))
         .sign(rell.test.keypairs.alice).run();
 
-    val withdraw_info = [
-        (1).to_gtv(),
-        network_id.to_gtv(),
-        to_32_byte_array(token_address).to_gtv(),
-        to_32_byte_array(evm_address).to_gtv(),
-        (amount / 2).to_gtv()
-    ];
-    assert_events(("eif_event", withdraw_info.to_gtv_pretty()));
-
-    assert_equals(hbridge.get_erc20_withdrawal(network_id, token_address, evm_address), [
-        struct<hbridge.erc20_withdraw>(
-            serial = 1,
-            network_id,
-            token_address,
-            beneficiary = evm_address,
-            amount / 2
-        )
-    ]);
+    assert_withdraw(1, evm_address, amount / 2);
 
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount / 2);
 }

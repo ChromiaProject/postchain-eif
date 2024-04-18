@@ -121,6 +121,14 @@ function process_event(network_id: integer, evm_block_height: integer, evm_block
             return;
         }
 
+        if (not empty(ft4.transfer_strategy.account_creation_transfer @* {
+            recipient_id, erc20.asset, .state == ft4.transfer_strategy.account_creation_state.pending
+        })) {
+            log("deposit event bounced: this token has already been transferred, and has not been claimed yet");
+            bounce_deposit_event(network_id, token_address, beneficiary, amount);
+            return;
+        }
+
         bridge_increase_balance(ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid),
             erc20.asset, amount);
 

@@ -92,19 +92,22 @@ function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_l
         .run_must_fail("No records found");
 }
 
-function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_registering_account() {
+function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_registering_account_and_duplicate_deposit_will_bounce() {
     val ft_asset = register_foreign_asset();
 
     val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
 
     val amount = 10000000000000000000L;
+    val amount2 = 5000000000000000000L;
 
-    deposit_from_ethereum(evm_address, amount);
+    deposit_from_ethereum(evm_address, amount, block_height=1);
 
     val recipient_id = evm_address.hash();
-    log("recipient_id: %s".format(recipient_id));
 
     assert_true("open" in create_on_transfer.get_pending_transfer_strategies(recipient_id));
+
+    deposit_from_ethereum(evm_address, amount2, block_height=2);
+    assert_withdraw(1, evm_address, amount2);
 
     val auth_descriptor = create_auth_descriptor(evm_address, ["A", "T"]);
 

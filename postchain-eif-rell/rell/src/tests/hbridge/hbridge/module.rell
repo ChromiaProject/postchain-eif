@@ -81,12 +81,12 @@ function link_account(
     assert_equals(hbridge.get_addresses_for_account(account_id), [evm_address]);
 }
 
-function deposit_from_ethereum(sender_address: byte_array, amount: big_integer) {
+function deposit_from_ethereum(sender_address: byte_array, amount: big_integer, block_height: integer = 1) {
     val events = [
         event_data(
-            tnx_hash = x"26b1a0d2c8ed8e32efff45232a106b459aeb23c98d83478eb5f29ca4109be13c",
+            tnx_hash = ("TX", block_height).hash(),
             log_index = 1,
-            signature = x"4090023c909f5c377c211a8e8aedd778ec5de71852d4d66b4bb2fe6fc033211f",
+            signature = ("SIG", block_height).hash(),
             contract_address = contract_address,
             name = event_name,
             indexed_values = [sender_address.to_gtv(), token_address.to_gtv()],
@@ -94,8 +94,7 @@ function deposit_from_ethereum(sender_address: byte_array, amount: big_integer) 
         )
     ];
     val account_number_1 = 1;
-    val block_height = 100;
-    val block_hash = x"508ccf97bb5fac1546ac0040793e32d0336e764d62b60810fd460d445adfde64";
+    val block_hash = ("BLOCK", block_height).hash();
     rell.test.tx().op(
         evm_block_op(network_id, block_height, block_hash, events)
     ).run();
@@ -114,7 +113,6 @@ function deposit_from_ethereum(sender_address: byte_array, amount: big_integer) 
             evm_block_message(network_id, evm_block_height = block_height, block_hash, events).to_gtv()
         )
     ).run();
-    assert_events();
 }
 
 function run_block_after_timeout() {
@@ -148,4 +146,25 @@ function create_auth_message(template: text) {
     message = message.replace(auth.NONCE_PLACEHOLDER, "0");
 
     return message;
+}
+
+function assert_withdraw(serial: integer, evm_address: byte_array, amount: big_integer) {
+    val withdraw_info = [
+        serial.to_gtv(),
+        network_id.to_gtv(),
+        to_32_byte_array(token_address).to_gtv(),
+        to_32_byte_array(evm_address).to_gtv(),
+        amount.to_gtv()
+    ];
+    assert_events(("eif_event", withdraw_info.to_gtv_pretty()));
+
+    assert_equals(hbridge.get_erc20_withdrawal(network_id, token_address, evm_address), [
+        struct<hbridge.erc20_withdraw>(
+            serial,
+            network_id,
+            token_address,
+            beneficiary = evm_address,
+            amount
+        )
+    ]);
 }
