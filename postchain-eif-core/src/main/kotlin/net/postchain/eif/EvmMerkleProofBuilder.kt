@@ -31,13 +31,13 @@ class EvmMerkleProofBuilder(
 
     private val merkleHashCalculator = GtvMerkleHashCalculator(cryptoSystem)
 
-    fun build(ctx: EContext, blockHeight: Long, blockRid: ByteArray, data: ByteArray, hash: ByteArray, position: Long, signatures: Array<Signature>? = null): EvmMerkleProof {
+    fun build(ctx: EContext, blockHeight: Long, blockRid: ByteArray, data: ByteArray, hash: ByteArray, position: Long, clientProvidedSignatures: Array<Signature>? = null): EvmMerkleProof {
         val db = DatabaseAccess.of(ctx)
         val blockHeader = BaseBlockHeader(db.getBlockHeader(ctx, blockRid), merkleHashCalculator).blockHeaderRec
         return EvmMerkleProof(
                 data = data,
                 blockHeader = encodeBlockHeaderDataForEVM(blockRid, blockHeader, merkleHashCalculator),
-                blockWitness = blockWitnessData(db, ctx, blockRid, signatures),
+                blockWitness = blockWitnessData(db, ctx, blockRid, clientProvidedSignatures),
                 proof = proof(blockHeight, hash, position),
                 extraMerkleProof = extraMerkleProof(blockHeader)
         )
@@ -47,10 +47,10 @@ class EvmMerkleProofBuilder(
             db: DatabaseAccess,
             ctx: EContext,
             blockRid: ByteArray,
-            signatures: Array<Signature>?
+            clientProvidedSignatures: Array<Signature>?
     ): List<EifSignature> {
-        val signatures0 = signatures ?: BaseBlockWitness.fromBytes(db.getWitnessData(ctx, blockRid)).getSignatures()
-        return signatures0.map {
+        val signatures = clientProvidedSignatures ?: BaseBlockWitness.fromBytes(db.getWitnessData(ctx, blockRid)).getSignatures()
+        return signatures.map {
             EifSignature(
                     sig = encodeSignatureWithV(blockRid, it),
                     pubkey = getEthereumAddress(it.subjectID)
