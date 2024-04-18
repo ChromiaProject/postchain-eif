@@ -174,8 +174,8 @@ function test_can_recall_unclaimed_deposit_from_ethereum_after_timeout_once_but_
     val other_withdraw_info = [
         (1).to_gtv(),
         network_id.to_gtv(),
-        to_32_byte_array(token_address).to_gtv(),
-        to_32_byte_array(evm_address).to_gtv(),
+        eif_utils.to_32_byte_array(token_address).to_gtv(),
+        eif_utils.to_32_byte_array(evm_address).to_gtv(),
         amount.to_gtv()
     ];
     assert_events(("eif_event", other_withdraw_info.to_gtv_pretty()));

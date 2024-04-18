@@ -1,5 +1,4 @@
 @mount('eif.utils')
 module;
 
-// TODO: extend byte array instead
-function zero_pad(array: byte_array): byte_array = byte_array.from_hex("000000000000000000000000" + array.to_hex());
+function to_32_byte_array(array: byte_array): byte_array = (x"00").repeat(12) + array;

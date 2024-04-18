@@ -18,6 +18,7 @@ import eif_event_receiver_chain.messaging.*;
 import eif_event_receiver_chain.test.helpers.*;
 import eif_event_receiver_connector.*;
 
+import eif_utils: eif.utils;
 import eif.common;
 import hbridge;
 
@@ -34,10 +35,6 @@ val token_symbol = "CHR";
 val token_decimal = 6;
 val token_icon_url = "https://chromaway.com/chr";
 val network_id = 1;
-
-function to_32_byte_array(evm_address: byte_array): byte_array {
-    return byte_array.from_hex("000000000000000000000000" + evm_address.to_hex());
-}
 
 function register_foreign_asset(): assets.asset {
     val asset_id = (token_name, chain_context.blockchain_rid).hash();
@@ -152,8 +149,8 @@ function assert_withdraw(serial: integer, evm_address: byte_array, amount: big_i
     val withdraw_info = [
         serial.to_gtv(),
         network_id.to_gtv(),
-        to_32_byte_array(token_address).to_gtv(),
-        to_32_byte_array(evm_address).to_gtv(),
+        eif_utils.to_32_byte_array(token_address).to_gtv(),
+        eif_utils.to_32_byte_array(evm_address).to_gtv(),
         amount.to_gtv()
     ];
     assert_events(("eif_event", withdraw_info.to_gtv_pretty()));
