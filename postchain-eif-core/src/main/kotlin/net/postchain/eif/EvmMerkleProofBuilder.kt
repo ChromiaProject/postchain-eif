@@ -6,10 +6,10 @@ import net.postchain.base.data.DatabaseAccess
 import net.postchain.base.gtv.BlockHeaderData
 import net.postchain.base.snapshot.PageStore
 import net.postchain.common.data.Hash
-import net.postchain.common.exception.UserMistake
 import net.postchain.common.toHex
 import net.postchain.core.EContext
 import net.postchain.crypto.CryptoSystem
+import net.postchain.crypto.Signature
 import net.postchain.eif.merkle.ProofTreeParser
 import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvEncoder
@@ -31,15 +31,13 @@ class EvmMerkleProofBuilder(
 
     private val merkleHashCalculator = GtvMerkleHashCalculator(cryptoSystem)
 
-    fun build(ctx: EContext, blockHeight: Long, data: ByteArray, hash: ByteArray, position: Long): EvmMerkleProof {
+    fun build(ctx: EContext, blockHeight: Long, blockRid: ByteArray, data: ByteArray, hash: ByteArray, position: Long, clientProvidedSignatures: Array<Signature>? = null): EvmMerkleProof {
         val db = DatabaseAccess.of(ctx)
-        val blockRid = db.getBlockRID(ctx, blockHeight) ?: throw UserMistake("No block at height $blockHeight")
         val blockHeader = BaseBlockHeader(db.getBlockHeader(ctx, blockRid), merkleHashCalculator).blockHeaderRec
-
         return EvmMerkleProof(
                 data = data,
                 blockHeader = encodeBlockHeaderDataForEVM(blockRid, blockHeader, merkleHashCalculator),
-                blockWitness = blockWitnessData(db, ctx, blockRid),
+                blockWitness = blockWitnessData(db, ctx, blockRid, clientProvidedSignatures),
                 proof = proof(blockHeight, hash, position),
                 extraMerkleProof = extraMerkleProof(blockHeader)
         )
@@ -48,10 +46,10 @@ class EvmMerkleProofBuilder(
     private fun blockWitnessData(
             db: DatabaseAccess,
             ctx: EContext,
-            blockRid: ByteArray
+            blockRid: ByteArray,
+            clientProvidedSignatures: Array<Signature>?
     ): List<EifSignature> {
-        val witness = BaseBlockWitness.fromBytes(db.getWitnessData(ctx, blockRid))
-        val signatures = witness.getSignatures()
+        val signatures = clientProvidedSignatures ?: BaseBlockWitness.fromBytes(db.getWitnessData(ctx, blockRid)).getSignatures()
         return signatures.map {
             EifSignature(
                     sig = encodeSignatureWithV(blockRid, it),

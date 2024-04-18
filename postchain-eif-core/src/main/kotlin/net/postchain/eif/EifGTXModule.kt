@@ -9,10 +9,14 @@ import net.postchain.base.snapshot.EventPageStore
 import net.postchain.base.snapshot.SimpleDigestSystem
 import net.postchain.base.snapshot.SnapshotPageStore
 import net.postchain.common.data.KECCAK256
+import net.postchain.common.exception.UserMistake
 import net.postchain.common.hexStringToByteArray
+import net.postchain.common.toHex
 import net.postchain.core.BlockchainConfiguration
 import net.postchain.core.EContext
+import net.postchain.crypto.CryptoSystem
 import net.postchain.crypto.Secp256K1CryptoSystem
+import net.postchain.crypto.Signature
 import net.postchain.eif.config.EifEventConsumerConfig
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvFactory.gtv
@@ -80,6 +84,10 @@ class EifGTXModule : SimpleGTXModule<Config>(
 
 }
 
+/**
+ * The `get_event_block_height()` query returns the block height of the withdrawal event by given event hash
+ *   - eventHash: GtvByteArray -- withdrawal event hash
+ */
 @Suppress("UNUSED_PARAMETER")
 fun eventBlockHeightQuery(config: Config, ctx: EContext, args: Gtv): Gtv {
     val argsDict = args.asDict()
@@ -89,33 +97,69 @@ fun eventBlockHeightQuery(config: Config, ctx: EContext, args: Gtv): Gtv {
     return gtv(eventInfo.blockHeight)
 }
 
+/**
+ * The `get_event_merkle_proof()` query returns withdrawal event confirmation proof by given event hash
+ *   - eventHash: GtvByteArray -- withdrawal event hash
+ *   - signers: GtvArray<GtvByteArray> -- `signers` component of the alternative block witness; usually used when signers change after a transfer to EVM has been initiated
+ *   - signatures: GtvArray<GtvByteArray> -- `signatures` component of the alternative block witness; usually used when signers change after a transfer to EVM has been initiated
+ */
 fun eventMerkleProofQuery(config: Config, ctx: EContext, args: Gtv): Gtv {
     val argsDict = args.asDict()
     val eventHash = argsDict["eventHash"]!!.asString().hexStringToByteArray()
+
+    val cs = Secp256K1CryptoSystem()
     val db = DatabaseAccess.of(ctx)
     val eventInfo = db.getEvent(ctx, PREFIX, eventHash) ?: return GtvNull
+    val blockRid = db.getBlockRID(ctx, eventInfo.blockHeight)
+            ?: throw UserMistake("No block at height ${eventInfo.blockHeight}")
+    val signatures = validateSignatures(blockRid, argsDict["signers"]?.asArray(), argsDict["signatures"]?.asArray(), cs)
 
     val eventPageStore = EventPageStore(ctx, config.levelsPerPage, SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)), PREFIX)
-    val eventMerkleProof = EvmMerkleProofBuilder(eventPageStore, Secp256K1CryptoSystem(), listOf(EIF))
-            .build(ctx, eventInfo.blockHeight, eventInfo.data, eventHash, eventInfo.pos)
+    val eventMerkleProof = EvmMerkleProofBuilder(eventPageStore, cs, listOf(EIF))
+            .build(ctx, eventInfo.blockHeight, blockRid, eventInfo.data, eventHash, eventInfo.pos, signatures)
     return GtvObjectMapper.toGtvDictionary(EventMerkleProof.fromEvmMerkleProof(eventMerkleProof))
 }
 
+internal fun validateSignatures(blockRid: ByteArray, signers: Array<out Gtv>?, signatures: Array<out Gtv>?, cryptoSystem: CryptoSystem): Array<Signature>? {
+    if (signers == null && signatures == null) return null
+    if (signers == null) throw UserMistake("No signers provided")
+    if (signatures == null) throw UserMistake("No signatures provided")
+    if (signers.size != signatures.size) throw UserMistake("Mismatch between the number of signers and signatures")
+
+    val blockWitness = signers.zip(signatures)
+            .map { Signature(it.first.asByteArray(), it.second.asByteArray()) }.toTypedArray()
+
+    blockWitness.forEach { sig ->
+        if (!cryptoSystem.verifyDigest(blockRid, sig))
+            throw UserMistake("Invalid signature for signer ${sig.subjectID.toHex()}")
+    }
+
+    return blockWitness
+}
+
 /**
- * blockHeight should be the latest block height that the global snapshot was updated.
- * That mean the block header's extra data should contain the state root hash as well.
+ * The `get_account_state_merkle_proof()` query returns an account state confirmation proof as of `blockHeight` by the given `accountNumber`
+ *   - blockHeight: GtvInteger -- specifies the latest block height at which the global snapshot was updated; the corresponding block header's extra data must also contain the state root hash
+ *   - accountNumber: GtvInteger -- the EVM account link ID
+ *   - signers: GtvArray<GtvByteArray> -- `signers` component of the alternative block witness; usually used when signers change after a transfer to EVM has been initiated
+ *   - signatures: GtvArray<GtvByteArray> -- `signatures` component of the alternative block witness; usually used when signers change after a transfer to EVM has been initiated
  */
 fun accountStateMerkleProofQuery(config: Config, ctx: EContext, args: Gtv): Gtv {
     val argsDict = args.asDict()
     val blockHeight = argsDict["blockHeight"]!!.asInteger()
     val accountNumber = argsDict["accountNumber"]!!.asInteger()
+
+    val cs = Secp256K1CryptoSystem()
     val db = DatabaseAccess.of(ctx)
     val accountState = db.getAccountState(ctx, PREFIX, blockHeight, accountNumber) ?: return GtvNull
+    val blockRid = db.getBlockRID(ctx, blockHeight)
+            ?: throw UserMistake("No block at height $blockHeight")
+    val signatures = validateSignatures(blockRid, argsDict["signers"]?.asArray(), argsDict["signatures"]?.asArray(), cs)
 
     val ds = SimpleDigestSystem(MessageDigest.getInstance(KECCAK256))
     val snapshotPageStore = SnapshotPageStore(ctx, config.levelsPerPage, config.snapshotsToKeep, ds, PREFIX)
-    val accountStateMerkleProof = EvmMerkleProofBuilder(snapshotPageStore, Secp256K1CryptoSystem(), listOf(EIF))
-            .build(ctx, blockHeight, accountState.data, ds.digest(accountState.data), accountState.stateN)
+    val accountStateMerkleProof = EvmMerkleProofBuilder(snapshotPageStore, cs, listOf(EIF))
+            .build(ctx, blockHeight, blockRid, accountState.data, ds.digest(accountState.data), accountState.stateN, signatures)
     return GtvObjectMapper.toGtvDictionary(AccountStateMerkleProof.fromEvmMerkleProof(accountStateMerkleProof))
 }
 
