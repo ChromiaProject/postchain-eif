@@ -49,7 +49,9 @@ class EvmSignerUpdateBlockBuilderExtension(private val ds: DigestSystem, private
                     .map { getEthereumAddress(it.asByteArray()) })
             val hash = ds.digest(encodedEvent)
             store.writeEvent(ctxt, SIGNER_LIST_UPDATE_TABLE_PREFIX, events.size.toLong(), hash, encodedEvent)
-            events.add(hash)
+            ctxt.addAfterAppendHook {
+                events.add(hash)
+            }
         } else throw ProgrammerMistake("Unrecognized event")
     }
 

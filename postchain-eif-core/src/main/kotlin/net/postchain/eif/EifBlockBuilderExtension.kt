@@ -38,7 +38,7 @@ class EifBlockBuilderExtension(
     override fun processEmittedEvent(ctxt: TxEContext, type: String, data: Gtv) {
         when (type) {
             EIF_EVENT -> emitEifEvent(ctxt, data as GtvArray)
-            EIF_STATE -> emitEifState(data[0].asInteger(), data[1] as GtvArray)
+            EIF_STATE -> emitEifState(ctxt, data[0].asInteger(), data[1] as GtvArray)
             else -> throw ProgrammerMistake("Unrecognized event")
         }
     }
@@ -72,7 +72,9 @@ class EifBlockBuilderExtension(
         val data = SimpleGtvEncoder.encodeGtv(evt)
         val hash = ds.digest(data)
         store.writeEvent(ctxt, PREFIX, events.size.toLong(), hash, data)
-        events.add(hash)
+        ctxt.addAfterAppendHook {
+            events.add(hash)
+        }
     }
 
     /**
@@ -80,10 +82,12 @@ class EifBlockBuilderExtension(
      * hash using keccak256. (state_n, hash) pairs are submitted to updateSnapshot
      * during finalization
      */
-    private fun emitEifState(stateN: Long, state: GtvArray) {
+    private fun emitEifState(ctxt: TxEContext, stateN: Long, state: GtvArray) {
         val data = SimpleGtvEncoder.encodeGtv(state)
         val hash = ds.digest(data)
-        states[stateN] = hash
         store.writeState(bctx, PREFIX, stateN, data)
+        ctxt.addAfterAppendHook {
+            states[stateN] = hash
+        }
     }
 }
