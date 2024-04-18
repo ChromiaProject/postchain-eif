@@ -3,6 +3,7 @@ import ^.*;
 val signer_list_update_topic = "L_signer_list_update";
 
 struct signer_list_update_message {
+    serial: integer;
     blockchain_rid: byte_array;
     signers: byte_array;
     confirmed_in_directory_at_height: integer;
@@ -17,6 +18,7 @@ enum signer_list_update_status {
 }
 
 entity signer_list_update {
+    serial: integer;
     index blockchain_rid: byte_array;
     signers: byte_array;
     confirmed_in_directory_at_height: integer;
@@ -24,6 +26,7 @@ entity signer_list_update {
 }
 
 entity parked_directory_signer_list_update {
+    serial: integer;
     signers: byte_array;
     confirmed_in_directory_at_height: integer;
 }
@@ -34,6 +37,7 @@ entity signer_list_update_transaction {
 
 struct signer_list_update_data {
     rowid: integer;
+    serial: integer;
     blockchain_rid: byte_array;
     signers: byte_array;
     confirmed_in_directory_at_height: integer;
@@ -112,6 +116,7 @@ function enqueue_signer_update_transaction_impl(
 query get_queued_signer_updates() = signer_list_update @* { .status == signer_list_update_status.QUEUED } ( 
     signer_list_update_data (
         rowid = .rowid.to_integer(),
+        serial = .serial,
         blockchain_rid = .blockchain_rid,
         signers = .signers,
         confirmed_in_directory_at_height = .confirmed_in_directory_at_height
@@ -214,6 +219,7 @@ function handle_signer_update_message(sender: byte_array, topic: text, body: gtv
             latest_directory_update_status != signer_list_update_status.COMPLETED
             ) {
                 create parked_directory_signer_list_update (
+                    serial = update_message.serial,
                     signers = update_message.signers,
                     confirmed_in_directory_at_height = update_message.confirmed_in_directory_at_height
                 );
@@ -222,6 +228,7 @@ function handle_signer_update_message(sender: byte_array, topic: text, body: gtv
         }
 
         create signer_list_update (
+            serial = update_message.serial,
             blockchain_rid = update_message.blockchain_rid,
             signers = update_message.signers,
             confirmed_in_directory_at_height = update_message.confirmed_in_directory_at_height
@@ -246,6 +253,7 @@ function handle_bridge_mapping_messasge_signers(
             current_signers_override != current_signers
         ) {
             create signer_list_update (
+                serial = -1,
                 blockchain_rid = bridge_mapping_message.blockchain_rid,
                 signers = current_signers_override,
                 confirmed_in_directory_at_height = -1,
@@ -322,6 +330,7 @@ function dequeue_parked_update(blockchain_rid: byte_array) {
         val next_update = parked_directory_signer_list_update @? {} limit 1;
         if (next_update != null) {
             create signer_list_update (
+                serial = next_update.serial,
                 blockchain_rid = blockchain_rid,
                 signers = next_update.signers,
                 confirmed_in_directory_at_height = next_update.confirmed_in_directory_at_height

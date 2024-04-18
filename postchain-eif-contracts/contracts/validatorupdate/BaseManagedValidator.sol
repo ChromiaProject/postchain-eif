@@ -15,7 +15,7 @@ abstract contract BaseManagedValidator is IManagedValidator {
     address[] public validators;
     bytes32 public blockchainRid;
     uint public previousUpdateHeight;
-    uint public previousUpdateProofPosition;
+    uint public previousUpdateSerial;
 
     event UpdateValidators(uint confirmedAtHeight, address[] validators);
 
@@ -52,13 +52,13 @@ abstract contract BaseManagedValidator is IManagedValidator {
         require(Hash.hashGtvBytes32Leaf(validatorUpdateRoot) == extraProof.hashedLeaf, "Postchain: invalid signer update extra data");
         (uint height, bytes32 blockRid) = Postchain.verifyBlockHeader(_directoryBlockchainRid(), blockHeader, extraProof);
         if (previousUpdateHeight > 0 && height < previousUpdateHeight) revert("Update validators: height is lower than previous update height");
-        if (height == previousUpdateHeight && proof.position < previousUpdateProofPosition) revert("Update validators: proof is older than previous update");
+        if (validatorUpdate.serial <= previousUpdateSerial) revert("Update validators: proof is older or same as previous update");
 
         if (!MerkleProof.verify(proof.merkleProofs, proof.leaf, proof.position, validatorUpdateRoot)) revert("Update validators: invalid merkle proof");
         if (!_validateUpdateSignatures(blockRid, signatures, signers)) revert("Update validators: block signature is invalid");
 
         previousUpdateHeight = height;
-        previousUpdateProofPosition = proof.position;
+        previousUpdateSerial = validatorUpdate.serial;
 
         _updateValidators(validatorUpdate.validators);
         emit UpdateValidators(height, validatorUpdate.validators);

@@ -7,14 +7,13 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../../TokenBridge.sol";
 
 contract TokenBridgeDelegator {
-
     TokenBridge private _bridge;
 
     constructor(TokenBridge bridge) {
         _bridge = bridge;
     }
 
-    function approve(IERC20 token, address _spender, uint256 _amount) public returns(bool) {
+    function approve(IERC20 token, address _spender, uint256 _amount) public returns (bool) {
         return token.approve(_spender, _amount);
     }
 

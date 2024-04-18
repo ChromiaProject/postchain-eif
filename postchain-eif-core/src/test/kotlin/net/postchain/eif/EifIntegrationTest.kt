@@ -21,7 +21,7 @@ import net.postchain.crypto.devtools.KeyPairHelper
 import net.postchain.devtools.PostchainTestNode
 import net.postchain.devtools.PostchainTestNode.Companion.DEFAULT_CHAIN_IID
 import net.postchain.eif.contracts.TestToken
-import net.postchain.eif.contracts.TokenBridge
+import net.postchain.eif.contracts.TokenBridgeWithSnapshotWithdraw
 import net.postchain.eif.contracts.Validator
 import net.postchain.eif.transaction.TransactionSubmitter
 import net.postchain.gtv.Gtv
@@ -104,7 +104,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : EifBaseIntegrationTest(
     private val totalTransferAmount = BigInteger("1234567890ABCDEF", 16)
     private lateinit var toRemainingAccount: BigInteger
     private lateinit var validator: Validator
-    private lateinit var bridge: TokenBridge
+    private lateinit var bridge: TokenBridgeWithSnapshotWithdraw
     private lateinit var testToken: TestToken
     private lateinit var testTokenAddress: ByteArray
     private lateinit var userBalance: Uint256
@@ -163,7 +163,7 @@ abstract class EifIntegrationTest(evmType: EvmType) : EifBaseIntegrationTest(
         validator = Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedConstructor).send()
 
         // Deploy token bridge contract
-        bridge = Contract.deployRemoteCall(TokenBridge::class.java, web3j, transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
+        bridge = Contract.deployRemoteCall(TokenBridgeWithSnapshotWithdraw::class.java, web3j, transactionManager, gasProvider, tokenBridgeWithSnapshotWithdrawBinary, "").send().apply {
             initialize(Address(validator.contractAddress), Uint256(2)).send()
         }
 

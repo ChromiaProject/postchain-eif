@@ -14,13 +14,14 @@ import org.web3j.abi.datatypes.DynamicStruct
 import org.web3j.abi.datatypes.Uint
 import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.abi.datatypes.reflection.Parameterized
+import java.math.BigInteger
 
 /**
  * SimpleGtvEncoder is not flexible enough for our use cases, so we need this exact encoder
  */
 object EvmTypeEncoder {
-    fun encodeSignerUpdateEvent(blockchainRid: ByteArray, evmSigners: List<ByteArray>): ByteArray = TypeEncoder.encode(
-            DynamicStruct(Bytes32(blockchainRid), DynamicArray(Address::class.java, evmSigners.map { Address(it.toHex()) }))
+    fun encodeSignerUpdateEvent(serial: Long, blockchainRid: ByteArray, evmSigners: List<ByteArray>): ByteArray = TypeEncoder.encode(
+            DynamicStruct(Uint(BigInteger.valueOf(serial)), Bytes32(blockchainRid), DynamicArray(Address::class.java, evmSigners.map { Address(it.toHex()) }))
     ).hexStringToByteArray()
 
     fun encodeExtraMerkleProof(extraMerkleProof: ExtraMerkleProof): ByteArray = TypeEncoder.encode(

@@ -240,6 +240,7 @@
                     <contract>
                         <includes>
                             <include>TokenBridge</include>
+                            <include>TokenBridgeWithSnapshotWithdraw</include>
                             <include>TestToken</include>
                             <include>Validator</include>
                             <include>Anchoring</include>
@@ -254,6 +255,7 @@
                         <directory>${project.build.directory}/postchain-eif-contracts/abi</directory>
                         <includes>
                             <include>**/TokenBridge.json</include>
+                            <include>**/TokenBridgeWithSnapshotWithdraw.json</include>
                             <include>**/TestToken.json</include>
                             <include>**/Validator.json</include>
                             <include>**/Anchoring.json</include>
