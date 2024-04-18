@@ -30,9 +30,9 @@ data class EvmTransactionSubmitterConfig(
         fun fromAppConfig(chain: String, config: AppConfig): EvmTransactionSubmitterConfig {
             return EvmTransactionSubmitterConfig(
                     config.getEnvOrListProperty("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_URLS", "$chain.urls", listOf()),
-                    config.getEnvOrLong(EVM_CONNECT_TIMEOUT, "evm.connectTimeout", 300),
-                    config.getEnvOrLong(EVM_READ_TIMEOUT, "evm.readTimeout", 300),
-                    config.getEnvOrLong(EVM_WRITE_TIMEOUT, "evm.writeTimeout", 300),
+                    config.getEnvOrLong(EVM_CONNECT_TIMEOUT, "evm.connectTimeout", 10),
+                    config.getEnvOrLong(EVM_READ_TIMEOUT, "evm.readTimeout", 10),
+                    config.getEnvOrLong(EVM_WRITE_TIMEOUT, "evm.writeTimeout", 10),
                     config.getEnvOrLong(EVM_MAX_RETRY_DELAY, "evm.maxRetryDelay", 60_000L),
                     config.getEnvOrLong(EVM_MIN_RETRY_DELAY, "evm.minRetryDelay", 500L),
                     config.getEnvOrLong(EVM_MAX_TRY_ERRORS, "evm.maxTryErrors", 10L),
