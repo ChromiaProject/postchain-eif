@@ -9,7 +9,7 @@ There are two modes: foreign and native.
 
 ### Foreign mode
 
-In foreign mode, we assume that EVM is the origin of the token. This is mode is simpler.
+In foreign mode, we assume that EVM is the origin of the token. This mode is simpler.
 
 When token is moved from EVM to FT4 we mint FT4 tokens.
 When token is moved from FT4 to EVM we burn FT4 tokens.
