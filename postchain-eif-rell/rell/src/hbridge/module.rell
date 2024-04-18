@@ -151,17 +151,20 @@ function (ft4.accounts.account) {
 // accounts might be linked explicitly (e.g. when account_id is not derived from EVM address)
 function _link_evm_account(address: byte_array, account: ft4.accounts.account) {
     create evm_account_link(address, account);
-    val address_hash = address.hash();
 
-    // there's a possibility that the account_id is different from address hash
-    // collect funds from the pool account here
+    val pending = pending_deposit @? { .sender_address == address };
+    if (pending != null) {
+        // there's a possibility that the account_id is different from address hash
+        // collect funds from the pool account here
+        collect_pooled_assets(account, recipient_id = address.hash());
+        delete pending;
+    }
+}
+
+function collect_pooled_assets(ft4.accounts.account, recipient_id: byte_array) {
     for (account_creation_transfer in ft4.transfer_strategy.account_creation_transfer @* {
-        .recipient_id == address_hash, .state == ft4.transfer_strategy.account_creation_state.pending
+        recipient_id, .state == ft4.transfer_strategy.account_creation_state.pending
     }) {
-        val pending = pending_deposit @? { account_creation_transfer }; // TODO: perhaps iterate pending_deposit instead
-        if (empty(pending)) { // weird
-            continue;
-        }
         val pool_account = ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid);
         ft4.assets.Unsafe.transfer(
             pool_account,
@@ -172,7 +175,6 @@ function _link_evm_account(address: byte_array, account: ft4.accounts.account) {
         account_creation_transfer.state = ft4.transfer_strategy.account_creation_state.done;
         account_creation_transfer.final_tx_rid = op_context.transaction.tx_rid;
         account_creation_transfer.final_op_index = op_context.op_index;
-        delete pending;
     }
 }
 
