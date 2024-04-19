@@ -3,7 +3,6 @@ module;
 import messaging: ^.eif.messaging;
 import common: ^.eif.common;
 import utils: ^.eif.utils;
-import ^.eif;
 
 namespace ft4 {
     import lib.ft4.accounts;
