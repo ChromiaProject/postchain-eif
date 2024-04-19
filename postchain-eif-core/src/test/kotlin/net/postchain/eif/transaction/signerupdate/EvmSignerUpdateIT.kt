@@ -8,7 +8,6 @@ import net.postchain.devtools.PostchainTestNode
 import net.postchain.devtools.getModules
 import net.postchain.devtools.utils.ChainUtil
 import net.postchain.eif.EifBaseIntegrationTest
-import net.postchain.eif.EvmType
 import net.postchain.eif.contracts.DirectoryChainValidator
 import net.postchain.eif.contracts.ManagedValidator
 import net.postchain.eif.getEthereumAddress
@@ -35,9 +34,7 @@ import org.web3j.tx.Contract
 import java.math.BigInteger
 
 @Testcontainers(disabledWithoutDocker = true)
-class EvmSignerUpdateIT : EifBaseIntegrationTest(
-        EvmType.GETH
-) {
+class EvmSignerUpdateIT : EifBaseIntegrationTest() {
 
     private var txSubmitterChain: Long = -1
     private lateinit var directoryValidatorContract: DirectoryChainValidator

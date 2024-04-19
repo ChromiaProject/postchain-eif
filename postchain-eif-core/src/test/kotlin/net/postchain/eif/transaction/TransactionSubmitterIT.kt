@@ -10,7 +10,6 @@ import net.postchain.devtools.PostchainTestNode.Companion.DEFAULT_CHAIN_IID
 import net.postchain.devtools.getModules
 import net.postchain.devtools.utils.configuration.NodeSeqNumber
 import net.postchain.eif.EifBaseIntegrationTest
-import net.postchain.eif.EvmType
 import net.postchain.eif.contracts.Validator
 import org.apache.commons.configuration2.MapConfiguration
 import org.awaitility.Awaitility
@@ -28,9 +27,7 @@ import org.web3j.tx.Contract
 import java.math.BigInteger
 
 @Testcontainers(disabledWithoutDocker = true)
-class TransactionSubmitterIT : EifBaseIntegrationTest(
-        EvmType.GETH
-) {
+class TransactionSubmitterIT : EifBaseIntegrationTest() {
 
     private lateinit var contractAddress: String
 

@@ -9,7 +9,6 @@ import net.postchain.concurrent.util.get
 import net.postchain.devtools.addBlockchainAndStart
 import net.postchain.devtools.getModules
 import net.postchain.eif.EifBaseIntegrationTest
-import net.postchain.eif.EvmType
 import net.postchain.eif.contracts.Anchoring
 import net.postchain.eif.contracts.Validator
 import net.postchain.eif.getEthereumAddress
@@ -26,9 +25,7 @@ import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.tx.Contract
 
 @Testcontainers(disabledWithoutDocker = true)
-class TransactionSubmitterAnchoringIT : EifBaseIntegrationTest(
-        EvmType.GETH
-) {
+class TransactionSubmitterAnchoringIT : EifBaseIntegrationTest() {
 
     @Test
     fun `Anchoring blocks on EVM`() {

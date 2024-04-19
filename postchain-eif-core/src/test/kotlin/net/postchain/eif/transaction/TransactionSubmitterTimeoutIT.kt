@@ -5,7 +5,6 @@ import assertk.assertions.isEqualTo
 import assertk.assertions.isNotNull
 import net.postchain.devtools.getModules
 import net.postchain.eif.EifBaseIntegrationTest
-import net.postchain.eif.EvmType
 import net.postchain.eif.contracts.Validator
 import org.apache.logging.log4j.Level
 import org.awaitility.Awaitility
@@ -21,9 +20,7 @@ import org.web3j.tx.Contract
 import java.math.BigInteger
 
 @Testcontainers(disabledWithoutDocker = true)
-class TransactionSubmitterTimeoutIT : EifBaseIntegrationTest(
-        EvmType.GETH
-) {
+class TransactionSubmitterTimeoutIT : EifBaseIntegrationTest() {
 
     private lateinit var contractAddress: String
 
