@@ -148,7 +148,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest(
                 assertThat(it.size).isEqualTo(1)
                 assertThat(it[0].blockHash).isNotNull()
                 assertThat(it[0].effectiveGasPrice).isLessThan(4000000000)
-                assertThat(it[0].gasUsage).isEqualTo(58597)
+                assertThat(it[0].gasUsage).isEqualTo(58577)
             }
         }
     }

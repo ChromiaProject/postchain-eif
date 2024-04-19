@@ -49,7 +49,7 @@ class TransactionSubmitterAnchoringIT : EifBaseIntegrationTest(
 
         // Deploy anchoring contract
         val encodedAnchoringConstructor = FunctionEncoder.encodeConstructor(listOf(Address(validatorContract.contractAddress), Bytes32(systemAnchoringMockBrid.data)))
-        val anchoringBinary = getBinaryFromArtifactResource("/artifacts/contracts/anchoring/Anchoring.sol/Anchoring.json")
+        val anchoringBinary = getBinaryFromArtifactResource("/net/postchain/eif/contracts/Anchoring.bin")
         val anchoringContract = Contract.deployRemoteCall(Anchoring::class.java, web3j, transactionManager, gasProvider, anchoringBinary, encodedAnchoringConstructor).send()
 
         val txSubmitterConfig = readBlockchainConfig("/net/postchain/eif/transaction/anchoring/blockchain_config_with_anchoring.xml")
