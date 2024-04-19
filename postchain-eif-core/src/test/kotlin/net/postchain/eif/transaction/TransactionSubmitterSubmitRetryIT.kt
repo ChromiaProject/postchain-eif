@@ -2,7 +2,6 @@ package net.postchain.eif.transaction
 
 import net.postchain.devtools.getModules
 import net.postchain.eif.EifBaseIntegrationTest
-import net.postchain.eif.EvmType
 import net.postchain.eif.contracts.Validator
 import org.awaitility.Awaitility
 import org.awaitility.Duration
@@ -18,7 +17,6 @@ import java.math.BigInteger
 
 @Testcontainers(disabledWithoutDocker = true)
 class TransactionSubmitterSubmitRetryIT : EifBaseIntegrationTest(
-        EvmType.GETH,
         prependUrls = listOf("http://127.0.0.1:1", "http://127.0.0.1:2")
 ) {
 

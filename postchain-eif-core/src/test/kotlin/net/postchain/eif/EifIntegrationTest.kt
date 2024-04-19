@@ -74,8 +74,7 @@ import java.security.MessageDigest
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-abstract class EifIntegrationTest(evmType: EvmType) : EifBaseIntegrationTest(
-        evmType,
+class EifIntegrationTest : EifBaseIntegrationTest(
         prependUrls = listOf("http://127.0.0.1:8888", "http://127.0.0.1:9999")
 ) {
 

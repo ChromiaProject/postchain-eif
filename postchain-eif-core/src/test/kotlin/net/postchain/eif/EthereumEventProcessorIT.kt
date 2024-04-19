@@ -2,7 +2,6 @@ package net.postchain.eif
 
 import assertk.assertThat
 import assertk.assertions.containsExactly
-import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
 import net.postchain.core.BlockchainEngine
 import net.postchain.core.block.BlockQueries
@@ -24,7 +23,6 @@ import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.datatypes.Address
-import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.protocol.Web3j
 import org.web3j.tx.Contract.deployRemoteCall
@@ -33,12 +31,9 @@ import java.util.concurrent.CompletableFuture
 
 @Testcontainers(disabledWithoutDocker = true)
 class EthereumEventProcessorIT : EifBaseIntegrationTest(
-        EvmType.GETH,
         prependUrls = listOf("http://127.0.0.1:8888", "http://127.0.0.1:9999")
 ) {
 
-    private val accountId = Bytes32("fc91c4abaff09f4c67a0ab84d4e9afd37c929978bea3fa1790403ab6ee85bf33"
-            .hexStringToByteArray())
     private val validatorContract = Address("0x0000000000000000000000000000000000000001")
     private var url = "http://localhost:8545"
     private var web3jServices = mutableListOf<Web3j>()
