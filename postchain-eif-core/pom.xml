@@ -279,7 +279,6 @@
                 </executions>
             </plugin>
 
-            <!--
             <plugin>
                 <groupId>net.postchain.rell</groupId>
                 <artifactId>rell-maven-plugin</artifactId>
@@ -299,7 +298,6 @@
                     </execution>
                 </executions>
             </plugin>
-            -->
 
         </plugins>
     </build>
