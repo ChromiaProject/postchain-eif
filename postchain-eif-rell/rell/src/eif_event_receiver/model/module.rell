@@ -7,6 +7,7 @@ entity evm_block {
     key network_id, evm_block_height, evm_block_hash;
 }
 
+// TODO: add queries for this
 entity evm_event {
     index evm_block;
     tnx_hash: byte_array;

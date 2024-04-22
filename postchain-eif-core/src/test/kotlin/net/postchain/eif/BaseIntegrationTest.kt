@@ -1,19 +1,10 @@
 package net.postchain.eif
 
-import net.postchain.common.BlockchainRid
-import net.postchain.common.data.Hash
 import net.postchain.common.hexStringToByteArray
-import net.postchain.crypto.KeyPair
-import net.postchain.crypto.SigMaker
-import net.postchain.crypto.devtools.KeyPairHelper
 import net.postchain.devtools.ManagedModeTest
 import net.postchain.eif.transaction.TransactionSubmitter
 import net.postchain.gtv.Gtv
-import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvFactory.gtv
-import net.postchain.gtv.GtvInteger
-import net.postchain.gtv.GtvNull
-import net.postchain.gtx.GtxBuilder
 import org.apache.logging.log4j.Level
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -65,7 +56,6 @@ abstract class EifBaseIntegrationTest(private val prependUrls: List<String> = li
 
     @BeforeEach
     open fun setup() {
-
         testLogAppender = TestLogAppender.addAppender(listOf(Level.WARN, Level.ERROR))
         testLogAppender.clear()
 
@@ -116,127 +106,6 @@ abstract class EifBaseIntegrationTest(private val prependUrls: List<String> = li
      * @see SimpleGtvEncoder.encodeGtv
      */
     fun to32Bytes(address: String) = "000000000000000000000000$address".hexStringToByteArray()
-
-    // Register asset on postchain
-    fun registerAsset(
-            tokenName: String,
-            tokenSymbol: String,
-            tokenDecimal: Long,
-            tokenIconUrl: String,
-            bcRid: BlockchainRid,
-            sigMaker: SigMaker
-    ): ByteArray {
-        val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
-        b.addOperation(
-                "ft4.admin.register_asset",
-                gtv(tokenName), gtv(tokenSymbol), gtv(tokenDecimal), gtv(tokenIconUrl)
-        )
-        return b.finish()
-                .sign(sigMaker)
-                .buildGtx()
-                .encode()
-    }
-
-    // Add new evm erc20 token
-    fun addNewEvmErc20(
-            tokenAddress: ByteArray,
-            name: String,
-            symbol: String,
-            decimal: Long,
-            bcRid: BlockchainRid,
-            sigMaker: SigMaker
-    ): ByteArray {
-        val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
-        b.addOperation(
-                "eif.ft4.add_new_evm_erc20",
-                gtv(networkId),
-                gtv(tokenAddress),
-                gtv(name),
-                gtv(symbol),
-                gtv(decimal)
-        )
-        return b.finish()
-                .sign(sigMaker)
-                .buildGtx()
-                .encode()
-    }
-
-    // Add new token mapping
-    fun addTokenMapping(tokenAddress: ByteArray, assetId: Gtv, bcRid: BlockchainRid, sigMaker: SigMaker): ByteArray {
-        val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
-        b.addOperation("eif.ft4.add_new_token_mapping", gtv(networkId), gtv(tokenAddress), assetId)
-        return b.finish()
-                .sign(sigMaker)
-                .buildGtx()
-                .encode()
-    }
-
-    // Register account on postchain
-    fun registerAccount(
-            userPubkey: ByteArray,
-            userPriKey: ByteArray,
-            userEVMAddress: ByteArray,
-            sig: GtvArray,
-            bcRid: BlockchainRid
-    ): ByteArray {
-        val auth = gtv(
-                gtv(AuthType.S.ordinal.toLong()),
-                gtv(GtvArray(arrayOf(gtv("A"), gtv("T"))), gtv(userPubkey)),
-                GtvNull
-        )
-
-        val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
-        b.addOperation("eif.evm.register_account", gtv(userEVMAddress), auth, sig)
-
-        val signer = cryptoSystem.buildSigMaker(KeyPair(userPubkey, userPriKey))
-        return b.finish()
-                .sign(signer)
-                .buildGtx()
-                .encode()
-    }
-
-    // Withdraw ft3 token on postchain
-    fun withdrawOnPostchain(
-            userPubkey: ByteArray, userPriKey: ByteArray,
-            authId: Gtv, tokenAddress: ByteArray,
-            userEvmAddress: ByteArray, withdrawAmount: BigInteger, bcRid: BlockchainRid
-    ): ByteArray {
-        val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
-        b.addOperation(
-                "eif.ft4.bridge_ft_token_to_evm",
-                authId,
-                gtv(networkId),
-                gtv(tokenAddress),
-                gtv(userEvmAddress),
-                gtv(withdrawAmount)
-        )
-        b.addOperation("nop", GtvInteger(System.currentTimeMillis()))
-        val signer = cryptoSystem.buildSigMaker(KeyPair(userPubkey, userPriKey))
-        return b.finish()
-                .sign(signer)
-                .buildGtx()
-                .encode()
-    }
-
-    // Transfer ft3 token to another account
-    fun transfer(
-            userPubkey: ByteArray, userPriKey: ByteArray,
-            accountId: Gtv, authDescriptorId: Hash, otherAccountId: Gtv,
-            assetId: Gtv, transferAmount: BigInteger, bcRid: BlockchainRid
-    ): ByteArray {
-        val b = GtxBuilder(bcRid, listOf(userPubkey), myCS)
-        b.addOperation("ft4.ft_auth", accountId, gtv(authDescriptorId))
-        b.addOperation("ft4.transfer", otherAccountId, assetId, gtv(transferAmount))
-
-        val signer = cryptoSystem.buildSigMaker(KeyPair(userPubkey, userPriKey))
-        return b.finish()
-                .sign(signer)
-                .buildGtx()
-                .encode()
-    }
-
-    fun getRegisterMessage(evmAddress: String, disposableKey: String) =
-            "Create account for EVM wallet:\n${evmAddress}\n\nDisposable key:\n${disposableKey}"
 
     fun sendTransaction(contractAddress: String): EthSendTransaction? {
         return sendTransaction(contractAddress, "updateValidators", listOf("address[]"), listOf(gtv(listOf(gtv(ByteArray(20) { 1 })))))

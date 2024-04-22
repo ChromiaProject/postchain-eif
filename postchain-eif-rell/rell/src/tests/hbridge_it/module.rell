@@ -1,0 +1,22 @@
+@mount("eif.hbridge")
+module;
+
+import eif_event_receiver.*;
+import hbridge;
+
+import lib.ft4.admin;
+import lib.ft4.assets;
+
+operation register_erc20_asset(
+        network_id: integer,
+        token_address: byte_array,
+        asset_id: byte_array) {
+    admin.require_admin();
+
+    val asset = assets.Asset(asset_id);
+
+    hbridge.register_erc20_asset(network_id,
+        token_address,
+        asset,
+        hbridge.bridge_mode.foreign);
+}

@@ -1,14 +1,14 @@
 module;
 
 import ^^.*;
-import ^^.messaging.*;
+import ^^^.eif.messaging;
 import ^^.model.*;
 
 operation evm_block_op(
     network_id: integer,
     evm_block_height: integer,
     evm_block_hash: byte_array,
-    events: list<event_data>
+    events: list<messaging.event_data>
 ) {
     _evm_block(network_id, evm_block_height, evm_block_hash, events);
 }
