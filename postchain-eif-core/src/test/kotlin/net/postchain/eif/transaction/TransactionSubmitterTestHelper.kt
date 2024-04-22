@@ -3,12 +3,21 @@ package net.postchain.eif.transaction
 import assertk.assertThat
 import assertk.assertions.contains
 import assertk.assertions.isEqualTo
+import net.postchain.base.data.DatabaseAccess
+import net.postchain.base.withReadConnection
 import net.postchain.common.BlockchainRid
+import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
+import net.postchain.devtools.PostchainTestNode
+import net.postchain.devtools.PostchainTestNode.Companion.DEFAULT_CHAIN_IID
+import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_REQUEST_ID
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_RECEIPT
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_STATUS
 import net.postchain.gtv.GtvFactory
 import net.postchain.gtx.data.ExtOpData
+import org.jooq.SQLDialect
+import org.jooq.impl.DSL
+import org.junit.Assert.fail
 import java.math.BigInteger
 
 data class TxReceiptUpdateOpArg(val blockHash: String, val effectiveGasPrice: Long, val gasUsage: Long)
@@ -58,14 +67,14 @@ fun assertStatusOperation(
         val requestOps = operations
                 .filter { it.args[0].asInteger() == rowId }
         val statusOperations = requestOps
-                .map { RellTransactionStatus.values()[it.args[1].asInteger().toInt()] }
+                .map { RellTransactionStatus.entries[it.args[1].asInteger().toInt()] }
 
         assertThat(statusOperations).contains(expectedStatus)
 
         var txHash: String? = null
         if (expectedStatus == RellTransactionStatus.PENDING) {
             for (requestOp in requestOps) {
-                if (RellTransactionStatus.values()[requestOp.args[1].asInteger().toInt()] == RellTransactionStatus.PENDING) {
+                if (RellTransactionStatus.entries.toTypedArray()[requestOp.args[1].asInteger().toInt()] == RellTransactionStatus.PENDING) {
                     txHash = requestOp.args[2].asString()
                 }
             }
@@ -94,6 +103,8 @@ fun mkEvmSubmitTxRellRequest(
         created: Long = System.currentTimeMillis(),
         txHash: String? = null,
         functionName: String = "updateValidators",
+        processedByNode: PostchainTestNode? = null,
+        processedBy: ByteArray? = null
 ) = EvmSubmitTxRellRequest(
         rowId,
         contractAddress,
@@ -106,10 +117,11 @@ fun mkEvmSubmitTxRellRequest(
         BlockchainRid.ZERO_RID.data,
         created,
         txHash,
-        status
+        status,
+        processedByNode?.pubKey?.hexStringToByteArray() ?: processedBy
 )
 
-fun mkEvmSubmitTxRequest(maxFeePerGas: Long = 4000000000) = EvmSubmitTxRequest(
+fun mkEvmSubmitTxRequest(maxFeePerGas: Long = 4000000000, node: PostchainTestNode? = null) = EvmSubmitTxRequest(
         EvmSubmitTxRequest(
                 EvmSubmitTxRellRequest(
                         0L,
@@ -124,6 +136,7 @@ fun mkEvmSubmitTxRequest(maxFeePerGas: Long = 4000000000) = EvmSubmitTxRequest(
                         System.currentTimeMillis(),
                         null,
                         null,
+                        node?.pubKey?.hexStringToByteArray(),
                 )
         )
 )
@@ -161,4 +174,25 @@ fun <T> withTxSubmitter(
     }
 
     return null
+}
+
+fun withDbTransactions(node: PostchainTestNode, rowId: Long, op: (List<org.jooq.Record>) -> Unit) {
+
+    withReadConnection(node.getBlockchainInstance().blockchainEngine.sharedStorage, DEFAULT_CHAIN_IID) {
+        val jooq = DSL.using(it.conn, SQLDialect.POSTGRES)
+
+        val tableName = DatabaseAccess.of(it).tableEvmTxSubmit(it)
+
+        val fetch = jooq
+                .select()
+                .from(tableName)
+                .where(EVM_TX_SUBMIT_COLUMN_REQUEST_ID.eq(rowId))
+                .fetch()
+
+        try {
+            op(fetch)
+        } catch (e: Exception) {
+            fail("Failed to get transaction rows")
+        }
+    }
 }

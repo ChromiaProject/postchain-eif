@@ -209,7 +209,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
             val statusOperations = operations
                     .filter {
                         it.args[0].asInteger() == txSubmit.rowId &&
-                                RellTransactionStatus.values()[it.args[1].asInteger()
+                                RellTransactionStatus.entries.toTypedArray()[it.args[1].asInteger()
                                         .toInt()] == RellTransactionStatus.PENDING &&
                                 it.args.size == 5
                     }
@@ -253,7 +253,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
         val txSubmit = mkEvmSubmitTxRellRequest(0, contractAddress)
 
         // Mock rell status for other nodes to be able to verify the operation
-        allTxSubmitterTestModules.forEach { it.addTransaction(mkEvmSubmitTxRellRequest(txSubmit.rowId, "", RellTransactionStatus.QUEUED)) }
+        allTxSubmitterTestModules.forEach { it.addTransaction(mkEvmSubmitTxRellRequest(txSubmit.rowId, "", RellTransactionStatus.QUEUED, processedByNode = nodes[0])) }
 
         // Make it available for node[0]
         txSubmitterTestModule0.addTransactionsAvailableToTake(txSubmit)
@@ -272,7 +272,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
         }
 
         // Mock rell status for other nodes to be able to verify the operation
-        allTxSubmitterTestModules.forEach { it.addTransaction(mkEvmSubmitTxRellRequest(txSubmit.rowId, "", RellTransactionStatus.QUEUED)) }
+        allTxSubmitterTestModules.forEach { it.addTransaction(mkEvmSubmitTxRellRequest(txSubmit.rowId, "", RellTransactionStatus.QUEUED, processedByNode = nodes[0])) }
 
         //  Make it available for node[1]
         txSubmitterTestModule1.addTransactionsAvailableToTake(txSubmit)
@@ -284,7 +284,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
         }
 
         // Mock rell status for other nodes to be able to verify the operation
-        allTxSubmitterTestModules.forEach { it.addTransaction(mkEvmSubmitTxRellRequest(txSubmit.rowId, "", RellTransactionStatus.TAKEN)) }
+        allTxSubmitterTestModules.forEach { it.addTransaction(mkEvmSubmitTxRellRequest(txSubmit.rowId, "", RellTransactionStatus.TAKEN, processedByNode = nodes[0])) }
 
         // node[1] successfully submits it
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
@@ -300,7 +300,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
             val statusOperations = operations
                     .filter {
                         it.args[0].asInteger() == txSubmit.rowId &&
-                                RellTransactionStatus.values()[it.args[1].asInteger()
+                                RellTransactionStatus.entries.toTypedArray()[it.args[1].asInteger()
                                         .toInt()] == RellTransactionStatus.PENDING &&
                                 it.args.size == 5
                     }

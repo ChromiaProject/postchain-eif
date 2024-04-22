@@ -8,9 +8,6 @@ data class TransactionSubmitterBlockchainConfig(
         val chains: Map<String, NetworkBlockchainConfig>,
         @Name("gas_limit")
         val gasLimit: Long,
-        @Name("node_tx_timeout")                        // Timeout for submitting TX
-        @DefaultValue(86400000)
-        val nodeTxTimeout: Long,
         @Name("node_tx_verification_timeout")           // Timeout for verifying TX
         @DefaultValue(240000)
         val nodeTxVerificationTimeout: Long,

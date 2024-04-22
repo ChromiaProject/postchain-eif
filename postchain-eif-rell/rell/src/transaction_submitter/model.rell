@@ -59,6 +59,7 @@ struct module_args {
     directory_chain_config: gtv;
     system_anchoring_chain_config: gtv?;
     contract_tx_rate_limit: big_integer;
+    tx_node_submit_timeout: big_integer;
     tx_timeout: big_integer;
     node_retry_strategy;
     network_configs: gtv = list<network_config>().to_gtv();

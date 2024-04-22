@@ -54,7 +54,7 @@ class TransactionSubmitterPendingTransactionTestGTXModule : TransactionSubmitter
         DatabaseAccess.of(ctx).apply {
             val jooq = DSL.using(ctx.conn, SQLDialect.POSTGRES)
 
-            // Submit and pending to be removed
+            // Submit a pending tx to be removed
             jooq.insertInto(table(tableEvmTxSubmit(ctx)))
                     .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_REQUEST_ID, 0)
                     .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_CONTRACT, "")
@@ -81,7 +81,7 @@ open class TransactionSubmitterTestGTXModule(
 ) : SimpleGTXModule<TransactionSubmitterTestContext>(
         TransactionSubmitterTestContext(mutableListOf(), mutableListOf(), mutableSetOf(), mutableSetOf(), mutableSetOf(), mutableSetOf(), mutableListOf(), mutableListOf()),
         mapOf(UPDATE_EVM_TRANSACTION_STATUS to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
-            ModifyTxStatusOperation(conf, opData)
+            ModifyTxStatusOperation(conf, opData, this.updateTxStatus)
         }, UPDATE_EVM_TRANSACTION_RECEIPT to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
             CaptureTxOperation(conf, opData)
         }, EVM_TX_NO_OP to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
@@ -107,6 +107,11 @@ open class TransactionSubmitterTestGTXModule(
                 }
         ) + queryOverrides
 ) {
+
+    companion object {
+
+        var updateTxStatus: Boolean = true
+    }
 
     private val specialTxExtensions = listOf(TransactionSubmitterSpecialTxExtension(), EvmAnchoringSpecialTxExtension())
 
@@ -145,31 +150,36 @@ open class TransactionSubmitterTestGTXModule(
 class ModifyTxStatusOperation(
         private val conf: TransactionSubmitterTestContext,
         private val extOpData: ExtOpData,
+        private val updateTxStatus: Boolean,
 ) : GTXOperation(extOpData) {
     override fun checkCorrectness() {}
     override fun apply(ctx: TxEContext): Boolean {
         val rowId = extOpData.args[0].asInteger()
-        val status = RellTransactionStatus.values()[extOpData.args[1].asInteger().toInt()]
+        val status = RellTransactionStatus.entries[extOpData.args[1].asInteger().toInt()]
+        val signer = extOpData.args[3].asByteArray()
 
-        conf.transactions.replaceAll {
+        if (updateTxStatus) {
+            conf.transactions.replaceAll {
 
-            if (it.rowId == rowId) {
-                EvmSubmitTxRellRequest(
-                        it.rowId,
-                        it.contractAddress,
-                        it.functionName,
-                        it.parameterTypes,
-                        it.parameterValues,
-                        it.networkId,
-                        BigInteger.ONE,
-                        BigInteger.valueOf(4000000000),
-                        it.sender,
-                        it.created,
-                        it.txHash,
-                        status
-                )
-            } else {
-                it
+                if (it.rowId == rowId) {
+                    EvmSubmitTxRellRequest(
+                            it.rowId,
+                            it.contractAddress,
+                            it.functionName,
+                            it.parameterTypes,
+                            it.parameterValues,
+                            it.networkId,
+                            BigInteger.ONE,
+                            BigInteger.valueOf(4000000000),
+                            it.sender,
+                            it.created,
+                            it.txHash,
+                            status,
+                            if (status == RellTransactionStatus.TAKEN) signer else it.processed_by,
+                    )
+                } else {
+                    it
+                }
             }
         }
 
