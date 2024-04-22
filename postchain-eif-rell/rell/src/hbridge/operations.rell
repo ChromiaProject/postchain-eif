@@ -1,13 +1,25 @@
 @extend(ft4.auth.auth_handler)
 function () = ft4.auth.add_auth_handler(
-    scope = rell.meta(link_evm_account).mount_name,
+    scope = rell.meta(link_evm_eoa_account).mount_name,
     flags = ["A"]
 );
 
-operation link_evm_account(address: byte_array) {
+operation link_evm_eoa_account(address: byte_array) {
     val account = ft4.auth.authenticate();
     ft4.auth.verify_signers([address]);
-    _link_evm_account(address, account);
+    _link_evm_eoa_account(address, account);
+}
+
+@extend(ft4.auth.auth_handler)
+function () = ft4.auth.add_auth_handler(
+    scope = rell.meta(link_evm_sc_account).mount_name,
+    flags = ["A"]
+);
+
+operation link_evm_sc_account(address: byte_array, network_id: integer) {
+    val account = ft4.auth.authenticate();
+    require(proposed_evm_sc_account_link @? { account, address, network_id }, "proposal does not exist");
+    _link_evm_sc_account(address, account, network_id);
 }
 
 @extend(ft4.auth.auth_handler)

@@ -77,9 +77,10 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     event PendingWithdraw(bytes32 indexed hash);
     event UnpendingWithdraw(bytes32 indexed hash);
     event FundedERC20(address indexed sender, IERC20 indexed token, uint amount);
-    event DepositedERC20(address indexed sender, IERC20 indexed token, uint networkId, uint amount, string name, string symbol, uint8 decimals);
+    event DepositedERC20(address indexed sender, IERC20 indexed token, uint amount, bytes32 accountID);
     event WithdrawRequest(address indexed beneficiary, IERC20 indexed token, uint256 value, uint height, bytes32 blockRid);
     event Withdrawal(address indexed beneficiary, IERC20 indexed token, uint256 value);
+    event LinkAccountID(address indexed sender, bytes32 accountID, bool isContract);
 
     modifier isAllowToken(IERC20 token) {
         require(_allowedToken[token], "TokenBridge: not allow token");
@@ -181,10 +182,30 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     }
 
     function deposit(IERC20 token, uint256 amount) public isAllowToken(token) whenNotPaused returns (bool) {
-        (string memory name, string memory symbol, uint8 decimals) = _getTokenInfo(token);
         transferDeposit(token, amount);
-        emit DepositedERC20(msg.sender, token, networkId, amount, name, symbol, decimals);
+        emit DepositedERC20(msg.sender, token, 0x0); // accountID will be determined from sender
         return true;
+    }
+
+    function isContract(address addr) internal returns (bool) {
+        // Note: We are aware of the fact that this might return false even when the address is a contract.
+        // It is fine for our purposes. We want to prevent EOA from calling depositToAccountID.
+        return addr.code.length > 0;
+    }
+
+    function depositToAccountID(IERC20 token, uint256 amount, bytes32 accountID) public
+        isAllowToken(token)
+        whenNotPaused
+        isContract(msg.sender) // cannot be called from EOA for security reasons
+        returns (bool)
+    {
+        transferDeposit(token, amount);
+        emit DepositedERC20(msg.sender, token, amount, accountID);
+        return true;
+    }
+
+    function linkAccountID(bytes32 accountID) external {
+        emit LinkAccountID(msg.sender, accountID, isContract(msg.sender));
     }
 
     function transferDeposit(IERC20 token, uint256 amount) internal virtual {
@@ -274,8 +295,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         wd.status = Status.PostchainWithdrawn;
         uint amount = wd.amount;
         wd.amount = 0;
-        (string memory name, string memory symbol, uint8 decimals) = _getTokenInfo(wd.token);
-        emit DepositedERC20(msg.sender, wd.token, networkId, amount, name, symbol, decimals);
+        emit DepositedERC20(msg.sender, wd.token, amount, 0x0); // accountID will be determined from sender
     }
 
     function _getTokenInfo(
