@@ -44,9 +44,9 @@ libs:
     tagOrBranch: 1.37.0
     rid: x"19D6BC28D527E6D2239843608486A84F44EDCD244E253616F13D1C65893F35F6"
     insecure: false
-  eif_event_receiver_chain:
+  eif_event_receiver:
     registry: https://gitlab.com/chromaway/postchain-eif
-    path: postchain-eif-rell/rell/src/eif_event_receiver_chain
+    path: postchain-eif-rell/rell/src/eif_event_receiver
     tagOrBranch: 0.3.7
     rid: x"9380C4B43D2BF6CB4920E0CC9634F9EE7F9D1943E8690CD11A7C7DA5C924CB20"
     insecure: false

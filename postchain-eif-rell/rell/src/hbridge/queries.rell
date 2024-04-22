@@ -1,0 +1,31 @@
+struct erc20_info {
+    network_id: integer;
+    token_address: byte_array; // contract address
+    bridge_mode;
+    virtual_blockchain_rid: byte_array; // virtual blockchain RID derived from network_id and address
+}
+
+query get_erc20_for_asset(asset_id: byte_array): list<erc20_info> {
+    val asset = ft4.assets.Asset(asset_id);
+    return erc20_asset @* { asset } (erc20_info(
+        .network_id,
+        .token_address,
+        .bridge_mode,
+        .virtual_blockchain_rid
+    ));
+}
+
+query get_erc20_withdrawal(network_id: integer, token_address: byte_array, beneficiary: byte_array): list<struct<erc20_withdraw>> =
+    erc20_withdraw @* {
+        network_id,
+        token_address,
+        beneficiary
+    } (@sort_desc @omit .serial, $.to_struct());
+
+query get_account_for_address(evm_address: byte_array): byte_array? =
+    evm_account_link @? { .address == evm_address } (.account.id);
+
+query get_addresses_for_account(account_id: byte_array): list<byte_array> {
+    val account = ft4.accounts.Account(account_id);
+    return evm_account_link @* { account } (.address);
+}

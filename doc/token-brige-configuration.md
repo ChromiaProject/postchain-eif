@@ -59,16 +59,16 @@ libs:
     tagOrBranch: 1.37.0
     rid: x"19D6BC28D527E6D2239843608486A84F44EDCD244E253616F13D1C65893F35F6"
     insecure: false
-  eif_event_receiver_connector:
+  eif_event_connector:
     registry: https://gitlab.com/chromaway/postchain-eif
-    path: postchain-eif-rell/rell/src/eif_event_receiver_connector
-    tagOrBranch: eif_config_refactoring
+    path: postchain-eif-rell/rell/src/eif_event_connector
+    tagOrBranch: 0.3.7
     rid: x"4EFAD07454151733CEE2457377898B2085184596A3C1D724CC25387B06013EB2"
     insecure: false
   eif:
     registry: https://gitlab.com/chromaway/postchain-eif
     path: postchain-eif-rell/rell/src/eif
-    tagOrBranch: eif_config_refactoring
+    tagOrBranch: 0.3.7
     rid: x"B023B96EF2331FC912A39D56489810935E718D10BA8EE953BF09526250F6AB53"
     insecure: false
 ```

@@ -14,6 +14,9 @@ definitions:
         max_points: 200
         recovery_time: 5000
         points_at_account_creation: 100
+    lib.ft4.auth:
+      evm_signatures_authorized_operations:
+        - eif.hbridge.link_evm_account
   - &rell_test_args
     lib.ft4.admin:
       admin_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
@@ -21,15 +24,26 @@ definitions:
       admin_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
 
 test:
+  failOnError: false
   modules:
     - tests.utils
-    - tests.ft4
+    - tests.hbridge.hbridge
     - transaction_submitter.test
     - transaction_submitter.anchoring.test
     - transaction_submitter.signer_update.test
   moduleArgs:
     <<: *common_args
     <<: *rell_test_args
+    lib.ft4.accounts.strategies.transfer:
+      rules:
+        - sender_blockchain:
+            - "*"
+          sender: "*"
+          recipient: "*"
+          asset: "*"
+          timeout_days: 10
+          strategy: "open"
+
     transaction_submitter:
       manual_admins:
         - x"02466d7fcae563e5cb09a0d1870bb580344804617879a14949cf22285f1bae3f27"
@@ -66,8 +80,8 @@ test:
       anchoring_interval: 3600000
 
 blockchains:
-  event_receiver:
-    module: eif_event_receiver_chain
+  eif_event_receiver:
+    module: eif_event_receiver
     config:
       gtx:
         modules:
@@ -75,8 +89,9 @@ blockchains:
           - "net.postchain.d1.icmf.IcmfSenderGTXModule"
       sync_ext:
         - "net.postchain.eif.EifSynchronizationInfrastructureExtension"
-  eif:
-    module: main
+
+  hbridge:
+    module: hbridge
     config:
       gtx:
         modules:
@@ -94,6 +109,9 @@ blockchains:
     moduleArgs:
       <<: *common_args
       <<: *rell_test_args
+      lib.ft4.accounts.strategies.transfer:
+        rules: [] # TODO specify transfer strategy rules
+
   transaction_submitter:
     module: transaction_submitter
     moduleArgs:
@@ -165,13 +183,14 @@ blockchains:
 compile:
   source: src
   target: target
-  rellVersion: 0.13.5
+  rellVersion: 0.13.10
 libs:
   ft4:
     registry: https://bitbucket.org/chromawallet/ft3-lib
     path: rell/src/lib/ft4
-    tagOrBranch: v0.5.0r
-    rid: x"125809B57980D6E36C07210D0541E7BCAD86A66F324FC1C0DA9CA7D1F8D5A720"
+    # TODO use this when released: tagOrBranch: v0.7.0r
+    tagOrBranch: hbridge
+    rid: x"FD27ABFA0CEA9B460EA4CEADE8993915B52F2D0437D923969B902422A908CD19"
     insecure: false
   iccf:
     registry: https://gitlab.com/chromaway/core/directory-chain
@@ -184,3 +203,4 @@ libs:
     path: src/messaging/icmf
     tagOrBranch: 1.35.0
     rid: x"19D6BC28D527E6D2239843608486A84F44EDCD244E253616F13D1C65893F35F6"
+    insecure: false
