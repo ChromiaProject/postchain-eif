@@ -3,6 +3,7 @@ package net.postchain.eif
 import assertk.assertThat
 import assertk.assertions.contains
 import assertk.assertions.isEqualTo
+import assertk.assertions.isNotEqualTo
 import mu.KotlinLogging
 import net.postchain.base.BaseBlockWitness
 import net.postchain.base.configuration.KEY_SIGNERS
@@ -256,7 +257,9 @@ class HBridgeIT : EifBaseIntegrationTest() {
         // Check the asset balance
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             sealBlock() // keep postchain build new blocks to ensure that all evm deposits are recorded
-            val balance = blockQuery.query("ft4.get_asset_balance", gtv("account_id" to gtv(accountId), "asset_id" to gtv(assetId))).get()["amount"]!!.asBigInteger()
+            val gtvBalance = blockQuery.query("ft4.get_asset_balance", gtv("account_id" to gtv(accountId), "asset_id" to gtv(assetId)))
+            assertThat(gtvBalance).isNotEqualTo(GtvNull)
+            val balance = gtvBalance.get()["amount"]!!.asBigInteger()
             assertEquals(depositAmount, balance)
         }
         snapshotHeights.add(currentBlockHeight)
