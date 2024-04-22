@@ -258,8 +258,9 @@ class HBridgeIT : EifBaseIntegrationTest() {
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             sealBlock() // keep postchain build new blocks to ensure that all evm deposits are recorded
             val gtvBalance = blockQuery.query("ft4.get_asset_balance", gtv("account_id" to gtv(accountId), "asset_id" to gtv(assetId)))
+                    .get()
             assertThat(gtvBalance).isNotEqualTo(GtvNull)
-            val balance = gtvBalance.get()["amount"]!!.asBigInteger()
+            val balance = gtvBalance["amount"]!!.asBigInteger()
             assertEquals(depositAmount, balance)
         }
         snapshotHeights.add(currentBlockHeight)
