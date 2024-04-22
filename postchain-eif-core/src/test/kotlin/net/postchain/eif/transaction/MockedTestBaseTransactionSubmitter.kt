@@ -5,15 +5,20 @@ import net.postchain.core.Storage
 import net.postchain.devtools.IntegrationTestSetup
 import net.postchain.eif.TestLogAppender
 import net.postchain.eif.Web3jRequestHandler
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.GET_TRANSACTION
+import net.postchain.gtv.GtvFactory.gtv
+import net.postchain.gtx.GTXModule
 import org.apache.logging.log4j.Level
 import org.junit.jupiter.api.BeforeEach
 import org.mockito.ArgumentMatchers
+import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.Mockito
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argThat
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.doThrow
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.Request
@@ -38,6 +43,7 @@ import kotlin.reflect.jvm.reflect
 
 open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
 
+    lateinit var module: GTXModule
     lateinit var storage: Storage
     lateinit var databaseOperations: TransactionSubmitterDatabaseOperations
     lateinit var testLogAppender: TestLogAppender
@@ -45,8 +51,12 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
     @BeforeEach
     fun setup() {
 
+        module = mock<GTXModule>()
         storage = mock<Storage> {
-            on { openWriteConnection(ArgumentMatchers.anyLong()) } doAnswer {
+            on { openWriteConnection(anyLong()) } doAnswer {
+                mock<EContext>()
+            }
+            on { openReadConnection(anyLong()) } doAnswer {
                 mock<EContext>()
             }
         }
@@ -143,7 +153,7 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
             if (exception != null) {
                 on {
                     sendEIP1559Transaction(
-                            ArgumentMatchers.anyLong(),
+                            anyLong(),
                             any(),
                             any(),
                             any(),
@@ -161,7 +171,7 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
                 }
                 on {
                     sendEIP1559Transaction(
-                            ArgumentMatchers.anyLong(),
+                            anyLong(),
                             any(),
                             any(),
                             any(),
@@ -231,8 +241,16 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
                 BigInteger.valueOf(10),
                 -1,
                 24 * 60 * 60000,
-                1000 * 60 * 4,
                 5,
+                module,
+                ByteArray (32) { 0 },
         )
+    }
+
+    fun mockTakenBy() {
+        Mockito.`when`(module.query(any(), eq(GET_TRANSACTION), any())).thenReturn(gtv(mapOf(
+                "status" to gtv(RellTransactionStatus.TAKEN.name),
+                "processed_by" to gtv(ByteArray(32) { 0 })
+        )))
     }
 }

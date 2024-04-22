@@ -5,7 +5,6 @@
 | Name                              | Description                                                                                                                                                                                                                                               | Type | Required           | Default  |
 |-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------|--------------------|----------|
 | `gas_limit`                       | The maximum amount of gas that is allowed for any transaction to spend                                                                                                                                                                                    | int  | :white_check_mark: |          |
-| `node_tx_timeout`                 | Time out for a transaction to be submitted in milliseconds, if this deadline is passed the transaction is considered to have failed. NOTE: This seems to be duplicated in module arg, we should try to align implementation so we can remove this config. | int  |                    | 86400000 |
 | `node_tx_verification_timeout`    | Time out for a transaction submission to be verified as processed on EVM side in milliseconds, if this deadline is passed the transaction submission attempt is considered to have failed and the transaction can be retried by another node.             | int  |                    | 240000   |
 | `node_tx_verification_evm_blocks` | The number of block confirmations required on the EVM network side to be considered final on the Chromia network side. This offset is used to avoid issues caused by potential EVM chain reorganization.                                                  | int  |                    | 100      |
 | `tx_verification_time`            | How long a node should wait until attempting to find consensus on a transaction in milliseconds                                                                                                                                                           | int  |                    | 60000    |
@@ -23,19 +22,20 @@ parameter `chains`. Each item in the list have the following configuration prope
 
 The transaction submitter chain has the following module args:
 
-| Name                              | Description                                                                                                                         | Type         | Required           | Default |
-|-----------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|--------------|--------------------|---------|
-| `genesis_node`                    | Public key of network genesis node                                                                                                  | bytea        | :white_check_mark: |         |
-| `directory_chain_config`          | See details under [setup](#Setup) section                                                                                           | gtv          | :white_check_mark: |         |
-| `system_anchoring_chain_config`   | See details under [setup with anchoring](#Setup-with-anchoring) section                                                             | gtv          | :white_check_mark: |         |
-| `system_chain_bridges`            | See details under [connect system chain bridge](#connect-system-chain-bridge) section                                               | gtv          | :white_check_mark: |         |
-| `contract_tx_rate_limit`          | Rate limit for transaction submission (applied per contract)                                                                        | int          | :white_check_mark: |         |
-| `tx_timeout`                      | Time out for a transaction to be submitted in milliseconds, if this deadline is passed the transaction is considered to have failed | int          | :white_check_mark: |         |
-| `node_retry_strategy`             | Strategy for how many nodes that should retry a transaction before considering it to have failed. `ALL` or `SUPERMAJORITY`.         | text         | :white_check_mark: |         |
-| `network_configs`                 | Mapping of native currency for each network `id` to `currency_symbol`                                                               | array<gtv>   |                    | []      |
-| `manual_admins`                   | Public keys for manual admins. See [manual reset of failed signer updates](#manual-reset-of-failed-signer-updates).                 | array<bytea> | :white_check_mark: |         |
-| `system_max_priority_fee_per_gas` | Max priority fee to use for system transactions.                                                                                    | int          | :white_check_mark: |         |
-| `system_max_fee_per_gas`          | Max gas to use for system transactions.                                                                                             | int          | :white_check_mark: |         |
+| Name                              | Description                                                                                                                                                                                                     | Type         | Required           | Default |
+|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|--------------------|---------|
+| `genesis_node`                    | Public key of network genesis node                                                                                                                                                                              | bytea        | :white_check_mark: |         |
+| `directory_chain_config`          | See details under [setup](#Setup) section                                                                                                                                                                       | gtv          | :white_check_mark: |         |
+| `system_anchoring_chain_config`   | See details under [setup with anchoring](#Setup-with-anchoring) section                                                                                                                                         | gtv          | :white_check_mark: |         |
+| `system_chain_bridges`            | See details under [connect system chain bridge](#connect-system-chain-bridge) section                                                                                                                           | gtv          | :white_check_mark: |         |
+| `contract_tx_rate_limit`          | Rate limit for transaction submission (applied per contract)                                                                                                                                                    | int          | :white_check_mark: |         |
+| `tx_node_submit_timeout`          | Time out for a transaction to be submitted by a node in milliseconds, if this deadline is passed the node is considered to not be able to submit the transaction and another node will try to submit it instead | int          | :white_check_mark: |         |
+| `tx_timeout`                      | Time out for a transaction to be submitted and verified by all nodes in milliseconds, if this deadline is passed the transaction is considered to have failed                                                   | int          | :white_check_mark: |         |
+| `node_retry_strategy`             | Strategy for how many nodes that should retry a transaction before considering it to have failed. `ALL` or `SUPERMAJORITY`.                                                                                     | text         | :white_check_mark: |         |
+| `network_configs`                 | Mapping of native currency for each network `id` to `currency_symbol`                                                                                                                                           | array<gtv>   |                    | []      |
+| `manual_admins`                   | Public keys for manual admins. See [manual reset of failed signer updates](#manual-reset-of-failed-signer-updates).                                                                                             | array<bytea> | :white_check_mark: |         |
+| `system_max_priority_fee_per_gas` | Max priority fee to use for system transactions.                                                                                                                                                                | int          | :white_check_mark: |         |
+| `system_max_fee_per_gas`          | Max gas to use for system transactions.                                                                                                                                                                         | int          | :white_check_mark: |         |
 
 The transaction submitter chain anchoring module has the following module args:
 
@@ -81,6 +81,7 @@ Example:
                 validator_contract: "ec_validator_contract"
                 network_id: 5
         contract_tx_rate_limit: 60000
+        tx_node_submit_timeout: 1800000 # 30m
         tx_timeout: 86400000 #24h
         node_retry_strategy: SUPERMAJORITY
         network_configs:
@@ -102,7 +103,6 @@ Example:
             network_id: 5
             max_gas_price: 4100000000
             min_wallet_balance: 100000000000
-        node_tx_timeout: 86400000 #24h
         gas_limit: 9000000
         node_tx_verification_evm_blocks: 10
         tx_verification_time: 20000

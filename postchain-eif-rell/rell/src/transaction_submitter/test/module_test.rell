@@ -185,22 +185,47 @@ function test_is_supermajority() {
     assert_true(is_supermajority(41, 60));
 }
 
-function test_timeout_evm_transaction(){
-    rell.test.set_next_block_time(1);
-    rell.test.block().run();
-    rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
-    ).run();
+function timeout_evm_transactions() {
 
     rell.test.set_next_block_time(86400000);
     rell.test.block().run();
     rell.test.tx().op(
-        create_test_evm_submit_transaction(x"01", "address1","myFunction", transaction_status.QUEUED, 86400000, 1337)
+        create_test_evm_submit_transaction(x"00", "should-time-out", "myFunction", transaction_status.QUEUED, 0),
+        create_test_evm_submit_transaction(x"01", "should-not-time-out", "myFunction", transaction_status.QUEUED, 86400000),
+        create_test_evm_submit_transaction(x"02", "should-not-time-out", "myFunction", transaction_status.TAKEN, 86400000),
+        create_test_evm_submit_transaction(x"03", "should-not-time-out", "myFunction", transaction_status.FAILURE, 86400000)
     ).run();
     rell.test.block().run();
 
-    val tx = evm_submit_transaction @ {.status == transaction_status.FAILURE};
-    assert_true(tx.contract_address == "address");
+    val transactions = evm_submit_transaction @* { } ( .id, .status );
+    assert_equals(transactions, [
+        (id = x"00", status = transaction_status.FAILURE), // Only one changed
+        (id = x"01", status = transaction_status.QUEUED),
+        (id = x"02", status = transaction_status.TAKEN),
+        (id = x"03", status = transaction_status.FAILURE)
+    ]);
+}
+
+function timeout_submit_evm_transaction() {
+    rell.test.set_next_block_time(1800000);
+    rell.test.block().run();
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "should-time-out", "myFunction", transaction_status.TAKEN, 0, taken_timestamp = 0),
+        create_test_evm_submit_transaction(x"01", "should-not-time-out", "myFunction", transaction_status.TAKEN, 1800000, taken_timestamp = 1800000),
+        create_test_evm_submit_transaction(x"02", "should-not-time-out", "myFunction", transaction_status.TAKEN, 86400000, taken_timestamp = 1800000),
+        create_test_evm_submit_transaction(x"03", "should-not-time-out", "myFunction", transaction_status.FAILURE, 86400000),
+        create_test_evm_submit_transaction(x"04", "should-not-time-out", "myFunction", transaction_status.QUEUED, 0)
+    ).run();
+    rell.test.block().run();
+
+    val transactions = evm_submit_transaction @* { } ( .id, .status );
+    assert_equals(transactions, [
+        (id = x"00", status = transaction_status.QUEUED), // Only one changed
+        (id = x"01", status = transaction_status.TAKEN),
+        (id = x"02", status = transaction_status.TAKEN),
+        (id = x"03", status = transaction_status.FAILURE),
+        (id = x"04", status = transaction_status.QUEUED)
+    ]);
 }
 
 function test_get_currency_symbol() {
@@ -251,12 +276,9 @@ function test_update_evm_transaction_status_taken_only_once() {
 
     rell.test.tx().op(
         update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"01"),
-        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.QUEUED, x"01")
-    ).run();
-
-    rell.test.tx().op(
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.QUEUED, x"01"),
         update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"01")
-    ).run_must_fail();
+    ).run_must_fail("Each node can only process one transaction once");
 }
 
 function test_update_evm_transaction_status_rejects() {

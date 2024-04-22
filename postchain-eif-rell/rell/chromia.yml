@@ -69,6 +69,7 @@ test:
               validator_contract: "validator"
               network_id: 1337
       contract_tx_rate_limit: 60000
+      tx_node_submit_timeout: 1800000 # 30m
       tx_timeout: 86400000 #24h
       node_retry_strategy: SUPERMAJORITY
       network_configs:
@@ -139,6 +140,7 @@ blockchains:
         #                validator_contract: "ec_validator_contract"
         #                network_id: 5
         contract_tx_rate_limit: 60000
+        tx_node_submit_timeout: 1800000 # 30m
         tx_timeout: 86400000 #24h
         node_retry_strategy: SUPERMAJORITY
         network_configs:
@@ -160,7 +162,6 @@ blockchains:
             network_id: 5
             max_gas_price: 4100000000
             min_wallet_balance: 100000000000
-        node_tx_timeout: 86400000 #24h
         gas_limit: 9000000
         node_tx_verification_evm_blocks: 10
         tx_verification_time: 20000

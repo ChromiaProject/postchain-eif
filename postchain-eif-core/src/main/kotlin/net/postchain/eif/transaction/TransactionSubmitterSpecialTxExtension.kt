@@ -68,7 +68,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
             if (op.opName == UPDATE_EVM_TRANSACTION_STATUS) {
 
                 val requestId = op.args[0].asInteger()
-                val newTxStatus = RellTransactionStatus.values()[op.args[1].asInteger().toInt()]
+                val newTxStatus = RellTransactionStatus.entries[op.args[1].asInteger().toInt()]
                 val txHash = if (op.args[2].isNull()) null else op.args[2].asString()
                 val signer = op.args[3].asByteArray()
                 val signedData = op.args[4].asByteArray()
@@ -78,7 +78,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                     return false
                 }
 
-                val currentTxStatus = getBcTransactionStatus(bctx, requestId)
+                val currentTxStatus = getBcTransactionStatus(module, bctx, requestId)
 
                 if (currentTxStatus == null) {
                     logger.warn { "Validation failed. Transaction $requestId not found" }
@@ -183,42 +183,63 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
         transactionSubmitters.values.forEach { txSubmitter ->
 
-            // Transaction status updates
+            // Submitted transaction status updates
             val submitTxUpdates = txSubmitter.getSubmitTxUpdates()
             submitTxUpdates.forEach { result ->
-                operations.add(
-                        buildTxUpdateOp(result.requestId, result.status, result.txHash)
-                )
 
-                // Status QUEUE can be set multiple times due to retry - add a no op for them
-                if (result.status == RellTransactionStatus.QUEUED) {
-                    addNoOp(operations, bctx)
-                }
+                if (continueProcessTx(module, bctx, result.requestId)) {
 
-                // We have processed this TX - cleanup
-                if (result.status != RellTransactionStatus.TAKEN) {
-                    txSubmitter.setSubmitBCPersisted(bctx, result.requestId)
+                    operations.add(
+                            buildTxUpdateOp(result.requestId, result.status, result.txHash)
+                    )
+
+                    // Status QUEUE can be set multiple times due to retry - add a no op for them
+                    if (result.status == RellTransactionStatus.QUEUED) {
+                        addNoOp(operations, bctx)
+                    }
+
+                    // We have processed this TX - cleanup
+                    if (result.status != RellTransactionStatus.TAKEN) {
+                        txSubmitter.setSubmitBCPersisted(bctx, result.requestId)
+                    }
                 }
             }
 
             bctx.addAfterCommitHook { txSubmitter.clearSubmitTxUpdates(submitTxUpdates) }
 
+            // Verified transaction updates
             txSubmitter.getVerifiedTransactions(txVerificationTime).forEach {
 
-                val rellStatus =
-                        if (it.status == PendingTxStatus.SUCCESS) RellTransactionStatus.SUCCESS else RellTransactionStatus.FAILURE
+                if (continueProcessTx(module, bctx, it.rowId)) {
 
-                operations.add(
-                        buildTxReceiptOp(it)
-                )
+                    val rellStatus =
+                            if (it.status == PendingTxStatus.SUCCESS) RellTransactionStatus.SUCCESS else RellTransactionStatus.FAILURE
 
-                operations.add(
-                        buildTxUpdateOp(it.rowId, rellStatus)
-                )
+                    operations.add(
+                            buildTxReceiptOp(it)
+                    )
+
+                    operations.add(
+                            buildTxUpdateOp(it.rowId, rellStatus)
+                    )
+                }
             }
         }
 
         return operations
+    }
+
+    private fun continueProcessTx(module: GTXModule, eContext: EContext, requestId: Long): Boolean {
+
+        if (isTxCompletedOnBlockchain(module, eContext, requestId)) {
+
+            withTxPending(requestId) { txSubmitter, _ ->
+                txSubmitter.removePendingTx(requestId)
+            }
+            return false
+        }
+
+        return true
     }
 
     private fun buildTxReceiptOp(txPending: EvmPendingTx): OpData {
@@ -332,16 +353,6 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         }
     }
 
-    private fun getBcTransactionStatus(bctx: BlockEContext, requestId: Long): RellTransactionStatus? {
-
-        val queryResult = module.query(bctx, GET_TRANSACTION_STATUS, gtv("row_id" to gtv(requestId)))
-        if (queryResult.isNull()) {
-            return null
-        }
-
-        return RellTransactionStatus.valueOf(queryResult.asString())
-    }
-
     private fun getBcTransaction(bctx: BlockEContext, requestId: Long): EvmSubmitTxRellRequest {
 
         val queryResult = module.query(bctx, GET_TRANSACTION, gtv("row_id" to gtv(requestId)))
@@ -377,4 +388,28 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
     private fun signatureDataHash(value: Long, status: RellTransactionStatus) =
             gtv(gtv(value), gtv(status.ordinal.toLong())).merkleHash(GtvMerkleHashCalculator(cryptoSystem))
+
+    // Checks if rell has marked the tx as completed
+    private fun isTxCompletedOnBlockchain(module: GTXModule, eContext: EContext, requestId: Long): Boolean {
+
+        val txStatus = getBcTransactionStatus(module, eContext, requestId)
+
+        if (txStatus == null || txStatus.isCompleted()) {
+            logger.warn { "Transaction $requestId blockchain status is set to completed. This node will stop processing this transaction." }
+            return true
+        }
+
+        return false
+    }
+
+    private fun getBcTransactionStatus(module: GTXModule, eContext: EContext, requestId: Long): RellTransactionStatus? {
+
+        val queryResult = module.query(eContext, GET_TRANSACTION_STATUS, gtv("row_id" to gtv(requestId)))
+        if (queryResult.isNull()) {
+            return null
+        }
+
+        return RellTransactionStatus.valueOf(queryResult.asString())
+    }
+
 }
