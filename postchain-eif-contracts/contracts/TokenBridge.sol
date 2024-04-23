@@ -183,7 +183,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
 
     function deposit(IERC20 token, uint256 amount) public isAllowToken(token) whenNotPaused returns (bool) {
         transferDeposit(token, amount);
-        emit DepositedERC20(msg.sender, token, 0x0); // accountID will be determined from sender
+        emit DepositedERC20(msg.sender, token, amount, 0x0); // accountID will be determined from sender
         return true;
     }
 
@@ -193,10 +193,15 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         return addr.code.length > 0;
     }
 
+    modifier onlyContract() {
+        require(isContract(msg.sender), "TokenBridge: only contract can call this function");
+        _;
+    }
+
     function depositToAccountID(IERC20 token, uint256 amount, bytes32 accountID) public
         isAllowToken(token)
         whenNotPaused
-        isContract(msg.sender) // cannot be called from EOA for security reasons
+        onlyContract() // cannot be called from EOA for security reasons
         returns (bool)
     {
         transferDeposit(token, amount);
