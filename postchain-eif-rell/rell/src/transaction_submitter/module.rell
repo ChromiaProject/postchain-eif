@@ -7,11 +7,24 @@ import .utils.*;
 import lib.icmf.*;
 import lib.icmf.receiver.{ receive_icmf_message };
 
+// Limit the overall time for a transaction to be submitted and verified
 function timeout_evm_transactions() {
     val timeout_timestamp = get_last_blocktime() - chain_context.args.tx_timeout;
     val row_ids = evm_submit_transaction @* { .status != transaction_status.SUCCESS and .status != transaction_status.FAILURE and .created < timeout_timestamp } ( .rowid );
     for (row_id in row_ids) {
-        update evm_submit_transaction @ { row_id } (status = transaction_status.FAILURE);
+        log("Total time expired for transaction %s, status changed to %s".format(row_id, transaction_status.FAILURE));
+        update_evm_transaction_status(row_id.to_integer(), transaction_status.FAILURE);
+    }
+}
+
+// Limit the time for each node to submit a transaction before it is passed on to the next node
+function timeout_submit_evm_transactions() {
+    val timeout_timestamp = get_last_blocktime() - chain_context.args.tx_node_submit_timeout;
+    val transactions = evm_submit_transaction @* { .status == transaction_status.TAKEN and .taken_timestamp < timeout_timestamp } ( .rowid, .processed_by );
+    for (transaction in transactions) {
+        log("Submit time for node %s expired for transaction, status changed to %s".format(
+            transaction.rowid, transaction.processed_by, transaction_status.QUEUED));
+        update evm_submit_transaction @ { transaction.rowid } (status = transaction_status.QUEUED);
     }
 }
 
@@ -32,6 +45,7 @@ operation __update_evm_transaction_receipt(row_id: integer, block_hash: text, ef
 
 operation __begin_block(height: integer) {
     timeout_evm_transactions();
+    timeout_submit_evm_transactions();
     fail_transactions_with_enough_retries(chain_context.args.node_retry_strategy);
 }
 

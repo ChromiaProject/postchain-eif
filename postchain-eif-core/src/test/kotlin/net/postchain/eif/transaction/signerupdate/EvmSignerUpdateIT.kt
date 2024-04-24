@@ -125,7 +125,7 @@ class EvmSignerUpdateIT : EifBaseIntegrationTest() {
                 1,
                 directoryChainBrid.data,
                 GtvEncoder.encodeGtv(gtv(gtv(updatedSigner.pubKey.data))),
-                3
+                3,
         ))
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {

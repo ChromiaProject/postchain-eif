@@ -57,7 +57,8 @@ class AnchorOperation(private val conf: TransactionSubmitterTestContext, private
                 BlockchainRid.ZERO_RID.data,
                 System.currentTimeMillis(),
                 null,
-                RellTransactionStatus.QUEUED
+                RellTransactionStatus.QUEUED,
+                null
         )
         conf.transactions.add(tx)
         conf.transactionsAvailableToTake.add(tx)

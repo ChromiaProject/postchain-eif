@@ -97,7 +97,7 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
                 "contractAddress",
                 "0x9329efad000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000101010101010101010101010101010101010101"
         ))
-        ts.pollPendingTransaction(txPending, BigInteger.valueOf(15))
+        ts.pollPendingTransaction(txPending, BigInteger.valueOf(ts.nodeTxVerificationEvmBlocks + 15))
 
         assertThat(txPending.status).isEqualTo(PendingTxStatus.REVERTED)
 

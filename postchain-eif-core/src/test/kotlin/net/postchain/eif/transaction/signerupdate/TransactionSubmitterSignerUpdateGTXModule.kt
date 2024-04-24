@@ -63,7 +63,8 @@ class SubmitSignerUpdateOperation(private val conf: TransactionSubmitterTestCont
                 BlockchainRid.ZERO_RID.data, // Don't care
                 System.currentTimeMillis(),
                 null,
-                RellTransactionStatus.QUEUED
+                RellTransactionStatus.QUEUED,
+                null
         )
 
         conf.transactions.add(tx)

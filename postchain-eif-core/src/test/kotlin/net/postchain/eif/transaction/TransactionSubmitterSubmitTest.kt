@@ -33,6 +33,8 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
                 mock<ContractGasProvider>()
         )
 
+        mockTakenBy()
+
         val exception = assertThrows<RuntimeException>("Expected thrown exception") {
             ts.submitTransaction(
                     mkEvmSubmitTxRequest()
@@ -55,6 +57,8 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
                 transactionManagers,
                 gasProvider
         )
+
+        mockTakenBy()
 
         val exception = assertThrows<RuntimeException>("Expected thrown exception") {
             ts.submitTransaction(
@@ -86,6 +90,8 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
                 gasProvider
         )
 
+        mockTakenBy()
+
         val exception = assertThrows<RuntimeException>("Expected thrown exception") {
             ts.submitTransaction(
                     mkEvmSubmitTxRequest(4)
@@ -102,7 +108,6 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         testLogAppender.assertError("Max fee per gas 4 for tx exceeds limit of 3")
     }
 
-
     @Test
     fun `fail send transaction for all 1 nodes`() {
 
@@ -116,6 +121,8 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
                 transactionManagers,
                 gasProvider
         )
+
+        mockTakenBy()
 
         val exception = assertThrows<RuntimeException>("Expected thrown exception") {
             ts.submitTransaction(
@@ -150,6 +157,8 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
                 transactionManagers,
                 gasProvider
         )
+
+        mockTakenBy()
 
         val exception = assertThrows<RuntimeException>("Expected thrown exception") {
             ts.submitTransaction(

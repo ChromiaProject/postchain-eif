@@ -56,9 +56,6 @@
             <entry key="gas_limit">
                 <int>1</int>
             </entry>
-            <entry key="node_tx_timeout">
-                <int>86400000</int>
-            </entry>
             <entry key="node_tx_verification_timeout">
                 <int>240000</int> <!-- 4 minutes -->
             </entry>

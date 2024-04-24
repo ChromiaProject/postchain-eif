@@ -45,7 +45,15 @@ operation fail_transactions_with_enough_retries_op(node_retry_strategy) {
     fail_transactions_with_enough_retries(node_retry_strategy);
 }
 
-operation create_test_evm_submit_transaction(id: byte_array, contract_address: text, function_name: text, status: transaction_status, created: timestamp, network_id: integer = 1) {
+operation create_test_evm_submit_transaction(
+    id: byte_array,
+    contract_address: text,
+    function_name: text,
+    status: transaction_status,
+    created: timestamp = 0,
+    network_id: integer = 1,
+    taken_timestamp: integer = 0
+) {
     create evm_submit_transaction (
         id = id,
         contract_address = contract_address,
@@ -59,7 +67,7 @@ operation create_test_evm_submit_transaction(id: byte_array, contract_address: t
         sender = x"",
         status = status,
         created = created,
-        taken_timestamp = 0);
+        taken_timestamp = taken_timestamp);
 }
 
 operation timeout_evm_transactions_op(){

@@ -25,7 +25,10 @@ enum class RellTransactionStatus {
     TAKEN,
     PENDING,
     SUCCESS,
-    FAILURE
+    FAILURE;
+
+    fun isCompleted(): Boolean =
+        this == SUCCESS || this == FAILURE
 }
 
 open class EvmSubmitTxRellRequest(
@@ -55,6 +58,9 @@ open class EvmSubmitTxRellRequest(
         @Nullable
         @Name("status")
         val status: RellTransactionStatus?,
+        @Nullable
+        @Name("processed_by")
+        val processed_by: ByteArray?,
 )
 
 class EvmSubmitTxRequest(
@@ -72,7 +78,8 @@ class EvmSubmitTxRequest(
         rellRequest.sender,
         rellRequest.created,
         rellRequest.txHash,
-        rellRequest.status
+        rellRequest.status,
+        rellRequest.processed_by
 ) {
     companion object {
         fun fromRell(rellRequest: EvmSubmitTxRellRequest): EvmSubmitTxRequest {
@@ -128,6 +135,7 @@ val evmSubmitTxRequestRecordMapper = RecordMapper<Record, EvmSubmitTxRequest> {
                     it.get(EVM_TX_SUBMIT_COLUMN_SENDER),
                     it.get(EVM_TX_SUBMIT_COLUMN_CREATED),
                     it.get(EVM_TX_SUBMIT_COLUMN_HASH),
+                    null,
                     null
             ),
             it.get(EVM_TX_SUBMIT_COLUMN_BC_PERSISTED)

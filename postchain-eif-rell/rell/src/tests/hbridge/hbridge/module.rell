@@ -2,12 +2,11 @@
 
 import lib.icmf.test.{ test_icmf_message };
 import lib.ft4.auth;
-import auth_ext: lib.ft4.auth.external;
 import lib.ft4.admin;
 import lib.ft4.accounts;
 import lib.ft4.assets;
 import lib.ft4.utils;
-import strategies_ext: lib.ft4.accounts.strategies.external;
+import lib.ft4.accounts.strategies;
 import create_on_transfer: lib.ft4.accounts.strategies.transfer;
 import lib.ft4.accounts.strategies.transfer.open;
 import test_utils: lib.ft4.test.utils;
@@ -40,7 +39,7 @@ function register_foreign_asset(): assets.asset {
     val asset_id = (token_name, chain_context.blockchain_rid).hash();
 
     rell.test.tx().op(
-        admin.register_asset(token_name, token_symbol, token_decimal, token_icon_url)
+        admin.external.register_asset(token_name, token_symbol, token_decimal, token_icon_url)
     ).sign(admin_privkey).run();
 
     rell.test.tx().op(
@@ -64,11 +63,11 @@ function link_account(
 ) {
     val evm_address = crypto.eth_pubkey_to_address(evm_keypair.pub);
     val op = hbridge.link_evm_account(evm_address);
-    val message = create_auth_message(op.name, op.args);
+    val message = test_utils.create_evm_auth_message(op);
     val signature = test_utils.evm_sign(message, evm_keypair.priv);
     rell.test.tx()
-        .op(auth_ext.evm_signatures([evm_address], [signature]))
-        .op(auth_ext.ft_auth(account_id, auth_descriptor_id))
+        .op(auth.evm_signatures([evm_address], [signature]))
+        .op(auth.external.ft_auth(account_id, auth_descriptor_id))
         .op(op)
         .nop()
         .sign(ft_keypair).run();
@@ -101,31 +100,6 @@ function run_block_after_timeout() {
     rell.test.set_next_block_time(rell.test.last_block_time + (utils.MILLISECONDS_PER_DAY * 10) + 1);
     rell.test.block().run();
 }
-
-// Copied from https://bitbucket.org/chromawallet/ft3-lib/src/209d2bbe15284ecb38632840895a068d47ead525/rell/src/tests/assets/utils.rell#utils.rell-88
-function create_auth_descriptor(
-    signer: byte_array,
-    permissions: list<text> = ["T"],
-    rules: gtv = null.to_gtv()
-): accounts.auth_descriptor {
-    return accounts.auth_descriptor(
-            accounts.auth_type.S,
-            [
-                set(permissions).to_gtv(),
-                signer.to_gtv()
-            ],
-            rules
-        );
-}
-
-// Copied from FT4
-function create_auth_message(op_name: name, op_args: list<gtv>) =
-    auth_ext.get_auth_message_template(op_name, op_args.to_gtv())
-        .replace(
-            auth.BLOCKCHAIN_RID_PLACEHOLDER,
-            chain_context.blockchain_rid.to_hex().upper_case()
-        )
-        .replace(auth.NONCE_PLACEHOLDER, "0");
 
 function assert_withdraw(serial: integer, evm_address: byte_array, amount: big_integer) {
     val withdraw_info = [
