@@ -1,15 +1,15 @@
 definitions:
   - &common_args
-    lib.ft4.accounts:
+    lib.ft4.core.accounts:
       rate_limit:
         active: true
         max_points: 200
         recovery_time: 5000
         points_at_account_creation: 100
-    lib.ft4.auth:
+    lib.ft4.core.auth:
       evm_signatures_authorized_operations:
         - eif.hbridge.link_evm_account
-    lib.ft4.accounts.strategies.transfer:
+    lib.ft4.core.accounts.strategies.transfer:
       rules:
         - sender_blockchain:
             - "*"
@@ -18,7 +18,7 @@ definitions:
           asset: "*"
           timeout_days: 10
           strategy: "open"
-    lib.ft4.admin:
+    lib.ft4.core.admin:
       admin_pubkey: 03A301697BDFCD704313BA48E51D567543F2A182031EFD6915DDC07BBCC4E16070
     lib.access.admin:
       admin_pubkey: 03A301697BDFCD704313BA48E51D567543F2A182031EFD6915DDC07BBCC4E16070
@@ -71,15 +71,14 @@ blockchains:
 compile:
   source: src
   target: target
-  rellVersion: 0.13.5
+  rellVersion: 0.13.10
 
 libs:
   ft4:
     registry: https://bitbucket.org/chromawallet/ft3-lib
     path: rell/src/lib/ft4
-    # TODO use this when released: tagOrBranch: v0.7.0r
-    tagOrBranch: hbridge
-    rid: x"FD27ABFA0CEA9B460EA4CEADE8993915B52F2D0437D923969B902422A908CD19"
+    tagOrBranch: v0.7.0r
+    rid: x"F7C207AA595ABD25FDE5C2C2E32ECD3768B480AD03D1F2341548FF4F37D9B7AF"
     insecure: false
   iccf:
     registry: https://gitlab.com/chromaway/core/directory-chain

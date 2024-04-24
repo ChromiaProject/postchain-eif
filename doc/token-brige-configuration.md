@@ -31,21 +31,21 @@ blockchains:
             - bc-rid: x"97271A3CB40A857AF4CD9E4A575AA928BA7584BA65B9DEB65028FDF1A49178F4"
               topic: "L_evm_block_events"
     moduleArgs:
-      lib.ft4.accounts:
+      lib.ft4.core.accounts:
         rate_limit:
           active: true
           max_points: 200
           recovery_time: 5000
           points_at_account_creation: 100
-      lib.ft4.admin:
+      lib.ft4.core.admin:
         admin_pubkey: x"02a829e1d7fffbd856a04b53ec7d478d8896803b571c7700ec464d6a9d4f0e3bbd"
 
 libs:
   ft4:
     registry: https://bitbucket.org/chromawallet/ft3-lib
     path: rell/src/lib/ft4
-    tagOrBranch: v0.5.0r
-    rid: x"125809B57980D6E36C07210D0541E7BCAD86A66F324FC1C0DA9CA7D1F8D5A720"
+    tagOrBranch: v0.7.0r
+    rid: x"F7C207AA595ABD25FDE5C2C2E32ECD3768B480AD03D1F2341548FF4F37D9B7AF"
     insecure: false
   iccf:
     registry: https://gitlab.com/chromaway/core/directory-chain

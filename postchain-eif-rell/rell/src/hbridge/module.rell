@@ -130,11 +130,13 @@ function process_event(network_id: integer, evm_block_height: integer, evm_block
         bridge_increase_balance(ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid),
             erc20.asset, amount);
 
-        val creation = create ft4.transfer_strategy.account_creation_transfer(
-            op_context.transaction, op_index = op_context.op_index,
-            sender_blockchain_rid, sender_id, recipient_id, erc20.asset, amount,
-            rules = rules.to_gtv().to_bytes(),
-            timestamp = ft4.utils.latest_time()
+        val creation = ft4.transfer_strategy.pool_assets_with_rules(
+            sender_blockchain_rid = sender_blockchain_rid,
+            sender_id = sender_id,
+            recipient_id = recipient_id,
+            asset = erc20.asset,
+            amount = amount,
+            rules = rules
         );
 
         create pending_deposit(sender_address = beneficiary, recipient_id, creation, erc20);
@@ -162,25 +164,8 @@ function _link_evm_account(address: byte_array, account: ft4.accounts.account) {
     if (pending != null) {
         // there's a possibility that the account_id is different from address hash
         // collect funds from the pool account here
-        collect_pooled_assets(account, recipient_id = address.hash());
+        ft4.transfer_strategy.collect_pooled_assets(account, recipient_id = address.hash());
         delete pending;
-    }
-}
-
-function collect_pooled_assets(ft4.accounts.account, recipient_id: byte_array) {
-    for (account_creation_transfer in ft4.transfer_strategy.account_creation_transfer @* {
-        recipient_id, .state == ft4.transfer_strategy.account_creation_state.pending
-    }) {
-        val pool_account = ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid);
-        ft4.assets.Unsafe.transfer(
-            pool_account,
-            account,
-            account_creation_transfer.asset,
-            account_creation_transfer.amount);
-
-        account_creation_transfer.state = ft4.transfer_strategy.account_creation_state.done;
-        account_creation_transfer.final_tx_rid = op_context.transaction.tx_rid;
-        account_creation_transfer.final_op_index = op_context.op_index;
     }
 }
 
