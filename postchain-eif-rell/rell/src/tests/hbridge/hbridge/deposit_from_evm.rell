@@ -1,10 +1,10 @@
 function test_deposit_foreign_token_from_ethereum_with_already_linked_account() {
     val ft_asset = register_foreign_asset();
 
-    val auth_descriptor = create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
-    val account_id = auth_descriptor.hash();
+    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val account_id = rell.test.pubkeys.alice.hash();
     rell.test.tx().op(
-        admin.register_account(auth_descriptor)
+        admin.external.register_account(auth_descriptor)
     ).sign(admin_privkey).run();
     val ft_account = accounts.Account(account_id);
 
@@ -34,10 +34,10 @@ function test_deposit_foreign_token_from_ethereum_with_already_linked_account() 
 function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_linking_once_but_not_twice() {
     val ft_asset = register_foreign_asset();
 
-    val auth_descriptor = create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
-    val account_id = auth_descriptor.hash();
+    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val account_id = rell.test.pubkeys.alice.hash();
     rell.test.tx().op(
-        admin.register_account(auth_descriptor)
+        admin.external.register_account(auth_descriptor)
     ).sign(admin_privkey).run();
     val ft_account = accounts.Account(account_id);
 
@@ -70,10 +70,10 @@ function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_l
         )
     );
 
-    val auth_descriptor2 = create_auth_descriptor(rell.test.pubkeys.bob, ["A", "T"]);
-    val account_id2 = auth_descriptor2.hash();
+    val auth_descriptor2 = test_utils.create_auth_descriptor(rell.test.pubkeys.bob, ["A", "T"]);
+    val account_id2 = rell.test.pubkeys.bob.hash();
     rell.test.tx().op(
-        admin.register_account(auth_descriptor2)
+        admin.external.register_account(auth_descriptor2)
     ).sign(admin_privkey).run();
     assert_fails("duplicate key value violates unique constraint",
         link_account(
@@ -109,17 +109,17 @@ function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_r
     deposit_from_ethereum(evm_address, amount2, block_height=2);
     assert_withdraw(1, evm_address, amount2);
 
-    val auth_descriptor = create_auth_descriptor(evm_address, ["A", "T"]);
+    val auth_descriptor = test_utils.create_auth_descriptor(evm_address, ["A", "T"]);
 
     val op1 = open.ras_transfer_open(auth_descriptor);
-    val op2 = strategies_ext.register_account();
-    val message = strategies_ext.get_register_account_message(
+    val op2 = strategies.external.register_account();
+    val message = strategies.external.get_register_account_message(
         op1.to_gtx_operation(),
         op2.to_gtx_operation()
     );
     val signature = test_utils.evm_sign(message, rell.test.privkeys.eve);
     rell.test.tx()
-        .op(auth_ext.evm_signatures([evm_address], [signature]))
+        .op(auth.evm_signatures([evm_address], [signature]))
         .op(op1)
         .op(op2)
         .nop()
@@ -135,11 +135,11 @@ function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_r
     assert_equals(hbridge.get_addresses_for_account(ft_account.id), [evm_address]);
 
     val op = hbridge.link_evm_account(evm_address);
-    val message2 = create_auth_message(op.name, op.args);
+    val message2 = test_utils.create_evm_auth_message(op);
     val signature2 = test_utils.evm_sign(message2, rell.test.privkeys.eve);
     rell.test.tx()
-        .op(auth_ext.evm_signatures([evm_address], [signature2]))
-        .op(auth_ext.evm_auth(recipient_id, auth_descriptor.hash(), [signature2]))
+        .op(auth.evm_signatures([evm_address], [signature2]))
+        .op(auth.external.evm_auth(recipient_id, auth_descriptor.hash(), [signature2]))
         .op(op)
         .nop()
         .run_must_fail("duplicate key value violates unique constraint");

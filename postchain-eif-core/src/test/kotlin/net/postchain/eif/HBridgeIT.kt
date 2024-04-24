@@ -742,7 +742,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
                 .buildGtx()
                 .encode())
 
-        val accountId = auth.merkleHash(GtvMerkleHashCalculator(myCS))
+        val accountId = gtv(userPubkey).merkleHash(GtvMerkleHashCalculator(myCS))
 
         return accountId to authDescriptorId
     }
@@ -754,10 +754,20 @@ class HBridgeIT : EifBaseIntegrationTest() {
             credentials: Credentials,
             bcRid: BlockchainRid,
     ) {
+        val opName = gtv("eif.hbridge.link_evm_account")
+        val opArgs = gtv(listOf(gtv(userEvmAddress)))
+
+        val nonce = gtv(listOf(
+              gtv(bcRid.data),
+              opName,
+              opArgs,
+              gtv(0),
+            )).merkleHash(GtvMerkleHashCalculator(myCS))
+
         val message = blockQuery.query("ft4.get_auth_message_template",
-                gtv(mapOf("op_name" to gtv("eif.hbridge.link_evm_account"), "op_args" to gtv(listOf(gtv(userEvmAddress)))))).get().asString()
+                gtv(mapOf("op_name" to opName, "op_args" to opArgs))).get().asString()
                 .replace("{blockchain_rid}", bcRid.toHex().uppercase())
-                .replace("{nonce}", "0")
+                .replace("{nonce}", nonce.toHex().uppercase())
         val evmSig = Sign.signPrefixedMessage(
                 message.toByteArray(StandardCharsets.UTF_8),
                 credentials.ecKeyPair
