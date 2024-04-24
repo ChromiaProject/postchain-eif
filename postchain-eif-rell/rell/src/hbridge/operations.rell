@@ -19,7 +19,7 @@ function () = ft4.auth.add_auth_handler(
 operation link_evm_sc_account(address: byte_array, network_id: integer) {
     val account = ft4.auth.authenticate();
     require(proposed_evm_sc_account_link @? { account, address, network_id }, "proposal does not exist");
-    _link_evm_sc_account(address, account, network_id);
+    _link_evm_sc_account(address, network_id, account);
 }
 
 @extend(ft4.auth.auth_handler)
@@ -35,7 +35,10 @@ operation bridge_ft4_token_to_evm(network_id: integer, asset_id: byte_array, amo
 
     val from_account = ft4.auth.authenticate();
 
-    require(evm_account_link @? { .account == from_account, .address == beneficiary },
+    require(exists(evm_eoa_account_link @? { .account == from_account, .address == beneficiary })
+            or
+            exists(evm_sc_account_link @? { .account == from_account, .address == beneficiary, network_id })
+    ,
         "Can only withdraw to your own account");
 
     bridge_deduct_balance(from_account, erc20.asset, amount);

@@ -90,7 +90,7 @@ function register_erc20_asset(
 function compute_virtual_blockchain_rid(network_id: integer, token_address: byte_array): byte_array =
     ("EVM", network_id, token_address).hash();
 
-function find_ft4_account_for_address(network_id: integer, address: byte_array): ft4.accounts.account? {
+function find_ft4_account_for_address(address: byte_array, network_id: integer): ft4.accounts.account? {
     val candidate = evm_eoa_account_link @? { address } .account;
     if (not empty(candidate)) {
         return candidate;
@@ -102,7 +102,8 @@ function find_ft4_account_for_address(network_id: integer, address: byte_array):
 @extend(messaging.handle_evm_block)
 function (evm_block: messaging.evm_block_message) {
     for (event in evm_block.events) {
-        process_event(evm_block.network_id, evm_block.evm_block_height, evm_block.evm_block_hash, event);
+        process_link_event(evm_block.network_id, evm_block.evm_block_height, evm_block.evm_block_hash, event);
+        process_deposit_event(evm_block.network_id, evm_block.evm_block_height, evm_block.evm_block_hash, event);
     }
 }
 
@@ -168,7 +169,7 @@ function process_deposit_event(network_id: integer, evm_block_height: integer, e
 
     } else {
         // compute beneficiary account automatically
-        ft4_account = find_ft4_account_for_address(sender);
+        ft4_account = find_ft4_account_for_address(sender, network_id);
         beneficiary = sender.hash();
     }
 
@@ -224,7 +225,7 @@ function (ft4.accounts.account) {
         if (deposit.from_smart_contract) {
             create evm_sc_account_link(deposit.sender_address, deposit.network_id, account);
         } else {
-            create evm_account_link(pending.sender_address, account);
+            create evm_eoa_account_link(deposit.sender_address, account);
         }
 
         // note: we don't need to call collect_pooled_assets here, because it's already done in the transfer strategy implementation
