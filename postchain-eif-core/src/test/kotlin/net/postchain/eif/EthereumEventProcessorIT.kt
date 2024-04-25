@@ -152,7 +152,7 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
         // Check that data in the event matches what we sent
         assertEquals("0x${indexedValues[0].asByteArray().toHex().lowercase()}", transactionManager.fromAddress) // owner
         assertEquals("0x${indexedValues[1].asByteArray().toHex().lowercase()}", testToken.contractAddress) // token
-        assertEquals(nonIndexedValues[1].asBigInteger(), max) // value
+        assertEquals(nonIndexedValues[0].asBigInteger(), max) // value
 
         evmEventProcessor.shutdown()
     }
