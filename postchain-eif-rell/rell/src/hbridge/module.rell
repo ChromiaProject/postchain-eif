@@ -102,8 +102,10 @@ function find_ft4_account_for_address(address: byte_array, network_id: integer):
 @extend(messaging.handle_evm_block)
 function (evm_block: messaging.evm_block_message) {
     for (event in evm_block.events) {
-        process_link_event(evm_block.network_id, evm_block.evm_block_height, evm_block.evm_block_hash, event);
-        process_deposit_event(evm_block.network_id, evm_block.evm_block_height, evm_block.evm_block_hash, event);
+        when (event.name) {
+            "DepositedERC20" -> process_deposit_event(evm_block.network_id, evm_block.evm_block_height, evm_block.evm_block_hash, event);
+            "LinkAccountID" -> process_link_event(evm_block.network_id, evm_block.evm_block_height, evm_block.evm_block_hash, event);
+        }
     }
 }
 
@@ -144,7 +146,7 @@ function process_deposit_event(network_id: integer, evm_block_height: integer, e
 
     // normally only smart contracts have non-zero beneficiary
     // given that it's just a flag which enable more complex account registration logic
-    // it's OK if it's not 100% reliable - it only needs to be true in a specific case
+    // it's OK if it's not 100% reliable -- it only needs to be true in a specific case
     val deposit_from_smart_contract = beneficiary != (x"00".repeat(32));
 
     val erc20 = erc20_asset @? { network_id, token_address };
@@ -196,9 +198,9 @@ function process_deposit_event(network_id: integer, evm_block_height: integer, e
             return;
         }
 
-        if (not empty(pending_deposit @* { .sender_address == beneficiary })) {
+        if (not empty(pending_deposit @* { .recipient_id == beneficiary })) {
             log("deposit event bounced: tokens has already been transferred to this recipient, and has not been claimed yet");
-            bounce_deposit_event(network_id, token_address, beneficiary, amount);
+            bounce_deposit_event(network_id, token_address, sender, amount);
             return;
         }
 

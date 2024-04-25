@@ -100,13 +100,13 @@ function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_r
     val amount = 10000000000000000000L;
     val amount2 = 5000000000000000000L;
 
-    deposit_from_ethereum(evm_address, amount, block_height=1);
+    deposit_from_ethereum(evm_address, amount, block_height = 1);
 
     val recipient_id = evm_address.hash();
 
     assert_true("open" in create_on_transfer.get_pending_transfer_strategies(recipient_id));
 
-    deposit_from_ethereum(evm_address, amount2, block_height=2);
+    deposit_from_ethereum(evm_address, amount2, block_height = 2);
     assert_withdraw(1, evm_address, amount2);
 
     val auth_descriptor = test_utils.create_auth_descriptor(evm_address, ["A", "T"]);
@@ -131,10 +131,10 @@ function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_r
 
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
 
-    assert_equals(hbridge.get_account_for_address(evm_address), ft_account.id);
-    assert_equals(hbridge.get_addresses_for_account(ft_account.id), [evm_address]);
+    assert_equals(hbridge.get_account_for_eoa_address(evm_address), ft_account.id);
+    assert_equals(hbridge.get_eoa_addresses_for_account(ft_account.id), [evm_address]);
 
-    val op = hbridge.link_evm_account(evm_address);
+    val op = hbridge.link_evm_eoa_account(evm_address);
     val message2 = test_utils.create_evm_auth_message(op);
     val signature2 = test_utils.evm_sign(message2, rell.test.privkeys.eve);
     rell.test.tx()
