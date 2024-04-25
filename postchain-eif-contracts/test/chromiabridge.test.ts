@@ -7,7 +7,7 @@ import {
   DailyLimit__factory,
   TokenBridgeDelegator__factory,
   Validator__factory,
-  TokenMinter__factory,
+  TokenMinter__factory, Address,
 } from "../src/types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BytesLike, hexZeroPad, keccak256 } from "ethers/lib/utils";
@@ -122,17 +122,13 @@ describe("ChromiaToken Bridge Test", () => {
       const bridge = new ChromiaTokenBridge__factory(user).attach(bridgeAddress);
       const toDeposit = ethers.utils.parseEther("100");
       const tokenApproveInstance = new Chromia__factory(user).attach(tokenAddress);
-      const name = await tokenApproveInstance.name();
-      const symbol = await tokenApproveInstance.symbol();
+      const accountID = "0x0000000000000000000000000000000000000000000000000000000000000000"
       await tokenApproveInstance.approve(bridgeAddress, toDeposit);
       await expect(bridge.deposit(tokenAddress, toDeposit)).to.emit(bridge, "DepositedERC20").withArgs(
         user.address,
         tokenAddress,
-        network.config.chainId,
         toDeposit,
-        name,
-        symbol,
-        6, // Default decimals is 18, but chromia token has 6
+        accountID
       );
 
       expect(await tokenInstance.balanceOf(bridge.address)).to.eq(0);
