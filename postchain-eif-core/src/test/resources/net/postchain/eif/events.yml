@@ -11,23 +11,27 @@
       type: address
     - indexed: 0
       internalType: uint256
-      name: networkId
-      type: uint256
-    - indexed: 0
-      internalType: uint256
       name: amount
       type: uint256
     - indexed: 0
-      internalType: string
-      name: name
-      type: string
-    - indexed: 0
-      internalType: string
-      name: symbol
-      type: string
-    - indexed: 0
-      internalType: uint8
-      name: decimals
-      type: uint8
+      internalType: bytes32
+      name: accountID
+      type: bytes32
   name: DepositedERC20
+  type: event
+- anonymous: 0
+  inputs:
+    - indexed: 1
+      internalType: address
+      name: sender
+      type: address
+    - indexed: 0
+      internalType: bytes32
+      name: accountID
+      type: bytes32
+    - indexed: 0
+      internalType: bool
+      name: isContract
+      type: bool
+  name: LinkAccountID
   type: event
