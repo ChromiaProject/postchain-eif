@@ -99,19 +99,15 @@ describe("Token Bridge Test", () => {
             const bridge = new TokenBridge__factory(user).attach(bridgeAddress)
             const toDeposit = ethers.utils.parseEther("100")
             const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
-            const name = await tokenApproveInstance.name()
-            const symbol = await tokenApproveInstance.symbol()
+            const accountID = "0x0000000000000000000000000000000000000000000000000000000000000000"
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
             await expect(bridge.deposit(tokenAddress, toDeposit))
                     .to.emit(bridge, "DepositedERC20")
                     .withArgs(
                         user.address,
                         tokenAddress,
-                        network.config.chainId,
                         toDeposit,
-                        name,
-                        symbol,
-                        18 // Default decimals is 18
+                        accountID
                     )
 
             expect(await tokenInstance.balanceOf(bridge.address)).to.eq(toDeposit)

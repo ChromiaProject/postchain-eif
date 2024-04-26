@@ -62,7 +62,7 @@ function link_account(
         auth_descriptor_id: byte_array
 ) {
     val evm_address = crypto.eth_pubkey_to_address(evm_keypair.pub);
-    val op = hbridge.link_evm_account(evm_address);
+    val op = hbridge.link_evm_eoa_account(evm_address);
     val message = test_utils.create_evm_auth_message(op);
     val signature = test_utils.evm_sign(message, evm_keypair.priv);
     rell.test.tx()
@@ -71,13 +71,13 @@ function link_account(
         .op(op)
         .nop()
         .sign(ft_keypair).run();
-    assert_not_null(hbridge.evm_account_link @? { .address == evm_address });
+    assert_not_null(hbridge.evm_eoa_account_link @? { .address == evm_address });
 
-    assert_equals(hbridge.get_account_for_address(evm_address), account_id);
-    assert_equals(hbridge.get_addresses_for_account(account_id), [evm_address]);
+    assert_equals(hbridge.get_account_for_eoa_address(evm_address), account_id);
+    assert_equals(hbridge.get_eoa_addresses_for_account(account_id), [evm_address]);
 }
 
-function deposit_from_ethereum(sender_address: byte_array, amount: big_integer, block_height: integer = 1) {
+function deposit_from_ethereum(sender_address: byte_array, amount: big_integer, block_height: integer = 1, account_id: byte_array = hbridge.zero_beneficiary) {
     val events = [
         event_data(
             tnx_hash = ("TX", block_height).hash(),
@@ -86,7 +86,7 @@ function deposit_from_ethereum(sender_address: byte_array, amount: big_integer, 
             contract_address = contract_address,
             name = event_name,
             indexed_values = [sender_address.to_gtv(), token_address.to_gtv()],
-            non_indexed_values = [network_id.to_gtv(), amount.to_gtv(), token_name.to_gtv(), token_symbol.to_gtv(), token_decimal.to_gtv()]
+            non_indexed_values = [amount.to_gtv(), account_id.to_gtv()]
         )
     ];
     val account_number_1 = 1;
