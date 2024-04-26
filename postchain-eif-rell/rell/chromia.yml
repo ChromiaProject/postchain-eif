@@ -16,7 +16,7 @@ definitions:
         points_at_account_creation: 100
     lib.ft4.core.auth:
       evm_signatures_authorized_operations:
-        - eif.hbridge.link_evm_account
+        - eif.hbridge.link_evm_eoa_account
   - &rell_test_args
     lib.ft4.core.admin:
       admin_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
@@ -79,6 +79,8 @@ test:
       system_max_fee_per_gas: 4000000000
     transaction_submitter.anchoring:
       anchoring_interval: 3600000
+    eif_event_receiver:
+      enable_icmf: false
 
 blockchains:
   eif_event_receiver:

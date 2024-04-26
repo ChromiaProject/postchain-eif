@@ -37,13 +37,6 @@ function _evm_block(
 
     val relevant_events = list<messaging.event_data>();
     for (event in events) {
-        // validate network id
-        val event_network_id = integer.from_gtv(event.non_indexed_values[0]);
-        if (network_id != event_network_id) {
-            log("Ignoring event with invalid network_id: expected: %d, actual: %d".format(network_id, event_network_id));
-            continue;
-        }
-
         create evm_event (
             evm_block = block,
             tnx_hash = event.tnx_hash,

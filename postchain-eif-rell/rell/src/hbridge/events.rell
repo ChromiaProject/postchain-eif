@@ -1,0 +1,25 @@
+struct link_account_id_event {
+    sender: byte_array;
+    account_id: byte_array;
+    is_contract: boolean;
+}
+
+function create_link_account_id_event(event: messaging.event_data) = link_account_id_event(
+    sender = byte_array.from_gtv(event.indexed_values[0]),
+    account_id = byte_array.from_gtv(event.non_indexed_values[0]),
+    is_contract = boolean.from_gtv(event.non_indexed_values[1])
+);
+
+struct deposited_erc20_event {
+    sender: byte_array;
+    token_address: byte_array;
+    amount: big_integer;
+    beneficiary: byte_array; // account_id
+}
+
+function create_deposited_erc20_event(event: messaging.event_data) = deposited_erc20_event(
+    sender = byte_array.from_gtv(event.indexed_values[0]),
+    token_address = byte_array.from_gtv(event.indexed_values[1]),
+    amount = big_integer.from_gtv(event.non_indexed_values[0]),
+    beneficiary = byte_array.from_gtv(event.non_indexed_values[1])
+);

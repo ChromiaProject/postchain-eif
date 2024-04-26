@@ -754,7 +754,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
             credentials: Credentials,
             bcRid: BlockchainRid,
     ) {
-        val opName = gtv("eif.hbridge.link_evm_account")
+        val opName = gtv("eif.hbridge.link_evm_eoa_account")
         val opArgs = gtv(listOf(gtv(userEvmAddress)))
 
         val nonce = gtv(listOf(
@@ -781,7 +781,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
         val b = GtxBuilder(bcRid, listOf(userKeyPair.pubKey.data), myCS)
         b.addOperation("ft4.evm_signatures", gtv(listOf(gtv(userEvmAddress))), gtv(listOf(signature)))
         b.addOperation("ft4.ft_auth", gtv(accountId), gtv(authDescriptorId))
-        b.addOperation("eif.hbridge.link_evm_account", gtv(userEvmAddress))
+        b.addOperation("eif.hbridge.link_evm_eoa_account", gtv(userEvmAddress))
         enqueueTx(b.finish()
                 .sign(cryptoSystem.buildSigMaker(userKeyPair))
                 .buildGtx()
