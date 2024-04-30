@@ -47,13 +47,13 @@ libs:
   eif:
     registry: https://gitlab.com/chromaway/postchain-eif
     path: postchain-eif-rell/rell/src/eif
-    tagOrBranch: 0.5.3
+    tagOrBranch: 0.5.4
     rid: x"73EEA09493338825235D685EC1E6D33BB882659AD4983929B66044E8B9E9B3CA"
     insecure: false
   eif_event_receiver:
     registry: https://gitlab.com/chromaway/postchain-eif
     path: postchain-eif-rell/rell/src/eif_event_receiver
-    tagOrBranch: 0.5.3
+    tagOrBranch: 0.5.4
     rid: x"4B509E09E33F36E1CD4642C1DF9C61931D88D4C50004664113898659E87BE489"
     insecure: false
 ```

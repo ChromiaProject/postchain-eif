@@ -62,19 +62,19 @@ libs:
   eif:
     registry: https://gitlab.com/chromaway/postchain-eif
     path: postchain-eif-rell/rell/src/eif
-    tagOrBranch: 0.5.3
+    tagOrBranch: 0.5.4
     rid: x"73EEA09493338825235D685EC1E6D33BB882659AD4983929B66044E8B9E9B3CA"
     insecure: false
   eif_event_connector:
     registry: https://gitlab.com/chromaway/postchain-eif
     path: postchain-eif-rell/rell/src/eif_event_connector
-    tagOrBranch: 0.5.3
+    tagOrBranch: 0.5.4
     rid: x"4A669C5F98AEE970FECD5B77116E737196C7D3C7C6217DFD7EAC2F9317FC9461"
     insecure: false
   hbridge:
     registry: https://gitlab.com/chromaway/postchain-eif
     path: postchain-eif-rell/rell/src/hbridge
-    tagOrBranch: 0.5.3
+    tagOrBranch: 0.5.4
     rid: x"8D18FB8274EB7653D5734AA07C569E9DC480828096D4CF81A2EE4C25C60DE324"
     insecure: false
 ```
