@@ -11,11 +11,11 @@ struct module_args {
 
 operation __evm_block(
     network_id: integer,
-    evm_block_height: integer,
+    evm_block_height: big_integer,
     evm_block_hash: byte_array,
     events: list<messaging.event_data>
 ) {
-    _evm_block(network_id, evm_block_height, evm_block_hash, events);
+    _evm_block(network_id, evm_block_height.to_integer(), evm_block_hash, events);
 }
 
 function _evm_block(
