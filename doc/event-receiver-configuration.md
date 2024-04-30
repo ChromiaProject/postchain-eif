@@ -41,7 +41,7 @@ libs:
   icmf:
     registry: https://gitlab.com/chromaway/core/directory-chain
     path: src/messaging/icmf
-    tagOrBranch: 1.37.0
+    tagOrBranch: 1.45.0
     rid: x"19D6BC28D527E6D2239843608486A84F44EDCD244E253616F13D1C65893F35F6"
     insecure: false
   eif_event_receiver:

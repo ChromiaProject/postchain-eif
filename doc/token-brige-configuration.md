@@ -50,13 +50,13 @@ libs:
   iccf:
     registry: https://gitlab.com/chromaway/core/directory-chain
     path: src/iccf
-    tagOrBranch: 1.37.0
+    tagOrBranch: 1.45.0
     rid: x"1D567580C717B91D2F188A4D786DB1D41501086B155A68303661D25364314A4D"
     insecure: false
   icmf:
     registry: https://gitlab.com/chromaway/core/directory-chain
     path: src/messaging/icmf
-    tagOrBranch: 1.37.0
+    tagOrBranch: 1.45.0
     rid: x"19D6BC28D527E6D2239843608486A84F44EDCD244E253616F13D1C65893F35F6"
     insecure: false
   eif_event_connector:
