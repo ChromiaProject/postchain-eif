@@ -9,11 +9,12 @@ import org.apache.logging.log4j.core.LifeCycle
 import org.apache.logging.log4j.core.LogEvent
 import org.apache.logging.log4j.core.LoggerContext
 import java.io.Serializable
+import java.util.concurrent.ConcurrentLinkedQueue
 
 // Log appender used to capture and assert log entries
 class TestLogAppender(private val levels: List<Level>) : Appender {
 
-    private val events = mutableListOf<LogEvent>()
+    private val events = ConcurrentLinkedQueue<LogEvent>()
 
     companion object {
 
