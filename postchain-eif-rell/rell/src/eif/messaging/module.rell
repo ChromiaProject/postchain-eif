@@ -11,7 +11,7 @@ struct evm_block_message {
 
 struct event_data {
     tnx_hash: byte_array;
-    log_index: integer;
+    log_index: big_integer;
     signature: byte_array;
     contract_address: byte_array;
     name: text;

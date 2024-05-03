@@ -40,7 +40,7 @@ function _evm_block(
         create evm_event (
             evm_block = block,
             tnx_hash = event.tnx_hash,
-            log_index = event.log_index,
+            log_index = event.log_index.to_integer(),
             event_signature = event.signature,
             contract_address = event.contract_address,
             indexed_values = event.indexed_values.to_gtv().to_bytes(),
