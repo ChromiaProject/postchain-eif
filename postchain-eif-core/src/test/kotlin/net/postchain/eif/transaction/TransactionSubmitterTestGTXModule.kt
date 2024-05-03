@@ -1,6 +1,7 @@
 package net.postchain.eif.transaction
 
 import net.postchain.base.data.DatabaseAccess
+import net.postchain.common.hexStringToByteArray
 import net.postchain.core.EContext
 import net.postchain.core.TxEContext
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.EVM_TX_NO_OP
@@ -43,7 +44,21 @@ class TransactionSubmitterQueuedTransactionTestGTXModule : TransactionSubmitterT
         val transactionSubmitterDatabaseOperations = TransactionSubmitterDatabaseOperationsImpl()
         transactionSubmitterDatabaseOperations.initialize(ctx)
         val transactionRequest = mkEvmSubmitTxRequest(
-                status = RellTransactionStatus.TAKEN
+                status = RellTransactionStatus.TAKEN,
+                processedBy = "03A301697BDFCD704313BA48E51D567543F2A182031EFD6915DDC07BBCC4E16070".hexStringToByteArray()
+        )
+        transactionSubmitterDatabaseOperations.queueTransaction(ctx, transactionRequest, 1337L)
+        addTransaction(transactionRequest)
+    }
+}
+
+class TransactionSubmitterQueuedTransactionNoLongerTakenByNodeTestGTXModule : TransactionSubmitterTestGTXModule() {
+    override fun initializeDB(ctx: EContext) {
+        val transactionSubmitterDatabaseOperations = TransactionSubmitterDatabaseOperationsImpl()
+        transactionSubmitterDatabaseOperations.initialize(ctx)
+        val transactionRequest = mkEvmSubmitTxRequest(
+                status = RellTransactionStatus.TAKEN,
+                processedBy = "000000007BDFCD704313BA48E51D567543F2A182031EFD6915DDC07BBCC4E16070".hexStringToByteArray()
         )
         transactionSubmitterDatabaseOperations.queueTransaction(ctx, transactionRequest, 1337L)
         addTransaction(transactionRequest)
@@ -96,12 +111,12 @@ open class TransactionSubmitterTestGTXModule(
                     gtv(conf.transactionsAvailableToTake.map { GtvObjectMapper.toGtvDictionary(it) })
                 },
                 GET_TRANSACTION to { conf: TransactionSubmitterTestContext, _, args: Gtv ->
-                    val obj = conf.transactions.first { it.rowId == args["row_id"]!!.asInteger() }
-//                    GtvObjectMapper.toGtvDictionary(obj) - does not map inherited attributes?
-                    gtv(mapOf<String, Gtv>(
-                            "status" to gtv(obj.status!!.name),
-                            "processed_by" to gtv(obj.processed_by!!)
-                    ))
+                    var transaction = conf.transactions.first { it.rowId == args["row_id"]!!.asInteger() }
+                    // GtvObjectMapper.toGtvDictionary() do not support mapping inherited attributes, convert class if necessary
+                    if (transaction is EvmSubmitTxRequest) {
+                        transaction = (transaction as EvmSubmitTxRequest).toRell()
+                    }
+                    GtvObjectMapper.toGtvDictionary(transaction)
                 },
                 GET_PENDING_TRANSACTIONS to { conf: TransactionSubmitterTestContext, _, _ ->
                     gtv(conf.transactions

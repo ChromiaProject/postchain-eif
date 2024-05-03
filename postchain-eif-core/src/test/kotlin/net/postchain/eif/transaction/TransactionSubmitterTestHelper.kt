@@ -124,7 +124,8 @@ fun mkEvmSubmitTxRellRequest(
 fun mkEvmSubmitTxRequest(
         maxFeePerGas: Long = 4000000000,
         node: PostchainTestNode? = null,
-        status: RellTransactionStatus? = null
+        status: RellTransactionStatus? = null,
+        processedBy: ByteArray? = null
 ) = EvmSubmitTxRequest(
         EvmSubmitTxRequest(
                 EvmSubmitTxRellRequest(
@@ -140,7 +141,7 @@ fun mkEvmSubmitTxRequest(
                         System.currentTimeMillis(),
                         null,
                         status,
-                        node?.pubKey?.hexStringToByteArray(),
+                        node?.pubKey?.hexStringToByteArray() ?: processedBy,
                 )
         )
 )

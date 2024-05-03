@@ -1,8 +1,11 @@
 package net.postchain.eif.transaction
 
+import assertk.assertThat
+import assertk.assertions.isEqualTo
 import net.postchain.devtools.getModules
 import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.contracts.Validator
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_STATUS
 import org.awaitility.Awaitility
 import org.awaitility.Duration
 import org.junit.jupiter.api.BeforeEach
@@ -47,6 +50,33 @@ class TransactionSubmitterStartupIT : EifBaseIntegrationTest() {
             buildBlock(1L)
             assertTransactionsByStatus(txSubmitterTestModule, RellTransactionStatus.QUEUED, 1)
             assertStatusOperation(txSubmitterTestModule, 0, RellTransactionStatus.QUEUED)
+        }
+    }
+
+    @Test
+    fun `verify drop txs on startup if no longer taken by node`() {
+
+        val node = createNodes(1, "/net/postchain/eif/transaction/blockchain_config_queue_taken_lost.xml")[0]
+
+        val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
+
+        txSubmitterTestModule.addTransaction(mkEvmSubmitTxRellRequest(0, contractAddress, RellTransactionStatus.TAKEN))
+
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            buildBlock(1L)
+            // Make sure the tx is no longer in db
+            withDbTransactions(node, 0) {
+                assertThat(it.size).isEqualTo(0)
+            }
+            // Make sure no tx status was sent
+            withTxOperations(
+                    txSubmitterTestModule,
+                    UPDATE_EVM_TRANSACTION_STATUS
+            ) { operations ->
+                assertThat(operations.size).isEqualTo(0)
+            }
+
+            testLogAppender.assertInfo("Transaction 0 is no longer processed by this node")
         }
     }
 

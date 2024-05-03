@@ -3,6 +3,7 @@ package net.postchain.eif.transaction
 import net.postchain.PostchainContext
 import net.postchain.base.data.DatabaseAccess
 import net.postchain.base.withReadConnection
+import net.postchain.base.withReadWriteConnection
 import net.postchain.common.BlockchainRid
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.exception.UserMistake
@@ -132,7 +133,7 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
 
     private fun loadTxQueue(chainID: Long, databaseOperations: TransactionSubmitterDatabaseOperationsImpl, networkId: Long, module: GTXModule): Collection<EvmSubmitTxRequest> {
         val queue = mutableListOf<EvmSubmitTxRequest>()
-        withReadConnection(postchainContext.sharedStorage, chainID) {
+        withReadWriteConnection(postchainContext.sharedStorage, chainID) {
             for (queuedTransaction in databaseOperations.getQueuedTransactions(it, networkId)) {
 
                 if (txTakenByThisNode(module, it, queuedTransaction.rowId)) {

@@ -42,6 +42,10 @@ class TestLogAppender(private val levels: List<Level>) : Appender {
         }
     }
 
+    fun assertInfo(message: String) {
+        assertEvent(Level.INFO, message)
+    }
+
     fun assertError(message: String) {
         assertEvent(Level.ERROR, message)
     }

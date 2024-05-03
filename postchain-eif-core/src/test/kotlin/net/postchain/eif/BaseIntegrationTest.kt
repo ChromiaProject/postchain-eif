@@ -56,7 +56,7 @@ abstract class EifBaseIntegrationTest(private val prependUrls: List<String> = li
 
     @BeforeEach
     open fun setup() {
-        testLogAppender = TestLogAppender.addAppender(listOf(Level.WARN, Level.ERROR))
+        testLogAppender = TestLogAppender.addAppender(listOf(Level.INFO, Level.WARN, Level.ERROR))
         testLogAppender.clear()
 
         evmContainer.start()
