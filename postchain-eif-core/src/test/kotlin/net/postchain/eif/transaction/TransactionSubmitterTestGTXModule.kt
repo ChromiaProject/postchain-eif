@@ -42,7 +42,11 @@ class TransactionSubmitterQueuedTransactionTestGTXModule : TransactionSubmitterT
     override fun initializeDB(ctx: EContext) {
         val transactionSubmitterDatabaseOperations = TransactionSubmitterDatabaseOperationsImpl()
         transactionSubmitterDatabaseOperations.initialize(ctx)
-        transactionSubmitterDatabaseOperations.queueTransaction(ctx, mkEvmSubmitTxRequest(), 1337L)
+        val transactionRequest = mkEvmSubmitTxRequest(
+                status = RellTransactionStatus.TAKEN
+        )
+        transactionSubmitterDatabaseOperations.queueTransaction(ctx, transactionRequest, 1337L)
+        addTransaction(transactionRequest)
     }
 }
 
@@ -92,7 +96,12 @@ open class TransactionSubmitterTestGTXModule(
                     gtv(conf.transactionsAvailableToTake.map { GtvObjectMapper.toGtvDictionary(it) })
                 },
                 GET_TRANSACTION to { conf: TransactionSubmitterTestContext, _, args: Gtv ->
-                    GtvObjectMapper.toGtvDictionary(conf.transactions.first { it.rowId == args["row_id"]!!.asInteger() })
+                    val obj = conf.transactions.first { it.rowId == args["row_id"]!!.asInteger() }
+//                    GtvObjectMapper.toGtvDictionary(obj) - does not map inherited attributes?
+                    gtv(mapOf<String, Gtv>(
+                            "status" to gtv(obj.status!!.name),
+                            "processed_by" to gtv(obj.processed_by!!)
+                    ))
                 },
                 GET_PENDING_TRANSACTIONS to { conf: TransactionSubmitterTestContext, _, _ ->
                     gtv(conf.transactions
