@@ -9,21 +9,16 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.slf4j.MDCContext
 import mu.KLogging
-import net.postchain.base.withReadConnection
 import net.postchain.base.withReadWriteConnection
 import net.postchain.base.withWriteConnection
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.exception.UserMistake
 import net.postchain.core.BlockEContext
-import net.postchain.core.EContext
 import net.postchain.core.Shutdownable
 import net.postchain.core.Storage
 import net.postchain.eif.GtvToTypeMapper
 import net.postchain.eif.Web3jRequestHandler
-import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.GET_TRANSACTION
 import net.postchain.gtv.Gtv
-import net.postchain.gtv.GtvFactory.gtv
-import net.postchain.gtx.GTXModule
 import okhttp3.internal.toImmutableList
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.TypeReference
@@ -58,8 +53,6 @@ class TransactionSubmitter(
         val healthCheckInterval: Long,
         val nodeTxVerificationTimeout: Long,
         val nodeTxVerificationEvmBlocks: Long,
-        private val module: GTXModule,
-        private val pubKeyByteArray: ByteArray
 ) : Shutdownable {
 
     companion object : KLogging() {
@@ -346,122 +339,99 @@ class TransactionSubmitter(
 
     private fun sendTransaction(txRequest: EvmSubmitTxRequest) {
 
-        if (!withReadConnection(storage, chainId) {
-                    txTakenByThisNode(module, it, txRequest.rowId)
-                }) {
-            logger.warn { "Transaction ${txRequest.rowId} is ignored since blockchain says this is no longer taken by this node" }
-        } else {
+        logger.info { "Submitting transaction ${txRequest.rowId}" }
 
-            logger.info { "Submitting transaction ${txRequest.rowId}" }
+        val fromAddress = transactionManagers.values.first().fromAddress
+        val walletBalance = try {
+            web3jRequestHandler.sendWeb3jRequest { it.ethGetBalance(fromAddress, DefaultBlockParameterName.LATEST) }
+        } catch (e: Exception) {
+            val errorMessage = "Failed to get balance for request id ${txRequest.rowId}: ${e.message}"
+            logger.error(e) { errorMessage }
+            throw ProgrammerMistake(errorMessage, e)
+        }
 
-            val fromAddress = transactionManagers.values.first().fromAddress
-            val walletBalance = try {
-                web3jRequestHandler.sendWeb3jRequest { it.ethGetBalance(fromAddress, DefaultBlockParameterName.LATEST) }
-            } catch (e: Exception) {
-                val errorMessage = "Failed to get balance for request id ${txRequest.rowId}: ${e.message}"
-                logger.error(e) { errorMessage }
-                throw ProgrammerMistake(errorMessage, e)
-            }
+        val functionData = encodeFunction(txRequest.functionName, txRequest.parameterTypes, txRequest.parameterValues)
+        val maxGasPrice = gasProvider.getGasPrice(functionData)
+        val gasLimit = gasProvider.getGasLimit(functionData)
 
-            val functionData = encodeFunction(txRequest.functionName, txRequest.parameterTypes, txRequest.parameterValues)
-            val maxGasPrice = gasProvider.getGasPrice(functionData)
-            val gasLimit = gasProvider.getGasLimit(functionData)
+        withWriteConnection(storage, chainId) {
+            databaseOperations.recordTransactionGas(it, txRequest.rowId, maxGasPrice, gasLimit)
+            true
+        }
 
-            withWriteConnection(storage, chainId) {
-                databaseOperations.recordTransactionGas(it, txRequest.rowId, maxGasPrice, gasLimit)
-                true
-            }
+        val baseFeePerGas = getBaseFeePerGas()
 
-            val baseFeePerGas = getBaseFeePerGas()
+        if (txRequest.maxFeePerGas < baseFeePerGas) {
+            throw UserMistake("Max fee per gas less than block base fee. maxFeePerGas: ${txRequest.maxFeePerGas} baseFeePerGas: $baseFeePerGas")
+        }
 
-            if (txRequest.maxFeePerGas < baseFeePerGas) {
-                throw UserMistake("Max fee per gas less than block base fee. maxFeePerGas: ${txRequest.maxFeePerGas} baseFeePerGas: $baseFeePerGas")
-            }
-
-            val estimatedGasUsage =
-                    try {
-                        getEstimatedGasUsage(
-                                txRequest.maxPriorityFeePerGas,
-                                txRequest.maxFeePerGas,
-                                gasLimit,
-                                txRequest.contractAddress,
-                                functionData,
-                                fromAddress,
-                                chainId
-                        )
-                    } catch (e: Exception) {
-                        val errorMessage = "Failed to get estimated gas usage for request id ${txRequest.rowId}: ${e.message}"
-                        logger.error(e) { errorMessage }
-                        throw ProgrammerMistake(errorMessage, e)
-                    }
-            if (estimatedGasUsage > gasLimit) {
-                throw UserMistake("Estimated gas usage $estimatedGasUsage for tx exceeds limit of $gasLimit")
-            }
-
-            if (walletBalance.balance < txRequest.maxFeePerGas * estimatedGasUsage) {
-                throw UserMistake("Insufficient wallet balance")
-            }
-
-            if (txRequest.maxFeePerGas > maxGasPrice) {
-                throw UserMistake("Max fee per gas ${txRequest.maxFeePerGas} for tx exceeds limit of $maxGasPrice")
-            }
-
-            for ((rpcUrl, transactionManager) in transactionManagers) {
+        val estimatedGasUsage =
                 try {
-
-                    val response = transactionManager.sendEIP1559Transaction(
-                            networkId,
+                    getEstimatedGasUsage(
                             txRequest.maxPriorityFeePerGas,
                             txRequest.maxFeePerGas,
                             gasLimit,
                             txRequest.contractAddress,
                             functionData,
-                            BigInteger.ZERO
+                            fromAddress,
+                            chainId
                     )
-
-                    if (response.hasError()) {
-                        val errorMessage =
-                                "Web3j request failed with error code: ${response.error.code} and message: ${response.error.message}"
-                        logger.error(errorMessage)
-                        throw ProgrammerMistake(errorMessage)
-                    }
-
-                    withReadWriteConnection(storage, chainId) {
-                        databaseOperations.recordTransactionHash(it, txRequest.rowId, response.transactionHash)
-                    }
-
-                    submitTxUpdates.add(EvmSubmitTransactionResult(txRequest.rowId, RellTransactionStatus.PENDING, response.transactionHash))
-
-                    logger.info { "Transaction ${txRequest.rowId} submitted successfully" }
-
-                    return
-
                 } catch (e: Exception) {
-
-                    val error = "Failed to send transaction ${txRequest.rowId} to $rpcUrl: ${e.message}"
-                    logger.error { error }
+                    val errorMessage = "Failed to get estimated gas usage for request id ${txRequest.rowId}: ${e.message}"
+                    logger.error(e) { errorMessage }
+                    throw ProgrammerMistake(errorMessage, e)
                 }
+        if (estimatedGasUsage > gasLimit) {
+            throw UserMistake("Estimated gas usage $estimatedGasUsage for tx exceeds limit of $gasLimit")
+        }
+
+        if (walletBalance.balance < txRequest.maxFeePerGas * estimatedGasUsage) {
+            throw UserMistake("Insufficient wallet balance")
+        }
+
+        if (txRequest.maxFeePerGas > maxGasPrice) {
+            throw UserMistake("Max fee per gas ${txRequest.maxFeePerGas} for tx exceeds limit of $maxGasPrice")
+        }
+
+        for ((rpcUrl, transactionManager) in transactionManagers) {
+            try {
+
+                val response = transactionManager.sendEIP1559Transaction(
+                        networkId,
+                        txRequest.maxPriorityFeePerGas,
+                        txRequest.maxFeePerGas,
+                        gasLimit,
+                        txRequest.contractAddress,
+                        functionData,
+                        BigInteger.ZERO
+                )
+
+                if (response.hasError()) {
+                    val errorMessage =
+                            "Web3j request failed with error code: ${response.error.code} and message: ${response.error.message}"
+                    logger.error(errorMessage)
+                    throw ProgrammerMistake(errorMessage)
+                }
+
+                withReadWriteConnection(storage, chainId) {
+                    databaseOperations.recordTransactionHash(it, txRequest.rowId, response.transactionHash)
+                }
+
+                submitTxUpdates.add(EvmSubmitTransactionResult(txRequest.rowId, RellTransactionStatus.PENDING, response.transactionHash))
+
+                logger.info { "Transaction ${txRequest.rowId} submitted successfully" }
+
+                return
+
+            } catch (e: Exception) {
+
+                val error = "Failed to send transaction ${txRequest.rowId} to $rpcUrl: ${e.message}"
+                logger.error { error }
             }
-
-            val errorMessage = "Failed to send transaction to all ${transactionManagers.size} nodes"
-            throw ProgrammerMistake(errorMessage)
-        }
-    }
-
-    private fun txTakenByThisNode(module: GTXModule, eContext: EContext, requestId: Long): Boolean {
-
-        val queryResult = module.query(eContext, GET_TRANSACTION, gtv("row_id" to gtv(requestId)))
-        if (queryResult.isNull()) {
-            return false
         }
 
-        val status = RellTransactionStatus.valueOf(queryResult["status"]!!.asString())
-        val processedBy = queryResult["processed_by"]
-
-        return status == RellTransactionStatus.TAKEN &&
-                processedBy != null &&
-                !processedBy.isNull() &&
-                pubKeyByteArray.contentEquals(processedBy.asByteArray())
+        val errorMessage = "Failed to send transaction to all ${transactionManagers.size} nodes"
+        throw ProgrammerMistake(errorMessage)
     }
 
     private fun getEstimatedGasUsage(
@@ -501,6 +471,9 @@ class TransactionSubmitter(
     }
 
     fun enqueue(evmSubmitTxRellRequest: EvmSubmitTxRequest) {
+
+        logger.info { "Enqueue transaction ${evmSubmitTxRellRequest.rowId}" }
+
         withWriteConnection(storage, chainId) {
             databaseOperations.queueTransaction(it, evmSubmitTxRellRequest, networkId)
             true

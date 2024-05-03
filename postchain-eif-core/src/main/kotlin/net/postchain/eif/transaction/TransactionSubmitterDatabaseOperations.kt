@@ -23,5 +23,5 @@ interface TransactionSubmitterDatabaseOperations {
 
     fun getQueuedTransactions(ctx: EContext, networkId: Long): List<EvmSubmitTxRequest>
 
-    fun removeTransaction(bctx: BlockEContext, requestId: Long)
+    fun removeTransaction(bctx: EContext, requestId: Long)
 }

@@ -46,8 +46,8 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
         val operations = mutableListOf<OpData>()
 
-        operations.addAll(takeTransactions(bctx))
-        operations.addAll(updateTransactionStatuses(bctx))
+        takeTransactions(bctx, operations)
+        updateTransactionStatuses(bctx, operations)
 
         return operations
     }
@@ -177,9 +177,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         return true
     }
 
-    private fun updateTransactionStatuses(bctx: BlockEContext): Collection<OpData> {
-
-        val operations = mutableListOf<OpData>()
+    private fun updateTransactionStatuses(bctx: BlockEContext, operations: MutableList<OpData>) {
 
         transactionSubmitters.values.forEach { txSubmitter ->
 
@@ -225,8 +223,6 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                 }
             }
         }
-
-        return operations
     }
 
     private fun continueProcessTx(module: GTXModule, eContext: EContext, requestId: Long): Boolean {
@@ -310,7 +306,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         }
     }
 
-    private fun takeTransactions(bctx: BlockEContext): MutableList<OpData> {
+    private fun takeTransactions(bctx: BlockEContext, operations: MutableList<OpData>) {
 
         val entities =
                 module.query(bctx, FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT, gtv("exclude_taken_by_key" to GtvByteArray(pubKey)))
@@ -318,7 +314,6 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
             it.toObject<EvmSubmitTxRellRequest>()
         }
 
-        val operations = mutableListOf<OpData>()
         queuedTransactions.forEach { transaction ->
 
             withTxSubmitter(transaction.networkId) {
@@ -333,7 +328,6 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                 logger.info { "Transaction ${transaction.rowId} taken to be processed by this node" }
             }
         }
-        return operations
     }
 
     override fun getRelevantOps(): Set<String> {

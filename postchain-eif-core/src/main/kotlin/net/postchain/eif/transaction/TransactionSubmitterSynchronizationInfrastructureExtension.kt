@@ -3,6 +3,7 @@ package net.postchain.eif.transaction
 import net.postchain.PostchainContext
 import net.postchain.base.data.DatabaseAccess
 import net.postchain.base.withReadConnection
+import net.postchain.base.withReadWriteConnection
 import net.postchain.common.BlockchainRid
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.exception.UserMistake
@@ -12,6 +13,7 @@ import net.postchain.core.SynchronizationInfrastructureExtension
 import net.postchain.eif.Web3jRequestHandler
 import net.postchain.eif.Web3jServiceFactory
 import net.postchain.eif.metrics.RpcUsageMetrics
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.GET_TRANSACTION
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.GET_SYSTEM_ANCHORING_BLOCKCHAIN_RID_QUERY
 import net.postchain.eif.transaction.config.EvmTransactionSubmitterConfig
@@ -19,12 +21,14 @@ import net.postchain.eif.transaction.config.TransactionSubmitterBlockchainConfig
 import net.postchain.eif.transaction.signerupdate.EvmSignerUpdateSpecialTxExtension
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.mapper.toObject
+import net.postchain.gtx.GTXModule
 import net.postchain.gtx.GTXModuleAware
+import net.postchain.core.EContext
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.logger
 import org.web3j.crypto.Credentials
 import org.web3j.tx.RawTransactionManager
 import org.web3j.tx.gas.StaticGasProvider
 import java.math.BigInteger
-import java.util.LinkedList
 
 class TransactionSubmitterSynchronizationInfrastructureExtension(private val postchainContext: PostchainContext) : SynchronizationInfrastructureExtension {
 
@@ -77,10 +81,7 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                                 web3jServicesMap.map { it.key to RawTransactionManager(it.value, credentials) }
                                         .toMap()
                         val gasProvider = StaticGasProvider(BigInteger.valueOf(networkBlockchainConfig.maxGasPrice), BigInteger.valueOf(transactionSubmitterBlockchainConfig.gasLimit))
-                        val queue = LinkedList<EvmSubmitTxRequest>()
-                        withReadConnection(postchainContext.sharedStorage, process.blockchainEngine.chainID) {
-                            queue.addAll(databaseOperations.getQueuedTransactions(it, networkId))
-                        }
+                        val queue = loadTxQueue(process.blockchainEngine.chainID, databaseOperations, networkId, blockchainConfig.module)
                         val transactionSubmitter = TransactionSubmitter(
                                 web3jRequestHandler,
                                 transactionManagers,
@@ -95,8 +96,6 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                                 appConfig.healthCheckInterval,
                                 transactionSubmitterBlockchainConfig.nodeTxVerificationTimeout,
                                 transactionSubmitterBlockchainConfig.nodeTxVerificationEvmBlocks,
-                                blockchainConfig.module,
-                                postchainContext.appConfig.pubKeyByteArray,
                         )
                         transactionSubmitters[networkId] = transactionSubmitter
                         ext.addTransactionSubmitter(transactionSubmitter, networkId)
@@ -132,11 +131,43 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
         }
     }
 
+    private fun loadTxQueue(chainID: Long, databaseOperations: TransactionSubmitterDatabaseOperationsImpl, networkId: Long, module: GTXModule): Collection<EvmSubmitTxRequest> {
+        val queue = mutableListOf<EvmSubmitTxRequest>()
+        withReadWriteConnection(postchainContext.sharedStorage, chainID) {
+            for (queuedTransaction in databaseOperations.getQueuedTransactions(it, networkId)) {
+
+                if (txTakenByThisNode(module, it, queuedTransaction.rowId)) {
+                    queue.add(queuedTransaction)
+                } else {
+                    logger.info { "Transaction ${queuedTransaction.rowId} is no longer processed by this node" }
+                    databaseOperations.removeTransaction(it, queuedTransaction.rowId)
+                }
+            }
+        }
+        return queue
+    }
+
     override fun disconnectProcess(process: BlockchainProcess) {
         transactionSubmitters.values.forEach { it.shutdown() }
     }
 
     override fun shutdown() {
         transactionSubmitters.values.forEach { it.shutdown() }
+    }
+
+    private fun txTakenByThisNode(module: GTXModule, eContext: EContext, requestId: Long): Boolean {
+
+        val queryResult = module.query(eContext, GET_TRANSACTION, gtv("row_id" to gtv(requestId)))
+        if (queryResult.isNull()) {
+            return false
+        }
+
+        val status = RellTransactionStatus.valueOf(queryResult["status"]!!.asString())
+        val processedBy = queryResult["processed_by"]
+
+        return status == RellTransactionStatus.TAKEN &&
+                processedBy != null &&
+                !processedBy.isNull() &&
+                postchainContext.appConfig.pubKeyByteArray.contentEquals(processedBy.asByteArray())
     }
 }

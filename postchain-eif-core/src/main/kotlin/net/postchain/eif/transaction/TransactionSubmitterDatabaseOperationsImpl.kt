@@ -136,7 +136,7 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
         }
     }
 
-    override fun removeTransaction(bctx: BlockEContext, requestId: Long) {
+    override fun removeTransaction(bctx: EContext, requestId: Long) {
         DatabaseAccess.of(bctx).apply {
             val jooq = createJooq(bctx)
 

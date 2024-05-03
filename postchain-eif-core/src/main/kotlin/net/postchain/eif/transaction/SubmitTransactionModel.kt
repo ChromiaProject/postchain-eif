@@ -28,7 +28,7 @@ enum class RellTransactionStatus {
     FAILURE;
 
     fun isCompleted(): Boolean =
-        this == SUCCESS || this == FAILURE
+            this == SUCCESS || this == FAILURE
 }
 
 open class EvmSubmitTxRellRequest(
@@ -86,6 +86,23 @@ class EvmSubmitTxRequest(
             return EvmSubmitTxRequest(rellRequest)
         }
     }
+
+    fun toRell() =
+            EvmSubmitTxRellRequest(
+                    rowId,
+                    contractAddress,
+                    functionName,
+                    parameterTypes,
+                    parameterValues,
+                    networkId,
+                    maxPriorityFeePerGas,
+                    maxFeePerGas,
+                    sender,
+                    created,
+                    txHash,
+                    status,
+                    processed_by
+            )
 }
 
 class EvmPendingTx(

@@ -242,8 +242,6 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
                 -1,
                 24 * 60 * 60000,
                 5,
-                module,
-                ByteArray (32) { 0 },
         )
     }
 

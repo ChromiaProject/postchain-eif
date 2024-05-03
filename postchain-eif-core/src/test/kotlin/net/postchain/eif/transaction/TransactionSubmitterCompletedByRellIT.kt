@@ -50,36 +50,6 @@ class TransactionSubmitterCompletedByRellIT : EifBaseIntegrationTest() {
     }
 
     /*
-    This will emulate a node timing out and not submit the transaction within given time period.
-
-    1. TX is submitted on BC.
-    2. Nodes takes TX.
-    3. Node submits TX. <- this test rejects the TX here due to incorrect status (we make sure it still is QUEUED)
-    4. NOde updates BC status to PENDING.
-    4. Node polls TX to verify it.
-     */
-    @Test
-    fun `do not submit tx due to status set to QUEUED by rell`() {
-
-        val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config.xml")
-        val node = nodes[0]
-
-        val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
-        TransactionSubmitterTestGTXModule.updateTxStatus = false
-
-        val txSubmit = mkEvmSubmitTxRellRequest(0, contractAddress)
-        txSubmitterTestModule.addTransactionsAvailableToTake(txSubmit)
-
-        Awaitility.await().atMost(Duration.ONE_MINUTE).pollInterval(Duration.ONE_SECOND).untilAsserted {
-
-            buildBlock(1L)
-            assertStatusOperation(txSubmitterTestModule, txSubmit.rowId, RellTransactionStatus.TAKEN)
-
-            testLogAppender.assertWarn("Transaction 0 is ignored since blockchain says this is no longer taken by this node")
-        }
-    }
-
-    /*
     This will emulate a node processing a transaction but it timed out in rell before the node had the chance to update the status
 
     1. TX is submitted on BC.
