@@ -141,7 +141,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
     val erc20 = erc20_asset @? { network_id, .token_address == event.token_address };
     if (erc20 == null) {
         log("deposit event bounced: ERC20 token not found");
-        bounce_deposit_event(network_id, event.token_address, event.beneficiary, event.amount);
+        bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
         return;
     }
 
@@ -152,7 +152,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
         if (not empty(ft4_account)) {
             // we require explicit link to avoid unwanted deposits
             if (need_consent_on_deposit and empty(evm_sc_account_link @? { event.sender, network_id, ft4_account })) {
-                bounce_deposit_event(network_id, event.token_address, beneficiary, event.amount);
+                bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
                 return;
             }
         }
