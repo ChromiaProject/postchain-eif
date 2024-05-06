@@ -211,6 +211,9 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
     }
 }
 
+@extendable
+function after_evm_account_linked(address: byte_array, account: ft4.accounts.account, network_id: integer, is_contract: boolean) {}
+
 @extend(ft4.strategies.after_register_account)
 function (ft4.accounts.account) {
     val pending = pending_deposit @* { .recipient_id == account.id };
@@ -218,9 +221,11 @@ function (ft4.accounts.account) {
         if (deposit.from_smart_contract) {
             if (empty(evm_sc_account_link @? { deposit.sender_address, deposit.network_id })) {
                 create evm_sc_account_link(deposit.sender_address, deposit.network_id, account);
+                after_evm_account_linked(deposit.sender_address, account, deposit.network_id, true);
             }
         } else {
             create evm_eoa_account_link(deposit.sender_address, account);
+            after_evm_account_linked(deposit.sender_address, account, -1, false);
         }
 
         // note: we don't need to call collect_pooled_assets here, because it's already done in the transfer strategy implementation
@@ -239,6 +244,7 @@ function _link_evm_eoa_account(address: byte_array, account: ft4.accounts.accoun
         ft4.transfer_strategy.collect_pooled_assets(account, recipient_id = address.hash());
         delete deposit;
     }
+    after_evm_account_linked(address, account, -1, false);
 }
 
 function _link_evm_sc_account(address: byte_array, network_id: integer, account: ft4.accounts.account) {
@@ -251,6 +257,7 @@ function _link_evm_sc_account(address: byte_array, network_id: integer, account:
         ft4.transfer_strategy.collect_pooled_assets(account, recipient_id = address.hash());
         delete deposit;
     }
+    after_evm_account_linked(address, account, network_id, true);
 }
 
 // return deposit if we cannot credit it to the account
