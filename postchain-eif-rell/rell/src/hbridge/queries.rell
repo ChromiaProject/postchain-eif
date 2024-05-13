@@ -15,12 +15,35 @@ query get_erc20_for_asset(asset_id: byte_array): list<erc20_info> {
     ));
 }
 
+/**
+ * @deprecated Use get_erc20_withdrawals()
+ */
 query get_erc20_withdrawal(network_id: integer, token_address: byte_array, beneficiary: byte_array): list<struct<erc20_withdraw>> =
     erc20_withdraw @* {
         network_id,
         token_address,
         beneficiary
     } (@sort_desc @omit .serial, $.to_struct());
+
+/**
+ * Returns ERC-20 withdrawals
+ *
+ * @param network_id EVM network ID
+ * @param token_address EVM token address
+ * @param beneficiary EVM beneficiary address
+ * @param from Beginning of a time interval (nullable)
+ * @param to End of a time interval (nullable)
+ */
+query get_erc20_withdrawals(network_id: integer, token_address: byte_array, beneficiary: byte_array, from: timestamp?, to: timestamp?): list<struct<erc20_withdraw>> {
+    // TODO: This will work soon: (from == null or timestamp >= from) and (to == null or timestamp < to)
+
+    return erc20_withdraw @* {
+        network_id,
+        token_address,
+        beneficiary
+//        , (from == null or timestamp >= from) and (to == null or timestamp < to)
+    } (@sort_desc @omit .serial, $.to_struct());
+}
 
 query get_account_for_eoa_address(evm_address: byte_array): byte_array? =
     evm_eoa_account_link @? { .address == evm_address } (.account.id);
@@ -36,4 +59,19 @@ query get_eoa_addresses_for_account(account_id: byte_array): list<byte_array> {
 query get_sc_addresses_for_account(account_id: byte_array): list<(address: byte_array, network_id: integer)> {
     val account = ft4.accounts.Account(account_id);
     return evm_sc_account_link @* { account } (.address, .network_id);
+}
+
+/**
+ * Returns ERC-20 deposits
+ *
+ * @param network_id EVM network ID
+ * @param token_address EVM token address
+ * @param recipient_id EVM beneficiary address
+ */
+query get_erc20_deposits(network_id: integer, token_address: byte_array, recipient_id: byte_array): list<struct<erc20_deposit>> {
+    return erc20_deposit @* {
+        network_id,
+        .token.token_address == token_address,
+        recipient_id
+    } ( $.to_struct() );
 }
