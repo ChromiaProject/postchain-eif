@@ -35,13 +35,11 @@ query get_erc20_withdrawal(network_id: integer, token_address: byte_array, benef
  * @param to End of a time interval (nullable)
  */
 query get_erc20_withdrawals(network_id: integer, token_address: byte_array, beneficiary: byte_array, from: timestamp?, to: timestamp?): list<struct<erc20_withdraw>> {
-    // TODO: This will work soon: (from == null or timestamp >= from) and (to == null or timestamp < to)
-
     return erc20_withdraw @* {
         network_id,
         token_address,
-        beneficiary
-//        , (from == null or timestamp >= from) and (to == null or timestamp < to)
+        beneficiary,
+        (from == null or .timestamp >= from) and (to == null or .timestamp < to)
     } (@sort_desc @omit .serial, $.to_struct());
 }
 
