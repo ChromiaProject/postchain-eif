@@ -43,6 +43,9 @@ class EifSynchronizationInfrastructureExtension(
                     }
 
                     val evmConfig = EvmConfig.fromAppConfig(evmBlockchainName, postchainContext.appConfig)
+                    if (evmConfig.urls.isEmpty()) {
+                        throw UserMistake("Node does not have any URLs configured for EVM network: $evmBlockchainName")
+                    }
                     val eventProcessor = initializeEventProcessor(cfg, evmBlockchainConfig, engine, evmConfig)
                     ext.addEventProcessor(evmBlockchainConfig.networkId, eventProcessor)
                     eventProcessors[cfg.blockchainRid.toHex()]?.set(evmBlockchainConfig.networkId, eventProcessor)
