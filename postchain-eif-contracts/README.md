@@ -19,7 +19,6 @@ Before running any command, make sure to install dependencies:
 $ yarn install
 ```
 
-
 ### Clean
 
 ```sh
@@ -64,11 +63,21 @@ INFURA_API_KEY="..."
 ETHERSCAN_API_KEY="..."
 ```
 
-Then, run the deployment task:
+There are two versions of the Bridge contract, TokenBridge and ChromiaTokenBridge. The TokenBridge contract is the standard bridge contract that handles depositing and withdrawing ERC20 tokens. When tokens are deposited to the TokenBridge, they are held in custody in the contract, and transfered back when the user withdraws the tokens from Chromia back to EVM.
+
+The ChromiaTokenBridge is meant to be used for tokens that are native to Chromia. This contract overrides the deposit/withdraw functions to burn the ERC20 tokens on deposit and mint them on withdraw. This is done since the total avaliable supply of tokens should be handled on the Chromia side, and to enable users to directly withdraw FT4 tokens to EVM without the need for tokens already being held in the contract.
+
+To deploy the normal TokenBridge, run the deploy script:
 
 ```sh
 $ yarn deploy --network sepolia --verify --app 0xCaf200436270A60Cda6543602F2Ea4224E31351d --offset 2
 $ yarn deploy --network goerli --verify --app 0x659E4A3726275EDFD125F52338ECE0D54D15BD99,0x1A642F0E3C3AF545E7ACBD38B07251B3990914F1,0x75E20828B343D1FE37FAE469AB698E19C17F20B5 --offset 2
+```
+
+To deploy the ChromiaTokenBridge, run the deploy:native script:
+
+```sh
+$ yarn deploy:native --network bsc --verify --app 0xCaf200436270A60Cda6543602F2Ea4224E31351d,0x9F4daAfc3F52C1c92e4583413824523679ABc9a3,0x4cBe97487b517b66B43943AD97Ad8394b9DEa7dC,0x4FC783e3a3beF0270858Dc5FbB837fA6f8fDbFc6 --offset 2
 ```
 
 You also can deploy ALICE token for test
@@ -100,7 +109,7 @@ yarn upgrade:bridge --network goerli --verify --address PROXY_ADDRESS
 yarn upgrade:nft --network goerli --verify --address PROXY_ADDRESS
 ```
 
-### Force import 
+### Force import
 
 ```sh
 yarn import:bridge --network goerli --address PROXY_ADDRESS
@@ -111,38 +120,48 @@ yarn import:bridge --network goerli --address PROXY_ADDRESS
 ### Token Bridge
 
 `renounceOwnership()`
+
 - Renounce ownership is not allowed.
 
 `setBlockchainRid(bytes32 rid)`
+
 - Sets blockchain rid.
-    
+
 `pause()`
+
 - Triggers stopped state.
 - Requirements: The contract must not be paused.
 
 `unpause()`
+
 - Returns to normal state.
 - Requirements: The contract must be paused.
 
 `allowToken(IERC20 token)`
+
 - Allows token.
 
 `triggerMassExit(uint height, bytes32 blockRid)`
+
 - Triggers mass exit.
 
-`postponeMassExit()` 
-- Postpone mass exit. 
+`postponeMassExit()`
+
+- Postpone mass exit.
 - Requirements: Mass exit state.
 
 `pendingWithdraw(bytes32 _hash)`
+
 - Blocks the withdrawal request by changing its status from `Withdrawable` to `Pending`.
 - Requirements: Withdraw request status to be `Withdrawable`.
 
 `unpendingWithdraw(bytes32 _hash)`
+
 - Unblocks the withdrawal request by changing its status from `Pending` to `Withdrawable`.
 - Requirements: Withdraw request status to be `Pending`.
 
 `fund(IERC20 token, uint256 amount)`
+
 - Admin funds `amount` of `token` to bridge.
 - Requirements: `token` to be allowed.
 
@@ -154,4 +173,37 @@ yarn import:bridge --network goerli --address PROXY_ADDRESS
 ### Validator
 
 `updateValidators(address[] _validators)`
+
 - Update validator list.
+
+### ChromiaTokenBridge
+
+`setTokenMinter(ITokenMinter _tokenMinter)`
+
+- Sets the token minter, this is the contract that has authorization to mint and burn the native token.
+
+### TokenMinter
+
+`setDailyLimit(IDailyLimit _dailyLimit)`
+
+- Begin setting daily limit contract.
+
+`finishSetDailyLimit()`
+
+- Finish setting daily limit contract.
+
+`transferMintRole(address newMinter)`
+
+- Begin transferring minter role for the token.
+
+`function finishTransferMintRole()`
+
+- Finish transferring minter role for the token.
+
+`transferOwnership(address newOwner)`
+
+- Begin transferring ownership of this contract.
+
+`acceptOwnership()`
+
+- Finish transferring ownership of this contract.
