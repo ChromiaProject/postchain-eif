@@ -17,6 +17,7 @@
     "typechain": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat typechain",
     "coverage": "cross-env CODE_COVERAGE=true hardhat coverage --solcoverjs ./.solcover.js --temp artifacts --testfiles \"./test/**/*.ts\"",
     "deploy": "npx hardhat deploy:bridge",
+    "deploy:native": "npx hardhat deploy:chromiabridge",
     "prepare:bridge": "npx hardhat prepare:bridge",
     "upgrade:bridge": "npx hardhat upgrade:bridge",
     "import:bridge": "npx hardhat import:bridge",
