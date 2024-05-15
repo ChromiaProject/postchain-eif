@@ -6,5 +6,5 @@ function map_deposit(deposit: erc20_deposit) = erc20_deposit_info(
     asset_id = deposit.token.asset.id,
     amount = deposit.amount,
     state = deposit.state,
-    last_updated = deposit.last_updated,
+    last_updated = deposit.last_updated
 );

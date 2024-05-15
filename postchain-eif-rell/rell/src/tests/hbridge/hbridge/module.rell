@@ -28,7 +28,8 @@ val admin_privkey = x"3132333435363738393031323334353637383930313233343536373839
 val event_name = "DepositedERC20";
 
 val contract_address = x"b7eB5d60Dd5610A82A4844Beb3F7d750316d3D32";
-val network_id = 1;
+val network_id1 = 1;
+val network_id2 = 2;
 
 struct asset_info {
     token_address: byte_array;
@@ -62,7 +63,7 @@ val BAR = asset_info(
     token_icon_url = "https://bar.com/bar",
 );
 
-function register_foreign_asset(asset: asset_info = CHR): assets.asset {
+function register_foreign_asset(asset: asset_info = CHR, network_id: integer = network_id1): assets.asset {
     val asset_id = (asset.token_name, chain_context.blockchain_rid).hash();
 
     rell.test.tx().op(
@@ -113,7 +114,8 @@ function deposit_from_ethereum(
     amount: big_integer,
     block_height: integer = 1,
     account_id: byte_array = hbridge.zero_beneficiary,
-    asset: asset_info = CHR
+    asset: asset_info = CHR,
+    network_id: integer = network_id1
 ) {
     val events = [
         event_data(
@@ -143,7 +145,7 @@ function assert_withdraw(serial: integer, evm_address: byte_array, amount: big_i
 
     val withdraw_info = [
         serial.to_gtv(),
-        network_id.to_gtv(),
+        network_id1.to_gtv(),
         eif_utils.to_32_byte_array(asset.token_address).to_gtv(),
         eif_utils.to_32_byte_array(evm_address).to_gtv(),
         amount.to_gtv(),
@@ -151,10 +153,10 @@ function assert_withdraw(serial: integer, evm_address: byte_array, amount: big_i
     ];
     assert_equals(rell.test.get_events()[0], ("eif_event", withdraw_info.to_gtv_pretty()));
 
-    assert_equals(hbridge.get_erc20_withdrawal(network_id, asset.token_address, evm_address), [
+    assert_equals(hbridge.get_erc20_withdrawal(network_id1, asset.token_address, evm_address), [
         struct<hbridge.erc20_withdraw>(
             serial,
-            network_id,
+            network_id = network_id1,
             token_address = asset.token_address,
             beneficiary = evm_address,
             amount,

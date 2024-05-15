@@ -61,9 +61,9 @@ query get_sc_addresses_for_account(account_id: byte_array): list<(address: byte_
  * @param recipient_id EVM beneficiary address
  */
 query get_erc20_deposits(
-    network_id: integer,
-    token_address: byte_array,
-    recipient_id: byte_array,
+    network_id: integer?,
+    token_address: byte_array?,
+    recipient_id: byte_array?,
     page_size: integer?,
     page_cursor: text?
 ): ft4.utils.paged_result {
@@ -71,9 +71,9 @@ query get_erc20_deposits(
     val before_rowid = ft4.utils.before_rowid(page_cursor);
 
     val paginated_result = erc20_deposit @* {
-        network_id,
-        .token.token_address == token_address,
-        recipient_id,
+        network_id == null or .network_id == network_id,
+        token_address == null or .token.token_address == token_address,
+        recipient_id == null or .recipient_id == recipient_id,
         .rowid > (before_rowid ?: rowid(0))
     } (
         ft4.utils.pagination_result(

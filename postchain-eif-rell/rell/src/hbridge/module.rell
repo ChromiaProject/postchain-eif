@@ -222,7 +222,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
             return;
         }
 
-        if (not deposit_from_smart_contract and exists(erc20_deposit @* { .recipient_id == recipient_id })) {
+        if (not deposit_from_smart_contract and exists(erc20_deposit @* { .recipient_id == recipient_id, erc20 })) {
             log("deposit event bounced: tokens has already been transferred from EOA account to this recipient, and has not been claimed yet");
             bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
             return;

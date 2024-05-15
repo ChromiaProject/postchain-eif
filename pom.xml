@@ -31,7 +31,7 @@
         <kotlin.compiler.jvmTarget>17</kotlin.compiler.jvmTarget>
         <testcontainers.version>1.16.2</testcontainers.version>
         <junit.pioneer.version>2.2.0</junit.pioneer.version>
-        <rell.maven.plugin.version>0.11.9</rell.maven.plugin.version>
+        <rell.maven.plugin.version>0.11.12</rell.maven.plugin.version>
         <web3j.version>4.11.1</web3j.version>
     </properties>
 
