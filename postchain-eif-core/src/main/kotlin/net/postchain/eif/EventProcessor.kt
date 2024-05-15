@@ -199,6 +199,11 @@ class EvmEventProcessor(
                 .map(::eventBlockToGtv)
         processLogEventsAndUpdateOffsets(sortedEncodedLogs, to)
 
+        // If we just saw one new block we can probably sleep
+        if (to == from) {
+            delay(delayWhenNoNewBlocks)
+        }
+
         while (isQueueFull()) {
             logger.debug("Wait for events to be consumed until we read more")
             delay(500)
