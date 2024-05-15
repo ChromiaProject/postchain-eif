@@ -35,9 +35,9 @@ function test_withdraw_foreign_ERC20_token_to_ethereum_with_already_linked_accou
 }
 
 function test_can_not_withdraw_to_ethereum_without_linked_token() {
-    val asset_id = (token_name, chain_context.blockchain_rid).hash();
+    val asset_id = (CHR.token_name, chain_context.blockchain_rid).hash();
     rell.test.tx().op(
-        admin.external.register_asset(token_name, token_symbol, token_decimal, token_icon_url)
+        admin.external.register_asset(CHR.token_name, CHR.token_symbol, CHR.token_decimal, CHR.token_icon_url)
     ).sign(admin_privkey).run();
     val ft_asset = assets.Asset(asset_id);
 

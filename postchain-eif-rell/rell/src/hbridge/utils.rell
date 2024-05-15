@@ -1,0 +1,10 @@
+function map_deposit(deposit: erc20_deposit) = erc20_deposit_info(
+    network_id = deposit.network_id,
+    sender_address = deposit.sender_address,
+    recipient_id = deposit.recipient_id,
+    from_smart_contract = deposit.from_smart_contract,
+    asset_id = deposit.token.asset.id,
+    amount = deposit.amount,
+    state = deposit.state,
+    last_updated = deposit.last_updated,
+);

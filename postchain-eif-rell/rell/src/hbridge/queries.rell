@@ -1,9 +1,3 @@
-struct erc20_info {
-    network_id: integer;
-    token_address: byte_array; // contract address
-    bridge_mode;
-    virtual_blockchain_rid: byte_array; // virtual blockchain RID derived from network_id and address
-}
 
 query get_erc20_for_asset(asset_id: byte_array): list<erc20_info> {
     val asset = ft4.assets.Asset(asset_id);
@@ -66,10 +60,27 @@ query get_sc_addresses_for_account(account_id: byte_array): list<(address: byte_
  * @param token_address EVM token address
  * @param recipient_id EVM beneficiary address
  */
-query get_erc20_deposits(network_id: integer, token_address: byte_array, recipient_id: byte_array): list<struct<erc20_deposit>> {
-    return erc20_deposit @* {
+query get_erc20_deposits(
+    network_id: integer,
+    token_address: byte_array,
+    recipient_id: byte_array,
+    page_size: integer?,
+    page_cursor: text?
+): ft4.utils.paged_result {
+
+    val before_rowid = ft4.utils.before_rowid(page_cursor);
+
+    val paginated_result = erc20_deposit @* {
         network_id,
         .token.token_address == token_address,
-        recipient_id
-    } ( $.to_struct() );
+        recipient_id,
+        .rowid > (before_rowid ?: rowid(0))
+    } (
+        ft4.utils.pagination_result(
+            data = map_deposit($).to_gtv_pretty(),
+            rowid = .rowid
+        )
+    ) limit ft4.utils.fetch_data_size(page_size);
+
+    return ft4.utils.make_page(paginated_result, page_size);
 }

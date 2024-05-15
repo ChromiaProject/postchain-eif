@@ -49,9 +49,9 @@ operation bridge_ft4_token_to_evm(network_id: integer, asset_id: byte_array, amo
 // note: we do not check authorization. after a time-out the deposit can be recalled by anyone,
 // and it goes back to where it came from. this simplifies the flow
 operation recall_pending_deposit(sender_address: byte_array) {
-    val pending_deposits = erc20_deposit @* { sender_address };
+    val pending_deposits = erc20_deposit @* { sender_address, deposit_state.pending };
     for (deposit in pending_deposits) {
-        val transfer = deposit.account_creation_transfer;
+        val transfer = pending_erc20_deposit @ { deposit } ( .account_creation_transfer );
         val (asset, amount) = ft4.transfer_strategy.recall_transfer(
             transfer.sender_blockchain_rid, transfer.sender_id, transfer.transaction.tx_rid, transfer.op_index
         );
@@ -59,6 +59,6 @@ operation recall_pending_deposit(sender_address: byte_array) {
         bridge_deduct_balance(ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid), asset, amount);
         emit_withdraw_event(deposit.token.network_id, deposit.token.token_address, sender_address, amount);
 
-        set_deposit_state(deposit, erc20_deposit_state.recalled);
+        update_deposit_state(deposit, deposit_state.recalled);
     }
 }

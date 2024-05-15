@@ -23,12 +23,6 @@ function test_deposit_foreign_token_from_ethereum_with_already_linked_account() 
     deposit_from_ethereum(evm_address, amount);
 
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
-
-    run_block_after_timeout();
-    rell.test.tx()
-        .op(hbridge.recall_pending_deposit(evm_address))
-        .nop()
-        .run_must_fail("No records found");
 }
 
 function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_linking_once_but_not_twice() {
@@ -84,12 +78,6 @@ function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_l
             *
         )
     );
-
-    run_block_after_timeout();
-    rell.test.tx()
-        .op(hbridge.recall_pending_deposit(evm_address))
-        .nop()
-        .run_must_fail("No records found");
 }
 
 function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_registering_account_and_duplicate_deposit_will_bounce() {
@@ -143,12 +131,6 @@ function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_r
         .op(op)
         .nop()
         .run_must_fail("duplicate key value violates unique constraint");
-
-    run_block_after_timeout();
-    rell.test.tx()
-        .op(hbridge.recall_pending_deposit(evm_address))
-        .nop()
-        .run_must_fail("No records found");
 }
 
 function test_can_recall_unclaimed_deposit_from_ethereum_after_timeout_once_but_not_twice() {
@@ -172,9 +154,4 @@ function test_can_recall_unclaimed_deposit_from_ethereum_after_timeout_once_but_
         .run();
 
     assert_withdraw(1, evm_address, amount);
-
-    rell.test.tx()
-        .op(hbridge.recall_pending_deposit(evm_address))
-        .nop()
-        .run_must_fail("No records found");
 }
