@@ -20,21 +20,41 @@ query get_erc20_withdrawal(network_id: integer, token_address: byte_array, benef
     } (@sort_desc @omit .serial, $.to_struct());
 
 /**
- * Returns ERC-20 withdrawals
+ * Returns paginated ERC-20 withdrawals
  *
- * @param network_id EVM network ID
- * @param token_address EVM token address
- * @param beneficiary EVM beneficiary address
- * @param from Beginning of a time interval (nullable)
- * @param to End of a time interval (nullable)
+ * @param network_id EVM network ID. If null, all networks are considered.
+ * @param token_address EVM token address. If null, all token addresses are considered.
+ * @param beneficiary EVM beneficiary address. If null, all beneficiaries are considered.
+ * @param from marks the beginning of a time interval. If not null, withdrawals occurring before `from` are excluded.
+ * @param to marks the end of a time interval. If not null, withdrawals occurring after to are excluded.
  */
-query get_erc20_withdrawals(network_id: integer, token_address: byte_array, beneficiary: byte_array, from: timestamp?, to: timestamp?): list<struct<erc20_withdraw>> {
-    return erc20_withdraw @* {
-        network_id,
-        token_address,
-        beneficiary,
-        (from == null or .timestamp >= from) and (to == null or .timestamp < to)
-    } (@sort_desc @omit .serial, $.to_struct());
+query get_erc20_withdrawals(
+    network_id: integer?,
+    token_address: byte_array?,
+    beneficiary: byte_array?,
+    from: timestamp?,
+    to: timestamp?,
+    page_size: integer?,
+    page_cursor: text?
+): ft4.utils.paged_result {
+
+    val before_rowid = ft4.utils.before_rowid(page_cursor);
+
+    val paginated_result = erc20_withdraw @* {
+        network_id == null or .network_id == network_id,
+        token_address == null or .token_address == token_address,
+        beneficiary == null or .beneficiary == beneficiary,
+        from == null or .timestamp >= from,
+        to == null or .timestamp < to,
+        .rowid > (before_rowid ?: rowid(0))
+    } (
+        ft4.utils.pagination_result(
+            data = map_withdrawal($).to_gtv_pretty(),
+            rowid = .rowid
+        )
+    ) limit ft4.utils.fetch_data_size(page_size);
+
+    return ft4.utils.make_page(paginated_result, page_size);
 }
 
 query get_account_for_eoa_address(evm_address: byte_array): byte_array? =

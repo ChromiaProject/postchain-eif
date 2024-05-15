@@ -35,6 +35,15 @@ entity erc20_withdraw {
     timestamp;
 }
 
+struct erc20_withdrawal_info {
+    serial: integer;
+    network_id: integer;
+    token_address: byte_array;
+    beneficiary: byte_array;
+    amount: big_integer;
+    timestamp;
+}
+
 // link between EVM address and FT4 account, specifically for EOA. (Where user has the private key)
 entity evm_eoa_account_link {
     key address: byte_array;
