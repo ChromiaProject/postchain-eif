@@ -104,3 +104,28 @@ query get_erc20_deposits(
 
     return ft4.utils.make_page(paginated_result, page_size);
 }
+
+/**
+ * Returns deposit's history
+ *
+ * @param deposit_id Deposit id
+ */
+query get_erc20_deposit_history(deposit_id: rowid): list<erc20_deposit_history_entry> {
+    val deposit = require(erc20_deposit @? { .rowid == deposit_id }, "Deposit not found: " + deposit_id);
+
+    val history = erc20_deposit_history @* { deposit } (
+        @sort @omit .timestamp,
+        erc20_deposit_history_entry(
+            deposit_id = deposit.rowid.to_integer(),
+            state = .state,
+            timestamp = .timestamp
+    ));
+
+    history.add(erc20_deposit_history_entry(
+        deposit_id = deposit.rowid.to_integer(),
+        state = deposit.state,
+        timestamp = deposit.last_updated
+    ));
+
+    return history;
+}

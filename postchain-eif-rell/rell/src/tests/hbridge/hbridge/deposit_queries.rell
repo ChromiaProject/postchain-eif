@@ -33,6 +33,7 @@ function test_get_erc20_deposits() {
     assert_equals(res2.data.size(), 1);
     val dep2 = erc20_deposit_info.from_gtv_pretty(res2.data[0]);
     val expected_deposit2 = erc20_deposit_info(
+        id = dep2.id,
         network_id = network_id1,
         sender_address = alice_evm_address,
         recipient_id = alice_evm_deposit_receipient_id,
@@ -43,6 +44,15 @@ function test_get_erc20_deposits() {
         last_updated = rell.test.last_block_time - rell.test.block_interval
     );
     assert_equals(dep2, expected_deposit2);
+    // History entries
+    //  - unknown deposit
+    try_call(get_erc20_deposit_history(rowid(integer.MAX_VALUE), *));
+    //  - deposit dep2
+    assert_equals(get_erc20_deposit_history(dep2.id), [erc20_deposit_history_entry(
+        deposit_id = dep2.id.to_integer(),
+        state = deposit_state.pending,
+        timestamp = rell.test.last_block_time - rell.test.block_interval
+    )]);
 
     // Alice is making one more deposit but it will be bounced
     deposit_from_ethereum(alice_evm_address, amount, block_height = 2);
@@ -61,6 +71,7 @@ function test_get_erc20_deposits() {
     assert_equals(res4.data.size(), 1);
     val dep4 = erc20_deposit_info.from_gtv_pretty(res4.data[0]);
     val expected_deposit4 = erc20_deposit_info(
+        id = dep4.id,
         network_id = network_id1,
         sender_address = alice_evm_address,
         recipient_id = alice_evm_deposit_receipient_id,
@@ -71,6 +82,21 @@ function test_get_erc20_deposits() {
         last_updated = rell.test.last_block_time - rell.test.block_interval
     );
     assert_equals(dep4, expected_deposit4);
+    // History entries
+    //  - deposit dep4 == dep2
+    log(get_erc20_deposit_history(dep4.id));
+    assert_equals(get_erc20_deposit_history(dep4.id), [
+        erc20_deposit_history_entry(
+            deposit_id = dep2.id.to_integer(),
+            state = deposit_state.pending,
+            timestamp = rell.test.last_block_time - 3 * rell.test.block_interval
+        ),
+        erc20_deposit_history_entry(
+            deposit_id = dep2.id.to_integer(),
+            state = deposit_state.completed,
+            timestamp = rell.test.last_block_time - rell.test.block_interval
+        )
+    ]);
 
     // Bob is making a deposit of CHR and FOO tokens
     deposit_from_ethereum(bob_evm_address, amount, asset = CHR, block_height = 3);
@@ -81,6 +107,7 @@ function test_get_erc20_deposits() {
     assert_equals(res5.data.size(), 3);
     val dep5 = parse_paged_deposits(res5);
     val expected_deposit51 = erc20_deposit_info(
+        id = dep5[1].id,
         network_id = network_id1,
         sender_address = bob_evm_address,
         recipient_id = bob_evm_deposit_receipient_id,
@@ -91,6 +118,7 @@ function test_get_erc20_deposits() {
         last_updated = rell.test.last_block_time - 2 * rell.test.block_interval
     );
     val expected_deposit52 = erc20_deposit_info(
+        id = dep5[2].id,
         network_id = network_id1,
         sender_address = bob_evm_address,
         recipient_id = bob_evm_deposit_receipient_id,

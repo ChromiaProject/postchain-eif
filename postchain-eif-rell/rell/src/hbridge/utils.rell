@@ -1,4 +1,5 @@
 function map_deposit(deposit: erc20_deposit) = erc20_deposit_info(
+    id = deposit.rowid,
     network_id = deposit.network_id,
     sender_address = deposit.sender_address,
     recipient_id = deposit.recipient_id,

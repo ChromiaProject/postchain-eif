@@ -73,6 +73,7 @@ entity erc20_deposit {
 }
 
 struct erc20_deposit_info {
+    id: rowid;
     network_id: integer;
     sender_address: byte_array;
     recipient_id: byte_array;
@@ -95,6 +96,12 @@ enum deposit_state {
 
 entity erc20_deposit_history {
     index erc20_deposit;
+    state: deposit_state;
+    timestamp;
+}
+
+struct erc20_deposit_history_entry {
+    deposit_id: integer;
     state: deposit_state;
     timestamp;
 }
