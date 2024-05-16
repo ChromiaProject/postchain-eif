@@ -7,7 +7,7 @@ function map_deposit(deposit: erc20_deposit) = erc20_deposit_info(
     asset_id = deposit.token.asset.id,
     amount = deposit.amount,
     state = deposit.state,
-    last_updated = deposit.last_updated
+    last_updated = deposit.last_updated,
 );
 
 function map_withdrawal(withdrawal: erc20_withdraw) = erc20_withdrawal_info(
@@ -16,5 +16,5 @@ function map_withdrawal(withdrawal: erc20_withdraw) = erc20_withdrawal_info(
     token_address = withdrawal.token_address,
     beneficiary = withdrawal.beneficiary,
     amount = withdrawal.amount,
-    timestamp = withdrawal.timestamp
+    timestamp = withdrawal.timestamp,
 );
