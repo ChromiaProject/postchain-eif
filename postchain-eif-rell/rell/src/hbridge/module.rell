@@ -357,8 +357,7 @@ function emit_withdraw_event(network_id: integer, token_address: byte_array, ben
         network_id.to_gtv(),
         utils.to_32_byte_array(token_address).to_gtv(),
         utils.to_32_byte_array(beneficiary).to_gtv(),
-        amount.to_gtv(),
-        op_context.last_block_time.to_gtv()
+        amount.to_gtv()
     ];
 
     op_context.emit_event("eif_event", withdraw_info.to_gtv());
