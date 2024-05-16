@@ -50,9 +50,10 @@ task("deploy:chromiabridge")
     await tokenMinter.deployed();
     console.log("Token Minter deployed to: ", tokenMinter.address);
 
-    token.changeMinter(tokenMinter.address);
-    dailyLimit.setParentContract(tokenMinter.address);
-    bridge.setTokenMinter(tokenMinter.address);
+    await token.changeMinter(tokenMinter.address);
+    await dailyLimit.setParentContract(tokenMinter.address);
+    await bridge.setTokenMinter(tokenMinter.address);
+    await bridge.allowToken(token.address);
 
     console.log("Token bridge deployed to: ", bridge.address);
     const proxyAdmin = await hre.upgrades.erc1967.getAdminAddress(bridge.address);

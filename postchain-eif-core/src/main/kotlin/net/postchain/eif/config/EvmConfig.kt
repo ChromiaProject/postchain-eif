@@ -36,7 +36,7 @@ data class EvmConfig(
                     config.getEnvOrLong(EVM_WRITE_TIMEOUT, "evm.writeTimeout", 10),
                     config.getEnvOrLong(EVM_MIN_RETRY_DELAY, "evm.minRetryDelay", 500L),
                     config.getEnvOrLong(EVM_MAX_RETRY_DELAY, "evm.maxRetryDelay", 60_000L),
-                    config.getEnvOrLong(EVM_DELAY_WHEN_NO_NEW_BLOCKS, "evm.delayWhenNoNewBlocks", 500L),
+                    config.getEnvOrLong(EVM_DELAY_WHEN_NO_NEW_BLOCKS, "evm.delayWhenNoNewBlocks", 2_000L),
                     config.getEnvOrLong(EVM_MAX_TRY_ERRORS, "evm.maxTryErrors", 10L),
                     config.getEnvOrListProperty(chainProperty(chain, "URLS"), "$chain.urls", listOf()),
                     config.getEnvOrLong(chainProperty(chain, "LAST_EVM_BLOCK_HEIGHT"), "$chain.lastEvmBlockHeight", 0),

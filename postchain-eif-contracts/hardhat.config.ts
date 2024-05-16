@@ -67,7 +67,6 @@ const config: HardhatUserConfig = {
     },
     mainnet: createTestnetConfig("mainnet"),
     goerli: createTestnetConfig("goerli"),
-    sepolia: createTestnetConfig("sepolia"),
     holesky: createTestnetConfig("holesky"),
     bsc: {
       accounts: {
@@ -88,6 +87,16 @@ const config: HardhatUserConfig = {
       },
       chainId: chainIds.mumbai,
       url: "https://polygon-mumbai.g.alchemy.com/v2/HY9dxoQq2MBbyMd-LSmnHujDe231wKgz",
+    },
+    sepolia: {
+      accounts: {
+        count: 10,
+        initialIndex: 0,
+        mnemonic: MNEMONIC,
+        path: "m/44'/60'/0'/0",
+      },
+      chainId: chainIds.sepolia,
+      url: "https://ethereum-sepolia.rpc.subquery.network/public",
     },
   },
   paths: {

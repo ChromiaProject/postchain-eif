@@ -23,6 +23,9 @@ class EvmSignerUpdateBlockBuilderExtension(private val ds: DigestSystem, private
 
     private val events = mutableListOf<Hash>()
 
+    private var currentTxCtx: TxEContext? = null
+    private var currentTxNrOfEvents = 0
+
     companion object {
         const val SIGNER_LIST_UPDATE_TABLE_PREFIX = "sys.x.signerupdate"
 
@@ -44,11 +47,16 @@ class EvmSignerUpdateBlockBuilderExtension(private val ds: DigestSystem, private
 
     override fun processEmittedEvent(ctxt: TxEContext, type: String, data: Gtv) {
         if (type == SIGNER_LIST_UPDATE_EVENT) {
+            if (currentTxCtx != ctxt) {
+                currentTxCtx = ctxt
+                currentTxNrOfEvents = 0
+            }
             val event = data.asArray()
             val encodedEvent = encodeSignerUpdateEvent(event[0].asInteger(), event[1].asByteArray(), event[2].asArray()
                     .map { getEthereumAddress(it.asByteArray()) })
             val hash = ds.digest(encodedEvent)
-            store.writeEvent(ctxt, SIGNER_LIST_UPDATE_TABLE_PREFIX, events.size.toLong(), hash, encodedEvent)
+            store.writeEvent(ctxt, SIGNER_LIST_UPDATE_TABLE_PREFIX, events.size.toLong() + currentTxNrOfEvents, hash, encodedEvent)
+            currentTxNrOfEvents++
             ctxt.addAfterAppendHook {
                 events.add(hash)
             }
