@@ -35,6 +35,9 @@ class EifBlockBuilderExtension(
     private val events = mutableListOf<Hash>()
     private val states = TreeMap<Long, Hash>()
 
+    private var currentTxCtx: TxEContext? = null
+    private var currentTxNrOfEvents = 0
+
     override fun processEmittedEvent(ctxt: TxEContext, type: String, data: Gtv) {
         when (type) {
             EIF_EVENT -> emitEifEvent(ctxt, data as GtvArray)
@@ -69,9 +72,14 @@ class EifBlockBuilderExtension(
      * Hashes are remembered and later combined into a Merkle tree
      */
     private fun emitEifEvent(ctxt: TxEContext, evt: GtvArray) {
+        if (currentTxCtx != ctxt) {
+            currentTxCtx = ctxt
+            currentTxNrOfEvents = 0
+        }
         val data = SimpleGtvEncoder.encodeGtv(evt)
         val hash = ds.digest(data)
-        store.writeEvent(ctxt, PREFIX, events.size.toLong(), hash, data)
+        store.writeEvent(ctxt, PREFIX, events.size.toLong() + currentTxNrOfEvents, hash, data)
+        currentTxNrOfEvents++
         ctxt.addAfterAppendHook {
             events.add(hash)
         }
