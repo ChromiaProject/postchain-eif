@@ -16,7 +16,7 @@ namespace ft4 {
 
 enum bridge_mode {
     native,
-    foreign,
+    foreign
 }
 
 // nothing really stops us from accepting deposits from any EVM address,
@@ -91,7 +91,7 @@ entity pending_erc20_deposit {
 enum deposit_state {
     pending,
     completed,
-    recalled,
+    recalled
 }
 
 entity erc20_deposit_history {
