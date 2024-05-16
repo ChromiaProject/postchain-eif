@@ -183,21 +183,6 @@ function test_get_erc20_deposits() {
     assert_equals((dep14 @ {} (@max .amount) ?: 0L) + 1L, dep15 @ {} (@min .amount));
 }
 
-function create_ft4_account(pubkey: byte_array) {
-    val auth_descriptor = test_utils.create_auth_descriptor(pubkey, ["A", "T"]);
-
-    rell.test.tx().op(
-        admin.external.register_account(auth_descriptor)
-    ).sign(admin_privkey).run();
-
-    val account_id = pubkey.hash();
-    val ft_account = accounts.Account(account_id);
-
-    return (
-        ft_account, auth_descriptor
-    );
-}
-
 function parse_paged_deposits(paged_result: ft4.utils.paged_result) {
     return paged_result.data @* {} ( erc20_deposit_info.from_gtv_pretty($) );
 }

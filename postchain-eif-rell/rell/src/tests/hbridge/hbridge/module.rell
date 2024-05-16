@@ -164,3 +164,18 @@ function assert_withdraw(serial: integer, evm_address: byte_array, amount: big_i
         )
     ]);
 }
+
+function create_ft4_account(pubkey: byte_array) {
+    val auth_descriptor = test_utils.create_auth_descriptor(pubkey, ["A", "T"]);
+
+    rell.test.tx().op(
+        admin.external.register_account(auth_descriptor)
+    ).sign(admin_privkey).run();
+
+    val account_id = pubkey.hash();
+    val ft_account = accounts.Account(account_id);
+
+    return (
+        ft_account, auth_descriptor
+    );
+}
