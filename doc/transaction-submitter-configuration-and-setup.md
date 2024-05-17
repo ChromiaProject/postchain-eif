@@ -24,7 +24,6 @@ The transaction submitter chain has the following module args:
 
 | Name                              | Description                                                                                                                                                                                                     | Type         | Required           | Default |
 |-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|--------------------|---------|
-| `genesis_node`                    | Public key of network genesis node                                                                                                                                                                              | bytea        | :white_check_mark: |         |
 | `directory_chain_config`          | See details under [setup](#Setup) section                                                                                                                                                                       | gtv          | :white_check_mark: |         |
 | `system_anchoring_chain_config`   | See details under [setup with anchoring](#Setup-with-anchoring) section                                                                                                                                         | gtv          | :white_check_mark: |         |
 | `system_chain_bridges`            | See details under [connect system chain bridge](#connect-system-chain-bridge) section                                                                                                                           | gtv          | :white_check_mark: |         |
@@ -60,7 +59,6 @@ Example:
       transaction_submitter:
         manual_admins:
           - x"03ECD350EEBC617CBBFBEF0A1B7AE553A748021FD65C7C50C5ABB4CA16D4EA5B05"
-        genesis_node: x"0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57"
         directory_chain_config:
           blockchain_rid: x"" # Replace with directory chain brid
           validator_contracts:
@@ -161,7 +159,6 @@ Not needed, transaction submitter chain is a system chain, thus we only support 
 ## Setup
 
 To handle signer updates the first step is to deploy `DirectoryChainValidator.sol` contract to all supported networks.
-Initial signer should be the genesis node.
 
 Configure tx submitter chain with contract:
 
@@ -176,7 +173,8 @@ directory_chain_config:
 ### Setup with anchoring
 
 Deploy a validator contract `ManagedValidator.sol` for system anchoring chain for each network you want to anchor to.
-Pass the directory chain validator contract from previous step to constructor and genesis node as initial signer:
+Pass the directory chain validator contract from previous step to constructor and then call `setBlockchainRid` with
+system anchoring chain blockchain RID as parameter:
 
 Deploy an anchoring contract `Anchoring.sol` for each network you want to anchor to, pass the corresponding validator
 contract to constructor.
@@ -195,7 +193,8 @@ system_anchoring_chain_config:
 ### Connect system chain bridge
 
 Deploy a bridge contract and a `ManagedValidator.sol` contract.
-Pass the directory chain validator contract from previous step to constructor and genesis node as initial signer.
+Pass the directory chain validator contract from previous step to constructor and then call `setBlockchainRid` with
+system chain blockchain RID as parameter.
 
 Add configuration:
 
@@ -211,7 +210,8 @@ system_chain_bridges:
 ### Connect dApp chain bridge
 
 Deploy a bridge contract and a `ManagedValidator.sol` contract.
-Pass in current chain signers to constructor and the directory chain validator contract.
+Pass the directory chain validator contract to constructor and then call `setBlockchainRid` with bridge blockchain RID
+as parameter.
 
 Refer to economy chain for documentation on which operations to use to create a bridge lease.
 

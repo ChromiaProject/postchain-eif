@@ -35,6 +35,11 @@ entity signer_list_update_transaction {
     key evm_submit_transaction, signer_list_update;
 }
 
+entity latest_signer_update_for_unmapped_chain {
+    key blockchain_rid: byte_array;
+    mutable signer_list_update_message: byte_array;
+}
+
 struct signer_list_update_data {
     rowid: integer;
     serial: integer;
@@ -127,25 +132,28 @@ query get_current_evm_signer_list(blockchain_rid: byte_array): list<byte_array> 
     val latest_confirmed_signers = current_evm_signer_list(blockchain_rid);
     return if (latest_confirmed_signers != null)
         list<byte_array>.from_gtv(gtv.from_bytes(latest_confirmed_signers))
-    else get_default_signers();
+    else [];
 }
 
 query is_chain_updatable_at_height(blockchain_rid: byte_array, update_height: integer) {
     val directory_chain_rid = get_directory_chain_blockchain_rid();
     if (blockchain_rid == directory_chain_rid) {
-        return (
+        return if (exists(current_evm_signer_list(blockchain_rid)))
+            (
                 signer_list_update @* {
                     .blockchain_rid != directory_chain_rid and
                     .status in [signer_list_update_status.QUEUED, signer_list_update_status.PENDING] and
                     .confirmed_in_directory_at_height <= update_height
                 }
-        ).empty();
+            ).empty() else true;
     } else {
         val latest_update = signer_list_update @? { .blockchain_rid == directory_chain_rid }
             ( @omit @sort_desc .rowid, $ ) limit 1;
-        return latest_update == null or
-        latest_update.status == signer_list_update_status.COMPLETED or
-        latest_update.confirmed_in_directory_at_height >= update_height;
+        return if (exists(current_evm_signer_list(directory_chain_rid)))
+            latest_update == null or
+            latest_update.status == signer_list_update_status.COMPLETED or
+            latest_update.confirmed_in_directory_at_height >= update_height
+        else false;
     }
 }
 
@@ -199,8 +207,10 @@ function handle_signer_update_message(sender: byte_array, topic: text, body: gtv
         if (not is_directory_chain and
         not has_bridge_mapping(update_message.blockchain_rid) and
             not is_system_anchoring_chain(update_message.blockchain_rid)
-        )
+        ) {
+            handle_unmapped_blockchain_signer_update(body.to_bytes(), update_message);
             return;
+        }
 
         // Any queued update is pointless now, we may cancel it. The exception is directory chain updates since those are validated by directory contract itself
         // TODO: If we implement https://chromaway.atlassian.net/browse/POS-1167 we may even be able to cancel txs that have been taken from queue
@@ -227,18 +237,24 @@ function handle_signer_update_message(sender: byte_array, topic: text, body: gtv
             }
         }
 
-        create signer_list_update (
-            serial = update_message.serial,
+        apply_signer_update(update_message);
+    }
+}
+
+function handle_unmapped_blockchain_signer_update(raw_message: byte_array, update_message: signer_list_update_message) {
+    val latest_update = latest_signer_update_for_unmapped_chain @? { .blockchain_rid == update_message.blockchain_rid };
+    if (exists(latest_update)) {
+        latest_update.signer_list_update_message = raw_message;
+    } else {
+        create latest_signer_update_for_unmapped_chain(
             blockchain_rid = update_message.blockchain_rid,
-            signers = update_message.signers,
-            confirmed_in_directory_at_height = update_message.confirmed_in_directory_at_height
+            signer_list_update_message = raw_message
         );
     }
 }
 
-// To register initial signers and manual overrides
 @extend(receive_icmf_message)
-function handle_bridge_mapping_messasge_signers(
+function handle_bridge_mapping_updates(
     sender: byte_array,
     topic: text,
     body: gtv
@@ -246,21 +262,77 @@ function handle_bridge_mapping_messasge_signers(
     if (topic == bridge_mapping_topic) {
         val bridge_mapping_message = bridge_mapping_message.from_gtv(body);
 
-        val current_signers_override = bridge_mapping_message.signers;
-        val current_signers = current_evm_signer_list(bridge_mapping_message.blockchain_rid);
-        if (current_signers_override != null and
-        current_signers != null and
-            current_signers_override != current_signers
-        ) {
-            create signer_list_update (
-                serial = -1,
-                blockchain_rid = bridge_mapping_message.blockchain_rid,
-                signers = current_signers_override,
-                confirmed_in_directory_at_height = -1,
-                status = signer_list_update_status.COMPLETED
+        if (not bridge_mapping_message.deleted) {
+            val latest_ignored_signer_update = latest_signer_update_for_unmapped_chain @? {
+                .blockchain_rid == bridge_mapping_message.blockchain_rid
+            }.signer_list_update_message;
+            val latest_signer_update = signer_list_update @? {
+                .blockchain_rid == bridge_mapping_message.blockchain_rid
+            } (@omit @sort_desc .serial, $) limit 1;
+            if (exists(latest_ignored_signer_update) and exists(latest_signer_update)) {
+                // Check if we should submit ignored update
+                val latest_ignored_signer_update_message = signer_list_update_message.from_gtv(gtv.from_bytes(latest_ignored_signer_update));
+                if (latest_ignored_signer_update_message.serial > latest_signer_update.serial) {
+                    apply_signer_update(latest_ignored_signer_update_message);
+                } else {
+                    check_and_resubmit_latest_update_if_needed(bridge_mapping_message, latest_signer_update);
+                }
+            } else if (exists(latest_ignored_signer_update)) {
+                val latest_ignored_signer_update_message = signer_list_update_message.from_gtv(gtv.from_bytes(latest_ignored_signer_update));
+                apply_signer_update(latest_ignored_signer_update_message);
+            } else if (exists(latest_signer_update)) {
+                check_and_resubmit_latest_update_if_needed(bridge_mapping_message, latest_signer_update);
+            }
+        }
+    }
+}
+
+function check_and_resubmit_latest_update_if_needed(updated_mapping: bridge_mapping_message, signer_list_update) {
+    if (signer_list_update.status != signer_list_update_status.QUEUED) {
+        val transactions = signer_list_update_transaction @* { signer_list_update }.evm_submit_transaction;
+        for (transaction in transactions) {
+            if (transaction.contract_address == updated_mapping.validator_contract and transaction.network_id == updated_mapping.evm_network_id) {
+                return;
+            }
+        }
+
+        // Resubmission is necessary, just copy any of the old txs
+        if (empty(transactions)) {
+            // Weird, but ok, let's just queue it again then
+            signer_list_update.status = signer_list_update_status.QUEUED;
+        } else {
+            val old_transaction = transactions[0];
+
+            val new_transaction = add_transaction_to_queue(
+                old_transaction.contract_address,
+                old_transaction.function_name,
+                old_transaction.parameter_types.split("."),
+                list<gtv>.from_gtv(gtv.from_bytes(old_transaction.parameter_values)),
+                updated_mapping.evm_network_id,
+                get_system_max_priority_fee_per_gas(),
+                get_system_max_fee_per_gas(),
+                chain_context.blockchain_rid
+            );
+
+            create signer_list_update_transaction ( new_transaction, signer_list_update );
+
+            log(
+                "Submitting signer update tx for blockchain %s on network %s.".format(
+                    signer_list_update.blockchain_rid,
+                    updated_mapping.evm_network_id
+                )
             );
         }
     }
+}
+
+function apply_signer_update(signer_list_update_message) {
+    create signer_list_update (
+        serial = signer_list_update_message.serial,
+        blockchain_rid = signer_list_update_message.blockchain_rid,
+        signers = signer_list_update_message.signers,
+        confirmed_in_directory_at_height = signer_list_update_message.confirmed_in_directory_at_height
+    );
 }
 
 @extend(on_transaction_completed)

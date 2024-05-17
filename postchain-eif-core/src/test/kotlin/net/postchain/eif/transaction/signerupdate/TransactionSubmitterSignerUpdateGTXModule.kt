@@ -52,7 +52,7 @@ class SubmitSignerUpdateOperation(private val conf: TransactionSubmitterTestCont
             "6936b1761eafc2116650b6593bbc86bd79a339a5" else "39615b16b74589919c9ce1ea73f1fc5d53141a78"
 
         val tx = EvmSubmitTxRellRequest(
-                0,
+                signerUpdate.rowId,
                 contractAddress,
                 "updateValidators",
                 listOf("bytes", "bytes", "bytes[]", "address[]", "bytes", "bytes"),

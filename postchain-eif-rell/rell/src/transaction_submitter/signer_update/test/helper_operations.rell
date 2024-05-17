@@ -8,4 +8,8 @@ operation enqueue_signer_update_op(update_id: integer) {
 
 operation signer_update_message_op(signer_list_update_message) {
     handle_signer_update_message(x"", signer_list_update_topic, signer_list_update_message.to_gtv());
+
+}
+operation bridge_mapping_message_update_op(bridge_mapping_message) {
+    handle_bridge_mapping_updates(x"", bridge_mapping_topic, bridge_mapping_message.to_gtv());
 }
