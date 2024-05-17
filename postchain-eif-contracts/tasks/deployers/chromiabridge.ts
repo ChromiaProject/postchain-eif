@@ -2,8 +2,9 @@ import { task } from "hardhat/config";
 import {
   ChromiaTokenBridge,
   ChromiaTokenBridge__factory,
-  Validator,
+  IValidator,
   Validator__factory,
+  ManagedValidator__factory,
   DailyLimit,
   DailyLimit__factory,
   TokenMinter,
@@ -14,15 +15,24 @@ import {
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 task("deploy:chromiabridge")
-  .addOptionalParam("app", "app node")
+  .addOptionalParam("app", "app node, not needed when using managed validator")
   .addOptionalParam("offset", "withdraw offset")
+  .addOptionalParam("directoryValidator", "Contract address of directory chain validator, supply this to use managed validator contract")
   .addFlag("verify", "Verify contracts at Etherscan")
-  .setAction(async ({ verify, app, offset }, hre) => {
+  .setAction(async ({verify, app, offset, directoryValidator}, hre) => {
     // deploy validator smart contract
-    const validatorFactory: Validator__factory = await hre.ethers.getContractFactory("Validator");
-    const validators = app === undefined ? [] : getNodes(app);
+      let validator;
+      let validators;
+      if (directoryValidator === undefined) {
+        const validatorFactory: Validator__factory = await hre.ethers.getContractFactory("Validator");
+        validators = app === undefined ? [] : getNodes(app);
+        validator = <IValidator>await validatorFactory.deploy(validators);
+      } else {
+        const validatorFactory: ManagedValidator__factory = await hre.ethers.getContractFactory("ManagedValidator");
+        validator = <IValidator>await validatorFactory.deploy(directoryValidator);
+      }
+      console.log("validator deployed to: ", validator.address);
     const withdrawOffset = offset === undefined ? 0 : parseInt(offset);
-    const validator: Validator = <Validator>await validatorFactory.deploy(validators);
 
     // deploy token bridge smart contracts
     const factory: ChromiaTokenBridge__factory = await hre.ethers.getContractFactory("ChromiaTokenBridge");
@@ -64,10 +74,17 @@ task("deploy:chromiabridge")
       // with the similar code, then calling verify will return error.
       // We add try/catch to handle the error and continue to verify the main bridge smart contract.
       try {
-        await hre.run("verify:verify", {
-          address: validator.address,
-          constructorArguments: [validators],
-        });
+        if (directoryValidator === undefined) {
+          await hre.run("verify:verify", {
+            address: validator.address,
+            constructorArguments: [validators],
+          });
+        } else {
+          await hre.run("verify:verify", {
+            address: validator.address,
+            constructorArguments: [directoryValidator],
+          });
+        }
         await hre.run("verify:verify", {
           address: token.address,
           constructorArguments: [signerAddress, 0],
