@@ -198,6 +198,10 @@ class HBridgeIT : EifBaseIntegrationTest() {
         bcRid = node.getBlockchainInstance(chainId).blockchainEngine.blockchainRid
         logger.info { "Chain deployed: chainId: $chainId, blockchainRid: $bcRid" }
         blockQuery = node.getBlockchainInstance().blockchainEngine.getBlockQueries()
+
+        val apiVersion = node.getBlockchainInstance().blockchainEngine.getBlockQueries()
+                .query("api_version", gtv(emptyMap())).get().asInteger()
+        logger.info { "EIF API version: $apiVersion" }
     }
 
     @Test
@@ -758,11 +762,11 @@ class HBridgeIT : EifBaseIntegrationTest() {
         val opArgs = gtv(listOf(gtv(userEvmAddress)))
 
         val nonce = gtv(listOf(
-              gtv(bcRid.data),
-              opName,
-              opArgs,
-              gtv(0),
-            )).merkleHash(GtvMerkleHashCalculator(myCS))
+                gtv(bcRid.data),
+                opName,
+                opArgs,
+                gtv(0),
+        )).merkleHash(GtvMerkleHashCalculator(myCS))
 
         val message = blockQuery.query("ft4.get_auth_message_template",
                 gtv(mapOf("op_name" to opName, "op_args" to opArgs))).get().asString()
