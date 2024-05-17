@@ -1,0 +1,68 @@
+
+entity erc20_deposit {
+    index sender_address: byte_array;
+    network_id: integer;
+    from_smart_contract: boolean;
+    index recipient_id: byte_array;
+    token: erc20_asset;
+    amount: big_integer;
+    mutable state: deposit_state;
+    mutable last_updated: timestamp;
+}
+
+struct erc20_deposit_info {
+    id: rowid;
+    network_id: integer;
+    sender_address: byte_array;
+    recipient_id: byte_array;
+    from_smart_contract: boolean;
+    asset_id: byte_array;
+    amount: big_integer;
+    state: deposit_state;
+    last_updated: timestamp;
+}
+
+entity pending_erc20_deposit {
+    key deposit: erc20_deposit, ft4.transfer_strategy.account_creation_transfer;
+}
+
+enum deposit_state {
+    pending,
+    completed,
+    recalled,
+}
+
+entity erc20_deposit_history {
+    index erc20_deposit;
+    state: deposit_state;
+    timestamp;
+}
+
+struct erc20_deposit_history_entry {
+    deposit_id: integer;
+    state: deposit_state;
+    timestamp;
+}
+
+function map_deposit(deposit: erc20_deposit) = erc20_deposit_info(
+    id = deposit.rowid,
+    network_id = deposit.network_id,
+    sender_address = deposit.sender_address,
+    recipient_id = deposit.recipient_id,
+    from_smart_contract = deposit.from_smart_contract,
+    asset_id = deposit.token.asset.id,
+    amount = deposit.amount,
+    state = deposit.state,
+    last_updated = deposit.last_updated,
+);
+
+function update_deposit_state(deposit: erc20_deposit, state: deposit_state) {
+    create erc20_deposit_history(deposit, deposit.state, deposit.last_updated);
+
+    if (deposit.state == deposit_state.pending and (state in [deposit_state.completed, deposit_state.recalled])) {
+        delete pending_erc20_deposit @ { deposit };
+    }
+
+    deposit.state = state;
+    deposit.last_updated = op_context.last_block_time;
+}
