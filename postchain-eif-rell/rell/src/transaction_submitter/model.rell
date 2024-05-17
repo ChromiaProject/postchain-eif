@@ -54,7 +54,6 @@ enum node_retry_strategy {
 }
 
 struct module_args {
-    genesis_node: byte_array;
     system_chain_bridges: gtv;
     directory_chain_config: gtv;
     system_anchoring_chain_config: gtv?;

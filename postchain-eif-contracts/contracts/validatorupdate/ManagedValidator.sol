@@ -7,9 +7,15 @@ import {IManagedValidator} from "./IManagedValidator.sol";
 contract ManagedValidator is BaseManagedValidator {
     IManagedValidator public directoryChainValidator;
 
-    constructor(bytes32 _blockchainRid, address[] memory _validators, IManagedValidator _directoryChainValidator) {
-        _initializeValidators(_blockchainRid, _validators);
+    constructor(IManagedValidator _directoryChainValidator) {
         directoryChainValidator = _directoryChainValidator;
+    }
+
+    function setBlockchainRid(bytes32 _blockchainRid) public {
+        if (blockchainRid != bytes32(0)) {
+            revert("Blockchain RID is already set");
+        }
+        blockchainRid = _blockchainRid;
     }
 
     function _validateUpdateSignatures(bytes32 hash, bytes[] memory signatures, address[] memory signers) internal view override returns (bool) {

@@ -298,8 +298,6 @@ function update_evm_transaction_status(row_id: integer, status: transaction_stat
     transaction.status = status;
 }
 
-function get_default_signers() = [chain_context.args.genesis_node];
-
 function get_manual_admins() = set<byte_array>.from_gtv(chain_context.args.manual_admins);
 
 function get_system_max_priority_fee_per_gas() = chain_context.args.system_max_priority_fee_per_gas;

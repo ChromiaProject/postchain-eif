@@ -19,14 +19,6 @@ abstract contract BaseManagedValidator is IManagedValidator {
 
     event UpdateValidators(uint confirmedAtHeight, address[] validators);
 
-    function _initializeValidators(bytes32 _blockchainRid, address[] memory _validators) internal {
-        blockchainRid = _blockchainRid;
-        validators = _validators;
-        for (uint i = 0; i < validators.length; i++) {
-            validatorMap[validators[i]] = true;
-        }
-    }
-
     function isValidator(address _addr) public view returns (bool) {
         return validatorMap[_addr];
     }
@@ -55,7 +47,10 @@ abstract contract BaseManagedValidator is IManagedValidator {
         if (validatorUpdate.serial <= previousUpdateSerial) revert("Update validators: proof is older or same as previous update");
 
         if (!MerkleProof.verify(proof.merkleProofs, proof.leaf, proof.position, validatorUpdateRoot)) revert("Update validators: invalid merkle proof");
-        if (!_validateUpdateSignatures(blockRid, signatures, signers)) revert("Update validators: block signature is invalid");
+        // Skip signature validation for first directory chain update
+        if (blockchainRid != _directoryBlockchainRid() || validators.length > 0) {
+            if (!_validateUpdateSignatures(blockRid, signatures, signers)) revert("Update validators: block signature is invalid");
+        }
 
         previousUpdateHeight = height;
         previousUpdateSerial = validatorUpdate.serial;

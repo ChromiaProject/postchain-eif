@@ -47,7 +47,6 @@ test:
     transaction_submitter:
       manual_admins:
         - x"02466d7fcae563e5cb09a0d1870bb580344804617879a14949cf22285f1bae3f27"
-      genesis_node: x"0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57"
       directory_chain_config:
         blockchain_rid: x"00000000000000000000000000000000"
         validator_contracts:
@@ -121,7 +120,6 @@ blockchains:
       transaction_submitter:
         # TODO replace with real brids and contracts
         manual_admins: [ ] # List of public keys that are allowed to reset failed signer list updates
-        genesis_node: x"0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57" # This will be the initial signer for system chains
         directory_chain_config:
           blockchain_rid: x"" # Replace with directory chain brid
           validator_contracts:

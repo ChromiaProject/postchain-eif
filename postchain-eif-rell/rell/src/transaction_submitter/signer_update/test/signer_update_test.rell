@@ -117,6 +117,45 @@ function test_directory_parked_signer_update() {
     assert_equals(queued_update.signers, new_parked_signers.to_gtv().to_bytes());
 }
 
+function test_adding_bridge_mapping_triggers_signer_update() {
+    val unmapped_chain_brid = x"11";
+    val new_signers = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub];
+
+    rell.test.tx().op(
+        signer_update_message_op(
+            signer_list_update_message(
+                serial = 1,
+                blockchain_rid = unmapped_chain_brid,
+                signers = new_signers.to_gtv().to_bytes(),
+                confirmed_in_directory_at_height = 1
+            )
+        )
+    ).run();
+
+    // Assert no updates was queued for the unmapped chain
+    val queued_updates = get_queued_signer_updates();
+    assert_true(queued_updates.empty());
+
+    rell.test.tx().op(
+        bridge_mapping_message_update_op(
+            bridge_mapping_message(
+                blockchain_rid = unmapped_chain_brid,
+                validator_contract = "validator",
+                bridge_contract = "bridge",
+                evm_network_id = 1337,
+                deleted = false
+            )
+        )
+    ).run();
+
+    val queued_updates2 = get_queued_signer_updates();
+    assert_equals(queued_updates2.size(), 1);
+    val queued_update = queued_updates2[0];
+
+    val signer_list_update_entity = signer_list_update @ { .rowid == rowid(queued_update.rowid) };
+    assert_equals(signer_list_update_entity.status, signer_list_update_status.QUEUED);
+}
+
 function trigger_signer_update(new_signers: list<byte_array>): signer_list_update {
     rell.test.tx().op(
             signer_update_message_op(

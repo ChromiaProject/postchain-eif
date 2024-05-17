@@ -88,8 +88,7 @@ function test_get_blockchains_with_bridge_and_anomaly_detection() {
                 validator_contract = "validator_contract",
                 bridge_contract = bridge_contract,
                 evm_network_id = test_network,
-                deleted = false,
-                signers = [x""].to_gtv().to_bytes()
+                deleted = false
             )
         )
     ).run();
