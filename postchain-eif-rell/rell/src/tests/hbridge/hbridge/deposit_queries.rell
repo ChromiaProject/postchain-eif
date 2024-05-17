@@ -1,0 +1,216 @@
+import hbridge.*;
+
+function test_get_erc20_deposits() {
+    // FT4 assets
+    val chr_asset = register_foreign_asset(CHR);
+    val foo_asset = register_foreign_asset(FOO);
+    val bar_asset = register_foreign_asset(BAR, network_id2);
+
+    // FT4 / Alice
+    val (alice_account, alice_auth_descriptor) = create_ft4_account(rell.test.pubkeys.alice);
+    // EVM / Alice
+    val alice_evm_keypair = rell.test.keypairs.eve;
+    val alice_evm_address = crypto.eth_pubkey_to_address(alice_evm_keypair.pub);
+    val alice_evm_deposit_receipient_id = alice_evm_address.hash();
+
+    // FT4 / Bob
+    val (bob_account, bob_auth_descriptor) = create_ft4_account(rell.test.pubkeys.bob);
+    // EVM / Bob
+    val bob_evm_keypair = rell.test.keypairs.dave;
+    val bob_evm_address = crypto.eth_pubkey_to_address(bob_evm_keypair.pub);
+    val bob_evm_deposit_receipient_id = bob_evm_address.hash();
+
+    // Asserting that there are no deposits for Alice
+    val res1 = get_erc20_deposits(network_id1, CHR.token_address, alice_evm_deposit_receipient_id, null, null);
+    assert_equals(res1, utils.null_page());
+
+    // Alice is making a deposit
+    val amount = 1000L;
+    deposit_from_ethereum(alice_evm_address, amount);
+    // Asserting that the new pending deposit added
+    val res2 = get_erc20_deposits(network_id1, CHR.token_address, alice_evm_deposit_receipient_id, null, null);
+    assert_null(res2.next_cursor);
+    assert_equals(res2.data.size(), 1);
+    val dep2 = erc20_deposit_info.from_gtv_pretty(res2.data[0]);
+    val expected_deposit2 = erc20_deposit_info(
+        id = dep2.id,
+        network_id = network_id1,
+        sender_address = alice_evm_address,
+        recipient_id = alice_evm_deposit_receipient_id,
+        from_smart_contract = false,
+        asset_id = chr_asset.id,
+        amount = 1000L,
+        state = deposit_state.pending,
+        last_updated = rell.test.last_block_time - rell.test.block_interval
+    );
+    assert_equals(dep2, expected_deposit2);
+    // History entries
+    //  - unknown deposit
+    try_call(get_erc20_deposit_history(rowid(integer.MAX_VALUE), *));
+    //  - deposit dep2
+    assert_equals(get_erc20_deposit_history(dep2.id), [erc20_deposit_history_entry(
+        deposit_id = dep2.id.to_integer(),
+        state = deposit_state.pending,
+        timestamp = rell.test.last_block_time - rell.test.block_interval
+    )]);
+
+    // Alice is making one more deposit but it will be bounced
+    deposit_from_ethereum(alice_evm_address, amount, block_height = 2);
+    val res3 = get_erc20_deposits(network_id1, CHR.token_address, alice_evm_deposit_receipient_id, null, null);
+    assert_null(res3.next_cursor);
+    assert_equals(res3.data.size(), 1);
+    val dep3 = erc20_deposit_info.from_gtv_pretty(res3.data[0]);
+    assert_equals(dep3, expected_deposit2);
+
+    // Linking Alice's EVM and FT4 accounts
+    link_account(alice_evm_keypair, rell.test.keypairs.alice, alice_account.id, alice_auth_descriptor.hash());
+
+    // Asserting that the deposit is completed
+    val res4 = get_erc20_deposits(network_id1, CHR.token_address, alice_evm_deposit_receipient_id, null, null);
+    assert_null(res4.next_cursor);
+    assert_equals(res4.data.size(), 1);
+    val dep4 = erc20_deposit_info.from_gtv_pretty(res4.data[0]);
+    val expected_deposit4 = erc20_deposit_info(
+        id = dep4.id,
+        network_id = network_id1,
+        sender_address = alice_evm_address,
+        recipient_id = alice_evm_deposit_receipient_id,
+        from_smart_contract = false,
+        asset_id = chr_asset.id,
+        amount = 1000L,
+        state = deposit_state.completed,
+        last_updated = rell.test.last_block_time - rell.test.block_interval
+    );
+    assert_equals(dep4, expected_deposit4);
+    // History entries
+    //  - deposit dep4 == dep2
+    log(get_erc20_deposit_history(dep4.id));
+    assert_equals(get_erc20_deposit_history(dep4.id), [
+        erc20_deposit_history_entry(
+            deposit_id = dep2.id.to_integer(),
+            state = deposit_state.pending,
+            timestamp = rell.test.last_block_time - 3 * rell.test.block_interval
+        ),
+        erc20_deposit_history_entry(
+            deposit_id = dep2.id.to_integer(),
+            state = deposit_state.completed,
+            timestamp = rell.test.last_block_time - rell.test.block_interval
+        )
+    ]);
+
+    // Bob is making a deposit of CHR and FOO tokens
+    deposit_from_ethereum(bob_evm_address, amount, asset = CHR, block_height = 3);
+    deposit_from_ethereum(bob_evm_address, amount, asset = FOO, block_height = 4);
+    // Asserting that the new pending deposits added
+    val res5 = get_erc20_deposits(network_id1, null, null, null, null);
+    assert_null(res5.next_cursor);
+    assert_equals(res5.data.size(), 3);
+    val dep5 = parse_paged_deposits(res5);
+    val expected_deposit51 = erc20_deposit_info(
+        id = dep5[1].id,
+        network_id = network_id1,
+        sender_address = bob_evm_address,
+        recipient_id = bob_evm_deposit_receipient_id,
+        from_smart_contract = false,
+        asset_id = chr_asset.id,
+        amount = 1000L,
+        state = deposit_state.pending,
+        last_updated = rell.test.last_block_time - 2 * rell.test.block_interval
+    );
+    val expected_deposit52 = erc20_deposit_info(
+        id = dep5[2].id,
+        network_id = network_id1,
+        sender_address = bob_evm_address,
+        recipient_id = bob_evm_deposit_receipient_id,
+        from_smart_contract = false,
+        asset_id = foo_asset.id,
+        amount = 1000L,
+        state = deposit_state.pending,
+        last_updated = rell.test.last_block_time - rell.test.block_interval
+    );
+    assert_equals(dep5, [expected_deposit4, expected_deposit51, expected_deposit52]);
+
+    // Linking bob's EVM and FT4 accounts
+    link_account(bob_evm_keypair, rell.test.keypairs.bob, bob_account.id, bob_auth_descriptor.hash());
+
+    // Alice is making 20 more deposits
+    for (dep in range(20)) {
+        deposit_from_ethereum(alice_evm_address, amount + (1 + dep), block_height = 5 + dep);
+    }
+    // Bob is making 10 more deposits
+    for (dep in range(10)) {
+        deposit_from_ethereum(bob_evm_address, amount + (100 + dep), asset = BAR, block_height = 25 + dep, network_id = network_id2);
+    }
+
+    // Getting all deposits
+    val res6 = get_erc20_deposits(null, null, null, null, null);
+    val dep6 = parse_paged_deposits(res6);
+    assert_equals(dep6.size(), 33);
+    assert_equals(dep6 @ {} (@set .network_id), set([network_id1, network_id2]));
+    assert_equals(dep6 @ {} (@set .sender_address), set([alice_evm_address, bob_evm_address]));
+    assert_equals(dep6 @ {} (@set .recipient_id), set([alice_evm_deposit_receipient_id, bob_evm_deposit_receipient_id]));
+    assert_equals(dep6 @ {} (@set .asset_id), set([chr_asset.id, foo_asset.id, bar_asset.id]));
+    assert_equals(dep6 @ {} (@set .state), set([deposit_state.completed]));
+
+    // Getting all network_id1's deposits
+    val res7 = get_erc20_deposits(network_id1, null, null, null, null);
+    val dep7 = parse_paged_deposits(res7);
+    assert_equals(dep7.size(), 23);
+    assert_equals(dep7 @ {} (@set .network_id), set([network_id1]));
+
+    // Getting all Bob's deposits
+    val res8 = get_erc20_deposits(null, null, bob_evm_deposit_receipient_id, null, null);
+    val dep8 = parse_paged_deposits(res8);
+    assert_equals(dep8.size(), 12);
+    assert_equals(dep8 @ {} (@set .network_id), set([network_id1, network_id2]));
+    assert_equals(dep8 @ {} (@set .sender_address), set([bob_evm_address]));
+    assert_equals(dep8 @ {} (@set .recipient_id), set([bob_evm_deposit_receipient_id]));
+    assert_equals(dep8 @ {} (@set .asset_id), set([chr_asset.id, foo_asset.id, bar_asset.id]));
+
+    // Getting all Bob's deposits from network_id2
+    val res9 = get_erc20_deposits(network_id2, null, bob_evm_deposit_receipient_id, null, null);
+    val dep9 = parse_paged_deposits(res9);
+    assert_equals(dep9.size(), 10);
+    assert_equals(dep9 @ {} (@set .network_id), set([network_id2]));
+    assert_equals(dep9 @ {} (@set .sender_address), set([bob_evm_address]));
+    assert_equals(dep9 @ {} (@set .recipient_id), set([bob_evm_deposit_receipient_id]));
+    assert_equals(dep9 @ {} (@set .asset_id), set([bar_asset.id]));
+
+    // Asserting a pagination
+    val res10 = try_call(
+        get_erc20_deposits(network_id1, CHR.token_address, null, 8, "sort of cursor", *)
+    );
+    assert_null(res10);
+    // Getting all CHR deposits
+    val res11 = get_erc20_deposits(null, CHR.token_address, null, null, null);
+    assert_null(res11.next_cursor);
+    val dep11 = parse_paged_deposits(res11);
+    assert_equals(dep11.size(), 22);
+    // - page_size 8, page 0
+    val res12 = get_erc20_deposits(null, CHR.token_address, null, 8, null);
+    assert_not_null(res12.next_cursor);
+    val dep12 = parse_paged_deposits(res12);
+    assert_equals(dep12.size(), 8);
+    // - page_size 8, page 1
+    val res13 = get_erc20_deposits(null, CHR.token_address, null, 8, res12.next_cursor);
+    assert_not_null(res13.next_cursor);
+    val dep13 = parse_paged_deposits(res13);
+    assert_equals(dep13.size(), 8);
+    assert_equals((dep12 @ {} (@max .amount) ?: 0L) + 1L, dep13 @ {} (@min .amount));
+    // - page_size 4, page 2
+    val res14 = get_erc20_deposits(null, CHR.token_address, null, 4, res13.next_cursor);
+    assert_not_null(res14.next_cursor);
+    val dep14 = parse_paged_deposits(res14);
+    assert_equals(dep14.size(), 4);
+    assert_equals((dep13 @ {} (@max .amount) ?: 0L) + 1L, dep14 @ {} (@min .amount));
+    // - page_size 4, page 3
+    val res15 = get_erc20_deposits(null, CHR.token_address, null, 4, res14.next_cursor);
+    assert_null(res15.next_cursor);
+    val dep15 = parse_paged_deposits(res15);
+    assert_equals(dep15.size(), 2);
+    assert_equals((dep14 @ {} (@max .amount) ?: 0L) + 1L, dep15 @ {} (@min .amount));
+}
+
+function parse_paged_deposits(paged_result: ft4.utils.paged_result) {
+    return paged_result.data @* {} ( erc20_deposit_info.from_gtv_pretty($) );
+}

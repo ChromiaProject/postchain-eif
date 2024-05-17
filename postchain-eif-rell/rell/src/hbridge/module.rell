@@ -16,7 +16,7 @@ namespace ft4 {
 
 enum bridge_mode {
     native,
-    foreign
+    foreign,
 }
 
 // nothing really stops us from accepting deposits from any EVM address,
@@ -32,6 +32,16 @@ entity erc20_withdraw {
     index network_id, token_address;
     index beneficiary: byte_array;
     amount: big_integer;
+    timestamp;
+}
+
+struct erc20_withdrawal_info {
+    serial: integer;
+    network_id: integer;
+    token_address: byte_array;
+    beneficiary: byte_array;
+    amount: big_integer;
+    timestamp;
 }
 
 // link between EVM address and FT4 account, specifically for EOA. (Where user has the private key)
@@ -51,14 +61,49 @@ entity proposed_evm_sc_account_link {
     index ft4.accounts.account;
 }
 
-// potential account_id
-entity pending_deposit {
+entity erc20_deposit {
     index sender_address: byte_array;
     network_id: integer;
     from_smart_contract: boolean;
     index recipient_id: byte_array;
     token: erc20_asset;
-    index ft4.transfer_strategy.account_creation_transfer;
+    amount: big_integer;
+    mutable state: deposit_state;
+    mutable last_updated: timestamp;
+}
+
+struct erc20_deposit_info {
+    id: rowid;
+    network_id: integer;
+    sender_address: byte_array;
+    recipient_id: byte_array;
+    from_smart_contract: boolean;
+    asset_id: byte_array;
+    amount: big_integer;
+    state: deposit_state;
+    last_updated: timestamp;
+}
+
+entity pending_erc20_deposit {
+    key deposit: erc20_deposit, ft4.transfer_strategy.account_creation_transfer;
+}
+
+enum deposit_state {
+    pending,
+    completed,
+    recalled,
+}
+
+entity erc20_deposit_history {
+    index erc20_deposit;
+    state: deposit_state;
+    timestamp;
+}
+
+struct erc20_deposit_history_entry {
+    deposit_id: integer;
+    state: deposit_state;
+    timestamp;
 }
 
 // link between ERC20 token and FT4 asset
@@ -69,6 +114,13 @@ entity erc20_asset {
     bridge_mode;
     index ft4.assets.asset;
     key virtual_blockchain_rid: byte_array; // virtual blockchain RID derived from network_id and address
+}
+
+struct erc20_info {
+    network_id: integer;
+    token_address: byte_array; // contract address
+    bridge_mode;
+    virtual_blockchain_rid: byte_array; // virtual blockchain RID derived from network_id and address
 }
 
 function register_erc20_asset(
@@ -163,15 +215,15 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
         beneficiary = event.sender.hash();
     }
 
+    val sender_id = beneficiary;
+    val recipient_id = beneficiary;
+
     if (empty(ft4_account)) {
         // create account_creation_transfer to allow the account to be registered later
         // note: we don't want to call create_on_transfer because it fails when requirements are not met.
         // we want to bounce instead
 
         val sender_blockchain_rid = erc20.virtual_blockchain_rid;
-        val sender_id = beneficiary;
-        val recipient_id = beneficiary;
-
         val rules = ft4.transfer_strategy.find_allowed_rules(
             from_chain = sender_blockchain_rid,
             from_id = sender_id,
@@ -186,7 +238,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
             return;
         }
 
-        if (not deposit_from_smart_contract and exists(pending_deposit @* { .recipient_id == recipient_id })) {
+        if (not deposit_from_smart_contract and exists(erc20_deposit @* { .recipient_id == recipient_id, erc20 })) {
             log("deposit event bounced: tokens has already been transferred from EOA account to this recipient, and has not been claimed yet");
             bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
             return;
@@ -194,6 +246,17 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
 
         bridge_increase_balance(
             ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid), erc20.asset, event.amount);
+
+        val deposit = create erc20_deposit(
+            sender_address = event.sender,
+            network_id,
+            deposit_from_smart_contract,
+            recipient_id,
+            erc20,
+            event.amount,
+            deposit_state.pending,
+            last_updated = op_context.last_block_time
+        );
 
         val creation = ft4.transfer_strategy.pool_assets_with_rules(
             sender_blockchain_rid = sender_blockchain_rid,
@@ -204,9 +267,20 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
             rules = rules
         );
 
-        create pending_deposit(sender_address = event.sender, recipient_id, creation, erc20, network_id, deposit_from_smart_contract);
+        create pending_erc20_deposit(deposit, creation);
 
     } else {
+        create erc20_deposit(
+            sender_address = event.sender,
+            network_id,
+            deposit_from_smart_contract,
+            recipient_id,
+            erc20,
+            event.amount,
+            deposit_state.completed,
+            last_updated = op_context.last_block_time
+        );
+
         bridge_increase_balance(ft4_account, erc20.asset, event.amount);
     }
 }
@@ -216,8 +290,8 @@ function after_evm_account_linked(address: byte_array, account: ft4.accounts.acc
 
 @extend(ft4.strategies.after_register_account)
 function (ft4.accounts.account) {
-    val pending = pending_deposit @* { .recipient_id == account.id };
-    for (deposit in pending) {
+    val pending_deposits = erc20_deposit @* { .recipient_id == account.id, deposit_state.pending };
+    for (deposit in pending_deposits) {
         if (deposit.from_smart_contract) {
             if (empty(evm_sc_account_link @? { deposit.sender_address, deposit.network_id })) {
                 create evm_sc_account_link(deposit.sender_address, deposit.network_id, account);
@@ -229,7 +303,7 @@ function (ft4.accounts.account) {
         }
 
         // note: we don't need to call collect_pooled_assets here, because it's already done in the transfer strategy implementation
-        delete deposit;
+        update_deposit_state(deposit, deposit_state.completed);
     }
 }
 
@@ -237,12 +311,12 @@ function (ft4.accounts.account) {
 function _link_evm_eoa_account(address: byte_array, account: ft4.accounts.account) {
     create evm_eoa_account_link(address, account);
 
-    val pending = pending_deposit @* { .sender_address == address, .from_smart_contract == false };
-    for (deposit in pending) {
+    val pending_deposits = erc20_deposit @* { .sender_address == address, deposit_state.pending, .from_smart_contract == false };
+    for (deposit in pending_deposits) {
         // there's a possibility that the account_id is different from address hash
         // collect funds from the pool account here
         ft4.transfer_strategy.collect_pooled_assets(account, recipient_id = address.hash());
-        delete deposit;
+        update_deposit_state(deposit, deposit_state.completed);
     }
     after_evm_account_linked(address, account, -1, false);
 }
@@ -250,12 +324,12 @@ function _link_evm_eoa_account(address: byte_array, account: ft4.accounts.accoun
 function _link_evm_sc_account(address: byte_array, network_id: integer, account: ft4.accounts.account) {
     create evm_sc_account_link(address, network_id, account);
 
-    val pending = pending_deposit @* { .sender_address == address, .from_smart_contract == true };
-    for (deposit in pending) {
+    val pending_deposits = erc20_deposit @* { .sender_address == address, deposit_state.pending, .from_smart_contract == true };
+    for (deposit in pending_deposits) {
         // there's a possibility that the account_id is different from address hash
         // collect funds from the pool account here
         ft4.transfer_strategy.collect_pooled_assets(account, recipient_id = address.hash());
-        delete deposit;
+        update_deposit_state(deposit, deposit_state.completed);
     }
     after_evm_account_linked(address, account, network_id, true);
 }
@@ -274,7 +348,8 @@ function emit_withdraw_event(network_id: integer, token_address: byte_array, ben
         network_id,
         token_address,
         beneficiary,
-        amount
+        amount,
+        timestamp = op_context.last_block_time
     );
 
     val withdraw_info = [
@@ -300,4 +375,15 @@ function bridge_deduct_balance(ft4.accounts.account, ft4.assets.asset, amount: b
 //  * transfer from pool account when bridge is in native mode
 function bridge_increase_balance(ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
     ft4.assets.Unsafe.mint(account, asset, amount);
+}
+
+function update_deposit_state(deposit: erc20_deposit, state: deposit_state) {
+    create erc20_deposit_history(deposit, deposit.state, deposit.last_updated);
+
+    if (deposit.state == deposit_state.pending and (state in [deposit_state.completed, deposit_state.recalled])) {
+        delete pending_erc20_deposit @ { deposit };
+    }
+
+    deposit.state = state;
+    deposit.last_updated = op_context.last_block_time;
 }

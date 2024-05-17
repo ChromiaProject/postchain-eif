@@ -26,7 +26,7 @@ function test_withdraw_foreign_ERC20_token_to_ethereum_with_already_linked_accou
 
     rell.test.tx()
         .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
-        .op(hbridge.bridge_ft4_token_to_evm(network_id, ft_asset.id, amount / 2, evm_address))
+        .op(hbridge.bridge_ft4_token_to_evm(network_id1, ft_asset.id, amount / 2, evm_address))
         .sign(rell.test.keypairs.alice).run();
 
     assert_withdraw(1, evm_address, amount / 2);
@@ -35,9 +35,9 @@ function test_withdraw_foreign_ERC20_token_to_ethereum_with_already_linked_accou
 }
 
 function test_can_not_withdraw_to_ethereum_without_linked_token() {
-    val asset_id = (token_name, chain_context.blockchain_rid).hash();
+    val asset_id = (CHR.token_name, chain_context.blockchain_rid).hash();
     rell.test.tx().op(
-        admin.external.register_asset(token_name, token_symbol, token_decimal, token_icon_url)
+        admin.external.register_asset(CHR.token_name, CHR.token_symbol, CHR.token_decimal, CHR.token_icon_url)
     ).sign(admin_privkey).run();
     val ft_asset = assets.Asset(asset_id);
 
@@ -66,7 +66,7 @@ function test_can_not_withdraw_to_ethereum_without_linked_token() {
 
     rell.test.tx()
         .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
-        .op(hbridge.bridge_ft4_token_to_evm(network_id, ft_asset.id, amount / 2, evm_address))
+        .op(hbridge.bridge_ft4_token_to_evm(network_id1, ft_asset.id, amount / 2, evm_address))
         .sign(rell.test.keypairs.alice)
         .run_must_fail("ERC20 token not found");
 }
@@ -93,7 +93,7 @@ function test_can_not_withdraw_to_ethereum_without_linked_account() {
 
     rell.test.tx()
         .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
-        .op(hbridge.bridge_ft4_token_to_evm(network_id, ft_asset.id, amount / 2, evm_address))
+        .op(hbridge.bridge_ft4_token_to_evm(network_id1, ft_asset.id, amount / 2, evm_address))
         .sign(rell.test.keypairs.alice)
         .run_must_fail("Can only withdraw to your own account");
 }
@@ -118,7 +118,7 @@ function test_can_not_withdraw_to_ethereum_with_insufficient_balance() {
 
     rell.test.tx()
         .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
-        .op(hbridge.bridge_ft4_token_to_evm(network_id, ft_asset.id, 100000000000000000L, evm_address))
+        .op(hbridge.bridge_ft4_token_to_evm(network_id1, ft_asset.id, 100000000000000000L, evm_address))
         .sign(rell.test.keypairs.alice)
         .run_must_fail("Insufficient balance");
 }

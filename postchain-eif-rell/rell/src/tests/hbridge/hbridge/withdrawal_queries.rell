@@ -1,0 +1,155 @@
+import hbridge.*;
+
+function test_get_erc20_withdrawals() {
+    // FT4 assets
+    val chr_asset = register_foreign_asset(CHR);
+    val foo_asset = register_foreign_asset(FOO);
+    val bar_asset = register_foreign_asset(BAR, network_id2);
+
+    // FT4 / Alice
+    val (alice_account, alice_auth_descriptor) = create_ft4_account(rell.test.pubkeys.alice);
+    // EVM / Alice
+    val alice_evm_keypair = rell.test.keypairs.eve;
+    val alice_evm_address = crypto.eth_pubkey_to_address(alice_evm_keypair.pub);
+    val alice_evm_deposit_receipient_id = alice_evm_address.hash();
+
+    // FT4 / Bob
+    val (bob_account, bob_auth_descriptor) = create_ft4_account(rell.test.pubkeys.bob);
+    // EVM / Bob
+    val bob_evm_keypair = rell.test.keypairs.dave;
+    val bob_evm_address = crypto.eth_pubkey_to_address(bob_evm_keypair.pub);
+    val bob_evm_deposit_receipient_id = bob_evm_address.hash();
+
+    // Linking EVM and FT4 accounts for Alice and Bob
+    link_account(alice_evm_keypair, rell.test.keypairs.alice, alice_account.id, alice_auth_descriptor.hash());
+    link_account(bob_evm_keypair, rell.test.keypairs.bob, bob_account.id, bob_auth_descriptor.hash());
+
+    // Minting some for Alice and Bob
+    val minted = 10000L;
+    rell.test.tx().op(
+        admin.external.mint(alice_account.id, chr_asset.id, minted),
+        admin.external.mint(alice_account.id, foo_asset.id, minted),
+        admin.external.mint(bob_account.id, foo_asset.id, minted),
+        admin.external.mint(bob_account.id, bar_asset.id, minted),
+    ).sign(admin_privkey).run();
+
+    // Asserting that there are no withdrawals
+    val res0 = get_erc20_withdrawals(null, null, null, null, null, null, null);
+    assert_equals(res0, utils.null_page());
+
+    // Withdrawing some to EVM
+    withdraw(rell.test.keypairs.alice, alice_account, alice_auth_descriptor, network_id1, chr_asset.id, 100, alice_evm_address);
+    withdraw(rell.test.keypairs.alice, alice_account, alice_auth_descriptor, network_id1, foo_asset.id, 200, alice_evm_address);
+    val t0 = rell.test.last_block_time;
+    // Alice
+    for (wdr in range(5)) {
+        withdraw(rell.test.keypairs.alice, alice_account, alice_auth_descriptor, network_id1, chr_asset.id, 300, alice_evm_address);
+        withdraw(rell.test.keypairs.alice, alice_account, alice_auth_descriptor, network_id1, foo_asset.id, 400, alice_evm_address);
+    }
+    val t1 = rell.test.last_block_time;
+    // Bob
+    for (wdr in range(5)) {
+        withdraw(rell.test.keypairs.bob, bob_account, bob_auth_descriptor, network_id1, foo_asset.id, 500, bob_evm_address);
+        withdraw(rell.test.keypairs.bob, bob_account, bob_auth_descriptor, network_id2, bar_asset.id, 600, bob_evm_address);
+    }
+    val t2 = rell.test.last_block_time;
+    withdraw(rell.test.keypairs.bob, bob_account, bob_auth_descriptor, network_id2, bar_asset.id, 700, bob_evm_address);
+    withdraw(rell.test.keypairs.bob, bob_account, bob_auth_descriptor, network_id2, bar_asset.id, 800, bob_evm_address);
+
+    // Getting all withdrawals
+    val res1 = get_erc20_withdrawals(null, null, null, null, null, null, null);
+    assert_null(res1.next_cursor);
+    val wdr1 = parse_paged_withdrawals(res1);
+    assert_equals(wdr1.size(), 24);
+    assert_equals(wdr1 @ {} (@set .network_id), set([network_id1, network_id2]));
+    assert_equals(wdr1 @ {} (@set .token_address), set([CHR.token_address, FOO.token_address, BAR.token_address]));
+    assert_equals(wdr1 @ {} (@set .beneficiary), set([alice_evm_address, bob_evm_address]));
+
+    // Getting all withdrawals to network_id1
+    val res2 = get_erc20_withdrawals(network_id1, null, null, null, null, null, null);
+    val wdr2 = parse_paged_withdrawals(res2);
+    assert_equals(wdr2.size(), 17);
+    assert_equals(wdr2 @ {} (@set .network_id), set([network_id1]));
+    assert_equals(wdr2 @ {} (@set .token_address), set([CHR.token_address, FOO.token_address]));
+    assert_equals(wdr2 @ {} (@set .beneficiary), set([alice_evm_address, bob_evm_address]));
+
+    // Getting all withdrawals for FOO
+    val res3 = get_erc20_withdrawals(null, FOO.token_address, null, null, null, null, null);
+    val wdr3 = parse_paged_withdrawals(res3);
+    assert_equals(wdr3.size(), 11);
+    assert_equals(wdr3 @ {} (@set .network_id), set([network_id1]));
+    assert_equals(wdr3 @ {} (@set .token_address), set([FOO.token_address]));
+    assert_equals(wdr3 @ {} (@set .beneficiary), set([alice_evm_address, bob_evm_address]));
+
+    // Getting all withdrawals for Bob
+    val res4 = get_erc20_withdrawals(null, null, bob_evm_address, null, null, null, null);
+    val wdr4 = parse_paged_withdrawals(res4);
+    assert_equals(wdr4.size(), 12);
+    assert_equals(wdr4 @ {} (@set .network_id), set([network_id1, network_id2]));
+    assert_equals(wdr4 @ {} (@set .token_address), set([FOO.token_address, BAR.token_address]));
+    assert_equals(wdr4 @ {} (@set .beneficiary), set([bob_evm_address]));
+
+    // Getting all withdrawals in [t0, t2) time interval
+    val res5 = get_erc20_withdrawals(null, null, null, t0, t2, null, null);
+    val wdr5 = parse_paged_withdrawals(res5);
+    assert_equals(wdr5.size(), 20);
+    assert_equals(wdr5 @ {} (@set .network_id), set([network_id1, network_id2]));
+    assert_equals(wdr5 @ {} (@set .token_address), set([CHR.token_address, FOO.token_address, BAR.token_address]));
+    assert_equals(wdr5 @ {} (@set .beneficiary), set([alice_evm_address, bob_evm_address]));
+
+    // Getting all withdrawals in [t1, ) time interval
+    val res6 = get_erc20_withdrawals(null, null, null, t1, null, null, null);
+    val wdr6 = parse_paged_withdrawals(res6);
+    assert_equals(wdr6.size(), 12);
+    assert_equals(wdr6 @ {} (@set .network_id), set([network_id1, network_id2]));
+    assert_equals(wdr6 @ {} (@set .token_address), set([FOO.token_address, BAR.token_address]));
+    assert_equals(wdr6 @ {} (@set .beneficiary), set([bob_evm_address]));
+
+    // Getting all withdrawals in [, t1) time interval
+    val res7 = get_erc20_withdrawals(null, null, null, null, t1, null, null);
+    val wdr7 = parse_paged_withdrawals(res7);
+    assert_equals(wdr7.size(), 12);
+    assert_equals(wdr7 @ {} (@set .network_id), set([network_id1]));
+    assert_equals(wdr7 @ {} (@set .token_address), set([CHR.token_address, FOO.token_address]));
+    assert_equals(wdr7 @ {} (@set .beneficiary), set([alice_evm_address]));
+
+    // Asserting pagination
+    //  - page_size 4, page 0
+    val res8 = get_erc20_withdrawals(network_id1, FOO.token_address, null, t0, null, 4, null);
+    assert_not_null(res8.next_cursor);
+    val wdr8 = parse_paged_withdrawals(res8);
+    assert_equals(wdr8.size(), 4);
+    assert_equals(wdr8 @ {} (@set .network_id), set([network_id1]));
+    assert_equals(wdr8 @ {} (@set .token_address), set([FOO.token_address]));
+    assert_equals(wdr8 @ {} (@set .beneficiary), set([alice_evm_address]));
+    //  - page_size 4, page 1
+    val res9 = get_erc20_withdrawals(network_id1, FOO.token_address, null, t0, null, 4, res8.next_cursor);
+    assert_not_null(res9.next_cursor);
+    val wdr9 = parse_paged_withdrawals(res9);
+    assert_equals(wdr9.size(), 4);
+    assert_equals(wdr9 @ {} (@set .network_id), set([network_id1]));
+    assert_equals(wdr9 @ {} (@set .token_address), set([FOO.token_address]));
+    assert_equals(wdr9 @ {} (@set .beneficiary), set([alice_evm_address, bob_evm_address]));
+    //  - page_size 4, page 2
+    val res10 = get_erc20_withdrawals(network_id1, FOO.token_address, null, t0, null, 4, res9.next_cursor);
+    assert_null(res10.next_cursor);
+    val wdr10 = parse_paged_withdrawals(res10);
+    assert_equals(wdr10.size(), 2);
+    assert_equals(wdr10 @ {} (@set .network_id), set([network_id1]));
+    assert_equals(wdr10 @ {} (@set .token_address), set([FOO.token_address]));
+    assert_equals(wdr10 @ {} (@set .beneficiary), set([bob_evm_address]));
+}
+
+function withdraw(
+    keypair: rell.test.keypair, account: ft4.accounts.account, auth_descriptor: accounts.auth_descriptor,
+    network_id: integer, asset_id: byte_array, amount: integer, beneficiary: byte_array
+) {
+    rell.test.tx().nop().op(
+        auth.external.ft_auth(account.id, auth_descriptor.hash()),
+        bridge_ft4_token_to_evm(network_id, asset_id, amount, beneficiary)
+    ).sign(keypair).run();
+}
+
+function parse_paged_withdrawals(paged_result: ft4.utils.paged_result) {
+    return paged_result.data @* {} ( erc20_withdrawal_info.from_gtv_pretty($) );
+}
