@@ -1,3 +1,5 @@
+import "./anchoring";
 import "./bridge";
-import "./token";
 import "./chromiabridge";
+import "./directoryChainValidator";
+import "./token";

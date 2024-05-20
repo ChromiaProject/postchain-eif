@@ -18,6 +18,8 @@
     "coverage": "cross-env CODE_COVERAGE=true hardhat coverage --solcoverjs ./.solcover.js --temp artifacts --testfiles \"./test/**/*.ts\"",
     "deploy": "npx hardhat deploy:bridge",
     "deploy:native": "npx hardhat deploy:chromiabridge",
+    "deploy:directoryValidator": "npx hardhat deploy:directoryValidator",
+    "deploy:anchoring": "npx hardhat deploy:anchoring",
     "prepare:bridge": "npx hardhat prepare:bridge",
     "upgrade:bridge": "npx hardhat upgrade:bridge",
     "import:bridge": "npx hardhat import:bridge",

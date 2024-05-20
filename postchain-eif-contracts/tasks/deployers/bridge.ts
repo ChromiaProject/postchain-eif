@@ -1,17 +1,32 @@
 import { task } from "hardhat/config";
-import { TokenBridge, TokenBridge__factory, Validator, Validator__factory } from "../../src/types";
+import {
+  IValidator,
+  ManagedValidator__factory,
+  TokenBridge,
+  TokenBridge__factory,
+  Validator__factory
+} from "../../src/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 task("deploy:bridge")
-  .addOptionalParam('app', 'app node')
+  .addOptionalParam("app", "app node, not needed when using managed validator")
   .addOptionalParam('offset', 'withdraw offset')
+  .addOptionalParam("directoryValidator", "Contract address of directory chain validator, supply this to use managed validator contract")
   .addFlag('verify', 'Verify contracts at Etherscan')
-  .setAction(async ({ verify, app, offset}, hre) => {
+  .setAction(async ({verify, app, offset, directoryValidator}, hre) => {
     // deploy validator smart contract
-    const validatorFactory: Validator__factory = await hre.ethers.getContractFactory("Validator")
-    const validators = app === undefined ? [] : getNodes(app)
     const withdrawOffset = offset === undefined ? 0 : parseInt(offset)
-    const validator: Validator = <Validator>await validatorFactory.deploy(validators)
+      let validator;
+      let validators;
+      if (directoryValidator === undefined) {
+        const validatorFactory: Validator__factory = await hre.ethers.getContractFactory("Validator");
+        validators = app === undefined ? [] : getNodes(app);
+        validator = <IValidator>await validatorFactory.deploy(validators);
+      } else {
+        const validatorFactory: ManagedValidator__factory = await hre.ethers.getContractFactory("ManagedValidator");
+        validator = <IValidator>await validatorFactory.deploy(directoryValidator);
+      }
+      console.log("validator deployed to: ", validator.address);
 
     // deploy token bridge smart contracts
     const factory: TokenBridge__factory = await hre.ethers.getContractFactory("TokenBridge")
@@ -26,14 +41,21 @@ task("deploy:bridge")
         // with the similar code, then calling verify will return error.
         // We add try/catch to handle the error and continue to verify the main bridge smart contract.
         try {
+          if (directoryValidator === undefined) {
             await hre.run("verify:verify", {
-                address: validator.address,
-                constructorArguments: [validators],
+              address: validator.address,
+              constructorArguments: [validators],
             });
+          } else {
+            await hre.run("verify:verify", {
+              address: validator.address,
+              constructorArguments: [directoryValidator],
+            });
+          }
         } catch (e) {
             console.log(e)
         }
-        
+
         try {
             await verifyProxyContract(hre, bridge.address)
         } catch (e) {
@@ -52,7 +74,7 @@ task("prepare:bridge")
 
 task("upgrade:bridge")
     .addParam('address', '')
-    .addFlag('verify', 'Verify contracts at Etherscan')    
+    .addFlag('verify', 'Verify contracts at Etherscan')
     .setAction(async ({ address, verify}, hre) => {
         const factory: TokenBridge__factory = await hre.ethers.getContractFactory("TokenBridge");
         await hre.upgrades.upgradeProxy(address, factory);
@@ -71,7 +93,7 @@ task("import:bridge")
         await hre.upgrades.forceImport(address, factory)
         console.log("Token bridge has been imported");
     });
-    
+
 async function verifyProxyContract(hre: HardhatRuntimeEnvironment, proxyAddress: string) {
     // We need to wait a little bit to verify the contract after deployment
     const implementationAddress = await hre.upgrades.erc1967.getImplementationAddress(proxyAddress);
