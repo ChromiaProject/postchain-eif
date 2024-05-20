@@ -142,7 +142,7 @@ function test_adding_bridge_mapping_triggers_signer_update() {
                 blockchain_rid = unmapped_chain_brid,
                 validator_contract = "validator",
                 bridge_contract = "bridge",
-                evm_network_id = 1337,
+                evm_network_id = 11155111,
                 deleted = false
             )
         )

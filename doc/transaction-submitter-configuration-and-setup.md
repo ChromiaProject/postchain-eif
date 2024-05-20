@@ -63,27 +63,27 @@ Example:
           blockchain_rid: x"" # Replace with directory chain brid
           validator_contracts:
             - address: "directory_chain_validator"
-              network_id: 5
+              network_id: 11155111
         # Omit this to disable anchoring
         system_anchoring_chain_config:
           blockchain_rid: x"" # Replace with system anchoring chain brid
           anchoring_contracts:
             - address: "anchoring_contract"
               validator_contract: "sac_validator_contract"
-              network_id: 5
+              network_id: 11155111
         # Here we can add all system chain bridges
         system_chain_bridges:
           - blockchain_rid: x"" # Replace with economy chain brid & contracts
             bridge_contracts:
               - address: "ec_bridge_contract"
                 validator_contract: "ec_validator_contract"
-                network_id: 5
+                network_id: 11155111
         contract_tx_rate_limit: 60000
         tx_node_submit_timeout: 1800000 # 30m
         tx_timeout: 86400000 #24h
         node_retry_strategy: SUPERMAJORITY
         network_configs:
-          - id: 1337
+          - id: 11155111
             currency_symbol: "ETH"
         system_max_priority_fee_per_gas: 1000000000
         system_max_fee_per_gas: 4000000000
@@ -97,8 +97,8 @@ Example:
           - "net.postchain.d1.icmf.IcmfSenderGTXModule"
       transaction_submitter:
         chains:
-          goerli:
-            network_id: 5
+          sepolia:
+            network_id: 11155111
             max_gas_price: 4100000000
             min_wallet_balance: 100000000000
         gas_limit: 9000000
