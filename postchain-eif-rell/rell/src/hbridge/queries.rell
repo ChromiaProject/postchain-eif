@@ -20,32 +20,22 @@ query get_erc20_withdrawal(network_id: integer, token_address: byte_array, benef
     } (@sort_desc @omit .serial, $.to_struct());
 
 /**
- * Returns paginated ERC-20 withdrawals
+ * Retrieves ERC20 token withdrawals based on a given filter, with pagination options.
  *
- * @param network_id EVM network ID. If null, all networks are considered.
- * @param token_address EVM token address. If null, all token addresses are considered.
- * @param beneficiary EVM beneficiary address. If null, all beneficiaries are considered.
- * @param from marks the beginning of a time interval. If not null, withdrawals occurring before `from` are excluded.
- * @param to marks the end of a time interval. If not null, withdrawals occurring after to are excluded.
+ * @param filter The filter applied to the withdrawal search. See [withdrawal_filter] structure.
+ * @param page_size The number of withdrawal records to return per page. Limited by the maximum page size defined in the chain configuration. If not specified, a maximum page size defined in the chain configuration is used.
+ * @param page_cursor A cursor for pagination, typically pointing to the start of the next page of results. If not specified, the first page will be returned.
+ * @return A `ft4.utils.paged_result` containing the filtered results and pagination data. This result includes data such as the list of withdrawals (see [erc20_withdrawal_info]), and the next page cursor (`next_cursor`). If `next_cursor` is null, there are no more pages to fetch.
  */
-query get_erc20_withdrawals(
-    network_id: integer?,
-    token_address: byte_array?,
-    beneficiary: byte_array?,
-    from: timestamp?,
-    to: timestamp?,
-    page_size: integer?,
-    page_cursor: text?
-): ft4.utils.paged_result {
-
+query get_erc20_withdrawals(filter: withdrawal_filter, page_size: integer?, page_cursor: text?): ft4.utils.paged_result {
     val before_rowid = ft4.utils.before_rowid(page_cursor);
 
     val paginated_result = erc20_withdraw @* {
-        network_id == null or .network_id == network_id,
-        token_address == null or .token_address == token_address,
-        beneficiary == null or .beneficiary == beneficiary,
-        from == null or .timestamp >= from,
-        to == null or .timestamp < to,
+        filter.network_id == null or .network_id == filter.network_id,
+        filter.token_address == null or .token_address == filter.token_address,
+        filter.beneficiary == null or .beneficiary == filter.beneficiary,
+        filter.from == null or .timestamp >= filter.from!!,
+        filter.to == null or .timestamp < filter.to!!,
         .rowid > (before_rowid ?: rowid(0))
     } (
         ft4.utils.pagination_result(
@@ -73,27 +63,23 @@ query get_sc_addresses_for_account(account_id: byte_array): list<(address: byte_
     return evm_sc_account_link @* { account } (.address, .network_id);
 }
 
-/**
- * Returns paginated ERC-20 deposits
- *
- * @param network_id EVM network ID. If null, all networks are considered.
- * @param token_address EVM token address. If null, all token addresses are considered.
- * @param recipient_id EVM beneficiary address. If null, all recipient_id values are considered.
- */
-query get_erc20_deposits(
-    network_id: integer?,
-    token_address: byte_array?,
-    recipient_id: byte_array?,
-    page_size: integer?,
-    page_cursor: text?
-): ft4.utils.paged_result {
 
+/**
+ * Retrieves ERC20 token deposits based on a given filter, with pagination options.
+ *
+ * @param filter The filter applied to the deposit search. See [deposit_filter] structure.
+ * @param page_size The number of deposit records to return per page. Limited by the maximum page size defined in the chain configuration. If not specified, a maximum page size defined in the chain configuration is used.
+ * @param page_cursor A cursor for pagination, typically pointing to the start of the next page of results. If not specified, the first page will be returned.
+ * @return A `ft4.utils.paged_result` containing the filtered results and pagination data. This result includes data such as the list of deposits (see [erc20_deposit_info]), and the next page cursor (`next_cursor`). If `next_cursor` is null, there are no more pages to fetch.
+ */
+query get_erc20_deposits(filter: deposit_filter, page_size: integer?, page_cursor: text?): ft4.utils.paged_result {
     val before_rowid = ft4.utils.before_rowid(page_cursor);
 
     val paginated_result = erc20_deposit @* {
-        network_id == null or .network_id == network_id,
-        token_address == null or .token.token_address == token_address,
-        recipient_id == null or .recipient_id == recipient_id,
+        filter.network_id == null or .network_id == filter.network_id,
+        filter.token_address == null or .token.token_address == filter.token_address,
+        filter.recipient_id == null or .recipient_id == filter.recipient_id,
+        filter.state == null or .state == filter.state,
         .rowid > (before_rowid ?: rowid(0))
     } (
         ft4.utils.pagination_result(
@@ -106,9 +92,12 @@ query get_erc20_deposits(
 }
 
 /**
- * Returns deposit's history
+ * Retrieves the history of an ERC20 deposit based on the specified deposit ID.
  *
- * @param deposit_id Deposit id
+ * @param deposit_id A `rowid` type identifier for the deposit.
+ *
+ * @return A list of `erc20_deposit_history_entry` objects, each representing a record in the
+ * history of the specified deposit.
  */
 query get_erc20_deposit_history(deposit_id: rowid): list<erc20_deposit_history_entry> {
     val deposit = require(erc20_deposit @? { .rowid == deposit_id }, "Deposit not found: " + deposit_id);
