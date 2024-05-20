@@ -1,0 +1,29 @@
+
+// withdrawal from EVM to FT4
+entity erc20_withdraw {
+    key serial: integer;
+    network_id: integer;
+    token_address: byte_array;
+    index network_id, token_address;
+    index beneficiary: byte_array;
+    amount: big_integer;
+    timestamp;
+}
+
+struct erc20_withdrawal_info {
+    serial: integer;
+    network_id: integer;
+    token_address: byte_array;
+    beneficiary: byte_array;
+    amount: big_integer;
+    timestamp;
+}
+
+function map_withdrawal(withdrawal: erc20_withdraw) = erc20_withdrawal_info(
+    serial = withdrawal.serial,
+    network_id = withdrawal.network_id,
+    token_address = withdrawal.token_address,
+    beneficiary = withdrawal.beneficiary,
+    amount = withdrawal.amount,
+    timestamp = withdrawal.timestamp,
+);

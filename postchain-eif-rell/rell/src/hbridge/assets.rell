@@ -1,0 +1,38 @@
+
+// link between ERC20 token and FT4 asset
+entity erc20_asset {
+    network_id: integer;
+    token_address: byte_array; // contract address
+    key network_id, token_address;
+    bridge_mode;
+    index ft4.assets.asset;
+    key virtual_blockchain_rid: byte_array; // virtual blockchain RID derived from network_id and address
+}
+
+struct erc20_info {
+    network_id: integer;
+    token_address: byte_array; // contract address
+    bridge_mode;
+    virtual_blockchain_rid: byte_array; // virtual blockchain RID derived from network_id and address
+}
+
+function register_erc20_asset(
+    network_id: integer,
+    token_address: byte_array,
+    ft4.assets.asset,
+    mode: bridge_mode
+) {
+    require(mode == bridge_mode.foreign, "native mode not supported yet");
+    require(empty(erc20_asset @? { network_id, token_address }), "token already exists");
+    create erc20_asset (
+        network_id,
+        token_address = token_address,
+        mode,
+        asset,
+        virtual_blockchain_rid = compute_virtual_blockchain_rid(network_id, token_address)
+    );
+}
+
+function compute_virtual_blockchain_rid(network_id: integer, token_address: byte_array): byte_array =
+        ("EVM", network_id, token_address).hash();
+

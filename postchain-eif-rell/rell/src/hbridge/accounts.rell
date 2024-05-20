@@ -1,0 +1,89 @@
+
+// link between EVM address and FT4 account, specifically for EOA. (Where user has the private key)
+entity evm_eoa_account_link {
+    key address: byte_array;
+    index ft4.accounts.account;
+}
+
+// for smart contracts we need to keep track of network_id
+entity evm_sc_account_link {
+    key address: byte_array, network_id: integer;
+    index ft4.accounts.account;
+}
+
+entity proposed_evm_sc_account_link {
+    key address: byte_array, network_id: integer;
+    index ft4.accounts.account;
+}
+
+function find_ft4_account_for_address(address: byte_array, network_id: integer): ft4.accounts.account? {
+    val candidate = evm_eoa_account_link @? { address } .account;
+    if (not empty(candidate)) {
+        return candidate;
+    } else {
+        return evm_sc_account_link @? { address, network_id } .account;
+    }
+}
+
+@extendable
+function after_evm_account_linked(address: byte_array, account: ft4.accounts.account, network_id: integer, is_contract: boolean) {}
+
+@extend(ft4.strategies.after_register_account)
+function (ft4.accounts.account) {
+    val pending_deposits = erc20_deposit @* { .recipient_id == account.id, deposit_state.pending };
+    for (deposit in pending_deposits) {
+        if (deposit.from_smart_contract) {
+            if (empty(evm_sc_account_link @? { deposit.sender_address, deposit.network_id })) {
+                create evm_sc_account_link(deposit.sender_address, deposit.network_id, account);
+                after_evm_account_linked(deposit.sender_address, account, deposit.network_id, true);
+            }
+        } else {
+            create evm_eoa_account_link(deposit.sender_address, account);
+            after_evm_account_linked(deposit.sender_address, account, -1, false);
+        }
+
+        // note: we don't need to call collect_pooled_assets here, because it's already done in the transfer strategy implementation
+        update_deposit_state(deposit, deposit_state.completed);
+    }
+}
+
+// accounts might be linked explicitly (e.g. when account_id is not derived from EVM address)
+function _link_evm_eoa_account(address: byte_array, account: ft4.accounts.account) {
+    create evm_eoa_account_link(address, account);
+
+    val pending_deposits = erc20_deposit @* { .sender_address == address, deposit_state.pending, .from_smart_contract == false };
+    for (deposit in pending_deposits) {
+        // there's a possibility that the account_id is different from address hash
+        // collect funds from the pool account here
+        ft4.transfer_strategy.collect_pooled_assets(account, recipient_id = address.hash());
+        update_deposit_state(deposit, deposit_state.completed);
+    }
+    after_evm_account_linked(address, account, -1, false);
+}
+
+function _link_evm_sc_account(address: byte_array, network_id: integer, account: ft4.accounts.account) {
+    create evm_sc_account_link(address, network_id, account);
+
+    val pending_deposits = erc20_deposit @* { .sender_address == address, deposit_state.pending, .from_smart_contract == true };
+    for (deposit in pending_deposits) {
+        // there's a possibility that the account_id is different from address hash
+        // collect funds from the pool account here
+        ft4.transfer_strategy.collect_pooled_assets(account, recipient_id = address.hash());
+        update_deposit_state(deposit, deposit_state.completed);
+    }
+    after_evm_account_linked(address, account, network_id, true);
+}
+
+// function which deducts balance from the account in a smart way:
+//  * burn when bridge is in foreign mode
+//  * transfer to pool account when bridge is in native mode
+function bridge_deduct_balance(ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
+    ft4.assets.Unsafe.burn(account, asset, amount);
+}
+
+// function which increase balance of the account in a smart way:
+//  * mint when bridge is in foreign mode
+//  * transfer from pool account when bridge is in native mode
+function bridge_increase_balance(ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
+    ft4.assets.Unsafe.mint(account, asset, amount);
+}
