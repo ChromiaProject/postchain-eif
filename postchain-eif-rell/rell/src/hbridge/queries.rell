@@ -79,6 +79,7 @@ query get_erc20_deposits(filter: deposit_filter, page_size: integer?, page_curso
         filter.network_id == null or .network_id == filter.network_id,
         filter.token_address == null or .token.token_address == filter.token_address,
         filter.recipient_id == null or .recipient_id == filter.recipient_id,
+        filter.state == null or .state == filter.state,
         .rowid > (before_rowid ?: rowid(0))
     } (
         ft4.utils.pagination_result(

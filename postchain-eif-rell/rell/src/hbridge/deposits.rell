@@ -55,6 +55,7 @@ struct deposit_filter {
     network_id: integer? = null;
     token_address: byte_array? = null;
     recipient_id: byte_array? = null;
+    state: deposit_state? = null;
 }
 
 function map_deposit(deposit: erc20_deposit) = erc20_deposit_info(
