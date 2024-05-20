@@ -1,8 +1,8 @@
 definitions:
   - &eif_test
     chains:
-      goerli:
-        network_id: 5
+      sepolia:
+        network_id: 11155111
         contracts:
           - '0xb7eb5d60dd5610a82a4844beb3f7d750316d3d32'
         skip_to_height: 9149852

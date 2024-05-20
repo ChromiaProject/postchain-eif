@@ -13,10 +13,10 @@ function test_system_chain_functions() {
     assert_true(is_system_anchoring_chain(test_system_anchoring_chain_brid));
     assert_false(is_system_anchoring_chain(test_directory_chain_brid));
 
-    assert_equals(get_system_chain_validator_contract(test_directory_chain_brid, 5), "directory_validator");
-    assert_equals(get_system_chain_validator_contract(test_system_anchoring_chain_brid, 5), "anchoring_validator");
+    assert_equals(get_system_chain_validator_contract(test_directory_chain_brid, 11155111), "directory_validator");
+    assert_equals(get_system_chain_validator_contract(test_system_anchoring_chain_brid, 11155111), "anchoring_validator");
 
-    assert_equals(get_anchoring_contracts(), [(address = "anchoring", network_id = 5)]);
+    assert_equals(get_anchoring_contracts(), [(address = "anchoring", network_id = 11155111)]);
 }
 
 function test_text_without_0x() {

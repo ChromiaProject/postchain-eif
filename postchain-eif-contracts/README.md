@@ -74,19 +74,18 @@ With managed validator contract:
 In case directory chain validator contract is not deployed:
 
 ```sh
-$ yarn deploy:directoryValidator --network bsc --verify --blockchain-rid {DIRECTORY_CHAIN_RID}
+$ yarn deploy:directoryValidator --network sepolia --verify --blockchain-rid {DIRECTORY_CHAIN_RID}
 ```
 
 Then:
 
 ```sh
-$ yarn deploy --network bsc --verify --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS} --offset 2
+$ yarn deploy --network sepolia --verify --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS} --offset 2
 ```
 
 With manually updated validator contract
 ```sh
 $ yarn deploy --network sepolia --verify --app 0xCaf200436270A60Cda6543602F2Ea4224E31351d --offset 2
-$ yarn deploy --network goerli --verify --app 0x659E4A3726275EDFD125F52338ECE0D54D15BD99,0x1A642F0E3C3AF545E7ACBD38B07251B3990914F1,0x75E20828B343D1FE37FAE469AB698E19C17F20B5 --offset 2
 ```
 
 To deploy the ChromiaTokenBridge, run the deploy:native script:
@@ -96,18 +95,18 @@ With managed validator contract:
 In case directory chain validator contract is not deployed:
 
 ```sh
-$ yarn deploy:directoryValidator --network bsc --verify --blockchain-rid {DIRECTORY_CHAIN_RID}
+$ yarn deploy:directoryValidator --network sepolia --verify --blockchain-rid {DIRECTORY_CHAIN_RID}
 ```
 
 Then:
 ```sh
-$ yarn deploy:native --network bsc --verify --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS} --offset 2
+$ yarn deploy:native --network sepolia --verify --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS} --offset 2
 ```
 
 With manually updated validator contract
 
 ```sh
-$ yarn deploy:native --network bsc --verify --app 0xCaf200436270A60Cda6543602F2Ea4224E31351d,0x9F4daAfc3F52C1c92e4583413824523679ABc9a3,0x4cBe97487b517b66B43943AD97Ad8394b9DEa7dC,0x4FC783e3a3beF0270858Dc5FbB837fA6f8fDbFc6 --offset 2
+$ yarn deploy:native --network sepolia --verify --app 0xCaf200436270A60Cda6543602F2Ea4224E31351d,0x9F4daAfc3F52C1c92e4583413824523679ABc9a3,0x4cBe97487b517b66B43943AD97Ad8394b9DEa7dC,0x4FC783e3a3beF0270858Dc5FbB837fA6f8fDbFc6 --offset 2
 ```
 
 You also can deploy ALICE token for test
@@ -119,7 +118,7 @@ $ yarn deploy:alice --network sepolia --verify
 Deploying anchoring contract:
 
 ```sh
-$ yarn deploy:anchoring --network bsc --verify --blockchain-rid {SYSTEM_ANCHORING_CHAIN_RID} --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS}
+$ yarn deploy:anchoring --network sepolia --verify --blockchain-rid {SYSTEM_ANCHORING_CHAIN_RID} --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS}
 ```
 
 ### Added plugins
@@ -134,21 +133,21 @@ $ yarn deploy:anchoring --network bsc --verify --blockchain-rid {SYSTEM_ANCHORIN
 Run below task to prepare upgrade token bridge smart contracts
 
 ```sh
-yarn prepare:bridge --network goerli --address PROXY_ADDRESS
-yarn prepare:nft --network goerli --address PROXY_ADDRESS
+yarn prepare:bridge --network sepolia --address PROXY_ADDRESS
+yarn prepare:nft --network sepolia --address PROXY_ADDRESS
 ```
 
 ### Upgrade
 
 ```sh
-yarn upgrade:bridge --network goerli --verify --address PROXY_ADDRESS
-yarn upgrade:nft --network goerli --verify --address PROXY_ADDRESS
+yarn upgrade:bridge --network sepolia --verify --address PROXY_ADDRESS
+yarn upgrade:nft --network sepolia --verify --address PROXY_ADDRESS
 ```
 
 ### Force import
 
 ```sh
-yarn import:bridge --network goerli --address PROXY_ADDRESS
+yarn import:bridge --network sepolia --address PROXY_ADDRESS
 ```
 
 ## Admin operations

@@ -22,7 +22,6 @@ import "./tasks/deployers";
 
 const chainIds = {
   ganache: 1337,
-  goerli: 5,
   sepolia: 11155111,
   holesky: 17000,
   hardhat: 31337,
@@ -66,7 +65,6 @@ const config: HardhatUserConfig = {
       hardfork: process.env.CODE_COVERAGE ? "berlin" : "london",
     },
     mainnet: createTestnetConfig("mainnet"),
-    goerli: createTestnetConfig("goerli"),
     holesky: createTestnetConfig("holesky"),
     bsc: {
       accounts: {

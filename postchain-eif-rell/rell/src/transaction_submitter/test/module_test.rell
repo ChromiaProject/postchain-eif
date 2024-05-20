@@ -49,12 +49,12 @@ function test_fetch_oldest_queued_transactions_per_contract() {
     rell.test.block().run();
     rell.test.tx().op(
         create_evm_submit_transaction_op("address","myFunction1"),
-        create_evm_submit_transaction_op("address1","myFunction2", 1337)
+        create_evm_submit_transaction_op("address1","myFunction2", 11155111)
     ).run();
 
     rell.test.tx().op(
         create_evm_submit_transaction_op("address","myFunction3"),
-        create_evm_submit_transaction_op("address1","myFunction4", 1337)
+        create_evm_submit_transaction_op("address1","myFunction4", 11155111)
     ).run();
 
     val evm_submit_transaction = fetch_oldest_queued_transactions_per_contract();
@@ -84,7 +84,7 @@ function test_fetch_oldest_queued_transactions_per_contract_and_taken_by() {
             "myFunction-2",
             transaction_status.QUEUED,
             get_last_blocktime(),
-            1337)
+            11155111)
     ).run();
 
     assert_equals(fetch_oldest_queued_transactions_per_contract().size(), 2);
@@ -229,7 +229,7 @@ function timeout_submit_evm_transaction() {
 }
 
 function test_get_currency_symbol() {
-    val currency_symbol = get_currency_symbol(1337);
+    val currency_symbol = get_currency_symbol(11155111);
 
     assert_equals(currency_symbol, "ETH");
 }
