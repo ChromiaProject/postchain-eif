@@ -91,7 +91,9 @@ class EifGTXModule : SimpleGTXModule<Config>(
 @Suppress("UNUSED_PARAMETER")
 fun eventBlockHeightQuery(config: Config, ctx: EContext, args: Gtv): Gtv {
     val argsDict = args.asDict()
-    val eventHash = argsDict["eventHash"]!!.asString().hexStringToByteArray()
+    val eventHash = argsDict["eventHash"]?.asString()?.hexStringToByteArray()
+            ?: throw UserMistake("Query is missing required input argument 'eventHash'")
+
     val db = DatabaseAccess.of(ctx)
     val eventInfo = db.getEvent(ctx, PREFIX, eventHash) ?: return GtvNull
     return gtv(eventInfo.blockHeight)
@@ -105,7 +107,8 @@ fun eventBlockHeightQuery(config: Config, ctx: EContext, args: Gtv): Gtv {
  */
 fun eventMerkleProofQuery(config: Config, ctx: EContext, args: Gtv): Gtv {
     val argsDict = args.asDict()
-    val eventHash = argsDict["eventHash"]!!.asString().hexStringToByteArray()
+    val eventHash = argsDict["eventHash"]?.asString()?.hexStringToByteArray()
+            ?: throw UserMistake("Query is missing required input argument 'eventHash'")
 
     val cs = Secp256K1CryptoSystem()
     val db = DatabaseAccess.of(ctx)
@@ -146,8 +149,10 @@ internal fun validateSignatures(blockRid: ByteArray, signers: Array<out Gtv>?, s
  */
 fun accountStateMerkleProofQuery(config: Config, ctx: EContext, args: Gtv): Gtv {
     val argsDict = args.asDict()
-    val blockHeight = argsDict["blockHeight"]!!.asInteger()
-    val accountNumber = argsDict["accountNumber"]!!.asInteger()
+    val blockHeight = argsDict["blockHeight"]?.asInteger()
+            ?: throw UserMistake("Query is missing required input argument 'blockHeight'")
+    val accountNumber = argsDict["accountNumber"]?.asInteger()
+            ?: throw UserMistake("Query is missing required input argument 'accountNumber'")
 
     val cs = Secp256K1CryptoSystem()
     val db = DatabaseAccess.of(ctx)
