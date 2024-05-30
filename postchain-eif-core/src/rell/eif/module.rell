@@ -200,6 +200,8 @@ operation __evm_block(network_id: integer, evm_block_height: integer, evm_block_
     evm_block_fn(network_id, evm_block_height, evm_block_hash, events);
 }
 
+@extendable function handle_evm_event(event_data) {}
+
 function evm_block_fn(network_id: integer, evm_block_height: integer, evm_block_hash: byte_array, events: list<event_data>) { 
     val evm_block = create evm_block(
         network_id,
@@ -208,6 +210,11 @@ function evm_block_fn(network_id: integer, evm_block_height: integer, evm_block_
     );
 
     for (event in events) {
+        if (event.name != "DepositedERC20" and event.name != "DepositedERC721") {
+            handle_evm_event(event);
+            continue;
+        }
+
         var indexed_values_bytes = x"";
         for (value in event.indexed_values) {
             indexed_values_bytes += value.to_bytes();
