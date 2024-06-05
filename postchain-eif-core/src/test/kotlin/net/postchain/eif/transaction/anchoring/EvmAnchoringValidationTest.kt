@@ -16,6 +16,7 @@ import net.postchain.eif.encodeBlockHeaderDataForEVM
 import net.postchain.eif.encodeSignatureWithV
 import net.postchain.eif.getEthereumAddress
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.ANCHOR_SYSTEM_ANCHORING_BLOCK_OP
+import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.GET_ANCHORING_CONTRACTS_QUERY
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.GET_CURRENT_EVM_SIGNER_LIST_QUERY
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.GET_PREVIOUSLY_ANCHORED_SYSTEM_ANCHORING_BLOCK_HEIGHT_QUERY
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.GET_SYSTEM_ANCHORING_BLOCKCHAIN_RID_QUERY
@@ -51,6 +52,7 @@ class EvmAnchoringValidationTest {
         on { query(mockContext, GET_PREVIOUSLY_ANCHORED_SYSTEM_ANCHORING_BLOCK_HEIGHT_QUERY, gtv(mapOf())) } doReturn gtv(-1)
         on { query(mockContext, GET_CURRENT_EVM_SIGNER_LIST_QUERY, gtv(mapOf("blockchain_rid" to gtv(systemAnchoringBrid)))) } doReturn gtv(listOf(gtv(systemAnchoringSigner1.pubKey.data), gtv(systemAnchoringSigner2.pubKey.data)))
         on { query(mockContext, GET_SYSTEM_ANCHORING_BLOCKCHAIN_RID_QUERY, gtv(mapOf())) } doReturn gtv(systemAnchoringBrid)
+        on { query(mockContext, GET_ANCHORING_CONTRACTS_QUERY, gtv(mapOf())) } doReturn gtv(listOf(gtv(1337), gtv("anchoring")))
     }
 
     private val sut = EvmAnchoringSpecialTxExtension()

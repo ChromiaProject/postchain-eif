@@ -24,7 +24,10 @@ import net.postchain.gtv.mapper.toObject
 import net.postchain.gtx.GTXModule
 import net.postchain.gtx.GTXModuleAware
 import net.postchain.core.EContext
+import net.postchain.eif.transaction.anchoring.AnchoringContractRell
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.logger
+import net.postchain.eif.transaction.anchoring.EvmAnchoringService
+import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.GET_ANCHORING_CONTRACTS_QUERY
 import org.web3j.crypto.Credentials
 import org.web3j.tx.RawTransactionManager
 import org.web3j.tx.gas.StaticGasProvider
@@ -80,6 +83,7 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                         val transactionManagers =
                                 web3jServicesMap.map { it.key to RawTransactionManager(it.value, credentials) }
                                         .toMap()
+                        EvmAnchoringService.INSTANCE.addWeb3jServices(web3jServicesMap, networkId, credentials)
                         val gasProvider = StaticGasProvider(BigInteger.valueOf(networkBlockchainConfig.maxGasPrice), BigInteger.valueOf(transactionSubmitterBlockchainConfig.gasLimit))
                         val queue = loadTxQueue(process.blockchainEngine.chainID, databaseOperations, networkId, blockchainConfig.module)
                         val transactionSubmitter = TransactionSubmitter(
@@ -106,6 +110,15 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                     }
                 }
             }
+
+            val anchoringContracts = withReadConnection(postchainContext.sharedStorage, process.blockchainEngine.chainID) {
+                val response = blockchainConfig.module.query(it, GET_ANCHORING_CONTRACTS_QUERY, gtv(mapOf()))
+                response.asArray().map {
+                    it.toObject<AnchoringContractRell>()
+                }
+            }
+            EvmAnchoringService.INSTANCE.addAnchoringContracts(anchoringContracts)
+            EvmAnchoringService.INSTANCE.setBlockQueriesProvider(postchainContext.blockQueriesProvider)
 
             val anchoringExt = exs.find { it is EvmAnchoringSpecialTxExtension }
             if (anchoringExt is EvmAnchoringSpecialTxExtension) {

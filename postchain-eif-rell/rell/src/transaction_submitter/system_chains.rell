@@ -102,6 +102,10 @@ function get_anchoring_contracts(): list<(address: text, network_id: integer)> {
     return anchoring_contracts;
 }
 
+query get_anchoring_contracts_query(): list<(address: text, network_id: integer)> {
+    return get_anchoring_contracts();
+}
+
 query get_directory_chain_blockchain_rid() =
     directory_chain_config.from_gtv_pretty(chain_context.args.directory_chain_config).blockchain_rid;
 

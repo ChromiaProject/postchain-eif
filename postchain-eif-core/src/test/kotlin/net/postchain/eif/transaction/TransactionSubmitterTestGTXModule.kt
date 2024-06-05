@@ -11,7 +11,9 @@ import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Comp
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.GET_TRANSACTION_STATUS
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_RECEIPT
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_STATUS
+import net.postchain.eif.transaction.anchoring.AnchoringContractRell
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension
+import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.GET_ANCHORING_CONTRACTS_QUERY
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.GET_SYSTEM_ANCHORING_BLOCKCHAIN_RID_QUERY
 import net.postchain.eif.transaction.signerupdate.EvmSignerUpdate
 import net.postchain.gtv.Gtv
@@ -128,6 +130,9 @@ open class TransactionSubmitterTestGTXModule(
                 },
                 GET_SYSTEM_ANCHORING_BLOCKCHAIN_RID_QUERY to { _, _, _ ->
                     GtvNull
+                },
+                GET_ANCHORING_CONTRACTS_QUERY to { _, _, _ ->
+                    gtv(listOf(GtvObjectMapper.toGtvDictionary(AnchoringContractRell("anchoring", 1337))))
                 }
         ) + queryOverrides
 ) {

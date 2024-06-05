@@ -41,6 +41,7 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
         const val SHOULD_ANCHOR_SYSTEM_ANCHORING_BLOCK_QUERY = "should_anchor_system_anchoring_block"
         const val GET_PREVIOUSLY_ANCHORED_SYSTEM_ANCHORING_BLOCK_HEIGHT_QUERY = "get_previously_anchored_system_anchoring_block_height"
         const val GET_SYSTEM_ANCHORING_BLOCKCHAIN_RID_QUERY = "get_system_anchoring_blockchain_rid"
+        const val GET_ANCHORING_CONTRACTS_QUERY = "get_anchoring_contracts_query"
         const val GET_CURRENT_EVM_SIGNER_LIST_QUERY = "get_current_evm_signer_list"
     }
 

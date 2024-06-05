@@ -149,6 +149,7 @@
                         <configuration>
                             <sourceDirs>
                                 <sourceDir>${project.basedir}/src/main/kotlin</sourceDir>
+                                <sourceDir>${project.basedir}/target/generated-sources</sourceDir>
                             </sourceDirs>
                         </configuration>
                     </execution>
@@ -242,10 +243,35 @@
                 </configuration>
                 <executions>
                     <execution>
+                        <id>test</id>
                         <phase>generate-test-sources</phase>
                         <goals>
                             <goal>generate-sources</goal>
                         </goals>
+                    </execution>
+                    <execution>
+                        <id>main</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>generate-sources</goal>
+                        </goals>
+                        <configuration>
+                            <contract>
+                                <includes>
+                                    <include>Anchoring</include>
+                                </includes>
+                            </contract>
+                            <soliditySourceFiles>
+                                <includes>
+                                    <include>**/Anchoring.sol</include>
+                                </includes>
+                            </soliditySourceFiles>
+                            <outputDirectory>
+                                <bin>${project.basedir}/target/generated-resources</bin>
+                                <java>${project.basedir}/target/generated-sources</java>
+                            </outputDirectory>
+                            <outputFormat>java,bin</outputFormat>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
