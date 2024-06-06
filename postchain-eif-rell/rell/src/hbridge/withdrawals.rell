@@ -1,5 +1,6 @@
 
 // withdrawal from EVM to FT4
+@log
 entity erc20_withdraw {
     key serial: integer;
     network_id: integer;
@@ -34,6 +35,7 @@ struct withdrawal_filter {
     beneficiary: byte_array? = null;
     from: timestamp? = null;
     to: timestamp? = null;
+    tx_rid: byte_array? = null;
 }
 
 function map_withdrawal(withdrawal: erc20_withdraw) = erc20_withdrawal_info(

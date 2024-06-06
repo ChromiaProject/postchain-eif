@@ -138,6 +138,15 @@ function test_get_erc20_withdrawals() {
     assert_equals(wdr10 @ {} (@set .network_id), set([network_id1]));
     assert_equals(wdr10 @ {} (@set .token_address), set([FOO.token_address]));
     assert_equals(wdr10 @ {} (@set .beneficiary), set([bob_evm_address]));
+
+    // Getting withdrawal by tx1.tx_rid
+    val wdr1_tx_rid = erc20_withdraw @ {} (@omit @sort .rowid, .transaction.tx_rid) limit 1;
+    val res11 = get_erc20_withdrawals(withdrawal_filter(tx_rid = wdr1_tx_rid), null, null);
+    val wdr11_actual = parse_paged_withdrawals(res11);
+    assert_equals(wdr11_actual.size(), 1);
+    assert_equals(wdr11_actual @ {} (_ = .network_id, _ = .token_address, _ = .beneficiary, _ = .amount),
+        (network_id1, CHR.token_address, alice_evm_address, 100L)
+    );
 }
 
 function withdraw(

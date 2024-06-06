@@ -152,16 +152,12 @@ function assert_withdraw(serial: integer, evm_address: byte_array, amount: big_i
     ];
     assert_equals(rell.test.get_events()[0], ("eif_event", withdraw_info.to_gtv_pretty()));
 
-    assert_equals(hbridge.get_erc20_withdrawal(network_id1, asset.token_address, evm_address), [
-        struct<hbridge.erc20_withdraw>(
-            serial,
-            network_id = network_id1,
-            token_address = asset.token_address,
-            beneficiary = evm_address,
-            amount,
-            timestamp
-        )
-    ]);
+    val wdr = hbridge.get_erc20_withdrawal(network_id1, asset.token_address, evm_address);
+    assert_equals(wdr.size(), 1);
+    assert_equals(
+        wdr @ {} (_ = .serial, _ = .network_id, _ = .token_address, _ = .beneficiary, _ = .amount, _ = .timestamp),
+        (serial, network_id1, asset.token_address, evm_address, amount, timestamp)
+    );
 }
 
 function create_ft4_account(pubkey: byte_array) {
