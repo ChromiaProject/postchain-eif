@@ -159,12 +159,20 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
 
 // return deposit if we cannot credit it to the account
 function bounce_deposit_event(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
-    emit_withdraw_event(network_id, token_address, beneficiary, amount);
+    emit_withdrawal_event(network_id, token_address, beneficiary, amount);
 }
 
-function emit_withdraw_event(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
+function emit_withdrawal_event(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
     val next_serial = common.event_counter.counter + 1;
     common.event_counter.counter = next_serial;
+
+    val event_hash = get_withdrawal_event_evm_hash(
+        next_serial,
+        network_id,
+        token_address,
+        beneficiary,
+        amount
+    );
 
     create erc20_withdraw(
         serial = next_serial,
@@ -172,7 +180,8 @@ function emit_withdraw_event(network_id: integer, token_address: byte_array, ben
         token_address,
         beneficiary,
         amount,
-        timestamp = op_context.last_block_time
+        timestamp = op_context.last_block_time,
+        event_hash
     );
 
     val withdraw_info = [
@@ -184,4 +193,21 @@ function emit_withdraw_event(network_id: integer, token_address: byte_array, ben
     ];
 
     op_context.emit_event("eif_event", withdraw_info.to_gtv());
+}
+
+function get_withdrawal_event_evm_hash(
+    serial: integer,
+    network_id: integer,
+    token_address: byte_array,
+    beneficiary: byte_array,
+    amount: big_integer
+): byte_array {
+
+    val data = utils.integer_to_32_byte_array(serial)
+        + utils.integer_to_32_byte_array(network_id)
+        + utils.evm_address_to_32_byte_array(token_address)
+        + utils.evm_address_to_32_byte_array(beneficiary)
+        + utils.big_integer_to_32_byte_array(amount);
+
+    return crypto.keccak256(data);
 }

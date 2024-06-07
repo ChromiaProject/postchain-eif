@@ -9,6 +9,7 @@ entity erc20_withdraw {
     index beneficiary: byte_array;
     amount: big_integer;
     timestamp;
+    index event_hash: byte_array;
 }
 
 struct erc20_withdrawal_info {
@@ -18,6 +19,7 @@ struct erc20_withdrawal_info {
     beneficiary: byte_array;
     amount: big_integer;
     timestamp;
+    event_hash: byte_array;
 }
 
 /**
@@ -28,6 +30,7 @@ struct erc20_withdrawal_info {
  * @property beneficiary EVM beneficiary address. If null, all beneficiaries are considered.
  * @property from marks the beginning of a time interval. If not null, withdrawals occurring before `from` are excluded.
  * @property to marks the end of a time interval. If not null, withdrawals occurring after `to` are excluded.
+ * @property tx_rid transaction RID in which the withdrawal was initiated
  */
 struct withdrawal_filter {
     network_id: integer? = null;
@@ -45,4 +48,5 @@ function map_withdrawal(withdrawal: erc20_withdraw) = erc20_withdrawal_info(
     beneficiary = withdrawal.beneficiary,
     amount = withdrawal.amount,
     timestamp = withdrawal.timestamp,
+    event_hash = withdrawal.event_hash,
 );

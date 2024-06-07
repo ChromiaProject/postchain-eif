@@ -119,3 +119,7 @@ query get_erc20_deposit_history(deposit_id: rowid): list<erc20_deposit_history_e
 
     return history;
 }
+
+query get_withdrawal_event_hash_by_tx(tx_rid: byte_array): byte_array? {
+    return erc20_withdraw @? { .transaction.tx_rid == tx_rid } ( .event_hash );
+}
