@@ -15,13 +15,15 @@ struct deposited_erc20_event {
     token_address: byte_array;
     amount: big_integer;
     beneficiary: byte_array; // account_id
+    evm_tx_hash: byte_array;
 }
 
 function create_deposited_erc20_event(event: messaging.event_data) = deposited_erc20_event(
     sender = byte_array.from_gtv(event.indexed_values[0]),
     token_address = byte_array.from_gtv(event.indexed_values[1]),
     amount = big_integer.from_gtv(event.non_indexed_values[0]),
-    beneficiary = byte_array.from_gtv(event.non_indexed_values[1])
+    beneficiary = byte_array.from_gtv(event.non_indexed_values[1]),
+    evm_tx_hash = event.tnx_hash,
 );
 
 @extend(messaging.handle_evm_block)
@@ -127,7 +129,8 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
             erc20,
             event.amount,
             deposit_state.pending,
-            last_updated = op_context.last_block_time
+            last_updated = op_context.last_block_time,
+            evm_tx_hash = event.evm_tx_hash,
         );
 
         val creation = ft4.transfer_strategy.pool_assets_with_rules(
@@ -150,7 +153,8 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
             erc20,
             event.amount,
             deposit_state.completed,
-            last_updated = op_context.last_block_time
+            last_updated = op_context.last_block_time,
+            evm_tx_hash = event.evm_tx_hash,
         );
 
         bridge_increase_balance(ft4_account, erc20.asset, event.amount);

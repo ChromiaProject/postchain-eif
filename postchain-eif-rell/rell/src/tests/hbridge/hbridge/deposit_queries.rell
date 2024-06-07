@@ -29,7 +29,7 @@ function test_get_erc20_deposits() {
 
     // Alice is making a deposit
     val amount = 1000L;
-    deposit_from_ethereum(alice_evm_address, amount);
+    deposit_from_ethereum(alice_evm_address, amount, block_height = 1);
     // Asserting that there are no deposits in `completed` or `recalled` states
     assert_equals(
         get_erc20_deposits(deposit_filter(state = deposit_state.completed), null, null),
@@ -60,9 +60,16 @@ function test_get_erc20_deposits() {
         asset_id = chr_asset.id,
         amount = 1000L,
         state = deposit_state.pending,
-        last_updated = rell.test.last_block_time - rell.test.block_interval
+        last_updated = rell.test.last_block_time - rell.test.block_interval,
+        evm_tx_hash = ("TX", 1).hash(),
     );
     assert_equals(dep2, expected_deposit2);
+    // Retrieving the deposit by evm_tx_hash
+    val res2_2 = get_erc20_deposits(deposit_filter(evm_tx_hash = ("TX", 1).hash()), null, null);
+    assert_equals(res2_2.data.size(), 1);
+    val dep2_2 = erc20_deposit_info.from_gtv_pretty(res2_2.data[0]);
+    assert_equals(dep2_2, expected_deposit2);
+
     // History entries
     //  - unknown deposit
     try_call(get_erc20_deposit_history(rowid(integer.MAX_VALUE), *));
@@ -118,12 +125,12 @@ function test_get_erc20_deposits() {
         asset_id = chr_asset.id,
         amount = 1000L,
         state = deposit_state.completed,
-        last_updated = rell.test.last_block_time - rell.test.block_interval
+        last_updated = rell.test.last_block_time - rell.test.block_interval,
+        evm_tx_hash = ("TX", 1).hash(),
     );
     assert_equals(dep4, expected_deposit4);
     // History entries
     //  - deposit dep4 == dep2
-    log(get_erc20_deposit_history(dep4.id));
     assert_equals(get_erc20_deposit_history(dep4.id), [
         erc20_deposit_history_entry(
             deposit_id = dep2.id.to_integer(),
@@ -154,7 +161,8 @@ function test_get_erc20_deposits() {
         asset_id = chr_asset.id,
         amount = 1000L,
         state = deposit_state.pending,
-        last_updated = rell.test.last_block_time - 2 * rell.test.block_interval
+        last_updated = rell.test.last_block_time - 2 * rell.test.block_interval,
+        evm_tx_hash = ("TX", 3).hash(),
     );
     val expected_deposit52 = erc20_deposit_info(
         id = dep5[2].id,
@@ -165,7 +173,8 @@ function test_get_erc20_deposits() {
         asset_id = foo_asset.id,
         amount = 1000L,
         state = deposit_state.pending,
-        last_updated = rell.test.last_block_time - rell.test.block_interval
+        last_updated = rell.test.last_block_time - rell.test.block_interval,
+        evm_tx_hash = ("TX", 4).hash(),
     );
     assert_equals(dep5, [expected_deposit4, expected_deposit51, expected_deposit52]);
     // Checking all `pending` deposits
