@@ -178,7 +178,7 @@ function emit_withdrawal_event(network_id: integer, token_address: byte_array, b
         amount
     );
 
-    create erc20_withdraw(
+    create erc20_withdrawal(
         serial = next_serial,
         network_id,
         token_address,
