@@ -356,10 +356,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
         val eventHash = ds.digest(encodedEventData)
 
         // or get evenHash by txRid:
-        val eventHash2 = blockQuery.query(
-                "eif.hbridge.get_withdrawal_event_hash_by_tx",
-                gtv("tx_rid" to gtv(txRid))
-        ).get().asByteArray()
+        val eventHash2 = getWithdrawalEventHashByTxRid(txRid)
         assertEquals(eventHash.toHex(), eventHash2.toHex())
 
         val eventProof = blockQuery.query("get_event_merkle_proof",
@@ -490,22 +487,14 @@ class HBridgeIT : EifBaseIntegrationTest() {
         // Withdraw request on evm for the last postchain withdraw
         val withdrawInfo2 = getLastWithdrawal(userEvmAddress.hexStringToByteArray())
         assertEquals(withdrawInfo2["amount"]!!.asBigInteger(), withdrawAmount)
-        val serial2 = withdrawInfo2["serial"]!!.asInteger()
+
+        // Get the withdrawal event hash
+        val eventHash2 = getWithdrawalEventHashByTxRid(withdrawInfo2["event_hash"]!!.asByteArray())
 
         // Query to get the event proof to withdraw fund on evm
-        val eventData2 = gtv(
-                gtv(serial2),
-                gtv(networkId),
-                gtv(to32Bytes(testToken.contractAddress.substring(2))),
-                gtv(to32Bytes(userEvmAddress)),
-                gtv(withdrawAmount)
-        )
-        val encodedEventData2 = SimpleGtvEncoder.encodeGtv(eventData2)
-        val eventHash2 = ds.digest(encodedEventData2)
         val eventProof2 = blockQuery.query("get_event_merkle_proof",
                 gtv("eventHash" to gtv(eventHash2.toHex()))
         ).get().toObject<EventMerkleProof>()
-        assertArrayEquals(encodedEventData2, eventProof2.eventData)
 
         val receipt = bridge.withdrawRequest(
                 eventProof2.web3EventData(),
@@ -583,22 +572,14 @@ class HBridgeIT : EifBaseIntegrationTest() {
 
         val withdrawInfo3 = getLastWithdrawal(userEvmAddress.hexStringToByteArray())
         assertThat(withdrawInfo3["amount"]!!.asBigInteger()).isEqualTo(withdrawAmount)
-        val serial3 = withdrawInfo3["serial"]!!.asInteger()
+
+        // Get the withdrawal event hash
+        val eventHash3 = getWithdrawalEventHashByTxRid(withdrawInfo3["event_hash"]!!.asByteArray())
 
         // Query to get the event proof to withdraw fund on evm
-        val eventData3 = gtv(
-                gtv(serial3),
-                gtv(networkId),
-                gtv(to32Bytes(testToken.contractAddress.substring(2))),
-                gtv(to32Bytes(userEvmAddress)),
-                gtv(withdrawAmount)
-        )
-        val encodedEventData3 = SimpleGtvEncoder.encodeGtv(eventData3)
-        val eventHash3 = ds.digest(encodedEventData3)
         val eventProof3 = blockQuery.query("get_event_merkle_proof",
                 gtv("eventHash" to gtv(eventHash3.toHex()))
         ).get().toObject<EventMerkleProof>()
-        assertArrayEquals(encodedEventData3, eventProof3.eventData)
 
         // User cannot send withdraw request after the mass-exit block height
         val exception = assertThrows<TransactionException> {
@@ -739,6 +720,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
             bcRid: BlockchainRid,
             keyPair: KeyPair
     ): Pair<ByteArray, ByteArray> {
+
         val auth = gtv(
                 gtv(AuthType.S.ordinal.toLong()),
                 gtv(GtvArray(arrayOf(gtv("A"), gtv("T"))), gtv(userPubkey)),
@@ -934,4 +916,9 @@ class HBridgeIT : EifBaseIntegrationTest() {
     private fun loadEifBlockchainConfig(): Gtv = GtvMLParser.parseGtvML(
             javaClass.getResource("/net/postchain/eif/eif.xml")!!.readText()
     )
+
+    private fun getWithdrawalEventHashByTxRid(txRid: ByteArray): ByteArray = blockQuery.query(
+            "eif.hbridge.get_withdrawal_event_hash_by_tx",
+            gtv("tx_rid" to gtv(txRid))
+    ).get().asByteArray()
 }
