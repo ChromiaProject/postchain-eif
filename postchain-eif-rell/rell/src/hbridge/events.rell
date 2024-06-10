@@ -170,7 +170,7 @@ function emit_withdrawal_event(network_id: integer, token_address: byte_array, b
     val next_serial = common.event_counter.counter + 1;
     common.event_counter.counter = next_serial;
 
-    val event_hash = get_withdrawal_event_evm_hash(
+    val event_hash = calculate_withdrawal_event_evm_hash(
         next_serial,
         network_id,
         token_address,
@@ -199,7 +199,7 @@ function emit_withdrawal_event(network_id: integer, token_address: byte_array, b
     op_context.emit_event("eif_event", withdraw_info.to_gtv());
 }
 
-function get_withdrawal_event_evm_hash(
+function calculate_withdrawal_event_evm_hash(
     serial: integer,
     network_id: integer,
     token_address: byte_array,
