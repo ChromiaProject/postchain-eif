@@ -918,7 +918,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
     )
 
     private fun getWithdrawalEventHashByTxRid(txRid: ByteArray): ByteArray = blockQuery.query(
-            "eif.hbridge.get_withdrawal_event_hash_by_tx",
-            gtv("tx_rid" to gtv(txRid))
-    ).get().asByteArray()
+            "eif.hbridge.get_erc20_withdrawal_by_tx",
+            gtv("tx_rid" to gtv(txRid), "op_index" to gtv(1))
+    ).get().asDict()["event_hash"]!!.asByteArray()
 }
