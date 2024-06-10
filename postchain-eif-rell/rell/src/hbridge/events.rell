@@ -191,8 +191,8 @@ function emit_withdrawal_event(network_id: integer, token_address: byte_array, b
     val withdraw_info = [
         next_serial.to_gtv(),
         network_id.to_gtv(),
-        utils.to_32_byte_array(token_address).to_gtv(),
-        utils.to_32_byte_array(beneficiary).to_gtv(),
+        utils.evm_address_to_32_byte_array(token_address).to_gtv(),
+        utils.evm_address_to_32_byte_array(beneficiary).to_gtv(),
         amount.to_gtv()
     ];
 

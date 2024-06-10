@@ -146,8 +146,8 @@ function assert_withdraw(serial: integer, evm_address: byte_array, amount: big_i
     val withdraw_info = [
         serial.to_gtv(),
         network_id1.to_gtv(),
-        eif_utils.to_32_byte_array(asset.token_address).to_gtv(),
-        eif_utils.to_32_byte_array(evm_address).to_gtv(),
+        eif_utils.evm_address_to_32_byte_array(asset.token_address).to_gtv(),
+        eif_utils.evm_address_to_32_byte_array(evm_address).to_gtv(),
         amount.to_gtv()
     ];
     assert_equals(rell.test.get_events()[0], ("eif_event", withdraw_info.to_gtv_pretty()));

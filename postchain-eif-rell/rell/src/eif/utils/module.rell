@@ -1,10 +1,8 @@
 @mount('eif.utils')
 module;
 
-function to_32_byte_array(array: byte_array): byte_array = (x"00").repeat(12) + array;
-
 function evm_address_to_32_byte_array(address: byte_array): byte_array {
-    require(address.size() == 20, "Invalid address length %d, must be 32".format(address.size()));
+    require(address.size() == 20, "Invalid address length %d, must be 20 bytes".format(address.size()));
     return (x"00").repeat(12) + address;
 }
 
