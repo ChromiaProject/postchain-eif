@@ -1,6 +1,9 @@
 
 // withdrawal from EVM to FT4
-entity erc20_withdraw {
+@log entity erc20_withdrawal {
+    op_index: integer = op_context.op_index;
+    index transaction, op_index;
+
     key serial: integer;
     network_id: integer;
     token_address: byte_array;
@@ -8,6 +11,7 @@ entity erc20_withdraw {
     index beneficiary: byte_array;
     amount: big_integer;
     timestamp;
+    index event_hash: byte_array;
 }
 
 struct erc20_withdrawal_info {
@@ -17,6 +21,7 @@ struct erc20_withdrawal_info {
     beneficiary: byte_array;
     amount: big_integer;
     timestamp;
+    event_hash: byte_array;
 }
 
 /**
@@ -27,6 +32,7 @@ struct erc20_withdrawal_info {
  * @property beneficiary EVM beneficiary address. If null, all beneficiaries are considered.
  * @property from marks the beginning of a time interval. If not null, withdrawals occurring before `from` are excluded.
  * @property to marks the end of a time interval. If not null, withdrawals occurring after `to` are excluded.
+ * @property tx_rid transaction RID in which the withdrawals were initiated
  */
 struct withdrawal_filter {
     network_id: integer? = null;
@@ -34,13 +40,15 @@ struct withdrawal_filter {
     beneficiary: byte_array? = null;
     from: timestamp? = null;
     to: timestamp? = null;
+    tx_rid: byte_array? = null;
 }
 
-function map_withdrawal(withdrawal: erc20_withdraw) = erc20_withdrawal_info(
+function map_withdrawal(withdrawal: erc20_withdrawal) = erc20_withdrawal_info(
     serial = withdrawal.serial,
     network_id = withdrawal.network_id,
     token_address = withdrawal.token_address,
     beneficiary = withdrawal.beneficiary,
     amount = withdrawal.amount,
     timestamp = withdrawal.timestamp,
+    event_hash = withdrawal.event_hash,
 );

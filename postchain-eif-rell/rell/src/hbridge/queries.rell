@@ -12,8 +12,8 @@ query get_erc20_for_asset(asset_id: byte_array): list<erc20_info> {
 /**
  * @deprecated Use get_erc20_withdrawals()
  */
-query get_erc20_withdrawal(network_id: integer, token_address: byte_array, beneficiary: byte_array): list<struct<erc20_withdraw>> =
-    erc20_withdraw @* {
+query get_erc20_withdrawal(network_id: integer, token_address: byte_array, beneficiary: byte_array): list<struct<erc20_withdrawal>> =
+    erc20_withdrawal @* {
         network_id,
         token_address,
         beneficiary
@@ -30,12 +30,13 @@ query get_erc20_withdrawal(network_id: integer, token_address: byte_array, benef
 query get_erc20_withdrawals(filter: withdrawal_filter, page_size: integer?, page_cursor: text?): ft4.utils.paged_result {
     val before_rowid = ft4.utils.before_rowid(page_cursor);
 
-    val paginated_result = erc20_withdraw @* {
+    val paginated_result = erc20_withdrawal @* {
         filter.network_id == null or .network_id == filter.network_id,
         filter.token_address == null or .token_address == filter.token_address,
         filter.beneficiary == null or .beneficiary == filter.beneficiary,
         filter.from == null or .timestamp >= filter.from!!,
         filter.to == null or .timestamp < filter.to!!,
+        filter.tx_rid == null or .transaction.tx_rid == filter.tx_rid!!,
         .rowid > (before_rowid ?: rowid(0))
     } (
         ft4.utils.pagination_result(
@@ -45,6 +46,16 @@ query get_erc20_withdrawals(filter: withdrawal_filter, page_size: integer?, page
     ) limit ft4.utils.fetch_data_size(page_size);
 
     return ft4.utils.make_page(paginated_result, page_size);
+}
+
+/**
+ * Retrieves ERC20 token withdrawal based on a transaction RID and operation index.
+ *
+ * @param tx_rid transaction RID in which the withdrawal was initiated
+ * @param op_index index of the operation within the transaction in which the withdrawal was initiated
+ */
+query get_erc20_withdrawal_by_tx(tx_rid: byte_array, op_index: integer): erc20_withdrawal_info? {
+    return erc20_withdrawal @? { .transaction.tx_rid == tx_rid, op_index } ( map_withdrawal($) );
 }
 
 query get_account_for_eoa_address(evm_address: byte_array): byte_array? =
@@ -80,6 +91,7 @@ query get_erc20_deposits(filter: deposit_filter, page_size: integer?, page_curso
         filter.token_address == null or .token.token_address == filter.token_address,
         filter.recipient_id == null or .recipient_id == filter.recipient_id,
         filter.state == null or .state == filter.state,
+        filter.evm_tx_hash == null or .evm_tx_hash == filter.evm_tx_hash,
         .rowid > (before_rowid ?: rowid(0))
     } (
         ft4.utils.pagination_result(
@@ -103,7 +115,7 @@ query get_erc20_deposit_history(deposit_id: rowid): list<erc20_deposit_history_e
     val deposit = require(erc20_deposit @? { .rowid == deposit_id }, "Deposit not found: " + deposit_id);
 
     val history = erc20_deposit_history @* { deposit } (
-        @sort @omit .timestamp,
+        @sort @omit .rowid,
         erc20_deposit_history_entry(
             deposit_id = deposit.rowid.to_integer(),
             state = .state,

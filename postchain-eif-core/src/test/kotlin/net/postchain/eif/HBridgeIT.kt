@@ -84,6 +84,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
     private val logger = KotlinLogging.logger("test_logger")
 
     private lateinit var ds: SimpleDigestSystem
+    private val hashCalculator = GtvMerkleHashCalculator(myCS)
 
     private val accountNum = 15
     private val accountBalance = 1L
@@ -309,11 +310,11 @@ class HBridgeIT : EifBaseIntegrationTest() {
                 GtvNull
         )
 
-        authDescriptorId = auth.merkleHash(GtvMerkleHashCalculator(myCS))
+        authDescriptorId = auth.merkleHash(hashCalculator)
         assertEquals(gtv(authDescriptorId), gtvAuthDescriptorId)
 
         withdrawAmount = BigInteger("1234567890", 16)
-        withdrawOnPostchain(userKeyPair, accountId, authDescriptorId, assetId, withdrawAmount, userEvmAddress.hexStringToByteArray(), bcRid)
+        val txRid = withdrawOnPostchain(userKeyPair, accountId, authDescriptorId, assetId, withdrawAmount, userEvmAddress.hexStringToByteArray(), bcRid)
         sealBlock()
         snapshotHeights.add(currentBlockHeight)
 
@@ -353,6 +354,11 @@ class HBridgeIT : EifBaseIntegrationTest() {
         )
         val encodedEventData = SimpleGtvEncoder.encodeGtv(eventData)
         val eventHash = ds.digest(encodedEventData)
+
+        // or get evenHash by txRid:
+        val eventHash2 = getWithdrawalEventHashByTxRid(txRid)
+        assertEquals(eventHash.toHex(), eventHash2.toHex())
+
         val eventProof = blockQuery.query("get_event_merkle_proof",
                 gtv("eventHash" to gtv(eventHash.toHex()))
         ).get().toObject<EventMerkleProof>()
@@ -481,22 +487,14 @@ class HBridgeIT : EifBaseIntegrationTest() {
         // Withdraw request on evm for the last postchain withdraw
         val withdrawInfo2 = getLastWithdrawal(userEvmAddress.hexStringToByteArray())
         assertEquals(withdrawInfo2["amount"]!!.asBigInteger(), withdrawAmount)
-        val serial2 = withdrawInfo2["serial"]!!.asInteger()
+
+        // Get the withdrawal event hash
+        val eventHash2 = getWithdrawalEventHashByTxRid(withdrawInfo2["event_hash"]!!.asByteArray())
 
         // Query to get the event proof to withdraw fund on evm
-        val eventData2 = gtv(
-                gtv(serial2),
-                gtv(networkId),
-                gtv(to32Bytes(testToken.contractAddress.substring(2))),
-                gtv(to32Bytes(userEvmAddress)),
-                gtv(withdrawAmount)
-        )
-        val encodedEventData2 = SimpleGtvEncoder.encodeGtv(eventData2)
-        val eventHash2 = ds.digest(encodedEventData2)
         val eventProof2 = blockQuery.query("get_event_merkle_proof",
                 gtv("eventHash" to gtv(eventHash2.toHex()))
         ).get().toObject<EventMerkleProof>()
-        assertArrayEquals(encodedEventData2, eventProof2.eventData)
 
         val receipt = bridge.withdrawRequest(
                 eventProof2.web3EventData(),
@@ -574,22 +572,14 @@ class HBridgeIT : EifBaseIntegrationTest() {
 
         val withdrawInfo3 = getLastWithdrawal(userEvmAddress.hexStringToByteArray())
         assertThat(withdrawInfo3["amount"]!!.asBigInteger()).isEqualTo(withdrawAmount)
-        val serial3 = withdrawInfo3["serial"]!!.asInteger()
+
+        // Get the withdrawal event hash
+        val eventHash3 = getWithdrawalEventHashByTxRid(withdrawInfo3["event_hash"]!!.asByteArray())
 
         // Query to get the event proof to withdraw fund on evm
-        val eventData3 = gtv(
-                gtv(serial3),
-                gtv(networkId),
-                gtv(to32Bytes(testToken.contractAddress.substring(2))),
-                gtv(to32Bytes(userEvmAddress)),
-                gtv(withdrawAmount)
-        )
-        val encodedEventData3 = SimpleGtvEncoder.encodeGtv(eventData3)
-        val eventHash3 = ds.digest(encodedEventData3)
         val eventProof3 = blockQuery.query("get_event_merkle_proof",
                 gtv("eventHash" to gtv(eventHash3.toHex()))
         ).get().toObject<EventMerkleProof>()
-        assertArrayEquals(encodedEventData3, eventProof3.eventData)
 
         // User cannot send withdraw request after the mass-exit block height
         val exception = assertThrows<TransactionException> {
@@ -730,13 +720,14 @@ class HBridgeIT : EifBaseIntegrationTest() {
             bcRid: BlockchainRid,
             keyPair: KeyPair
     ): Pair<ByteArray, ByteArray> {
+
         val auth = gtv(
                 gtv(AuthType.S.ordinal.toLong()),
                 gtv(GtvArray(arrayOf(gtv("A"), gtv("T"))), gtv(userPubkey)),
                 GtvNull
         )
 
-        val authDescriptorId = auth.merkleHash(GtvMerkleHashCalculator(myCS))
+        val authDescriptorId = auth.merkleHash(hashCalculator)
 
         val b = GtxBuilder(bcRid, listOf(keyPair.pubKey.data), myCS)
         b.addOperation("ft4.admin.register_account", auth)
@@ -746,7 +737,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
                 .buildGtx()
                 .encode())
 
-        val accountId = gtv(userPubkey).merkleHash(GtvMerkleHashCalculator(myCS))
+        val accountId = gtv(userPubkey).merkleHash(hashCalculator)
 
         return accountId to authDescriptorId
     }
@@ -766,7 +757,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
                 opName,
                 opArgs,
                 gtv(0),
-        )).merkleHash(GtvMerkleHashCalculator(myCS))
+        )).merkleHash(hashCalculator)
 
         val message = blockQuery.query("ft4.get_auth_message_template",
                 gtv(mapOf("op_name" to opName, "op_args" to opArgs))).get().asString()
@@ -798,8 +789,10 @@ class HBridgeIT : EifBaseIntegrationTest() {
             accountId: ByteArray, authDescriptorId: ByteArray,
             assetId: ByteArray, withdrawAmount: BigInteger, userEvmAddress: ByteArray,
             bcRid: BlockchainRid
-    ) {
+    ): Hash {
+
         val b = GtxBuilder(bcRid, listOf(userKeyPair.pubKey.data), myCS)
+
         b.addOperation("ft4.ft_auth", gtv(accountId), gtv(authDescriptorId))
         b.addOperation(
                 "eif.hbridge.bridge_ft4_token_to_evm",
@@ -809,11 +802,13 @@ class HBridgeIT : EifBaseIntegrationTest() {
                 gtv(userEvmAddress)
         )
         b.addOperation("nop", GtvInteger(System.currentTimeMillis()))
+
         val signer = cryptoSystem.buildSigMaker(userKeyPair)
-        enqueueTx(b.finish()
-                .sign(signer)
-                .buildGtx()
-                .encode())
+        val tx = b.finish().sign(signer).buildGtx()
+        val txRid = tx.calculateTxRid(hashCalculator)
+        enqueueTx(tx.encode())
+
+        return txRid
     }
 
     // Transfer ft3 token to another account
@@ -921,4 +916,9 @@ class HBridgeIT : EifBaseIntegrationTest() {
     private fun loadEifBlockchainConfig(): Gtv = GtvMLParser.parseGtvML(
             javaClass.getResource("/net/postchain/eif/eif.xml")!!.readText()
     )
+
+    private fun getWithdrawalEventHashByTxRid(txRid: ByteArray): ByteArray = blockQuery.query(
+            "eif.hbridge.get_erc20_withdrawal_by_tx",
+            gtv("tx_rid" to gtv(txRid), "op_index" to gtv(1))
+    ).get().asDict()["event_hash"]!!.asByteArray()
 }

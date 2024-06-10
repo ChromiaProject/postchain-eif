@@ -15,13 +15,15 @@ struct deposited_erc20_event {
     token_address: byte_array;
     amount: big_integer;
     beneficiary: byte_array; // account_id
+    evm_tx_hash: byte_array;
 }
 
 function create_deposited_erc20_event(event: messaging.event_data) = deposited_erc20_event(
     sender = byte_array.from_gtv(event.indexed_values[0]),
     token_address = byte_array.from_gtv(event.indexed_values[1]),
     amount = big_integer.from_gtv(event.non_indexed_values[0]),
-    beneficiary = byte_array.from_gtv(event.non_indexed_values[1])
+    beneficiary = byte_array.from_gtv(event.non_indexed_values[1]),
+    evm_tx_hash = event.tnx_hash,
 );
 
 @extend(messaging.handle_evm_block)
@@ -127,7 +129,8 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
             erc20,
             event.amount,
             deposit_state.pending,
-            last_updated = op_context.last_block_time
+            last_updated = op_context.last_block_time,
+            evm_tx_hash = event.evm_tx_hash,
         );
 
         val creation = ft4.transfer_strategy.pool_assets_with_rules(
@@ -150,7 +153,8 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
             erc20,
             event.amount,
             deposit_state.completed,
-            last_updated = op_context.last_block_time
+            last_updated = op_context.last_block_time,
+            evm_tx_hash = event.evm_tx_hash,
         );
 
         bridge_increase_balance(ft4_account, erc20.asset, event.amount);
@@ -159,20 +163,29 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
 
 // return deposit if we cannot credit it to the account
 function bounce_deposit_event(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
-    emit_withdraw_event(network_id, token_address, beneficiary, amount);
+    emit_withdrawal_event(network_id, token_address, beneficiary, amount);
 }
 
-function emit_withdraw_event(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
+function emit_withdrawal_event(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
     val next_serial = common.event_counter.counter + 1;
     common.event_counter.counter = next_serial;
 
-    create erc20_withdraw(
+    val event_hash = get_withdrawal_event_evm_hash(
+        next_serial,
+        network_id,
+        token_address,
+        beneficiary,
+        amount
+    );
+
+    create erc20_withdrawal(
         serial = next_serial,
         network_id,
         token_address,
         beneficiary,
         amount,
-        timestamp = op_context.last_block_time
+        timestamp = op_context.last_block_time,
+        event_hash
     );
 
     val withdraw_info = [
@@ -184,4 +197,21 @@ function emit_withdraw_event(network_id: integer, token_address: byte_array, ben
     ];
 
     op_context.emit_event("eif_event", withdraw_info.to_gtv());
+}
+
+function get_withdrawal_event_evm_hash(
+    serial: integer,
+    network_id: integer,
+    token_address: byte_array,
+    beneficiary: byte_array,
+    amount: big_integer
+): byte_array {
+
+    val data = utils.integer_to_32_byte_array(serial)
+        + utils.integer_to_32_byte_array(network_id)
+        + utils.evm_address_to_32_byte_array(token_address)
+        + utils.evm_address_to_32_byte_array(beneficiary)
+        + utils.big_integer_to_32_byte_array(amount);
+
+    return crypto.keccak256(data);
 }

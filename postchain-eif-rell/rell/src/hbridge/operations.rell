@@ -42,7 +42,7 @@ operation bridge_ft4_token_to_evm(network_id: integer, asset_id: byte_array, amo
     );
 
     bridge_deduct_balance(from_account, erc20.asset, amount);
-    emit_withdraw_event(erc20.network_id, erc20.token_address, beneficiary, amount);
+    emit_withdrawal_event(erc20.network_id, erc20.token_address, beneficiary, amount);
 }
 
 // if account was not created, we can recall the deposit back to EVM
@@ -57,7 +57,7 @@ operation recall_pending_deposit(sender_address: byte_array) {
         );
 
         bridge_deduct_balance(ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid), asset, amount);
-        emit_withdraw_event(deposit.token.network_id, deposit.token.token_address, sender_address, amount);
+        emit_withdrawal_event(deposit.token.network_id, deposit.token.token_address, sender_address, amount);
 
         update_deposit_state(deposit, deposit_state.recalled);
     }
