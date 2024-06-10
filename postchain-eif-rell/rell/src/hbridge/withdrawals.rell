@@ -1,7 +1,9 @@
 
 // withdrawal from EVM to FT4
-@log
-entity erc20_withdrawal {
+@log entity erc20_withdrawal {
+    op_index: integer = op_context.op_index;
+    index transaction, op_index;
+
     key serial: integer;
     network_id: integer;
     token_address: byte_array;
@@ -30,7 +32,7 @@ struct erc20_withdrawal_info {
  * @property beneficiary EVM beneficiary address. If null, all beneficiaries are considered.
  * @property from marks the beginning of a time interval. If not null, withdrawals occurring before `from` are excluded.
  * @property to marks the end of a time interval. If not null, withdrawals occurring after `to` are excluded.
- * @property tx_rid transaction RID in which the withdrawal was initiated
+ * @property tx_rid transaction RID in which the withdrawals were initiated
  */
 struct withdrawal_filter {
     network_id: integer? = null;
