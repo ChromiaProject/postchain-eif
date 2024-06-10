@@ -76,6 +76,7 @@ class EifBlockBuilderExtension(
             currentTxCtx = ctxt
             currentTxNrOfEvents = 0
         }
+        // Note: the event hash is also calculated on the Rell side and can be obtained through the `evt` argument
         val data = SimpleGtvEncoder.encodeGtv(evt)
         val hash = ds.digest(data)
         store.writeEvent(ctxt, PREFIX, events.size.toLong() + currentTxNrOfEvents, hash, data)
