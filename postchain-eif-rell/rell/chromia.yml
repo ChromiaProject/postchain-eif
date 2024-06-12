@@ -93,12 +93,19 @@ blockchains:
         - "net.postchain.eif.EifSynchronizationInfrastructureExtension"
       eif:
         chains:
-          bsc:
+          bsc: # BSC testnet
             network_id: 97
             contracts:
               - "0x493D0ECf721c375E7Da44a79eA172ba4EdbA3728"
               - "0x753218363422002DF74F3D0D8d67f6CB38bE32D0"
-            skip_to_height: 5801241
+            skip_to_height: 35000000 # Nov-11-2023 10:16:40 AM +UTC
+            events: !include configs/events.yml
+          bsc_mainnet:
+            network_id: 56
+            contracts:
+              - "0x6414FbBf1CC9d9253125e106435619577bAAc2aC"
+              - "0x05192a7e5f343b664d7F140234aF3bd9C0a20F3c"
+            skip_to_height: 30000000 # Jul-16-2023 01:36:22 AM +UTC
             events: !include configs/events.yml
           sepolia:
             network_id: 11155111
