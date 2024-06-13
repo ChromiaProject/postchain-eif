@@ -100,6 +100,13 @@ blockchains:
               - "0x05192a7e5f343b664d7F140234aF3bd9C0a20F3c"
             skip_to_height: 30000000 # Jul-16-2023 01:36:22 AM +UTC
             events: !include configs/events.yml
+          eth: # ETH mainnet
+            network_id: 1
+            contracts:
+              - "0xC7b0F970c1EFBB181194Fc15ccD5C4a2c2Ab863B"
+              - "0xdD8bd1a9927aB550Cf2fC0a9da14702F9c09ac88"
+            skip_to_height: 18000000 # Aug-26-2023 04:21:35 PM +UTC
+            events: !include configs/events.yml
           sepolia:
             network_id: 11155111
             contracts:
