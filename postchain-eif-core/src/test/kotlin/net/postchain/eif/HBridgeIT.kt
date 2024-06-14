@@ -861,11 +861,13 @@ class HBridgeIT : EifBaseIntegrationTest() {
         // adding a new config at height (last + 2)
         // (last + 1) will not work because (last + 1) config already loaded by afterCommit handler
         val newConfigHeight = lastBlockHeight + 2
-        val newRawConfig = GtvEncoder.encodeGtv(gtv(newConfig))
+        val newConfigGtv = gtv(newConfig)
+        val newRawConfig = GtvEncoder.encodeGtv(newConfigGtv)
         addDappBlockchainConfiguration(chainId, newRawConfig, newConfigHeight)
 
         // building at least two blocks to build a block with new signers
         sealBlock()
+        awaitChainRestarted(DEFAULT_CHAIN_IID, currentBlockHeight, newConfigGtv.merkleHash(hashCalculator))
         sealBlock()
 
         // asserting that new config is loaded
