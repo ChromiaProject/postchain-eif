@@ -139,6 +139,7 @@ class EvmEventProcessor(
     private val eventMap = events.associateBy(EventEncoder::encode)
     private val eventSignatures = eventMap.keys.toTypedArray()
 
+    @Volatile
     var lastReadLogBlockHeight = getLastCommittedEvmBlockHeight(networkId) ?: skipToHeight
         private set
 
