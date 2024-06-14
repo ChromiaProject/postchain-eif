@@ -99,7 +99,7 @@ blockchains:
               - "0x6414FbBf1CC9d9253125e106435619577bAAc2aC"
               - "0x05192a7e5f343b664d7F140234aF3bd9C0a20F3c"
             skip_to_height: 30000000 # Jul-16-2023 01:36:22 AM +UTC
-            evm_read_offset: 200
+            evm_read_offset: 100
             events: !include configs/events.yml
           eth: # ETH mainnet
             network_id: 1
