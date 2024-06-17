@@ -30,4 +30,11 @@ contract Anchoring {
         lastAnchoredBlockRid = blockHeaderData.blockRid;
         emit AnchoredBlock(blockHeaderData);
     }
+
+    /**
+     * Provides an atomic read of both height and hash
+     */
+    function getLastAnchoredBlock() public view returns (uint, bytes32) {
+        return (lastAnchoredHeight, lastAnchoredBlockRid);
+    }
 }

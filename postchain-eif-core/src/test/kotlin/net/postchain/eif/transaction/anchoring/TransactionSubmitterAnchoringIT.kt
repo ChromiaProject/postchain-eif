@@ -81,5 +81,9 @@ class TransactionSubmitterAnchoringIT : EifBaseIntegrationTest() {
         // Verify contract state
         assertThat(anchoringContract.lastAnchoredHeight().send().value.longValueExact()).isEqualTo(height)
         assertThat(anchoringContract.lastAnchoredBlockRid().send().value).isEqualTo(actualBlockAtHeight.header.blockRID)
+        // Using the function (should be the same)
+        val lastAnchoredBlockResponse = anchoringContract.lastAnchoredBlock.send()
+        assertThat(lastAnchoredBlockResponse.component1().value.longValueExact()).isEqualTo(height)
+        assertThat(lastAnchoredBlockResponse.component2().value).isEqualTo(actualBlockAtHeight.header.blockRID)
     }
 }
