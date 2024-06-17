@@ -96,8 +96,8 @@ blockchains:
           bsc:
             network_id: 97
             contracts:
-              - "0x493D0ECf721c375E7Da44a79eA172ba4EdbA3728"
-              - "0x753218363422002DF74F3D0D8d67f6CB38bE32D0"
+              - "0x3137801F54e9c6D09529C0Ab88E76a43470EdbBe" # TransparentUpgradeableProxy
+              - "0xAaE0437b279696464f5d49C54f9E8Fe5488F9323" # tCHR
             skip_to_height: 5801241
             events: !include configs/events.yml
           sepolia:
