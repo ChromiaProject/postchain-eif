@@ -82,7 +82,7 @@ test:
       enable_icmf: false
 
 blockchains:
-  eif_event_receiver:
+  eif_event_receiver_test:
     module: eif_event_receiver
     config:
       gtx:
@@ -106,6 +106,57 @@ blockchains:
               - "0xc50D39756779abFF28C45264D74f0352065CD248"
             skip_to_height: 5801241
             events: !include configs/events.yml
+
+  eif_event_receiver_mainnet:
+    module: eif_event_receiver
+    config:
+      gtx:
+        modules:
+          - "net.postchain.eif.EifGTXModule"
+          - "net.postchain.d1.icmf.IcmfSenderGTXModule"
+      sync_ext:
+        - "net.postchain.eif.EifSynchronizationInfrastructureExtension"
+      eif:
+        chains:
+          bsc:
+            network_id: 56
+            evm_read_offset: 100
+            contracts: # TODO
+            skip_to_height: 36375700 # TODO
+            events: !include configs/events.yml
+          ethereum:
+            network_id: 1
+            evm_read_offset: 50
+            contracts: # TODO
+            skip_to_height: 20043373  # TODO
+            events: !include configs/events.yml
+
+  eif_event_receiver_price_oracle_mainnet:
+    module: eif_event_receiver
+    config:
+      gtx:
+        modules:
+          - "net.postchain.eif.EifGTXModule"
+          - "net.postchain.d1.icmf.IcmfSenderGTXModule"
+      sync_ext:
+        - "net.postchain.eif.EifSynchronizationInfrastructureExtension"
+      eif:
+        chains:
+          bsc:
+            network_id: 56
+            evm_read_offset: 100
+            contracts:
+              - '0x6045931E511EF7e53A4A817F971e0CA28c758809'
+            skip_to_height: 39748031
+            events: !include configs/events_price_oracle.yml
+          ethereum:
+            network_id: 1
+            evm_read_offset: 50
+            contracts:
+              - '0xd366Ed22F5b2262A2Da4C32D8A4607C93690134a'
+              - '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+            skip_to_height: 20125551
+            events: !include configs/events_price_oracle.yml
 
   hbridge:
     module: hbridge
