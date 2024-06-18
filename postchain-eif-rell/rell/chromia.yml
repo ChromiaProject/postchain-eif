@@ -98,12 +98,14 @@ blockchains:
             contracts:
               - "0x3137801F54e9c6D09529C0Ab88E76a43470EdbBe" # TransparentUpgradeableProxy
               - "0xAaE0437b279696464f5d49C54f9E8Fe5488F9323" # tCHR
+            evm_read_offset: 10
             skip_to_height: 5801241
             events: !include configs/events.yml
           sepolia:
             network_id: 11155111
             contracts:
               - "0xc50D39756779abFF28C45264D74f0352065CD248"
+            evm_read_offset: 10
             skip_to_height: 5801241
             events: !include configs/events.yml
 
