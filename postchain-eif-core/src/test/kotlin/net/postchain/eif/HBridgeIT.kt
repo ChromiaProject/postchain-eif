@@ -201,7 +201,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
         blockQuery = node.getBlockchainInstance().blockchainEngine.getBlockQueries()
 
         val apiVersion = node.getBlockchainInstance().blockchainEngine.getBlockQueries()
-                .query("api_version", gtv(emptyMap())).get().asInteger()
+                .query("eif.api_version", gtv(emptyMap())).get().asInteger()
         logger.info { "EIF API version: $apiVersion" }
     }
 

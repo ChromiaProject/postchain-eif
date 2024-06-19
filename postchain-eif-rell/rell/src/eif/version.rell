@@ -1,3 +1,4 @@
+@mount('eif')
 module;
 
 // Increment this everytime a query/op is updated or changed
