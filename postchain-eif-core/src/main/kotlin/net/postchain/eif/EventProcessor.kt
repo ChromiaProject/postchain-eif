@@ -140,7 +140,7 @@ class EvmEventProcessor(
     private val eventSignatures = eventMap.keys.toTypedArray()
 
     @Volatile
-    var lastReadLogBlockHeight = getLastCommittedEvmBlockHeight(networkId) ?: skipToHeight
+    var lastReadLogBlockHeight = getLastCommittedEvmBlockHeight(networkId) ?: getSkipToHeight(skipToHeight)
         private set
 
     init {
@@ -345,5 +345,16 @@ class EvmEventProcessor(
             eventBlocks.poll()
             nextLogEvent = eventBlocks.peek()
         }
+    }
+
+    private fun getSkipToHeight(skipToHeight: BigInteger): BigInteger {
+
+        if (skipToHeight < BigInteger.ZERO) {
+
+            val blockNumberReply = web3jRequestHandler.sendWeb3jRequest { it.ethBlockNumber() }
+            return blockNumberReply.blockNumber.plus(skipToHeight)
+        }
+
+        return skipToHeight
     }
 }
