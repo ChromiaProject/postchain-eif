@@ -147,7 +147,8 @@ blockchains:
             evm_read_offset: 100
             contracts:
               - '0x6045931E511EF7e53A4A817F971e0CA28c758809'
-            skip_to_height: 39748031
+              - '0x16b9a82891338f9ba80e2d6970fdda79d1eb0dae'
+            skip_to_height: 39944000
             events: !include configs/events_price_oracle.yml
           ethereum:
             network_id: 1
