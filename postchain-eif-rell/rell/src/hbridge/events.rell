@@ -66,7 +66,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
 
     val erc20 = erc20_asset @? { network_id, .token_address == event.token_address };
     if (erc20 == null) {
-        log("deposit event bounced: ERC20 token not found");
+        log("Deposit event bounced: ERC20 token %s not found".format(event.token_address));
         bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
         return;
     }
@@ -107,13 +107,13 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
         );
 
         if (empty(rules)) {
-            log("deposit event bounced: no rules found for transfer");
+            log("Deposit event bounced: no rules found for transfer");
             bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
             return;
         }
 
         if (not deposit_from_smart_contract and exists(erc20_deposit @* { .recipient_id == recipient_id, erc20 })) {
-            log("deposit event bounced: tokens has already been transferred from EOA account to this recipient, and has not been claimed yet");
+            log("Deposit event bounced: tokens has already been transferred from EOA account to this recipient, and has not been claimed yet");
             bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
             return;
         }
@@ -145,6 +145,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
         create pending_erc20_deposit(deposit, creation);
 
     } else {
+
         create erc20_deposit(
             sender_address = event.sender,
             network_id,

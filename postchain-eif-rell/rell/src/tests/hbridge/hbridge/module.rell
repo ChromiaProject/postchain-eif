@@ -109,7 +109,7 @@ function link_account(
     assert_equals(hbridge.get_eoa_addresses_for_account(account_id), [evm_address]);
 }
 
-function deposit_from_ethereum(
+function deposit_from_evm(
     sender_address: byte_array,
     amount: big_integer,
     block_height: integer = 1,

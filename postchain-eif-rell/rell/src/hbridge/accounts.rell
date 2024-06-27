@@ -49,28 +49,33 @@ function (ft4.accounts.account) {
 
 // accounts might be linked explicitly (e.g. when account_id is not derived from EVM address)
 function _link_evm_eoa_account(address: byte_array, account: ft4.accounts.account) {
+    require(empty(evm_eoa_account_link @? { address }), "EVM address %s is already linked to FT4 account".format(address));
     create evm_eoa_account_link(address, account);
+
+    // there's a possibility that the account_id is different from address hash
+    // collect funds from the pool account here
+    ft4.transfer_strategy.collect_pooled_assets(account, recipient_id = address.hash());
 
     val pending_deposits = erc20_deposit @* { .sender_address == address, deposit_state.pending, .from_smart_contract == false };
     for (deposit in pending_deposits) {
-        // there's a possibility that the account_id is different from address hash
-        // collect funds from the pool account here
-        ft4.transfer_strategy.collect_pooled_assets(account, recipient_id = address.hash());
         update_deposit_state(deposit, deposit_state.completed);
     }
     after_evm_account_linked(address, account, -1, false);
 }
 
 function _link_evm_sc_account(address: byte_array, network_id: integer, account: ft4.accounts.account) {
+    require(empty(evm_sc_account_link @? { address, network_id }), "EVM address %s on EVM chain ID %d is already linked to FT4 account".format(address, network_id));
     create evm_sc_account_link(address, network_id, account);
+
+    // there's a possibility that the account_id is different from address hash
+    // collect funds from the pool account here
+    ft4.transfer_strategy.collect_pooled_assets(account, recipient_id = address.hash());
 
     val pending_deposits = erc20_deposit @* { .sender_address == address, deposit_state.pending, .from_smart_contract == true };
     for (deposit in pending_deposits) {
-        // there's a possibility that the account_id is different from address hash
-        // collect funds from the pool account here
-        ft4.transfer_strategy.collect_pooled_assets(account, recipient_id = address.hash());
         update_deposit_state(deposit, deposit_state.completed);
     }
+
     after_evm_account_linked(address, account, network_id, true);
 }
 

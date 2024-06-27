@@ -18,7 +18,10 @@ function () = ft4.auth.add_auth_handler(
 
 operation link_evm_sc_account(address: byte_array, network_id: integer) {
     val account = ft4.auth.authenticate();
-    require(proposed_evm_sc_account_link @? { account, address, network_id }, "proposal does not exist");
+    require(
+        proposed_evm_sc_account_link @? { account, address, network_id },
+        "Proposed EVM SC account link not found for EVM address %s on chain ID %d".format(address, network_id)
+    );
     _link_evm_sc_account(address, network_id, account);
 }
 

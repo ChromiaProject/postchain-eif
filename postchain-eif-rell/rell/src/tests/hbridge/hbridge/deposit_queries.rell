@@ -29,7 +29,7 @@ function test_get_erc20_deposits() {
 
     // Alice is making a deposit
     val amount = 1000L;
-    deposit_from_ethereum(alice_evm_address, amount, block_height = 1);
+    deposit_from_evm(alice_evm_address, amount, block_height = 1);
     // Asserting that there are no deposits in `completed` or `recalled` states
     assert_equals(
         get_erc20_deposits(deposit_filter(state = deposit_state.completed), null, null),
@@ -81,7 +81,7 @@ function test_get_erc20_deposits() {
     )]);
 
     // Alice is making one more deposit but it will be bounced
-    deposit_from_ethereum(alice_evm_address, amount, block_height = 2);
+    deposit_from_evm(alice_evm_address, amount, block_height = 2);
     val res3 = get_erc20_deposits(
         deposit_filter(network_id = network_id1, token_address = CHR.token_address, recipient_id = alice_evm_deposit_recipient_id),
         null, null
@@ -145,8 +145,8 @@ function test_get_erc20_deposits() {
     ]);
 
     // Bob is making a deposit of CHR and FOO tokens
-    deposit_from_ethereum(bob_evm_address, amount, asset = CHR, block_height = 3);
-    deposit_from_ethereum(bob_evm_address, amount, asset = FOO, block_height = 4);
+    deposit_from_evm(bob_evm_address, amount, asset = CHR, block_height = 3);
+    deposit_from_evm(bob_evm_address, amount, asset = FOO, block_height = 4);
     // Asserting that the new pending deposits added
     val res5 = get_erc20_deposits(deposit_filter(network_id = network_id1), null, null);
     assert_null(res5.next_cursor);
@@ -190,11 +190,11 @@ function test_get_erc20_deposits() {
 
     // Alice is making 20 more deposits
     for (dep in range(20)) {
-        deposit_from_ethereum(alice_evm_address, amount + (1 + dep), block_height = 5 + dep);
+        deposit_from_evm(alice_evm_address, amount + (1 + dep), block_height = 5 + dep);
     }
     // Bob is making 10 more deposits
     for (dep in range(10)) {
-        deposit_from_ethereum(bob_evm_address, amount + (100 + dep), asset = BAR, block_height = 25 + dep, network_id = network_id2);
+        deposit_from_evm(bob_evm_address, amount + (100 + dep), asset = BAR, block_height = 25 + dep, network_id = network_id2);
     }
 
     // Getting all deposits

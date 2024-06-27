@@ -1,4 +1,44 @@
-function test_deposit_foreign_token_from_ethereum_with_already_linked_account() {
+function test_deposit_foreign_token_from_evm_when_account_is_registered_and_erc20_token_is_not_registered() {
+    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val account_id = rell.test.pubkeys.alice.hash();
+
+    // Register ft4 account
+    rell.test.tx().op(
+        admin.external.register_account(auth_descriptor)
+    ).sign(admin_privkey).run();
+
+    // Deposit ERC20 tokens
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+    val amount = 10000000000000000000L;
+    deposit_from_evm(evm_address, amount);
+
+    // There is no deposit for evm_address
+    assert_true(empty(erc20_deposit @* {}));
+
+    // The deposit will be bounced
+    assert_withdraw(1, evm_address, amount);
+}
+
+function test_deposit_foreign_token_from_evm_when_both_account_and_erc20_token_are_not_registered() {
+    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val account_id = rell.test.pubkeys.alice.hash();
+
+    // Build the first block
+    rell.test.block().run();
+
+    // Deposit ERC20 tokens
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+    val amount = 10000000000000000000L;
+    deposit_from_evm(evm_address, amount);
+
+    // There is no deposit for evm_address
+    assert_true(empty(erc20_deposit @* {}));
+
+    // The deposit will be bounced
+    assert_withdraw(1, evm_address, amount);
+}
+
+function test_deposit_foreign_token_from_evm_with_already_linked_account() {
     val ft_asset = register_foreign_asset();
 
     val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
@@ -20,12 +60,12 @@ function test_deposit_foreign_token_from_ethereum_with_already_linked_account() 
 
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), 0L);
 
-    deposit_from_ethereum(evm_address, amount);
+    deposit_from_evm(evm_address, amount);
 
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
 }
 
-function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_linking_once_but_not_twice() {
+function test_deposit_foreign_token_from_evm_will_get_pending_assets_when_linking_once_but_not_twice() {
     val ft_asset = register_foreign_asset();
 
     val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
@@ -41,7 +81,7 @@ function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_l
 
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), 0L);
 
-    deposit_from_ethereum(evm_address, amount);
+    deposit_from_evm(evm_address, amount);
 
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), 0L);
 
@@ -54,7 +94,7 @@ function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_l
 
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
 
-    assert_fails("duplicate key value violates unique constraint",
+    assert_fails("EVM address %s is already linked to FT4 account".format(evm_address),
         link_account(
             rell.test.keypairs.eve,
             rell.test.keypairs.alice,
@@ -69,7 +109,7 @@ function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_l
     rell.test.tx().op(
         admin.external.register_account(auth_descriptor2)
     ).sign(admin_privkey).run();
-    assert_fails("duplicate key value violates unique constraint",
+    assert_fails("EVM address %s is already linked to FT4 account".format(evm_address),
         link_account(
             rell.test.keypairs.eve,
             rell.test.keypairs.bob,
@@ -80,7 +120,7 @@ function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_l
     );
 }
 
-function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_registering_account_and_duplicate_deposit_will_bounce() {
+function test_deposit_foreign_token_from_evm_will_get_pending_assets_when_registering_account_and_duplicate_deposit_will_bounce() {
     val ft_asset = register_foreign_asset();
 
     val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
@@ -88,13 +128,14 @@ function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_r
     val amount = 10000000000000000000L;
     val amount2 = 5000000000000000000L;
 
-    deposit_from_ethereum(evm_address, amount, block_height = 1);
+    deposit_from_evm(evm_address, amount, block_height = 1);
 
     val recipient_id = evm_address.hash();
 
     assert_true("open" in create_on_transfer.get_pending_transfer_strategies(recipient_id));
 
-    deposit_from_ethereum(evm_address, amount2, block_height = 2);
+    // The 2nd deposit will be bounced
+    deposit_from_evm(evm_address, amount2, block_height = 2);
     assert_withdraw(1, evm_address, amount2);
 
     val auth_descriptor = test_utils.create_auth_descriptor(evm_address, ["A", "T"]);
@@ -119,6 +160,7 @@ function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_r
 
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
 
+    // Making sure ft3 and evm accounts are linked
     assert_equals(hbridge.get_account_for_eoa_address(evm_address), ft_account.id);
     assert_equals(hbridge.get_eoa_addresses_for_account(ft_account.id), [evm_address]);
 
@@ -130,17 +172,17 @@ function test_deposit_foreign_token_from_ethereum_will_get_pending_assets_when_r
         .op(auth.external.evm_auth(recipient_id, auth_descriptor.hash(), [signature2]))
         .op(op)
         .nop()
-        .run_must_fail("duplicate key value violates unique constraint");
+        .run_must_fail("EVM address %s is already linked to FT4 account".format(evm_address));
 }
 
-function test_can_recall_unclaimed_deposit_from_ethereum_after_timeout_once_but_not_twice() {
+function test_can_recall_unclaimed_deposit_from_evm_after_timeout_once_but_not_twice() {
     val ft_asset = register_foreign_asset();
 
     val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
 
     val amount = 10000000000000000000L;
 
-    deposit_from_ethereum(evm_address, amount);
+    deposit_from_evm(evm_address, amount);
 
     rell.test.tx()
         .op(hbridge.recall_pending_deposit(evm_address))
