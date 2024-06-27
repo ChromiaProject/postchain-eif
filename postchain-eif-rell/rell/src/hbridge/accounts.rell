@@ -49,6 +49,7 @@ function (ft4.accounts.account) {
 
 // accounts might be linked explicitly (e.g. when account_id is not derived from EVM address)
 function _link_evm_eoa_account(address: byte_array, account: ft4.accounts.account) {
+    require(empty(evm_eoa_account_link @? { address }), "EVM address %s is already linked to FT4 account".format(address));
     create evm_eoa_account_link(address, account);
 
     // there's a possibility that the account_id is different from address hash
@@ -63,6 +64,7 @@ function _link_evm_eoa_account(address: byte_array, account: ft4.accounts.accoun
 }
 
 function _link_evm_sc_account(address: byte_array, network_id: integer, account: ft4.accounts.account) {
+    require(empty(evm_sc_account_link @? { address, network_id }), "EVM address %s on EVM chain ID %d is already linked to FT4 account".format(address, network_id));
     create evm_sc_account_link(address, network_id, account);
 
     // there's a possibility that the account_id is different from address hash

@@ -54,7 +54,7 @@ function test_deposit_foreign_token_from_evm_will_get_pending_assets_when_linkin
 
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
 
-    assert_fails("duplicate key value violates unique constraint",
+    assert_fails("EVM address %s is already linked to FT4 account".format(evm_address),
         link_account(
             rell.test.keypairs.eve,
             rell.test.keypairs.alice,
@@ -69,7 +69,7 @@ function test_deposit_foreign_token_from_evm_will_get_pending_assets_when_linkin
     rell.test.tx().op(
         admin.external.register_account(auth_descriptor2)
     ).sign(admin_privkey).run();
-    assert_fails("duplicate key value violates unique constraint",
+    assert_fails("EVM address %s is already linked to FT4 account".format(evm_address),
         link_account(
             rell.test.keypairs.eve,
             rell.test.keypairs.bob,
@@ -130,7 +130,7 @@ function test_deposit_foreign_token_from_evm_will_get_pending_assets_when_regist
         .op(auth.external.evm_auth(recipient_id, auth_descriptor.hash(), [signature2]))
         .op(op)
         .nop()
-        .run_must_fail("duplicate key value violates unique constraint");
+        .run_must_fail("EVM address %s is already linked to FT4 account".format(evm_address));
 }
 
 function test_can_recall_unclaimed_deposit_from_evm_after_timeout_once_but_not_twice() {
