@@ -1,3 +1,43 @@
+function test_deposit_foreign_token_from_evm_when_account_is_registered_and_erc20_token_is_not_registered() {
+    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val account_id = rell.test.pubkeys.alice.hash();
+
+    // Register ft4 account
+    rell.test.tx().op(
+        admin.external.register_account(auth_descriptor)
+    ).sign(admin_privkey).run();
+
+    // Deposit ERC20 tokens
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+    val amount = 10000000000000000000L;
+    deposit_from_evm(evm_address, amount);
+
+    // There is no deposit for evm_address
+    assert_true(empty(erc20_deposit @* {}));
+
+    // The deposit will be bounced
+    assert_withdraw(1, evm_address, amount);
+}
+
+function test_deposit_foreign_token_from_evm_when_both_account_and_erc20_token_are_not_registered() {
+    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val account_id = rell.test.pubkeys.alice.hash();
+
+    // Build the first block
+    rell.test.block().run();
+
+    // Deposit ERC20 tokens
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+    val amount = 10000000000000000000L;
+    deposit_from_evm(evm_address, amount);
+
+    // There is no deposit for evm_address
+    assert_true(empty(erc20_deposit @* {}));
+
+    // The deposit will be bounced
+    assert_withdraw(1, evm_address, amount);
+}
+
 function test_deposit_foreign_token_from_evm_with_already_linked_account() {
     val ft_asset = register_foreign_asset();
 
@@ -94,6 +134,7 @@ function test_deposit_foreign_token_from_evm_will_get_pending_assets_when_regist
 
     assert_true("open" in create_on_transfer.get_pending_transfer_strategies(recipient_id));
 
+    // The 2nd deposit will be bounced
     deposit_from_evm(evm_address, amount2, block_height = 2);
     assert_withdraw(1, evm_address, amount2);
 
@@ -119,6 +160,7 @@ function test_deposit_foreign_token_from_evm_will_get_pending_assets_when_regist
 
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
 
+    // Making sure ft3 and evm accounts are linked
     assert_equals(hbridge.get_account_for_eoa_address(evm_address), ft_account.id);
     assert_equals(hbridge.get_eoa_addresses_for_account(ft_account.id), [evm_address]);
 
