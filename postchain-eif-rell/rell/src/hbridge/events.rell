@@ -145,6 +145,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
         create pending_erc20_deposit(deposit, creation);
 
     } else {
+
         create erc20_deposit(
             sender_address = event.sender,
             network_id,
