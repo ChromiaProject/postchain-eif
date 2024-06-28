@@ -434,6 +434,80 @@ class HBridgeIT : EifBaseIntegrationTest() {
 
     @Test
     @Order(6)
+    fun `multiple withdraws per block`() {
+        // Multiple withdraws in same block to get multi-level page tree
+        val multiWithdrawAmount = BigInteger.ONE
+        val multiWithdrawTimes = 30
+        logger.info { "withdraw token $multiWithdrawTimes times in one block" }
+        repeat(multiWithdrawTimes - 1) {
+            withdrawOnPostchain(userKeyPair, accountId, authDescriptorId, assetId, multiWithdrawAmount, userEvmAddress.hexStringToByteArray(), bcRid)
+            Thread.sleep(1) // To get unique nop
+        }
+        val lastMultiTxRid = withdrawOnPostchain(userKeyPair, accountId, authDescriptorId, assetId, multiWithdrawAmount, userEvmAddress.hexStringToByteArray(), bcRid)
+        sealBlock()
+        val balanceAfterMultiWithdraw = blockQuery.query("ft4.get_asset_balance",
+                gtv("account_id" to gtv(accountId), "asset_id" to gtv(assetId))).get()["amount"]!!.asBigInteger()
+        assertEquals(depositAmount - withdrawAmount - BigInteger.valueOf(multiWithdrawTimes.toLong()) * multiWithdrawAmount, balanceAfterMultiWithdraw)
+
+        // Just completing the last one on EVM side
+        val lastMultiEventHash = getWithdrawalEventHashByTxRid(lastMultiTxRid)
+
+        val lastMultiEventProof = blockQuery.query("get_event_merkle_proof",
+                gtv("eventHash" to gtv(lastMultiEventHash.toHex()))
+        ).get().toObject<EventMerkleProof>()
+        logger.info { "\trequesting withdrawal of the last withdraw made" }
+        val lastMultiReceipt = bridge.withdrawRequest(
+                lastMultiEventProof.web3EventData(),
+                lastMultiEventProof.web3EventProof(),
+                lastMultiEventProof.web3BlockHeader(),
+                lastMultiEventProof.web3Signatures(),
+                lastMultiEventProof.web3Signers(),
+                lastMultiEventProof.web3ExtraProofData()
+        ).send()
+        // wait some seconds to allow evm node to mine some new blocks
+        // that mature enough to withdraw requesting fund
+        Awaitility.await().atMost(Duration.TEN_SECONDS).until {
+            val block = web3j.ethGetBlockByNumber(DefaultBlockParameter.valueOf(lastMultiReceipt.blockNumber.add(BigInteger.TWO)), false).send()
+            block.block != null
+        }
+        bridge.withdraw(Bytes32(lastMultiEventHash), Address(userEvmAddress)).send()
+        userBalance = testToken.balanceOf(Address(userEvmAddress)).send()
+        assertEquals(userBalance.value, initialMint - depositAmount + withdrawAmount + multiWithdrawAmount)
+
+        logger.info { "\tmaking a new withdrawal in next block" }
+        val nextBlockWithdraw = withdrawOnPostchain(userKeyPair, accountId, authDescriptorId, assetId, multiWithdrawAmount, userEvmAddress.hexStringToByteArray(), bcRid)
+        sealBlock()
+
+        val balanceAfterNextBlockWithdraw = blockQuery.query("ft4.get_asset_balance",
+                gtv("account_id" to gtv(accountId), "asset_id" to gtv(assetId))).get()["amount"]!!.asBigInteger()
+        assertEquals(depositAmount - withdrawAmount - BigInteger.valueOf(multiWithdrawTimes.toLong() + 1L) * multiWithdrawAmount, balanceAfterNextBlockWithdraw)
+
+        val nextBlockEventHash = getWithdrawalEventHashByTxRid(nextBlockWithdraw)
+
+        val nextBlockEventProof = blockQuery.query("get_event_merkle_proof",
+                gtv("eventHash" to gtv(nextBlockEventHash.toHex()))
+        ).get().toObject<EventMerkleProof>()
+        logger.info { "\trequesting withdrawal again" }
+        val nextBlockReceipt = bridge.withdrawRequest(
+                nextBlockEventProof.web3EventData(),
+                nextBlockEventProof.web3EventProof(),
+                nextBlockEventProof.web3BlockHeader(),
+                nextBlockEventProof.web3Signatures(),
+                nextBlockEventProof.web3Signers(),
+                nextBlockEventProof.web3ExtraProofData()
+        ).send()
+
+        Awaitility.await().atMost(Duration.TEN_SECONDS).until {
+            val block = web3j.ethGetBlockByNumber(DefaultBlockParameter.valueOf(nextBlockReceipt.blockNumber.add(BigInteger.TWO)), false).send()
+            block.block != null
+        }
+        bridge.withdraw(Bytes32(nextBlockEventHash), Address(userEvmAddress)).send()
+        userBalance = testToken.balanceOf(Address(userEvmAddress)).send()
+        assertEquals(userBalance.value, initialMint - depositAmount + withdrawAmount + multiWithdrawAmount * BigInteger.TWO)
+    }
+
+    @Test
+    @Order(7)
     fun `transfer ft token to another account`() {
         logger.info { "transfer ft token to another account" }
 
@@ -457,7 +531,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
 
     @Test
     @Disabled
-    @Order(7)
+    @Order(8)
     fun `trigger mass exit`() {
         logger.info { "trigger mass exit" }
 
@@ -480,7 +554,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
 
     @Test
     @Disabled
-    @Order(8)
+    @Order(9)
     fun `withdraw after mass exit`() {
         logger.info { "withdraw token to evm after mass exit" }
 
@@ -518,7 +592,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
 
     @Test
     @Disabled
-    @Order(9)
+    @Order(10)
     fun `withdraw token to evm after mass exit using snapshot`() {
         logger.info { "withdraw token to evm after mass exit using snapshot" }
 
@@ -566,7 +640,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
 
     @Test
     @Disabled
-    @Order(10)
+    @Order(11)
     fun `user can't withdraw token to evm after mass exit block height`() {
         logger.info { "user can't withdraw token to evm after mass exit block height" }
 
@@ -620,7 +694,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
         assertNotNull(latestState)
     }
 
-    @Order(11)
+    @Order(12)
     @Test
     fun `pause token bridge contract`() {
         Transfer(web3j, transactionManager).sendFunds(
