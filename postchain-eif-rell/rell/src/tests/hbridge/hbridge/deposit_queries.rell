@@ -28,7 +28,7 @@ function test_get_erc20_deposits() {
     assert_equals(res1, utils.null_page());
 
     // Alice is making a deposit
-    val amount = 1000L;
+    val amount = 10000000L;
     deposit_from_evm(alice_evm_address, amount, block_height = 1);
     // Asserting that there are no deposits in `completed` or `recalled` states
     assert_equals(
@@ -58,7 +58,7 @@ function test_get_erc20_deposits() {
         recipient_id = alice_evm_deposit_recipient_id,
         from_smart_contract = false,
         asset_id = chr_asset.id,
-        amount = 1000L,
+        amount = 10000000L,
         state = deposit_state.pending,
         last_updated = rell.test.last_block_time - rell.test.block_interval,
         evm_tx_hash = ("TX", 1).hash(),
@@ -123,7 +123,7 @@ function test_get_erc20_deposits() {
         recipient_id = alice_evm_deposit_recipient_id,
         from_smart_contract = false,
         asset_id = chr_asset.id,
-        amount = 1000L,
+        amount = 10000000L,
         state = deposit_state.completed,
         last_updated = rell.test.last_block_time - rell.test.block_interval,
         evm_tx_hash = ("TX", 1).hash(),
@@ -159,7 +159,7 @@ function test_get_erc20_deposits() {
         recipient_id = bob_evm_deposit_recipient_id,
         from_smart_contract = false,
         asset_id = chr_asset.id,
-        amount = 1000L,
+        amount = 10000000L,
         state = deposit_state.pending,
         last_updated = rell.test.last_block_time - 2 * rell.test.block_interval,
         evm_tx_hash = ("TX", 3).hash(),
@@ -171,7 +171,7 @@ function test_get_erc20_deposits() {
         recipient_id = bob_evm_deposit_recipient_id,
         from_smart_contract = false,
         asset_id = foo_asset.id,
-        amount = 1000L,
+        amount = 10000000L,
         state = deposit_state.pending,
         last_updated = rell.test.last_block_time - rell.test.block_interval,
         evm_tx_hash = ("TX", 4).hash(),

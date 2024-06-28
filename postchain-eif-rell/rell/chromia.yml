@@ -40,7 +40,13 @@ test:
             - "*"
           sender: "*"
           recipient: "*"
-          asset: "*"
+          asset:
+            - name: "Chromia"
+              min_amount: 10000000L # 10.0 tCHR
+            - name: "FOO Token"
+              min_amount: 10000000L
+            - name: "BAR Token"
+              min_amount: 10000000L
           timeout_days: 10
           strategy: "open"
 
