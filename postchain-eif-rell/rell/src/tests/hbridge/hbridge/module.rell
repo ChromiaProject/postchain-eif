@@ -140,7 +140,7 @@ function run_block_after_timeout() {
     rell.test.block().run();
 }
 
-function assert_withdraw(serial: integer, evm_address: byte_array, amount: big_integer, asset: asset_info = CHR) {
+function assert_withdraw(serial: integer, evm_address: byte_array, amount: big_integer, asset: asset_info = CHR, expected_nr_withdrawals: integer = 1) {
     val timestamp = if (rell.test.last_block_time_or_null??) (rell.test.last_block_time_or_null!! - rell.test.block_interval) else 0;
 
     val withdraw_info = [
@@ -152,10 +152,11 @@ function assert_withdraw(serial: integer, evm_address: byte_array, amount: big_i
     ];
     assert_equals(rell.test.get_events()[0], ("eif_event", withdraw_info.to_gtv_pretty()));
 
-    val wdr = hbridge.get_erc20_withdrawal(network_id1, asset.token_address, evm_address);
-    assert_equals(wdr.size(), 1);
+    val wdrs = hbridge.get_erc20_withdrawal(network_id1, asset.token_address, evm_address);
+    assert_equals(wdrs.size(), expected_nr_withdrawals);
+    val wdr = wdrs @ {} (@omit @sort_desc .serial, $) limit 1;
     assert_equals(
-        wdr @ {} (_ = .serial, _ = .network_id, _ = .token_address, _ = .beneficiary, _ = .amount, _ = .timestamp),
+        (wdr.serial, wdr.network_id, wdr.token_address, wdr.beneficiary, wdr.amount, wdr.timestamp),
         (serial, network_id1, asset.token_address, evm_address, amount, timestamp)
     );
 }

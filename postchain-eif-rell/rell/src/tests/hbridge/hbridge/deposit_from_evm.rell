@@ -9,7 +9,7 @@ function test_deposit_foreign_token_from_evm_when_account_is_registered_and_erc2
 
     // Deposit ERC20 tokens
     val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
-    val amount = 10000000000000000000L;
+    val amount = 10000000L;
     deposit_from_evm(evm_address, amount);
 
     // There is no deposit for evm_address
@@ -28,7 +28,7 @@ function test_deposit_foreign_token_from_evm_when_both_account_and_erc20_token_a
 
     // Deposit ERC20 tokens
     val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
-    val amount = 10000000000000000000L;
+    val amount = 10000000L;
     deposit_from_evm(evm_address, amount);
 
     // There is no deposit for evm_address
@@ -38,17 +38,21 @@ function test_deposit_foreign_token_from_evm_when_both_account_and_erc20_token_a
     assert_withdraw(1, evm_address, amount);
 }
 
-function test_deposit_foreign_token_from_evm_with_already_linked_account() {
+function test_deposit_foreign_token_from_evm_with_already_created_and_linked_account() {
     val ft_asset = register_foreign_asset();
 
+    // Account
     val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
     val account_id = rell.test.pubkeys.alice.hash();
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+
+    // Register account
     rell.test.tx().op(
         admin.external.register_account(auth_descriptor)
     ).sign(admin_privkey).run();
     val ft_account = accounts.Account(account_id);
 
-    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+    // Link account
     link_account(
         rell.test.keypairs.eve,
         rell.test.keypairs.alice,
@@ -56,35 +60,59 @@ function test_deposit_foreign_token_from_evm_with_already_linked_account() {
         auth_descriptor.hash()
     );
 
-    val amount = 10000000000000000000L;
-
+    // Deposit 1 tCHR, 8.000 tCHR, 10.000.000 tCHR
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), 0L);
-
-    deposit_from_evm(evm_address, amount);
-
-    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
+    deposit_from_evm(evm_address, 1, block_height = 1);
+    deposit_from_evm(evm_address, 8000, block_height = 2);
+    deposit_from_evm(evm_address, 10000000, block_height = 3);
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), 10008001L);
 }
 
-function test_deposit_foreign_token_from_evm_will_get_pending_assets_when_linking_once_but_not_twice() {
+function test_deposit_foreign_token_from_evm_before_account_creation() {
     val ft_asset = register_foreign_asset();
 
+    // Account
     val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
     val account_id = rell.test.pubkeys.alice.hash();
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+
+    // A user can't deposit less than 10 tCHR before account is created,
+    deposit_from_evm(evm_address, 7000000, block_height = 1);
+    assert_true(empty(erc20_deposit @* {}));
+    assert_withdraw(1, evm_address, 7000000);
+
+    // but can deposit 10+ tCHR before account is created,
+    deposit_from_evm(evm_address, 10000000, block_height = 2);
+    val deposit = erc20_deposit @ {} ($.to_struct());
+    assert_equals(deposit.amount, 10000000);
+    assert_equals(deposit.state, deposit_state.pending);
+    assert_equals(erc20_withdrawal @ {} (@sum 1), 1);
+
+    // but only once.
+    deposit_from_evm(evm_address, 11000000, block_height = 3);
+    assert_equals(erc20_deposit @ {} (@sum 1), 1);
+    assert_withdraw(2, evm_address, 11000000, expected_nr_withdrawals = 2);
+
+    // Register account
     rell.test.tx().op(
         admin.external.register_account(auth_descriptor)
     ).sign(admin_privkey).run();
     val ft_account = accounts.Account(account_id);
 
-    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
-
-    val amount = 10000000000000000000L;
-
+    // Accounts are not linked, so balance is 0
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), 0L);
 
-    deposit_from_evm(evm_address, amount);
+    // FT4 account is created but EVM account is not linked, so a user can't deposit
+    deposit_from_evm(evm_address, 8000, block_height = 5);
+    deposit_from_evm(evm_address, 12000000, block_height = 6);
+    // We still have 1 pending deposit
+    val deposit2 = erc20_deposit @ {} ($.to_struct());
+    assert_equals(deposit2.amount, 10000000);
+    assert_equals(deposit2.state, deposit_state.pending);
+    // and 4 bounced deposits
+    assert_equals(erc20_withdrawal @* {} (.amount), [7000000L, 11000000L, 8000L, 12000000L]);
 
-    assert_equals(assets.get_asset_balance(ft_account, ft_asset), 0L);
-
+    // Link accounts
     link_account(
         rell.test.keypairs.eve,
         rell.test.keypairs.alice,
@@ -92,8 +120,15 @@ function test_deposit_foreign_token_from_evm_will_get_pending_assets_when_linkin
         auth_descriptor.hash()
     );
 
-    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
+    // Once accounts are linked, the balance is equal to the amount of the single pending deposit
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), 10000000L);
 
+    // Once accounts are linked, the user can deposit any amount
+    deposit_from_evm(evm_address, 9000, block_height = 8);
+    deposit_from_evm(evm_address, 13000000, block_height = 9);
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), 10000000 + 9000 + 13000000);
+
+    // Trying to link accounts again
     assert_fails("EVM address %s is already linked to FT4 account".format(evm_address),
         link_account(
             rell.test.keypairs.eve,
@@ -104,6 +139,7 @@ function test_deposit_foreign_token_from_evm_will_get_pending_assets_when_linkin
         )
     );
 
+    // Trying to link Alice's EVM account to Bob's FT4 account
     val auth_descriptor2 = test_utils.create_auth_descriptor(rell.test.pubkeys.bob, ["A", "T"]);
     val account_id2 = rell.test.pubkeys.bob.hash();
     rell.test.tx().op(
@@ -120,26 +156,26 @@ function test_deposit_foreign_token_from_evm_will_get_pending_assets_when_linkin
     );
 }
 
-function test_deposit_foreign_token_from_evm_will_get_pending_assets_when_registering_account_and_duplicate_deposit_will_bounce() {
+function test_deposit_foreign_token_from_evm_will_get_pending_assets_when_registering_account_with_evm_address() {
     val ft_asset = register_foreign_asset();
 
+    // Account
     val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
-
-    val amount = 10000000000000000000L;
-    val amount2 = 5000000000000000000L;
-
-    deposit_from_evm(evm_address, amount, block_height = 1);
-
     val recipient_id = evm_address.hash();
+    val auth_descriptor = test_utils.create_auth_descriptor(evm_address, ["A", "T"]);
 
+    val amount = 10000000L;
+    val amount2 = 50000000L;
+
+    // THe first deposit will be created as pending
+    deposit_from_evm(evm_address, amount, block_height = 1);
     assert_true("open" in create_on_transfer.get_pending_transfer_strategies(recipient_id));
 
     // The 2nd deposit will be bounced
     deposit_from_evm(evm_address, amount2, block_height = 2);
     assert_withdraw(1, evm_address, amount2);
 
-    val auth_descriptor = test_utils.create_auth_descriptor(evm_address, ["A", "T"]);
-
+    // Register account
     val op1 = open.ras_transfer_open(auth_descriptor);
     val op2 = strategies.external.register_account();
     val message = strategies.external.get_register_account_message(
@@ -160,7 +196,7 @@ function test_deposit_foreign_token_from_evm_will_get_pending_assets_when_regist
 
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
 
-    // Making sure ft3 and evm accounts are linked
+    // Making sure ft4 and evm accounts are linked
     assert_equals(hbridge.get_account_for_eoa_address(evm_address), ft_account.id);
     assert_equals(hbridge.get_eoa_addresses_for_account(ft_account.id), [evm_address]);
 
@@ -180,7 +216,7 @@ function test_can_recall_unclaimed_deposit_from_evm_after_timeout_once_but_not_t
 
     val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
 
-    val amount = 10000000000000000000L;
+    val amount = 10000000L;
 
     deposit_from_evm(evm_address, amount);
 
