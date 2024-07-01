@@ -53,6 +53,7 @@ class TransactionSubmitter(
         val healthCheckInterval: Long,
         val nodeTxVerificationTimeout: Long,
         val nodeTxVerificationEvmBlocks: Long,
+        val txVerificationTime: Long,
 ) : Shutdownable {
 
     companion object : KLogging() {
@@ -81,7 +82,8 @@ class TransactionSubmitter(
         logger.info {
             "Initializing transaction submitter - chainId: $chainId, networkId: $networkId, " +
                     "txPollInterval: $txPollInterval, healthCheckInterval: $healthCheckInterval, " +
-                    "nodeTxVerificationTimeout: $nodeTxVerificationTimeout, nodeTxVerificationEvmBlocks: $nodeTxVerificationEvmBlocks"
+                    "nodeTxVerificationTimeout: $nodeTxVerificationTimeout, nodeTxVerificationEvmBlocks: $nodeTxVerificationEvmBlocks" +
+                    ", nodeTxVerificationEvmBlocks: $nodeTxVerificationEvmBlocks, txVerificationTime: $txVerificationTime"
         }
 
         // Add transactions to queue and recover states lost on node restart
@@ -516,13 +518,13 @@ class TransactionSubmitter(
         }
     }
 
-    fun getVerifiedTransactions(minMsSinceUpdate: Long): List<EvmPendingTx> {
+    fun getVerifiedTransactions(): List<EvmPendingTx> {
 
         return pendingTransactions.values
                 .filter {
                     it.networkId == networkId &&
-                            (it.status == PendingTxStatus.SUCCESS || it.status == PendingTxStatus.REVERTED) &&
-                            it.created <= Instant.now().minus(minMsSinceUpdate, ChronoUnit.MILLIS).toEpochMilli()
+                            it.status.isCompleted() &&
+                            (it.completedTime ?: Long.MAX_VALUE) <= Instant.now().minus(txVerificationTime, ChronoUnit.MILLIS).toEpochMilli()
                 }
     }
 

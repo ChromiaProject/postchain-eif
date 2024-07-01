@@ -235,9 +235,9 @@ blockchains:
             network_id: 11155111
             max_gas_price: 4100000000
             min_wallet_balance: 100000000000
-        gas_limit: 9000000
-        node_tx_verification_evm_blocks: 10
-        tx_verification_time: 20000
+            node_tx_verification_evm_blocks: 10
+            tx_verification_time: 20000
+            gas_limit: 9000000
       sync_ext:
         - "net.postchain.eif.transaction.TransactionSubmitterSynchronizationInfrastructureExtension"
         - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"
