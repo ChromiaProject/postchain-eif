@@ -80,8 +80,8 @@ function get_system_chain_validator_contracts(
                     network_id = contract.network_id
                 ));
             }
+            return validator_contracts;
         }
-        return validator_contracts;
     }
 
     return null;

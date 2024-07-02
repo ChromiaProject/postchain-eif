@@ -14,7 +14,7 @@ operation create_evm_submit_transaction_op(contract_address: text, function_name
         parameter_values = list(),
         network_id = network_id,
         max_priority_fee_per_gas = 1,
-        max_fee_per_gas = 4000000000), x"");
+        max_fee_per_gas = 4000000000), x"22222222222222222222222222222222");
 }
 
 operation update_evm_transaction_status_helper_op(row_id: rowid, status: transaction_status) {

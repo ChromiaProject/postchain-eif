@@ -65,13 +65,13 @@ test:
             validator_contract: "anchoring_validator"
             network_id: 11155111
       system_chain_bridges:
-        - blockchain_rid: x""
+        - blockchain_rid: x"22222222222222222222222222222222"
           bridge_contracts:
-            - address: "address"
-              validator_contract: "validator"
+            - address: "system_bridge_address"
+              validator_contract: "system_bridge_validator"
               network_id: 1
-            - address: "address1"
-              validator_contract: "validator"
+            - address: "system_bridge_address1"
+              validator_contract: "system_bridge_validator1"
               network_id: 11155111
       contract_tx_rate_limit: 60000
       tx_node_submit_timeout: 1800000 # 30m
