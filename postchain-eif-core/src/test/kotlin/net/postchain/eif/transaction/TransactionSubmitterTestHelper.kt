@@ -146,9 +146,9 @@ fun mkEvmSubmitTxRequest(
         )
 )
 
-fun mkEvmPendingDbTx(blockNumber: Long? = null) = EvmPendingTx(
+fun mkEvmPendingDbTx(blockNumber: Long? = null, networkId: Long = 1337) = EvmPendingTx(
         0,
-        1337,
+        networkId,
         "contractAddress",
         "functionName",
         listOf("address[]"),

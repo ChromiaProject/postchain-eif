@@ -119,10 +119,19 @@ class EvmPendingTx(
         var created: Long = System.currentTimeMillis(),
         var blockNumber: BigInteger? = null,
         var blockHash: String? = null,
-        var status: PendingTxStatus = PendingTxStatus.VERIFYING,
         var effectiveGasPrice: BigInteger? = null,
         var gasUsed: BigInteger? = null,
 ) {
+    var completedTime: Long? = null
+            private set
+    var status: PendingTxStatus = PendingTxStatus.VERIFYING
+        set(value) {
+            field = value
+            if (value.isCompleted()) {
+                completedTime = System.currentTimeMillis()
+            }
+        }
+
     companion object {
         fun fromEvmSubmitTxRellRequest(txPending: EvmSubmitTxRellRequest, txHash: String): EvmPendingTx {
             return EvmPendingTx(

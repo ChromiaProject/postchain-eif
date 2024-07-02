@@ -39,7 +39,6 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     private lateinit var module: GTXModule
     private lateinit var privKey: ByteArray
     private lateinit var pubKey: ByteArray
-    private var txVerificationTime: Long = Long.MAX_VALUE
     private var verifyTransactions: Boolean = true
 
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
@@ -206,7 +205,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
             bctx.addAfterCommitHook { txSubmitter.clearSubmitTxUpdates(submitTxUpdates) }
 
             // Verified transaction updates
-            txSubmitter.getVerifiedTransactions(txVerificationTime).forEach {
+            txSubmitter.getVerifiedTransactions().forEach {
 
                 if (continueProcessTx(module, bctx, it.rowId)) {
 
@@ -360,14 +359,13 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
     fun getTransactionSubmitter(networkId: Long) = transactionSubmitters[networkId]
 
-    fun setConfig(privKey: ByteArray, pubKey: ByteArray, txVerificationTime: Long, verifyTransactions: Boolean) {
+    fun setConfig(privKey: ByteArray, pubKey: ByteArray, verifyTransactions: Boolean) {
         this.privKey = privKey
         this.pubKey = pubKey
         this.sigMaker = cryptoSystem.buildSigMaker(KeyPair(pubKey, privKey))
-        this.txVerificationTime = txVerificationTime
         this.verifyTransactions = verifyTransactions
 
-        logger.info { "Transaction submitter special tx extension config: txVerificationTime: $txVerificationTime, verifyTransactions: $verifyTransactions" }
+        logger.info { "Transaction submitter special tx extension config: verifyTransactions: $verifyTransactions" }
     }
 
     private fun addNoOp(operations: MutableList<OpData>, bctx: BlockEContext) {

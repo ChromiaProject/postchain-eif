@@ -49,7 +49,6 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                 ext.setConfig(
                         postchainContext.appConfig.privKeyByteArray,
                         postchainContext.appConfig.pubKeyByteArray,
-                        transactionSubmitterBlockchainConfig.txVerificationTime,
                         !nodeIsReplica
                 )
 
@@ -80,7 +79,7 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                         val transactionManagers =
                                 web3jServicesMap.map { it.key to RawTransactionManager(it.value, credentials) }
                                         .toMap()
-                        val gasProvider = StaticGasProvider(BigInteger.valueOf(networkBlockchainConfig.maxGasPrice), BigInteger.valueOf(transactionSubmitterBlockchainConfig.gasLimit))
+                        val gasProvider = StaticGasProvider(BigInteger.valueOf(networkBlockchainConfig.maxGasPrice), BigInteger.valueOf(networkBlockchainConfig.gasLimit))
                         val queue = loadTxQueue(process.blockchainEngine.chainID, databaseOperations, networkId, blockchainConfig.module)
                         val transactionSubmitter = TransactionSubmitter(
                                 web3jRequestHandler,
@@ -95,7 +94,8 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                                 BigInteger.valueOf(networkBlockchainConfig.minWalletBalance),
                                 appConfig.healthCheckInterval,
                                 transactionSubmitterBlockchainConfig.nodeTxVerificationTimeout,
-                                transactionSubmitterBlockchainConfig.nodeTxVerificationEvmBlocks,
+                                networkBlockchainConfig.nodeTxVerificationEvmBlocks,
+                                networkBlockchainConfig.txVerificationTime,
                         )
                         transactionSubmitters[networkId] = transactionSubmitter
                         ext.addTransactionSubmitter(transactionSubmitter, networkId)

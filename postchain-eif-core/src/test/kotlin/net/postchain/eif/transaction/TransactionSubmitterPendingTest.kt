@@ -3,6 +3,7 @@ package net.postchain.eif.transaction
 import assertk.assertThat
 import assertk.assertions.isEqualTo
 import assertk.assertions.isNotNull
+import assertk.assertions.isTrue
 import net.postchain.eif.Web3jRequestHandler
 import org.apache.logging.log4j.Level
 import org.junit.jupiter.api.Test
@@ -17,6 +18,7 @@ import org.web3j.protocol.core.methods.response.EthGetBalance
 import org.web3j.protocol.core.methods.response.EthGetTransactionReceipt
 import org.web3j.protocol.core.methods.response.EthTransaction
 import org.web3j.tx.gas.ContractGasProvider
+import java.lang.reflect.AccessibleObject
 import java.math.BigInteger
 
 class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
@@ -119,7 +121,6 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
 
         // First poll - get receipt and store block number
         mockWeb3jRequest(web3jRequestHandler, EthGetTransactionReceipt::class, mockTransactionReceiptResponse(5, true))
-//        mockWeb3jRequest(web3jRequestHandler, EthBlockNumber::class, mockBlockNumber(BigInteger.valueOf(5)))
         ts.pollPendingTransaction(txPending, BigInteger.valueOf(5))
 
         assertThat(txPending.blockNumber!!.toLong()).isEqualTo(5)
@@ -133,7 +134,6 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         assertThat(txPending.status).isEqualTo(PendingTxStatus.VERIFYING)
 
         // Third poll with block number 10 - evm has built 5 blocks - lets verify everything
-//        mockWeb3jRequest(web3jRequestHandler, EthBlockNumber::class, mockBlockNumber(BigInteger.TEN))
         mockWeb3jRequest(web3jRequestHandler, EthTransaction::class, mockEthTransactionResponse(
                 "contractAddress",
                 "0x9329efad000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000101010101010101010101010101010101010101"
@@ -145,5 +145,47 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         assertThat(txPending.blockHash).isNotNull()
         assertThat(txPending.effectiveGasPrice).isNotNull()
         assertThat(txPending.gasUsed).isNotNull()
+    }
+
+    @Test
+    fun `get verified transactions - validation timeout not expired`() {
+
+        val web3jRequestHandler = mock<Web3jRequestHandler>()
+
+        val ts = createTransactionSubmitter(
+                web3jRequestHandler,
+                mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
+                mock<ContractGasProvider>()
+        )
+
+        val txPending = mkEvmPendingDbTx(networkId = 0L)
+        txPending.status = PendingTxStatus.SUCCESS
+        val completedTimeField = txPending.javaClass.getDeclaredField("completedTime")
+        AccessibleObject.setAccessible(listOf(completedTimeField).toTypedArray(), true)
+        completedTimeField.set(txPending, Long.MAX_VALUE)
+        ts.addPendingTransaction(txPending)
+
+        assertThat(ts.getVerifiedTransactions().isEmpty()).isTrue()
+    }
+
+    @Test
+    fun `get verified transactions - validation timeout expired`() {
+
+        val web3jRequestHandler = mock<Web3jRequestHandler>()
+
+        val ts = createTransactionSubmitter(
+                web3jRequestHandler,
+                mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
+                mock<ContractGasProvider>()
+        )
+
+        val txPending = mkEvmPendingDbTx(networkId = 0L)
+        txPending.status = PendingTxStatus.SUCCESS
+        val completedTimeField = txPending.javaClass.getDeclaredField("completedTime")
+        AccessibleObject.setAccessible(listOf(completedTimeField).toTypedArray(), true)
+        completedTimeField.set(txPending, 0L)
+        ts.addPendingTransaction(txPending)
+
+        assertThat(ts.getVerifiedTransactions().isNotEmpty()).isTrue()
     }
 }
