@@ -6,6 +6,8 @@ import net.postchain.devtools.IntegrationTestSetup
 import net.postchain.eif.TestLogAppender
 import net.postchain.eif.Web3jRequestHandler
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.GET_TRANSACTION
+import net.postchain.eif.transaction.gas.EIP1559FeeEstimatorFactory
+import net.postchain.eif.transaction.gas.EIP1559LastBlockFeeEstimatorMock
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtx.GTXModule
 import org.apache.logging.log4j.Level
@@ -33,7 +35,6 @@ import org.web3j.protocol.core.methods.response.EthTransaction
 import org.web3j.protocol.core.methods.response.Transaction
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.tx.TransactionManager
-import org.web3j.tx.gas.ContractGasProvider
 import java.math.BigInteger
 import java.util.Optional
 import java.util.concurrent.LinkedBlockingQueue
@@ -65,14 +66,6 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
 
         testLogAppender = TestLogAppender.addAppender(listOf(Level.WARN, Level.ERROR))
         testLogAppender.clear()
-    }
-
-    fun mockGasProvider(gasPrice: Long, gasLimit: Long): ContractGasProvider {
-        val gasProvider = mock<ContractGasProvider> {
-            on { getGasPrice(ArgumentMatchers.anyString()) } doReturn (BigInteger.valueOf(gasPrice))
-            on { getGasLimit(ArgumentMatchers.anyString()) } doReturn (BigInteger.valueOf(gasLimit))
-        }
-        return gasProvider
     }
 
     @OptIn(ExperimentalReflectionOnLambdas::class)
@@ -226,12 +219,21 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
     fun createTransactionSubmitter(
             web3jRequestHandler: Web3jRequestHandler,
             transactionManagers: Map<String, TransactionManager>,
-            gasProvider: ContractGasProvider
+            gasLimitValue: Long = 1,
+            maxGasPriceValue: Long = 1,
+            feeEstimator: EIP1559LastBlockFeeEstimatorMock = EIP1559LastBlockFeeEstimatorMock(1.toBigInteger(), 1.toBigInteger(), 1.toBigInteger(), 1.toBigInteger(), gasUsed = 1, gasLimitValue, maxGasPriceValue)
     ): TransactionSubmitter {
+
+        val feeEstimatorMock = mock<EIP1559FeeEstimatorFactory> {
+            on { gasLimit } doReturn gasLimitValue.toBigInteger()
+            on { maxGasPrice } doReturn maxGasPriceValue.toBigInteger()
+            on { createEstimate() } doReturn feeEstimator
+        }
+
         return TransactionSubmitter(
                 web3jRequestHandler,
                 transactionManagers,
-                gasProvider,
+                feeEstimatorMock,
                 databaseOperations,
                 storage,
                 0,

@@ -268,7 +268,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
             buildBlock(1L)
             assertStatusOperation(txSubmitterTestModule0, txSubmit.rowId, RellTransactionStatus.QUEUED)
-            testLogAppender.assertError("Failed to get balance for request id 0: Failed to send web3j request to all 1 nodes")
+            testLogAppender.assertError("Failed to send web3j request to all 1 nodes")
         }
 
         // Mock rell status for other nodes to be able to verify the operation

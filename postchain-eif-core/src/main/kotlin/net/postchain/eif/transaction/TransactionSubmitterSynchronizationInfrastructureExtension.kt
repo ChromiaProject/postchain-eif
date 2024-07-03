@@ -25,9 +25,9 @@ import net.postchain.gtx.GTXModule
 import net.postchain.gtx.GTXModuleAware
 import net.postchain.core.EContext
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.logger
+import net.postchain.eif.transaction.gas.EIP1559FeeEstimatorFactory
 import org.web3j.crypto.Credentials
 import org.web3j.tx.RawTransactionManager
-import org.web3j.tx.gas.StaticGasProvider
 import java.math.BigInteger
 
 class TransactionSubmitterSynchronizationInfrastructureExtension(private val postchainContext: PostchainContext) : SynchronizationInfrastructureExtension {
@@ -79,12 +79,14 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                         val transactionManagers =
                                 web3jServicesMap.map { it.key to RawTransactionManager(it.value, credentials) }
                                         .toMap()
-                        val gasProvider = StaticGasProvider(BigInteger.valueOf(networkBlockchainConfig.maxGasPrice), BigInteger.valueOf(networkBlockchainConfig.gasLimit))
                         val queue = loadTxQueue(process.blockchainEngine.chainID, databaseOperations, networkId, blockchainConfig.module)
+                        val feeEstimatorFactory = EIP1559FeeEstimatorFactory(web3jRequestHandler,
+                                BigInteger.valueOf(networkBlockchainConfig.gasLimit),
+                                BigInteger.valueOf(networkBlockchainConfig.maxGasPrice))
                         val transactionSubmitter = TransactionSubmitter(
                                 web3jRequestHandler,
                                 transactionManagers,
-                                gasProvider,
+                                feeEstimatorFactory,
                                 databaseOperations,
                                 postchainContext.sharedStorage,
                                 process.blockchainEngine.chainID,
