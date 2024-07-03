@@ -12,8 +12,8 @@ import java.math.BigInteger
 
 class EIP1559LastBlockFeeEstimator(
         private val web3jRequestHandler: Web3jRequestHandler,
-        val gasLimit: BigInteger,           // TX submitter hard max gas limit
-        val maxGasPrice: BigInteger,        // TX submitter hard max gas price (base + priority)
+        val gasLimit: BigInteger,
+        val maxGasPrice: BigInteger,
 ) : EIP1559FeeEstimator {
 
     override val blockNumber: BigInteger
