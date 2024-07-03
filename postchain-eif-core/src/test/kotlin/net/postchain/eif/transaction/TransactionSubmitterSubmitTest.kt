@@ -2,6 +2,7 @@ package net.postchain.eif.transaction
 
 import assertk.assertThat
 import assertk.assertions.isEqualTo
+import mockWeb3jRequestHandler
 import net.postchain.eif.Web3jRequestHandler
 import net.postchain.eif.transaction.gas.EIP1559LastBlockFeeEstimatorMock
 import org.junit.jupiter.api.Test
@@ -49,7 +50,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
     @Test
     fun `fail getting estimated gas`() {
 
-        val web3jRequestHandler = mockBalanceAndEstimateGas(200, null)
+        val web3jRequestHandler = mockWeb3jRequestHandler(200, null)
         val transactionManagers =
                 mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear"))
 
@@ -82,7 +83,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
     @Test
     fun `fail send transaction max fee per gas exceeds limit`() {
 
-        val web3jRequestHandler = mockBalanceAndEstimateGas(200, 10)
+        val web3jRequestHandler = mockWeb3jRequestHandler(200, 10)
         val transactionManagers =
                 mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear"))
 
@@ -91,7 +92,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
                 transactionManagers,
                 maxGasPriceValue = 3,
                 gasLimitValue = 10,
-                feeEstimator = EIP1559LastBlockFeeEstimatorMock(100.toBigInteger(), 1.toBigInteger(), 1.toBigInteger(), 1.toBigInteger(), 1, 1, 1)
+                feeEstimator = EIP1559LastBlockFeeEstimatorMock(100.toBigInteger(), 1.toBigInteger(), 1.toBigInteger(), 1.toBigInteger(), 1, 10, 3)
         )
 
         mockTakenBy()
@@ -101,7 +102,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
                     mkEvmSubmitTxRequest(4)
             )
         }
-        assertThat(exception.message).isEqualTo("Estimated total gas fee 2 for tx exceeds configured limit of 1")
+        assertThat(exception.message).isEqualTo("Estimated total gas fee 4 for tx exceeds configured limit of 3")
 
         verify(databaseOperations).recordTransactionGas(
                 any(),
@@ -109,13 +110,13 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
                 eq(BigInteger.valueOf(3)),
                 eq(BigInteger.valueOf(10))
         )
-        testLogAppender.assertError("Estimated total gas fee 2 for tx exceeds configured limit of 1")
+        testLogAppender.assertError("Estimated total gas fee 4 for tx exceeds configured limit of 3")
     }
 
     @Test
     fun `fail send transaction for all 1 nodes`() {
 
-        val web3jRequestHandler = mockBalanceAndEstimateGas(200, 10)
+        val web3jRequestHandler = mockWeb3jRequestHandler(200, 10)
         val transactionManagers =
                 mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear"))
 
@@ -149,7 +150,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
     @Test
     fun `fail send transaction for all 2 nodes`() {
 
-        val web3jRequestHandler = mockBalanceAndEstimateGas(200, 10)
+        val web3jRequestHandler = mockWeb3jRequestHandler(200, 10)
         val transactionManagers = mapOf(
                 createTransactionManager("http://evm-node-1:9999", "0xfrom", exception = "Oh dear"),
                 createTransactionManager("http://evm-node-2:9999", "0xfrom", hasErrorMsg = "Not found"),

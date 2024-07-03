@@ -22,13 +22,8 @@ import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
-import org.web3j.protocol.Web3j
-import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.Response
-import org.web3j.protocol.core.methods.response.EthBlock
 import org.web3j.protocol.core.methods.response.EthBlockNumber
-import org.web3j.protocol.core.methods.response.EthEstimateGas
-import org.web3j.protocol.core.methods.response.EthGetBalance
 import org.web3j.protocol.core.methods.response.EthGetTransactionReceipt
 import org.web3j.protocol.core.methods.response.EthSendTransaction
 import org.web3j.protocol.core.methods.response.EthTransaction
@@ -66,58 +61,6 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
 
         testLogAppender = TestLogAppender.addAppender(listOf(Level.WARN, Level.ERROR))
         testLogAppender.clear()
-    }
-
-    @OptIn(ExperimentalReflectionOnLambdas::class)
-    fun mockBalanceAndEstimateGas(balanceValue: Long, amountUsedValue: Long?): Web3jRequestHandler {
-
-        val web3jRequestHandler = mock<Web3jRequestHandler> {
-            on {
-                sendWeb3jRequest(argThat<(Web3j) -> Request<*, EthGetBalance>> { it ->
-                    it != null && it.reflect()!!.returnType.arguments[1].type!!.classifier == EthGetBalance::class
-                })
-            } doAnswer {
-                mock<EthGetBalance> {
-                    on { balance } doReturn (BigInteger.valueOf(balanceValue))
-                }
-            }
-            on {
-                sendWeb3jRequest(argThat<(Web3j) -> Request<*, EthEstimateGas>> { it ->
-                    it != null && it.reflect()!!.returnType.arguments[1].type!!.classifier == EthEstimateGas::class
-                })
-            } doAnswer {
-                mock<EthEstimateGas> {
-                    if (amountUsedValue == null) {
-                        on { amountUsed } doThrow (RuntimeException("Failed to get gas estimate"))
-                    } else {
-                        on { amountUsed } doReturn (BigInteger.valueOf(amountUsedValue))
-                    }
-                }
-            }
-            on {
-                sendWeb3jRequest(argThat<(Web3j) -> Request<*, EthBlockNumber>> { it ->
-                    it != null && it.reflect()!!.returnType.arguments[1].type!!.classifier == EthBlockNumber::class
-                })
-            } doAnswer {
-                mock<EthBlockNumber> {
-                    on { blockNumber } doReturn BigInteger.valueOf(123)
-                }
-            }
-            on {
-                sendWeb3jRequest(argThat<(Web3j) -> Request<*, EthBlock>> { it ->
-                    it != null && it.reflect()!!.returnType.arguments[1].type!!.classifier == EthBlock::class
-                })
-            } doAnswer {
-                mock<EthBlock> {
-                    val ethBlock = EthBlock()
-                    val resultBlock = EthBlock.Block()
-                    resultBlock.setBaseFeePerGas("3")
-                    ethBlock.result = resultBlock
-                    on { block } doReturn ethBlock.block
-                }
-            }
-        }
-        return web3jRequestHandler
     }
 
     @OptIn(ExperimentalReflectionOnLambdas::class)
