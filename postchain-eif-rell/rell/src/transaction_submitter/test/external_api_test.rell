@@ -4,7 +4,7 @@ import ^^.*;
 import ^.helper_operations.*;
 
 function test_query_transaction_status() {
-    val contract_address = "address";
+    val contract_address = "system_bridge_address";
     val function_name = "myFunction";
     val parameter_types = ["uint"];
     val parameter_values = [(1).to_gtv()];
@@ -23,7 +23,7 @@ function test_query_transaction_status() {
         parameter_values = parameter_values,
         network_id = network_id,
         max_priority_fee_per_gas = max_priority_fee_per_gas,
-        max_fee_per_gas = max_fee_per_gas), x"")).run();
+        max_fee_per_gas = max_fee_per_gas), x"22222222222222222222222222222222")).run();
 
     assert_equals(get_transaction_status(evm_transaction_id), transaction_status.QUEUED);
 
@@ -31,7 +31,7 @@ function test_query_transaction_status() {
 }
 
 function test_query_transaction_receipt() {
-    val contract_address = "address";
+    val contract_address = "system_bridge_address";
     val function_name = "myFunction";
     val parameter_types = ["uint"];
     val parameter_values = [(1).to_gtv()];
@@ -50,7 +50,7 @@ function test_query_transaction_receipt() {
         parameter_values = parameter_values,
         network_id = network_id,
         max_priority_fee_per_gas = max_priority_fee_per_gas,
-        max_fee_per_gas = max_fee_per_gas), x"")).run();
+        max_fee_per_gas = max_fee_per_gas), x"22222222222222222222222222222222")).run();
 
     val evm_submit_transaction_rowid = evm_submit_transaction @ {}.rowid;
 

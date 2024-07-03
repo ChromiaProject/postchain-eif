@@ -15,14 +15,14 @@ struct network_config {
 function test_create_evm_submit_transaction() {
 
     rell.test.tx().op(create_evm_submit_transaction_operation(evm_submit_transaction_message(
-        contract_address = "address",
+        contract_address = "system_bridge_address",
         function_name = "myFunction",
         parameter_types = list(),
         parameter_values = list(),
         network_id = 1,
         max_priority_fee_per_gas = 1,
         max_fee_per_gas = 4000000000
-    ), x"")).run();
+    ), x"22222222222222222222222222222222")).run();
 
     val evm_submit_transaction = evm_submit_transaction @? {};
 
@@ -38,7 +38,7 @@ function test_not_whitelisted_contracts_are_ignored(){
         parameter_values = list(),
         network_id = 1,
         max_priority_fee_per_gas = 1,
-        max_fee_per_gas = 4000000000), x"")).run();
+        max_fee_per_gas = 4000000000), x"22222222222222222222222222222222")).run();
 
     val evm_submit_transaction = evm_submit_transaction @? {};
 
@@ -48,21 +48,21 @@ function test_not_whitelisted_contracts_are_ignored(){
 function test_fetch_oldest_queued_transactions_per_contract() {
     rell.test.block().run();
     rell.test.tx().op(
-        create_evm_submit_transaction_op("address","myFunction1"),
-        create_evm_submit_transaction_op("address1","myFunction2", 11155111)
+        create_evm_submit_transaction_op("system_bridge_address","myFunction1"),
+        create_evm_submit_transaction_op("system_bridge_address1","myFunction2", 11155111)
     ).run();
 
     rell.test.tx().op(
-        create_evm_submit_transaction_op("address","myFunction3"),
-        create_evm_submit_transaction_op("address1","myFunction4", 11155111)
+        create_evm_submit_transaction_op("system_bridge_address","myFunction3"),
+        create_evm_submit_transaction_op("system_bridge_address1","myFunction4", 11155111)
     ).run();
 
     val evm_submit_transaction = fetch_oldest_queued_transactions_per_contract();
 
     assert_true(evm_submit_transaction.size() == 2);
-    assert_true(evm_submit_transaction[0].contract_address == "address");
+    assert_true(evm_submit_transaction[0].contract_address == "system_bridge_address");
     assert_true(evm_submit_transaction[0].function_name == "myFunction1");
-    assert_true(evm_submit_transaction[1].contract_address == "address1");
+    assert_true(evm_submit_transaction[1].contract_address == "system_bridge_address1");
     assert_true(evm_submit_transaction[1].function_name == "myFunction2");
 }
 
@@ -74,13 +74,13 @@ function test_fetch_oldest_queued_transactions_per_contract_and_taken_by() {
     rell.test.tx().op(
         create_test_evm_submit_transaction(
             x"00",
-            "address",
+            "system_bridge_address",
             "myFunction-1",
             transaction_status.QUEUED,
             get_last_blocktime()),
         create_test_evm_submit_transaction(
             x"01",
-            "address1",
+            "system_bridge_address1",
             "myFunction-2",
             transaction_status.QUEUED,
             get_last_blocktime(),
@@ -105,13 +105,13 @@ function test_fetch_oldest_queued_transactions_per_contract_and_rate_limit() {
     rell.test.tx().op(
         create_test_evm_submit_transaction(
             x"00",
-            "address",
+            "system_bridge_address",
             "myFunction-1",
             transaction_status.QUEUED,
             get_last_blocktime()),
         create_test_evm_submit_transaction(
             x"01",
-            "address",
+            "system_bridge_address",
             "myFunction-1",
             transaction_status.QUEUED,
             get_last_blocktime())
@@ -136,8 +136,8 @@ function test_fail_transactions_with_enough_retries_strategy_all() {
 
     // Submit 2 transactions - 1 not to be touched, 1 to be failed
     rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "address", "myFunction-0", transaction_status.QUEUED, 1),
-        create_test_evm_submit_transaction(x"01", "address", "myFunction-1", transaction_status.QUEUED, 1),
+        create_test_evm_submit_transaction(x"00", "system_bridge_address", "myFunction-0", transaction_status.QUEUED, 1),
+        create_test_evm_submit_transaction(x"01", "system_bridge_address", "myFunction-1", transaction_status.QUEUED, 1),
         add_transaction_taken_by(x"01", rell.test.keypairs.alice.pub),
         fail_transactions_with_enough_retries_op(node_retry_strategy.ALL)
     ).sign(rell.test.keypairs.alice).run();
@@ -155,8 +155,8 @@ function test_fail_transactions_with_enough_retries_strategy_supermajority() {
     rell.test.set_next_block_time(1);
     rell.test.block().run();
     rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "address", "myFunction-0", transaction_status.QUEUED, 1),
-        create_test_evm_submit_transaction(x"01", "address", "myFunction-1", transaction_status.QUEUED, 1),
+        create_test_evm_submit_transaction(x"00", "system_bridge_address", "myFunction-0", transaction_status.QUEUED, 1),
+        create_test_evm_submit_transaction(x"01", "system_bridge_address", "myFunction-1", transaction_status.QUEUED, 1),
         add_transaction_taken_by(x"01", rell.test.keypairs.alice.pub),
         fail_transactions_with_enough_retries_op(node_retry_strategy.SUPERMAJORITY)
     ).sign(rell.test.keypairs.alice).run();
@@ -237,7 +237,7 @@ function test_get_currency_symbol() {
 function test_update_evm_transaction_status_taken_to_pending() {
 
     rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+        create_test_evm_submit_transaction(x"00", "system_bridge_address","myFunction", transaction_status.QUEUED, 0)
     ).run();
 
     val tx_row_id = evm_submit_transaction @ { } ( .rowid );
@@ -253,7 +253,7 @@ function test_update_evm_transaction_status_taken_to_pending() {
 function test_update_evm_transaction_status_taken_to_queued() {
 
     rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+        create_test_evm_submit_transaction(x"00", "system_bridge_address","myFunction", transaction_status.QUEUED, 0)
     ).run();
 
     val tx_row_id = evm_submit_transaction @ { } ( .rowid );
@@ -269,7 +269,7 @@ function test_update_evm_transaction_status_taken_to_queued() {
 function test_update_evm_transaction_status_taken_only_once() {
 
     rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+        create_test_evm_submit_transaction(x"00", "system_bridge_address","myFunction", transaction_status.QUEUED, 0)
     ).run();
 
     val tx_row_id = evm_submit_transaction @ { } ( .rowid );
@@ -284,7 +284,7 @@ function test_update_evm_transaction_status_taken_only_once() {
 function test_update_evm_transaction_status_rejects() {
 
     rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+        create_test_evm_submit_transaction(x"00", "system_bridge_address","myFunction", transaction_status.QUEUED, 0)
     ).run();
 
     val tx_row_id = evm_submit_transaction @ { } ( .rowid );
@@ -313,7 +313,7 @@ function test_update_evm_transaction_status_rejects() {
 function test_update_evm_transaction_status_tx_hash() {
 
     rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+        create_test_evm_submit_transaction(x"00", "system_bridge_address","myFunction", transaction_status.QUEUED, 0)
     ).run();
 
     val tx_row_id = evm_submit_transaction @ { } ( .rowid );
@@ -333,7 +333,7 @@ function test_update_evm_transaction_status_tx_hash() {
 function test_update_evm_transaction_status_SUCCESS() {
 
     rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "address","myFunction", transaction_status.QUEUED, 0)
+        create_test_evm_submit_transaction(x"00", "system_bridge_address","myFunction", transaction_status.QUEUED, 0)
     ).run();
 
     val tx_row_id = evm_submit_transaction @ { } ( .rowid );
