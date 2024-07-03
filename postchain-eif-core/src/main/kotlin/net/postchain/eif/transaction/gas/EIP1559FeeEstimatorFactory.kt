@@ -2,6 +2,7 @@ package net.postchain.eif.transaction.gas
 
 import net.postchain.eif.Web3jRequestHandler
 import net.postchain.eif.transaction.EvmSubmitTxRequest
+import java.math.BigDecimal
 import java.math.BigInteger
 
 interface EIP1559FeeEstimator {
@@ -10,24 +11,27 @@ interface EIP1559FeeEstimator {
     val baseFeePerGas: BigInteger           // Latest block base fee
     val maxPriorityFeePerGas: BigInteger    // Estimated max priority fee to be included in next block
     val maxFeePerGas: BigInteger            // Max total fee per gas to spend on this transaction
+    val estimatedGasUsage: BigInteger       // Estimated gas usage for this transaction
+    val estimatedTotalGasFee: BigInteger    // Estimated total gas cost (estimatedGasUsage * maxFeePerGas)
+    val estimatedGasLimit: BigInteger       // Estimated gas limit (estimatedTotalGasFee * margin).
+                                            // Wallet needs funds to cover for this * maxFeePerGas
 
-    fun validateRequestFees(request: EvmSubmitTxRequest)
-
-    fun estimateAndValidateRequestGasAndBalance(
-            txRequest: EvmSubmitTxRequest,
-            functionData: String,
-            fromAddress: String,
-            chainId: Long
-    )
+    fun validateRequestFees(txRequest: EvmSubmitTxRequest)
 }
 
 open class EIP1559FeeEstimatorFactory(
         private val web3jRequestHandler: Web3jRequestHandler,
         open val gasLimit: BigInteger,           // TX submitter hard max gas limit
         open val maxGasPrice: BigInteger,        // TX submitter hard max gas price (base + priority)
+        open val gasLimitMargin: BigDecimal,     // TX submitter gas limit margin to add to estimated gas limit for a transaction
 ) {
     // Creates instance based on latest evm block fees
-    open fun createEstimate(): EIP1559FeeEstimator {
-        return EIP1559LastBlockFeeEstimator(web3jRequestHandler, gasLimit, maxGasPrice)
+    open fun createEstimate(
+            contractAddress: String,
+            functionData: String,
+            fromAddress: String,
+            chainId: Long
+    ): EIP1559FeeEstimator {
+        return EIP1559LastBlockFeeEstimator(web3jRequestHandler, gasLimit, maxGasPrice, gasLimitMargin, contractAddress, functionData, fromAddress, chainId)
     }
 }

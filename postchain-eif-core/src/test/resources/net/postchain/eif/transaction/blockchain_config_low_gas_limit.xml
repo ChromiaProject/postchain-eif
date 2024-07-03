@@ -52,6 +52,9 @@
                             <entry key="gas_limit">
                                 <int>1</int>
                             </entry>
+                            <entry key="gas_limit_margin">
+                                <string>0.1</string>
+                            </entry>
                             <entry key="node_tx_verification_evm_blocks">
                                 <int>5</int>
                             </entry>

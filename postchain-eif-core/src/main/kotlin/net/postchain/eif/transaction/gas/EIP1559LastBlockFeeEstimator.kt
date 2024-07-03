@@ -7,25 +7,36 @@ import net.postchain.eif.transaction.EvmSubmitTxRequest
 import net.postchain.eif.transaction.TransactionSubmitter.Companion.logger
 import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.methods.request.Transaction
-import org.web3j.protocol.core.methods.response.EthGetBalance
+import java.math.BigDecimal
 import java.math.BigInteger
 
 class EIP1559LastBlockFeeEstimator(
         private val web3jRequestHandler: Web3jRequestHandler,
         val gasLimit: BigInteger,
         val maxGasPrice: BigInteger,
+        val gasLimitMargin: BigDecimal,
+        contractAddress: String,
+        functionData: String,
+        fromAddress: String,
+        chainId: Long
 ) : EIP1559FeeEstimator {
 
     override val blockNumber: BigInteger
     override val baseFeePerGas: BigInteger
     override val maxPriorityFeePerGas: BigInteger
     override val maxFeePerGas: BigInteger
+    override val estimatedGasUsage = getEstimatedGasUsage(gasLimit, contractAddress, functionData, fromAddress, chainId)
+    override val estimatedGasLimit = getEstimatedGasLimit(estimatedGasUsage, gasLimitMargin)
+
+    override val estimatedTotalGasFee: BigInteger
+
+    private val walletBalance = getWalletBalance(fromAddress)
 
     init {
 
         val block = try {
             web3jRequestHandler.sendWeb3jRequest { it.ethGetBlockByNumber(DefaultBlockParameterName.LATEST, false) }
-                .block
+                    .block
         } catch (e: Exception) {
             val errorMessage = "Failed to get latest evm block: ${e.message}"
             logger.error(e) { errorMessage }
@@ -35,39 +46,22 @@ class EIP1559LastBlockFeeEstimator(
         baseFeePerGas = block.baseFeePerGas
         maxPriorityFeePerGas = getEstimatedMaxPriorityFeePerGas()
         maxFeePerGas = baseFeePerGas.add(maxPriorityFeePerGas)
+        estimatedTotalGasFee = estimatedGasUsage * maxFeePerGas
     }
 
-    override fun validateRequestFees(request: EvmSubmitTxRequest) {
+    override fun validateRequestFees(txRequest: EvmSubmitTxRequest) {
 
-        if (request.maxFeePerGas < baseFeePerGas) {
-            throw UserMistake("Max fee per gas less than block base fee. maxFeePerGas: ${request.maxFeePerGas} evm baseFeePerGas: $baseFeePerGas")
+        if (txRequest.maxFeePerGas < baseFeePerGas) {
+            throw UserMistake("Max fee per gas less than block base fee. maxFeePerGas: ${txRequest.maxFeePerGas} evm baseFeePerGas: $baseFeePerGas")
         }
 
-        if (request.maxFeePerGas < maxFeePerGas) {
-            logger.warn { "Transaction ${request.rowId} fee might be too low. maxFeePerGas: ${request.maxFeePerGas} estimated require: $maxFeePerGas" }
+        if (txRequest.maxFeePerGas < maxFeePerGas) {
+            logger.warn { "Transaction ${txRequest.rowId} fee might be too low. maxFeePerGas: ${txRequest.maxFeePerGas} estimated require: $maxFeePerGas" }
         }
 
-        if (request.maxPriorityFeePerGas < maxPriorityFeePerGas) {
-            logger.warn { "Transaction ${request.rowId} fee might be too low. maxPriorityFeePerGas: ${request.maxPriorityFeePerGas} estimated require: $maxPriorityFeePerGas" }
+        if (txRequest.maxPriorityFeePerGas < maxPriorityFeePerGas) {
+            logger.warn { "Transaction ${txRequest.rowId} fee might be too low. maxPriorityFeePerGas: ${txRequest.maxPriorityFeePerGas} estimated require: $maxPriorityFeePerGas" }
         }
-    }
-
-    override fun estimateAndValidateRequestGasAndBalance(
-            txRequest: EvmSubmitTxRequest,
-            functionData: String,
-            fromAddress: String,
-            chainId: Long
-    ) {
-
-        val estimatedGasUsage =
-                try {
-                    getEstimatedGasUsage(gasLimit, txRequest.contractAddress, functionData, fromAddress, chainId)
-                } catch (e: Exception) {
-                    val errorMessage = "Failed to get estimated gas usage for request id ${txRequest.rowId}: ${e.message}"
-                    logger.error(e) { errorMessage }
-                    throw ProgrammerMistake(errorMessage, e)
-                }
-        val estimatedTotalGasFee = estimatedGasUsage * maxFeePerGas
 
         if (estimatedGasUsage > gasLimit) {
             throw UserMistake("Estimated gas usage $estimatedGasUsage for tx ${txRequest.rowId} exceeds configured limit of $gasLimit")
@@ -77,10 +71,12 @@ class EIP1559LastBlockFeeEstimator(
             throw UserMistake("Estimated total gas fee $estimatedTotalGasFee for tx exceeds configured limit of $maxGasPrice")
         }
 
-        val walletBalance = getWalletBalance(fromAddress)
+        if (walletBalance < estimatedTotalGasFee) {
+            throw UserMistake("Insufficient wallet balance (estimatedTotalGasFee: $estimatedTotalGasFee, wallet balance: $walletBalance")
+        }
 
-        if (walletBalance.balance < estimatedTotalGasFee) {
-            throw UserMistake("Insufficient wallet balance (estimatedTotalGasFee: $estimatedTotalGasFee, wallet balance: ${walletBalance.balance}")
+        if (estimatedGasLimit > gasLimit) {
+            throw UserMistake("Estimated gas limit $estimatedGasLimit exceeds configured gas limit $gasLimit")
         }
     }
 
@@ -113,12 +109,13 @@ class EIP1559LastBlockFeeEstimator(
             throw ProgrammerMistake(errorMessage, e)
         }
     }
-    
-    private fun getWalletBalance(fromAddress: String): EthGetBalance {
+
+    private fun getWalletBalance(fromAddress: String): BigInteger {
         return try {
             web3jRequestHandler.sendWeb3jRequest { it.ethGetBalance(fromAddress, DefaultBlockParameterName.LATEST) }
+                    .balance
         } catch (e: Exception) {
-            val errorMessage = "Failed to get balance for request id: ${e.message}"
+            val errorMessage = "Failed to get balance for request: ${e.message}"
             logger.error(e) { errorMessage }
             throw ProgrammerMistake(errorMessage, e)
         }
@@ -135,5 +132,17 @@ class EIP1559LastBlockFeeEstimator(
             logger.error(e) { errorMessage }
             throw ProgrammerMistake(errorMessage, e)
         }
+    }
+
+    private fun getEstimatedGasLimit(estimatedGasUsage: BigInteger, gasLimitMargin: BigDecimal): BigInteger {
+
+        return estimatedGasUsage.add(estimatedGasUsage
+                .toBigDecimal()
+                .times(gasLimitMargin)
+                .toBigInteger())
+    }
+
+    override fun toString(): String {
+        return "gasLimit=$gasLimit, maxGasPrice=$maxGasPrice, blockNumber=$blockNumber, baseFeePerGas=$baseFeePerGas, maxPriorityFeePerGas=$maxPriorityFeePerGas, maxFeePerGas=$maxFeePerGas, estimatedGasUsage=$estimatedGasUsage, estimatedTotalGasFee=$estimatedTotalGasFee, estimatedGasLimit=$estimatedGasLimit, gasLimitMargin=$gasLimitMargin, walletBalance=$walletBalance"
     }
 }

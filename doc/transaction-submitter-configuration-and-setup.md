@@ -2,21 +2,22 @@
 
 ## Transaction Submitter Chain Configuration
 
-| Name                              | Description                                                                                                                                                                                                                                               | Type | Required           | Default  |
-|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------|--------------------|----------|
-| `node_tx_verification_timeout`    | Time out for a transaction submission to be verified as processed on EVM side in milliseconds, if this deadline is passed the transaction submission attempt is considered to have failed and the transaction can be retried by another node.             | int  |                    | 240000   |
+| Name                              | Description                                                                                                                                                                                                                                                                                                                                                | Type | Required           | Default  |
+|-----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------|--------------------|----------|
+| `node_tx_verification_timeout`    | Time out for a transaction submission to be verified as processed on EVM side in milliseconds, if this deadline is passed the transaction submission attempt is considered to have failed and the transaction can be retried by another node. Should never be set to a shorter time than `node_tx_verification_evm_blocks` + `tx_verification_time` takes. | int  |                    | 240000   |
 
 Transaction submitter blockchain configuration also contains configuration per EVM under configuration
 parameter `chains`. Each item in the list have the following configuration properties:
 
-| Name                              | Description                                                                                                                                                                                                                                      | Type | Required           | Default |
-|-----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------|--------------------|---------|
-| `network_id`                      | EVM network ID                                                                                                                                                                                                                                   | int  | :white_check_mark: |         |
-| `max_gas_price`                   | Maximum acceptable gas price for a transaction                                                                                                                                                                                                   | int  | :white_check_mark: |         |
-| `min_wallet_balance`              | Minimum allowed node wallet balance, if node account drops below this it will no longer pick up transactions                                                                                                                                     | int  | :white_check_mark: |         |
-| `gas_limit`                       | The maximum amount of gas that is allowed for any transaction to spend                                                                                                                                                                           | int  | :white_check_mark: |         |
-| `node_tx_verification_evm_blocks` | The number of block confirmations required on the EVM network side to be considered final on the Chromia network side. This offset is used to avoid issues caused by potential EVM chain reorganization.                                         | int  |                    | 100     |
-| `tx_verification_time`            | How long a node should wait until attempting to find consensus on a transaction in milliseconds                                                                                                                                                  | int  |                    | 60000   |
+| Name                              | Description                                                                                                                                                                                              | Type   | Required           | Default |
+|-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------|--------------------|---------|
+| `network_id`                      | EVM network ID                                                                                                                                                                                           | int    | :white_check_mark: |         |
+| `max_gas_price`                   | Maximum acceptable gas price for a transaction                                                                                                                                                           | int    | :white_check_mark: |         |
+| `min_wallet_balance`              | Minimum allowed node wallet balance, if node account drops below this it will no longer pick up transactions                                                                                             | int    | :white_check_mark: |         |
+| `gas_limit`                       | The maximum amount of gas that is allowed for any transaction to spend                                                                                                                                   | int    | :white_check_mark: |         |
+| `node_tx_verification_evm_blocks` | The number of block confirmations required on the EVM network side to be considered final on the Chromia network side. This offset is used to avoid issues caused by potential EVM chain reorganization. | int    |                    | 100     |
+| `tx_verification_time`            | How long a node should wait until attempting to find consensus on a transaction in milliseconds                                                                                                          | int    |                    | 60000   |
+| `gas_limit_margin`                | This is the margin in percent (0-1) to add as transaction gas limit based on the estimated gas usage * this margin                                                                                       | string |                    | 0.1     |
 
 ### Module args
 
@@ -101,9 +102,10 @@ Example:
             network_id: 11155111
             max_gas_price: 4100000000
             min_wallet_balance: 100000000000
-        gas_limit: 9000000
-        node_tx_verification_evm_blocks: 10
-        tx_verification_time: 20000
+            gas_limit: 9000000
+            gasLimitMargin: 0.1
+            node_tx_verification_evm_blocks: 10
+            tx_verification_time: 20000
       sync_ext:
         - "net.postchain.eif.transaction.TransactionSubmitterSynchronizationInfrastructureExtension"
         - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"

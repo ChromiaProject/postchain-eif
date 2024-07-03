@@ -80,9 +80,12 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                                 web3jServicesMap.map { it.key to RawTransactionManager(it.value, credentials) }
                                         .toMap()
                         val queue = loadTxQueue(process.blockchainEngine.chainID, databaseOperations, networkId, blockchainConfig.module)
-                        val feeEstimatorFactory = EIP1559FeeEstimatorFactory(web3jRequestHandler,
+                        val feeEstimatorFactory = EIP1559FeeEstimatorFactory(
+                                web3jRequestHandler,
                                 BigInteger.valueOf(networkBlockchainConfig.gasLimit),
-                                BigInteger.valueOf(networkBlockchainConfig.maxGasPrice))
+                                BigInteger.valueOf(networkBlockchainConfig.maxGasPrice),
+                                networkBlockchainConfig.gasLimitMargin
+                        )
                         val transactionSubmitter = TransactionSubmitter(
                                 web3jRequestHandler,
                                 transactionManagers,

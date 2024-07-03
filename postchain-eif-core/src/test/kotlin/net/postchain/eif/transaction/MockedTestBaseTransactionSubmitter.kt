@@ -12,8 +12,8 @@ import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtx.GTXModule
 import org.apache.logging.log4j.Level
 import org.junit.jupiter.api.BeforeEach
-import org.mockito.ArgumentMatchers
 import org.mockito.ArgumentMatchers.anyLong
+import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argThat
@@ -93,8 +93,8 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
                             any(),
                             any(),
                             any(),
-                            ArgumentMatchers.anyString(),
-                            ArgumentMatchers.anyString(),
+                            anyString(),
+                            anyString(),
                             any()
                     )
                 } doThrow (RuntimeException(exception))
@@ -111,8 +111,8 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
                             any(),
                             any(),
                             any(),
-                            ArgumentMatchers.anyString(),
-                            ArgumentMatchers.anyString(),
+                            anyString(),
+                            anyString(),
                             any()
                     )
                 } doReturn (result)
@@ -162,21 +162,13 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
     fun createTransactionSubmitter(
             web3jRequestHandler: Web3jRequestHandler,
             transactionManagers: Map<String, TransactionManager>,
-            gasLimitValue: Long = 1,
-            maxGasPriceValue: Long = 1,
-            feeEstimator: EIP1559LastBlockFeeEstimatorMock = EIP1559LastBlockFeeEstimatorMock(1.toBigInteger(), 1.toBigInteger(), 1.toBigInteger(), 1.toBigInteger(), gasUsed = 1, gasLimitValue, maxGasPriceValue)
+            feeEstimatorFactory: EIP1559FeeEstimatorFactory
     ): TransactionSubmitter {
-
-        val feeEstimatorMock = mock<EIP1559FeeEstimatorFactory> {
-            on { gasLimit } doReturn gasLimitValue.toBigInteger()
-            on { maxGasPrice } doReturn maxGasPriceValue.toBigInteger()
-            on { createEstimate() } doReturn feeEstimator
-        }
 
         return TransactionSubmitter(
                 web3jRequestHandler,
                 transactionManagers,
-                feeEstimatorMock,
+                feeEstimatorFactory,
                 databaseOperations,
                 storage,
                 0,
@@ -196,5 +188,22 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
                 "status" to gtv(RellTransactionStatus.TAKEN.name),
                 "processed_by" to gtv(ByteArray(32) { 0 })
         )))
+    }
+
+    fun mockFeeEstimatorFactory(
+            gasLimitValue: Long = 1,
+            maxGasPriceValue: Long = 1,
+            gasUsed: Long? = 1L,
+            walletBalance: Long? = 10000000L,
+    ): EIP1559FeeEstimatorFactory {
+
+        val feeEstimatorFactoryMock = mock<EIP1559FeeEstimatorFactory> {
+            on { gasLimit } doReturn gasLimitValue.toBigInteger()
+            on { maxGasPrice } doReturn maxGasPriceValue.toBigInteger()
+            on { createEstimate(anyString(), anyString(), anyString(), anyLong()) } doAnswer {
+                EIP1559LastBlockFeeEstimatorMock(1.toBigInteger(), 1.toBigInteger(), 1.toBigInteger(), 1.toBigInteger(), gasUsed = gasUsed, gasLimitValue, maxGasPriceValue, walletBalance = walletBalance)
+            }
+        }
+        return feeEstimatorFactoryMock
     }
 }
