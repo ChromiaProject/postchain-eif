@@ -147,10 +147,10 @@ Transaction submitter node configuration has the following properties.
 
 #### Chain-specific properties:
 
-| Name                  | Description                                                                       | Type         | Default             | Environment Variable                                   |
-|-----------------------|-----------------------------------------------------------------------------------|--------------|---------------------|--------------------------------------------------------|
-| `${chain}.urls`       | CSV list of URLs for connecting to EVM nodes (HTTP URLs or IPC socket paths)      | list<string> | [ ]                 | `POSTCHAIN_TRANSACTION_SUBMITTER_${CHAIN}_URLS`        |
-| `${chain}.privateKey` | Private key to use for submitting transactions. Will use node keypair by default. | string       | `messaging.privkey` | `POSTCHAIN_TRANSACTION_SUBMITTER_${CHAIN}_PRIVATE_KEY` |
+| Name                     | Description                                                                                                                        | Type         | Default             | Environment Variable                                   |
+|--------------------------|------------------------------------------------------------------------------------------------------------------------------------|--------------|---------------------|--------------------------------------------------------|
+| `${chain}.submitterUrls` | CSV list of URLs for connecting to EVM nodes (HTTP URLs or IPC socket paths). Will fallback to EIF urls property if not specified. | list<string> | `${chain}.urls`     | `POSTCHAIN_TRANSACTION_SUBMITTER_${CHAIN}_URLS`        |
+| `${chain}.privateKey`    | Private key to use for submitting transactions. Will use node keypair by default.                                                  | string       | `messaging.privkey` | `POSTCHAIN_TRANSACTION_SUBMITTER_${CHAIN}_PRIVATE_KEY` |
 
 #### Configuration when running Master-Sub architecture
 
