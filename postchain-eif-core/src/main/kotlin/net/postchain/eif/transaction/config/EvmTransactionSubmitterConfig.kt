@@ -29,7 +29,11 @@ data class EvmTransactionSubmitterConfig(
         @JvmStatic
         fun fromAppConfig(chain: String, config: AppConfig): EvmTransactionSubmitterConfig {
             return EvmTransactionSubmitterConfig(
-                    config.getEnvOrListProperty("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_URLS", "$chain.urls", listOf()),
+                    config.getEnvOrListProperty(
+                            "${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_SUBMITTER_URLS",
+                            "$chain.submitterUrls",
+                            config.getEnvOrListProperty("${EIF_CONFIG_ENV_PREFIX}${chain.uppercase()}_URLS", "$chain.urls", listOf())
+                    ),
                     config.getEnvOrLong(EVM_CONNECT_TIMEOUT, "evm.connectTimeout", 10),
                     config.getEnvOrLong(EVM_READ_TIMEOUT, "evm.readTimeout", 10),
                     config.getEnvOrLong(EVM_WRITE_TIMEOUT, "evm.writeTimeout", 10),
