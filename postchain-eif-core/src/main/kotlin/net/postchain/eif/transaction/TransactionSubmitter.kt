@@ -12,23 +12,20 @@ import mu.KLogging
 import net.postchain.base.withReadWriteConnection
 import net.postchain.base.withWriteConnection
 import net.postchain.common.exception.ProgrammerMistake
-import net.postchain.common.exception.UserMistake
 import net.postchain.core.BlockEContext
 import net.postchain.core.Shutdownable
 import net.postchain.core.Storage
 import net.postchain.eif.GtvToTypeMapper
 import net.postchain.eif.Web3jRequestHandler
+import net.postchain.eif.transaction.gas.EIP1559FeeEstimatorFactory
 import net.postchain.gtv.Gtv
 import okhttp3.internal.toImmutableList
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.TypeReference
 import org.web3j.abi.datatypes.Function
-import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.core.DefaultBlockParameterName
-import org.web3j.protocol.core.methods.request.Transaction
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.tx.TransactionManager
-import org.web3j.tx.gas.ContractGasProvider
 import org.web3j.utils.Numeric
 import java.math.BigInteger
 import java.time.Instant
@@ -42,7 +39,7 @@ import kotlin.coroutines.cancellation.CancellationException
 class TransactionSubmitter(
         private val web3jRequestHandler: Web3jRequestHandler,
         private val transactionManagers: Map<String, TransactionManager>,
-        private val gasProvider: ContractGasProvider,
+        private val feeEstimatorFactory: EIP1559FeeEstimatorFactory,
         private val databaseOperations: TransactionSubmitterDatabaseOperations,
         val storage: Storage,
         val chainId: Long,
@@ -111,7 +108,7 @@ class TransactionSubmitter(
                             try {
                                 submitTransaction(txToSubmit)
                             } catch (e: Exception) {
-                                logger.error("Failed to submit EVM transaction: ${e.message}", e)
+                                logger.error("Failed to submit EVM transaction ${txToSubmit.rowId}: ${e.message}", e)
                                 submitTxUpdates.add(EvmSubmitTransactionResult(txToSubmit.rowId, RellTransactionStatus.QUEUED))
                             }
                         } catch (e: CancellationException) {
@@ -344,65 +341,28 @@ class TransactionSubmitter(
         logger.info { "Submitting transaction ${txRequest.rowId}" }
 
         val fromAddress = transactionManagers.values.first().fromAddress
-        val walletBalance = try {
-            web3jRequestHandler.sendWeb3jRequest { it.ethGetBalance(fromAddress, DefaultBlockParameterName.LATEST) }
-        } catch (e: Exception) {
-            val errorMessage = "Failed to get balance for request id ${txRequest.rowId}: ${e.message}"
-            logger.error(e) { errorMessage }
-            throw ProgrammerMistake(errorMessage, e)
-        }
 
         val functionData = encodeFunction(txRequest.functionName, txRequest.parameterTypes, txRequest.parameterValues)
-        val maxGasPrice = gasProvider.getGasPrice(functionData)
-        val gasLimit = gasProvider.getGasLimit(functionData)
 
         withWriteConnection(storage, chainId) {
-            databaseOperations.recordTransactionGas(it, txRequest.rowId, maxGasPrice, gasLimit)
+            databaseOperations.recordTransactionGas(it, txRequest.rowId, feeEstimatorFactory.maxGasPrice, feeEstimatorFactory.gasLimit)
             true
         }
 
-        val baseFeePerGas = getBaseFeePerGas()
+        val feeEstimator = feeEstimatorFactory.createEstimate()
+        logger.info { "Estimated fees for transaction ${txRequest.rowId} based on evm block ${feeEstimator.blockNumber}: baseFeePerGas: ${feeEstimator.baseFeePerGas} maxPriorityFeePerGas: ${feeEstimator.maxPriorityFeePerGas} maxFeePerGas: ${feeEstimator.maxFeePerGas}" }
 
-        if (txRequest.maxFeePerGas < baseFeePerGas) {
-            throw UserMistake("Max fee per gas less than block base fee. maxFeePerGas: ${txRequest.maxFeePerGas} baseFeePerGas: $baseFeePerGas")
-        }
-
-        val estimatedGasUsage =
-                try {
-                    getEstimatedGasUsage(
-                            txRequest.maxPriorityFeePerGas,
-                            txRequest.maxFeePerGas,
-                            gasLimit,
-                            txRequest.contractAddress,
-                            functionData,
-                            fromAddress,
-                            chainId
-                    )
-                } catch (e: Exception) {
-                    val errorMessage = "Failed to get estimated gas usage for request id ${txRequest.rowId}: ${e.message}"
-                    logger.error(e) { errorMessage }
-                    throw ProgrammerMistake(errorMessage, e)
-                }
-        if (estimatedGasUsage > gasLimit) {
-            throw UserMistake("Estimated gas usage $estimatedGasUsage for tx exceeds limit of $gasLimit")
-        }
-
-        if (walletBalance.balance < txRequest.maxFeePerGas * estimatedGasUsage) {
-            throw UserMistake("Insufficient wallet balance")
-        }
-
-        if (txRequest.maxFeePerGas > maxGasPrice) {
-            throw UserMistake("Max fee per gas ${txRequest.maxFeePerGas} for tx exceeds limit of $maxGasPrice")
-        }
+        feeEstimator.validateRequestFees(txRequest)
+        feeEstimator.estimateAndValidateRequestGasAndBalance(txRequest, functionData, fromAddress, chainId)
 
         for ((rpcUrl, transactionManager) in transactionManagers) {
             try {
 
                 val response = transactionManager.sendEIP1559Transaction(
                         networkId,
-                        txRequest.maxPriorityFeePerGas,
-                        txRequest.maxFeePerGas,
-                        gasLimit,
+                        feeEstimator.maxPriorityFeePerGas,
+                        feeEstimator.maxFeePerGas,
+                        feeEstimatorFactory.gasLimit,
                         txRequest.contractAddress,
                         functionData,
                         BigInteger.ZERO
@@ -434,42 +394,6 @@ class TransactionSubmitter(
 
         val errorMessage = "Failed to send transaction to all ${transactionManagers.size} nodes"
         throw ProgrammerMistake(errorMessage)
-    }
-
-    private fun getEstimatedGasUsage(
-            maxPriorityFeePerGas: BigInteger,
-            maxFeePerGas: BigInteger,
-            gasLimit: BigInteger,
-            contractAddress: String,
-            functionData: String,
-            fromAddress: String,
-            chainId: Long
-    ): BigInteger {
-        val transaction = Transaction(
-                fromAddress,
-                BigInteger.ZERO,
-                null,
-                gasLimit,
-                "0x$contractAddress",
-                BigInteger.ZERO,
-                functionData,
-                chainId,
-                maxPriorityFeePerGas,
-                maxFeePerGas
-        )
-        return web3jRequestHandler.sendWeb3jRequest {
-            it.ethEstimateGas(transaction)
-        }.amountUsed
-    }
-
-    private fun getBaseFeePerGas(): BigInteger {
-        val blockNumber = web3jRequestHandler.sendWeb3jRequest {
-            it.ethBlockNumber()
-        }.blockNumber
-        val baseFeePerGas = web3jRequestHandler.sendWeb3jRequest {
-            it.ethGetBlockByNumber(DefaultBlockParameter.valueOf(blockNumber), false)
-        }.block.baseFeePerGas
-        return baseFeePerGas
     }
 
     fun enqueue(evmSubmitTxRellRequest: EvmSubmitTxRequest) {

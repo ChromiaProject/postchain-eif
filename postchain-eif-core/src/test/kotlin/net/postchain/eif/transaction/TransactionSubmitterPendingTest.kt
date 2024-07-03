@@ -17,7 +17,6 @@ import org.web3j.protocol.core.methods.response.EthBlockNumber
 import org.web3j.protocol.core.methods.response.EthGetBalance
 import org.web3j.protocol.core.methods.response.EthGetTransactionReceipt
 import org.web3j.protocol.core.methods.response.EthTransaction
-import org.web3j.tx.gas.ContractGasProvider
 import java.lang.reflect.AccessibleObject
 import java.math.BigInteger
 
@@ -42,7 +41,6 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
                 mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
-                mock<ContractGasProvider>()
         )
 
         ts.addPendingTransaction(mkEvmPendingDbTx(5))
@@ -63,7 +61,6 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
                 mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
-                mock<ContractGasProvider>()
         )
 
         val txPending = mkEvmPendingDbTx(10)
@@ -88,7 +85,6 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
                 mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
-                mock<ContractGasProvider>()
         )
 
         val txPending = mkEvmPendingDbTx(5)
@@ -114,7 +110,6 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
                 mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
-                mock<ContractGasProvider>()
         )
 
         val txPending = mkEvmPendingDbTx()
@@ -155,7 +150,6 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
                 mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
-                mock<ContractGasProvider>()
         )
 
         val txPending = mkEvmPendingDbTx(networkId = 0L)
@@ -176,7 +170,6 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
                 mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
-                mock<ContractGasProvider>()
         )
 
         val txPending = mkEvmPendingDbTx(networkId = 0L)
