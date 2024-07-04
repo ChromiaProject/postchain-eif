@@ -199,7 +199,7 @@ class ModifyTxStatusOperation(
                             it.created,
                             it.txHash,
                             status,
-                            if (status == RellTransactionStatus.TAKEN) signer else it.processed_by,
+                            if (status == RellTransactionStatus.TAKEN) signer else it.processedBy,
                     )
                 } else {
                     it
