@@ -3,9 +3,11 @@ package net.postchain.eif.transaction
 import assertk.assertThat
 import assertk.assertions.isEqualTo
 import assertk.assertions.isNotNull
+import assertk.assertions.isTrue
 import net.postchain.devtools.getModules
 import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.contracts.Validator
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_RECEIPT
 import org.apache.logging.log4j.Level
 import org.awaitility.Awaitility
 import org.awaitility.Duration
@@ -55,6 +57,11 @@ class TransactionSubmitterTimeoutIT : EifBaseIntegrationTest() {
         }
         assertStatusOperation(txSubmitterTestModule, evmSubmitTxRellRequest.rowId, RellTransactionStatus.QUEUED)
         testLogAppender.assertEventMatches(Level.WARN, "Transaction 0 with timestamp \\d+ was not processed within \\d+ ms and timed out")
+
+        // No receipt set since we don't have any
+        withTxOperations(txSubmitterTestModule, UPDATE_EVM_TRANSACTION_RECEIPT) {
+            assertThat(it.isEmpty()).isTrue()
+        }
     }
 
     @Test

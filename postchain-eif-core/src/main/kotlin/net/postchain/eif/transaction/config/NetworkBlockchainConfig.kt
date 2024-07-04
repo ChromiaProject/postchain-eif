@@ -7,7 +7,7 @@ import java.math.BigDecimal
 data class NetworkBlockchainConfig(
         @Name("network_id")
         val networkId: Long,
-        @Name("max_gas_price")                          // Max cas price for submitting a transaction
+        @Name("max_gas_price")                          // Max gas price for submitting a transaction
         val maxGasPrice: Long,
         @Name("min_wallet_balance")                     // Wallet funds required to submit transaction
         val minWalletBalance: Long,

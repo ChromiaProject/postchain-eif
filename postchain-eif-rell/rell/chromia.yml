@@ -239,7 +239,7 @@ blockchains:
             tx_verification_time: 20000
             gas_limit: 9000000
             gas_limit_margin: 0.1
-        node_tx_verification_timeout: 1500000 # 35 min - a bit less than tx_node_submit_timeout
+        node_tx_verification_timeout: 1500000 # 25 min - a bit less than tx_node_submit_timeout
       sync_ext:
         - "net.postchain.eif.transaction.TransactionSubmitterSynchronizationInfrastructureExtension"
         - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"

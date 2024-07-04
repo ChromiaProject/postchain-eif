@@ -130,6 +130,12 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                         return false
                     }
 
+                    // A SUCCESS must contain a receipt in same transaction
+                    if (newTxStatus == RellTransactionStatus.SUCCESS && getOpsForTx(ops, UPDATE_EVM_TRANSACTION_RECEIPT, requestId).isEmpty()) {
+                        logger.warn { "Validation failed. Transaction $requestId is set to ${RellTransactionStatus.SUCCESS.name} but without a receipt" }
+//                        return false TODO enable in future for additional validation
+                    }
+
                     logger.info { "Transaction $requestId is verified as $newTxStatus" }
                 }
             } else if (verifyTransactions && op.opName == UPDATE_EVM_TRANSACTION_RECEIPT) {
@@ -154,6 +160,13 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
                 if (valid == false) {
                     return false
+                }
+
+                // A receipt requires a SUCCESS update status
+                if (!getOpsForTx(ops, UPDATE_EVM_TRANSACTION_STATUS, requestId)
+                                .any { RellTransactionStatus.entries[it.args[1].asInteger().toInt()] == RellTransactionStatus.SUCCESS }) {
+                    logger.warn { "Validation failed. Receipt for transaction $requestId set without any ${RellTransactionStatus.SUCCESS.name} status update op" }
+//                    return false TODO enable in future for additional validation
                 }
             }
         }
@@ -240,7 +253,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         return true
     }
 
-    private fun buildTxReceiptOp(txPending: EvmPendingTx): OpData {
+    fun buildTxReceiptOp(txPending: EvmPendingTx): OpData {
 
         return OpData(
                 UPDATE_EVM_TRANSACTION_RECEIPT, arrayOf(
@@ -252,7 +265,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         )
     }
 
-    private fun buildTxUpdateOp(rowId: Long, rellStatus: RellTransactionStatus, txHash: String? = null): OpData {
+    fun buildTxUpdateOp(rowId: Long, rellStatus: RellTransactionStatus, txHash: String? = null): OpData {
 
         val signature = createSignature(rowId, rellStatus)
 
@@ -407,4 +420,8 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         return RellTransactionStatus.valueOf(queryResult.asString())
     }
 
+    private fun getOpsForTx(ops: List<OpData>, opName: String, requestId: Long): List<OpData> {
+        return ops
+                .filter { op -> op.opName == opName && op.args[0].asInteger() == requestId}
+    }
 }
