@@ -36,7 +36,7 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.cancellation.CancellationException
 
-class TransactionSubmitter(
+open class TransactionSubmitter(
         private val web3jRequestHandler: Web3jRequestHandler,
         private val transactionManagers: Map<String, TransactionManager>,
         private val feeEstimatorFactory: EIP1559FeeEstimatorFactory,
@@ -311,7 +311,12 @@ class TransactionSubmitter(
                     !transaction.to.contains(txPending.contractAddress)
             ) {
                 txPending.status = PendingTxStatus.REVERTED
-                logger.error { "Transaction ${txPending.rowId} does not match original" }
+                logger.error {
+                    "Transaction ${txPending.rowId} does not match original. " +
+                            "Node function data: $functionData Node contract address: ${txPending.contractAddress} " +
+                            "EVM function data: ${transaction.input} EVM contract address: ${transaction.to}"
+                }
+                logger.info { "Transaction ${txPending.rowId} functionName: ${txPending.functionName}, parameterTypes: ${txPending.parameterTypes}, parameterValues: ${txPending.parameterValues}" }
             }
         }
     }
@@ -381,7 +386,7 @@ class TransactionSubmitter(
 
                 submitTxUpdates.add(EvmSubmitTransactionResult(txRequest.rowId, RellTransactionStatus.PENDING, response.transactionHash))
 
-                logger.info { "Transaction ${txRequest.rowId} submitted successfully" }
+                logger.info { "Transaction ${txRequest.rowId} submitted successfully with maxPriorityFeePerGas=${feeEstimator.maxPriorityFeePerGas}, maxFeePerGas=${feeEstimator.maxFeePerGas}, gasLimit=$feeEstimatorFactory.gasLimit" }
 
                 return
 
@@ -452,7 +457,7 @@ class TransactionSubmitter(
                 }
     }
 
-    fun getPendingTx(requestId: Long): EvmPendingTx? {
+    open fun getPendingTx(requestId: Long): EvmPendingTx? {
 
         return pendingTransactions.values.firstOrNull { it.rowId == requestId }
     }
