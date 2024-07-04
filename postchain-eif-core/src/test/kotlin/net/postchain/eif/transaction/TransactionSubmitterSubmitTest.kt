@@ -4,7 +4,6 @@ import assertk.assertThat
 import assertk.assertions.isEqualTo
 import mockWeb3jRequestHandler
 import net.postchain.eif.Web3jRequestHandler
-import net.postchain.eif.transaction.gas.EIP1559LastBlockFeeEstimatorMock
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.any
@@ -31,9 +30,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
                 mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
-                maxGasPriceValue = 5,
-                gasLimitValue = 10,
-                feeEstimator = EIP1559LastBlockFeeEstimatorMock(1.toBigInteger(), 1.toBigInteger(), 1.toBigInteger(), 1.toBigInteger(), gasUsed = 1, 5, 10, walletBalance = null)
+                mockFeeEstimatorFactory(10, 5, gasUsed = 1, walletBalance = null)
         )
 
         mockTakenBy()
@@ -43,7 +40,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
                     mkEvmSubmitTxRequest()
             )
         }
-        assertThat(exception.message).isEqualTo("Failed to get wallet balance")
+        assertThat(exception.message).isEqualTo("Failed to get balance for request: Failed to get wallet balance")
         testLogAppender.assertError("Failed to get wallet balance")
     }
 
@@ -57,9 +54,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
                 transactionManagers,
-                maxGasPriceValue = 5,
-                gasLimitValue = 10,
-                feeEstimator = EIP1559LastBlockFeeEstimatorMock(1.toBigInteger(), 1.toBigInteger(), 1.toBigInteger(), 1.toBigInteger(), gasUsed = null, 5, 10)
+                mockFeeEstimatorFactory(10, 5, gasUsed = null)
         )
 
         mockTakenBy()
@@ -69,7 +64,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
                     mkEvmSubmitTxRequest()
             )
         }
-        assertThat(exception.message).isEqualTo("Failed to get estimated gas usage for request id 0: Failed to estimate gas usage: Failed to get gas estimate")
+        assertThat(exception.message).isEqualTo("Failed to estimate gas usage: Failed to get gas estimate")
 
         verify(databaseOperations).recordTransactionGas(
                 any(),
@@ -77,7 +72,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
                 eq(BigInteger.valueOf(5)),
                 eq(BigInteger.valueOf(10))
         )
-        testLogAppender.assertError("Failed to get estimated gas usage for request id 0")
+        testLogAppender.assertError("Failed to estimate gas usage: Failed to get gas estimate")
     }
 
     @Test
@@ -90,9 +85,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
                 transactionManagers,
-                maxGasPriceValue = 3,
-                gasLimitValue = 10,
-                feeEstimator = EIP1559LastBlockFeeEstimatorMock(100.toBigInteger(), 1.toBigInteger(), 1.toBigInteger(), 1.toBigInteger(), 1, 10, 3)
+                mockFeeEstimatorFactory(10, 3, gasUsed = 1)
         )
 
         mockTakenBy()
@@ -123,8 +116,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
                 transactionManagers,
-                maxGasPriceValue = 5,
-                gasLimitValue = 10
+                mockFeeEstimatorFactory(10, 5)
         )
 
         mockTakenBy()
@@ -159,8 +151,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
                 transactionManagers,
-                maxGasPriceValue = 5,
-                gasLimitValue = 10
+                mockFeeEstimatorFactory(10, 5)
         )
 
         mockTakenBy()

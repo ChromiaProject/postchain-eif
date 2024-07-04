@@ -2,6 +2,7 @@ package net.postchain.eif.transaction.gas
 
 import mockWeb3jRequestHandler
 import net.postchain.eif.transaction.EvmSubmitTxRequest
+import java.math.BigDecimal
 import java.math.BigInteger
 
 class EIP1559LastBlockFeeEstimatorMock(
@@ -11,8 +12,12 @@ class EIP1559LastBlockFeeEstimatorMock(
         override val maxFeePerGas: BigInteger,
         val gasUsed: Long? = 1L,
         val gasLimit: Long,
-        val maxGasPrice: Long,
-        val walletBalance: Long? = 10000000L
+        maxGasPrice: Long,
+        val walletBalance: Long? = 10000000L,
+        override val estimatedGasUsage: BigInteger = 1.toBigInteger(),
+        override val estimatedTotalGasFee: BigInteger = 1.toBigInteger(),
+        override val estimatedGasLimit: BigInteger = 1.toBigInteger(),
+        gasLimitMargin: BigDecimal = 0.1.toBigDecimal(),
 ) : EIP1559FeeEstimator {
 
     private val feeEstimator: EIP1559LastBlockFeeEstimator
@@ -21,19 +26,19 @@ class EIP1559LastBlockFeeEstimatorMock(
 
         val web3jRequestHandler = mockWeb3jRequestHandler(walletBalance, gasUsed, blockNumber, maxPriorityFeePerGas)
 
-        feeEstimator = EIP1559LastBlockFeeEstimator(web3jRequestHandler, gasLimit.toBigInteger(), maxGasPrice.toBigInteger())
+        feeEstimator = EIP1559LastBlockFeeEstimator(
+                web3jRequestHandler,
+                gasLimit.toBigInteger(),
+                maxGasPrice.toBigInteger(),
+                gasLimitMargin,
+                "contractAddress",
+                "contractData",
+                "fromAddress",
+                0L
+        )
     }
 
-    override fun validateRequestFees(request: EvmSubmitTxRequest) {
-        feeEstimator.validateRequestFees(request)
-    }
-
-    override fun estimateAndValidateRequestGasAndBalance(
-            txRequest: EvmSubmitTxRequest,
-            functionData: String,
-            fromAddress: String,
-            chainId: Long
-    ) {
-        feeEstimator.estimateAndValidateRequestGasAndBalance(txRequest, functionData, fromAddress, chainId)
+    override fun validateRequestFees(txRequest: EvmSubmitTxRequest) {
+        feeEstimator.validateRequestFees(txRequest)
     }
 }

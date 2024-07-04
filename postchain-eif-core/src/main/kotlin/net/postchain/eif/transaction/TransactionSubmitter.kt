@@ -79,7 +79,7 @@ class TransactionSubmitter(
         logger.info {
             "Initializing transaction submitter - chainId: $chainId, networkId: $networkId, " +
                     "txPollInterval: $txPollInterval, healthCheckInterval: $healthCheckInterval, " +
-                    "nodeTxVerificationTimeout: $nodeTxVerificationTimeout, nodeTxVerificationEvmBlocks: $nodeTxVerificationEvmBlocks" +
+                    "nodeTxVerificationTimeout: $nodeTxVerificationTimeout" +
                     ", nodeTxVerificationEvmBlocks: $nodeTxVerificationEvmBlocks, txVerificationTime: $txVerificationTime"
         }
 
@@ -349,11 +349,11 @@ class TransactionSubmitter(
             true
         }
 
-        val feeEstimator = feeEstimatorFactory.createEstimate()
-        logger.info { "Estimated fees for transaction ${txRequest.rowId} based on evm block ${feeEstimator.blockNumber}: baseFeePerGas: ${feeEstimator.baseFeePerGas} maxPriorityFeePerGas: ${feeEstimator.maxPriorityFeePerGas} maxFeePerGas: ${feeEstimator.maxFeePerGas}" }
+        val feeEstimator = feeEstimatorFactory.createEstimate(txRequest.contractAddress, functionData, fromAddress, chainId)
+
+        logger.info { "Estimated gas and fees for transaction ${txRequest.rowId}: $feeEstimator" }
 
         feeEstimator.validateRequestFees(txRequest)
-        feeEstimator.estimateAndValidateRequestGasAndBalance(txRequest, functionData, fromAddress, chainId)
 
         for ((rpcUrl, transactionManager) in transactionManagers) {
             try {

@@ -41,6 +41,7 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
                 mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
+                mockFeeEstimatorFactory()
         )
 
         ts.addPendingTransaction(mkEvmPendingDbTx(5))
@@ -61,6 +62,7 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
                 mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
+                mockFeeEstimatorFactory()
         )
 
         val txPending = mkEvmPendingDbTx(10)
@@ -85,6 +87,7 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
                 mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
+                mockFeeEstimatorFactory()
         )
 
         val txPending = mkEvmPendingDbTx(5)
@@ -110,6 +113,7 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
                 mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
+                mockFeeEstimatorFactory()
         )
 
         val txPending = mkEvmPendingDbTx()
@@ -150,6 +154,7 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
                 mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
+                mockFeeEstimatorFactory()
         )
 
         val txPending = mkEvmPendingDbTx(networkId = 0L)
@@ -170,6 +175,7 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
                 mapOf(createTransactionManager("http://127.0.0.1:9999", "0xfrom", exception = "Oh dear")),
+                mockFeeEstimatorFactory()
         )
 
         val txPending = mkEvmPendingDbTx(networkId = 0L)

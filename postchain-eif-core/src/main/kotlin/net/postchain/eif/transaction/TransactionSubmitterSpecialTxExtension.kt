@@ -212,9 +212,12 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                     val rellStatus =
                             if (it.status == PendingTxStatus.SUCCESS) RellTransactionStatus.SUCCESS else RellTransactionStatus.FAILURE
 
-                    operations.add(
-                            buildTxReceiptOp(it)
-                    )
+                    // Update receipt only if transaction has a receipt
+                    if (it.blockHash != null) {
+                        operations.add(
+                                buildTxReceiptOp(it)
+                        )
+                    }
 
                     operations.add(
                             buildTxUpdateOp(it.rowId, rellStatus)
