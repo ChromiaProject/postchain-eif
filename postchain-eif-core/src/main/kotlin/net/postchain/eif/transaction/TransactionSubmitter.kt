@@ -231,7 +231,6 @@ open class TransactionSubmitter(
             if (txReceipt == null) {
                 logger.info { "Re-fetching receipt for pending transaction ${txPending.rowId}" }
 
-                // Re-fetch receipt
                 val txReceiptResult = fetchTransactionReceipt(txPending.txHash, txPending.rowId)
 
                 if (txReceiptResult != null && txReceiptResult.transactionReceipt.isPresent) {
@@ -306,15 +305,16 @@ open class TransactionSubmitter(
             val functionData =
                     encodeFunction(txPending.functionName, txPending.parameterTypes, txPending.parameterValues)
 
+            val transactionToAddress = transaction.to.uppercase()
             if (
                     functionData != transaction.input ||
-                    !transaction.to.contains(txPending.contractAddress)
+                    !transactionToAddress.contains(txPending.contractAddress)
             ) {
                 txPending.status = PendingTxStatus.REVERTED
                 logger.error {
                     "Transaction ${txPending.rowId} does not match original. " +
                             "Node function data: $functionData Node contract address: ${txPending.contractAddress} " +
-                            "EVM function data: ${transaction.input} EVM contract address: ${transaction.to}"
+                            "EVM function data: ${transaction.input} EVM contract address: $transactionToAddress"
                 }
                 logger.info { "Transaction ${txPending.rowId} functionName: ${txPending.functionName}, parameterTypes: ${txPending.parameterTypes}, parameterValues: ${txPending.parameterValues}" }
             }

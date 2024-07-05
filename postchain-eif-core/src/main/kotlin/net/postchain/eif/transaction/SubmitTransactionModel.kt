@@ -35,7 +35,7 @@ open class EvmSubmitTxRellRequest(
         @Name("row_id")
         val rowId: Long,
         @Name("contract_address")
-        val contractAddress: String,
+        contractAddress: String,
         @Name("function_name")
         val functionName: String,
         @Name("parameter_types")
@@ -54,14 +54,18 @@ open class EvmSubmitTxRellRequest(
         val created: Long,
         @Nullable
         @Name("tx_hash")
-        var txHash: String?,
+        txHash: String?,
         @Nullable
         @Name("status")
         val status: RellTransactionStatus?,
         @Nullable
         @Name("processed_by")
-        val processed_by: ByteArray?,
-)
+        val processedBy: ByteArray?,
+) {
+    val contractAddress: String = contractAddress.uppercase()
+    var txHash: String? = txHash
+        set(value) { field = value?.uppercase() }
+}
 
 class EvmSubmitTxRequest(
         rellRequest: EvmSubmitTxRellRequest,
@@ -79,7 +83,7 @@ class EvmSubmitTxRequest(
         rellRequest.created,
         rellRequest.txHash,
         rellRequest.status,
-        rellRequest.processed_by
+        rellRequest.processedBy
 ) {
     companion object {
         fun fromRell(rellRequest: EvmSubmitTxRellRequest): EvmSubmitTxRequest {
@@ -101,7 +105,7 @@ class EvmSubmitTxRequest(
                     created,
                     txHash,
                     status,
-                    processed_by
+                    processedBy
             )
 }
 
@@ -109,27 +113,34 @@ class EvmPendingTx(
         // From BC
         val rowId: Long,
         val networkId: Long,
-        val contractAddress: String,
+        contractAddress: String,
         val functionName: String,
         val parameterTypes: List<String>,
         val parameterValues: List<Gtv>,
-        val txHash: String,
+        txHash: String,
 
-        // Internal
+        // Not persisted
         var created: Long = System.currentTimeMillis(),
         var blockNumber: BigInteger? = null,
-        var blockHash: String? = null,
         var effectiveGasPrice: BigInteger? = null,
         var gasUsed: BigInteger? = null,
 ) {
-    var completedTime: Long? = null
-            private set
+    val contractAddress: String = contractAddress.uppercase()
+    val txHash: String = txHash.uppercase()
     var status: PendingTxStatus = PendingTxStatus.VERIFYING
         set(value) {
             field = value
             if (value.isCompleted()) {
                 completedTime = System.currentTimeMillis()
             }
+        }
+
+    // Not persisted
+    var completedTime: Long? = null
+        private set
+    var blockHash: String? = null
+        set(value) {
+            field = value?.uppercase()
         }
 
     companion object {
