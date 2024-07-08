@@ -11,7 +11,6 @@ import "@nomiclabs/hardhat-ethers";
 import "@openzeppelin/hardhat-upgrades";
 
 import "hardhat-gas-reporter";
-import "@nomiclabs/hardhat-etherscan";
 import "solidity-coverage";
 
 import "hardhat-abi-exporter";
@@ -19,34 +18,9 @@ import "hardhat-abi-exporter";
 import "./tasks/clean";
 import "./tasks/accounts";
 import "./tasks/deployers";
-
-const chainIds = {
-  ganache: 1337,
-  sepolia: 11155111,
-  holesky: 17000,
-  hardhat: 31337,
-  mainnet: 1,
-  bsc: 97,
-  mumbai: 80001,
-};
+import "./tasks/txsubmitter";
 
 const MNEMONIC = process.env.MNEMONIC || "";
-const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
-const INFURA_API_KEY = process.env.INFURA_API_KEY || "";
-
-function createTestnetConfig(network: keyof typeof chainIds): NetworkUserConfig {
-  const url: string = "https://" + network + ".infura.io/v3/" + INFURA_API_KEY;
-  return {
-    accounts: {
-      count: 10,
-      initialIndex: 0,
-      mnemonic: MNEMONIC,
-      path: "m/44'/60'/0'/0",
-    },
-    chainId: chainIds[network],
-    url,
-  };
-}
 
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
@@ -60,42 +34,52 @@ const config: HardhatUserConfig = {
       accounts: {
         mnemonic: "manage discover reunion amount train dash jewel industry connect ride victory shift",
       },
-      chainId: chainIds.hardhat,
+      chainId: 31337,
       // See https://github.com/sc-forks/solidity-coverage/issues/652
       hardfork: process.env.CODE_COVERAGE ? "berlin" : "london",
     },
-    mainnet: createTestnetConfig("mainnet"),
-    holesky: createTestnetConfig("holesky"),
-    bsc: {
+    bsc: { // BSC mainnet
       accounts: {
         count: 10,
         initialIndex: 0,
         mnemonic: MNEMONIC,
         path: "m/44'/60'/0'/0",
       },
-      chainId: chainIds.bsc,
-      url: "https://data-seed-prebsc-1-s1.binance.org:8545/",
+      chainId: 56,
+      url: "[[FILL ME IN]]",
     },
-    mumbai: {
+    ethereum: { // ETH mainnet
       accounts: {
         count: 10,
         initialIndex: 0,
         mnemonic: MNEMONIC,
         path: "m/44'/60'/0'/0",
       },
-      chainId: chainIds.mumbai,
-      url: "https://polygon-mumbai.g.alchemy.com/v2/HY9dxoQq2MBbyMd-LSmnHujDe231wKgz",
+      chainId: 1,
+      url: "[[FILL ME IN]]",
     },
-    sepolia: {
+/*
+    bsc: { // BSC testnet
       accounts: {
         count: 10,
         initialIndex: 0,
         mnemonic: MNEMONIC,
         path: "m/44'/60'/0'/0",
       },
-      chainId: chainIds.sepolia,
-      url: "https://ethereum-sepolia.rpc.subquery.network/public",
+      chainId: 97,
+      url: "[[FILL ME IN]]",
     },
+    eth: { // ETH sepolia
+      accounts: {
+        count: 10,
+        initialIndex: 0,
+        mnemonic: MNEMONIC,
+        path: "m/44'/60'/0'/0",
+      },
+      chainId: 11155111,
+      url: "[[FILL ME IN]]",
+    },
+*/
   },
   paths: {
     artifacts: "./src/artifacts",
@@ -134,9 +118,6 @@ const config: HardhatUserConfig = {
         version: "0.5.8",
       },
     ],
-  },
-  etherscan: {
-    apiKey: ETHERSCAN_API_KEY,
   },
   gasReporter: {
     currency: "USD",

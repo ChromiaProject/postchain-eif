@@ -99,7 +99,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
 
     function initialize(IValidator _validator, uint256 _withdrawOffset) public initializer {
         require(address(_validator) != address(0), "TokenBridge: validator address is invalid");
-        __Ownable_init(_msgSender());
+        __Ownable_init(msg.sender);
         __Pausable_init();
         __ReentrancyGuard_init();
 
