@@ -226,28 +226,32 @@ open class TransactionSubmitter(
             }
         }
 
-        val blocksSinceReceipt = currentBlockHeight.minus(txPending.blockNumber!!).longValueExact()
-        if (blocksSinceReceipt >= nodeTxVerificationEvmBlocks) {
-            if (txReceipt == null) {
-                logger.info { "Re-fetching receipt for pending transaction ${txPending.rowId}" }
+        if (txPending.blockNumber != null) {
+            val blocksSinceReceipt = currentBlockHeight.minus(txPending.blockNumber!!).longValueExact()
+            if (blocksSinceReceipt >= nodeTxVerificationEvmBlocks) {
+                if (txReceipt == null) {
+                    logger.info { "Re-fetching receipt for pending transaction ${txPending.rowId}" }
 
                 val txReceiptResult = fetchTransactionReceipt(txPending.txHash, txPending.rowId)
 
-                if (txReceiptResult != null && txReceiptResult.transactionReceipt.isPresent) {
-                    txReceipt = txReceiptResult.transactionReceipt.get()
+                    if (txReceiptResult != null && txReceiptResult.transactionReceipt.isPresent) {
+                        txReceipt = txReceiptResult.transactionReceipt.get()
+                    }
+                } else {
+
+                    logger.info { "Receipt for transaction ${txPending.rowId} is old ($blocksSinceReceipt blocks) - verify" }
+                }
+
+                if (txReceipt != null) {
+
+                    verifyTxStructure(txPending)
+
+                    if (!txPending.status.isCompleted()) {
+                        verifyTxReceipt(txReceipt, txPending, currentBlockHeight)
+                    }
                 }
             } else {
-
-                logger.info { "Receipt for transaction ${txPending.rowId} is old ($blocksSinceReceipt blocks) - verify" }
-            }
-
-            if (txReceipt != null) {
-
-                verifyTxStructure(txPending)
-
-                if (!txPending.status.isCompleted()) {
-                    verifyTxReceipt(txReceipt, txPending, currentBlockHeight)
-                }
+                logger.info { "Receipt for transaction ${txPending.rowId} will be verified in ${nodeTxVerificationTimeout - blocksSinceReceipt} EVM blocks" }
             }
         }
     }
