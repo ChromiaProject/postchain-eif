@@ -5,34 +5,46 @@ import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 import "./utils/TwoWeekDelay.sol";
 
-interface ChromiaToken {
-    function transferFromChromia(address to, uint256 value, bytes32 refID) external returns (bool);
-
-    function transferToChromia(bytes32 to, uint256 value) external;
-
+interface ChromiaToken_Base {
     function changeMinter(address newMinter) external;
 }
 
-interface IDailyLimit {
-    function updateDayAmount(uint withdrawAmount) external;
+interface ChromiaToken_ETH {
+    function transferFromChromia(address to, uint256 value, bytes32 refID) external returns (bool);
+
+    function transferToChromia(bytes32 to, uint256 value) external;
 }
 
-contract TokenMinter is TwoWeekDelay, Ownable2Step {
-    IDailyLimit private dailyLimit;
+interface ChromiaToken_BSC {
+    function transferFromNative(address to, uint256 value, bytes32 refID) external returns (bool);
+
+    function transferToNative(bytes32 to, uint256 value) external;
+}
+
+
+abstract contract TokenMinterBase is TwoWeekDelay, Ownable2Step {
+    uint private dayStart; // Timestamp at which the day started
+    uint private dayAmount; // Amount of tokens withdrawn so far
+    uint private dayLimit; // Maximum amount of tokens that can be withdrawn in a day
+    uint private pendingDayLimit; // New day limit pending to be activated after 2 weeks
+
     address public tokenContractAddress;
     address public bridgeContractAddress;
 
     // Address to which minter role will be transferred after delay
     address public pendingNewMinter;
-    // New daily limit to be set after delay
-    IDailyLimit public pendingNewDailyLimit;
+
+    event DayLimitChanged(uint newDayLimit);
 
     constructor(
-        IDailyLimit _dailyLimit,
+        uint _dayLimit,
         address _tokenContractAddress,
-        address _bridgeContractAddress
-    ) Ownable(msg.sender) {
-        dailyLimit = _dailyLimit;
+        address _bridgeContractAddress,
+        address _owner
+    ) Ownable(_owner) {
+        dayLimit = _dayLimit;
+        dayStart = block.timestamp;
+        dayAmount = 0;
         tokenContractAddress = _tokenContractAddress;
         bridgeContractAddress = _bridgeContractAddress;
     }
@@ -42,17 +54,26 @@ contract TokenMinter is TwoWeekDelay, Ownable2Step {
         _;
     }
 
-    function setDailyLimit(IDailyLimit _dailyLimit) external onlyOwner {
-        if (address(pendingNewDailyLimit) != address(0)) resetDelayForFunction(this.setDailyLimit.selector);
-        startDelayedAction(this.setDailyLimit.selector);
-        pendingNewDailyLimit = _dailyLimit;
+    // Function to modify the day limit
+    function setDayLimit(uint _newDayLimit) external onlyOwner {
+        if (_newDayLimit > dayLimit) {
+            // if we already have a pending change, reset it
+            if (pendingDayLimit != 0) resetDelayForFunction(this.setDayLimit.selector);
+            // Set pending day limit and start the two-week delay
+            pendingDayLimit = _newDayLimit;
+            startDelayedAction(this.setDayLimit.selector);
+        } else {
+            // If the new limit is lower, apply immediately
+            dayLimit = _newDayLimit;
+            emit DayLimitChanged(_newDayLimit);
+        }
     }
 
-    function finishSetDailyLimit() external onlyOwner {
-        require(address(pendingNewDailyLimit) != address(0), "TokenMinter: No pending daily limit");
-        finishDelayedAction(this.setDailyLimit.selector);
-        dailyLimit = pendingNewDailyLimit;
-        delete pendingNewDailyLimit;
+    function finishSetDayLimit() external onlyOwner {
+        finishDelayedAction(this.setDayLimit.selector);
+        dayLimit = pendingDayLimit;
+        delete pendingDayLimit;
+        emit DayLimitChanged(dayLimit);
     }
 
     function transferMintRole(address newMinter) external onlyOwner {
@@ -64,7 +85,7 @@ contract TokenMinter is TwoWeekDelay, Ownable2Step {
     function finishTransferMintRole() external virtual onlyOwner {
         require(pendingNewMinter != address(0), "TokenMinter: No pending minter");
         finishDelayedAction(this.transferMintRole.selector);
-        ChromiaToken(tokenContractAddress).changeMinter(pendingNewMinter);
+        ChromiaToken_Base(tokenContractAddress).changeMinter(pendingNewMinter);
         delete pendingNewMinter;
     }
 
@@ -80,14 +101,52 @@ contract TokenMinter is TwoWeekDelay, Ownable2Step {
         super.acceptOwnership();
     }
 
-    // Function to mint tokens, can be called by derived contracts or specific addresses
-    function mint(address to, uint256 amount) external virtual onlyBridge {
-        dailyLimit.updateDayAmount(amount);
-        ChromiaToken(tokenContractAddress).transferFromChromia(to, amount, 0x0);
+    function updateDayAmount(uint amount) internal {
+        if (block.timestamp > dayStart + 1 days) {
+            dayStart = block.timestamp;
+            dayAmount = 0;
+        }
+
+        dayAmount += amount;
+        require(dayAmount <= dayLimit, "DailyLimit: limit reached");
     }
 
-    // Function to mint tokens, can be called by derived contracts or specific addresses
+}
+
+contract TokenMinterETH is TokenMinterBase {
+
+    constructor(
+        uint _dayLimit,
+        address _tokenContractAddress,
+        address _bridgeContractAddress,
+        address _owner
+    ) TokenMinterBase(_dayLimit, _tokenContractAddress, _bridgeContractAddress, _owner) {}
+
+    function mint(address to, uint256 amount) external virtual onlyBridge {
+        updateDayAmount(amount);
+        ChromiaToken_ETH(tokenContractAddress).transferFromChromia(to, amount, 0x0);
+    }
+
     function burn(uint256 amount) external virtual onlyBridge {
-        ChromiaToken(tokenContractAddress).transferToChromia(bytes32(0), amount);
+        ChromiaToken_ETH(tokenContractAddress).transferToChromia(bytes32(0), amount);
+    }
+}
+
+contract TokenMinterBSC is TokenMinterBase {
+
+    constructor(
+        uint _dayLimit,
+        address _tokenContractAddress,
+        address _bridgeContractAddress,
+        address _owner
+    ) TokenMinterBase(_dayLimit, _tokenContractAddress, _bridgeContractAddress, _owner) {}
+    
+    function mint(address to, uint256 amount) external virtual onlyBridge {
+        updateDayAmount(amount);
+        ChromiaToken_BSC(tokenContractAddress).transferFromNative(to, amount, 0x0);
+    }
+
+    function burn(uint256 amount) external virtual onlyBridge {
+        ChromiaToken_BSC(tokenContractAddress).transferToNative(bytes32(0), amount);
     }
 }

@@ -4,10 +4,9 @@ import { solidity } from "ethereum-waffle";
 import {
   Chromia__factory,
   ChromiaTokenBridge__factory,
-  DailyLimit__factory,
   TokenBridgeDelegator__factory,
   Validator__factory,
-  TokenMinter__factory,
+  TokenMinterETH__factory,
 } from "../src/types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { constants } from "ethers";
@@ -21,7 +20,6 @@ describe("TokenMinter test", () => {
   let tokenAddress: string;
   let bridgeAddress: string;
   let validatorAddress: string;
-  let dailyLimitAddress: string;
   let tokenMinterAddress: string;
   let bridgeDelegatorAddress: string;
   let migrationAddress: string;
@@ -54,14 +52,9 @@ describe("TokenMinter test", () => {
     const bridgeDelegator = await bridgeDelegatorFactory.deploy(bridgeAddress);
     bridgeDelegatorAddress = bridgeDelegator.address;
 
-    const dailyLimitFactory = new DailyLimit__factory(admin);
-    const dailyLimitContract = await dailyLimitFactory.deploy(DAILY_LIMIT);
-    dailyLimitAddress = dailyLimitContract.address;
-
-    const tokenMinterFactory = new TokenMinter__factory(admin);
-    const tokenMinterContract = await tokenMinterFactory.deploy(dailyLimitAddress, tokenAddress, deployer.address);
+    const tokenMinterFactory = new TokenMinterETH__factory(admin);
+    const tokenMinterContract = await tokenMinterFactory.deploy(DAILY_LIMIT, tokenAddress, deployer.address, deployer.address);
     tokenMinterAddress = tokenMinterContract.address;
-    dailyLimitContract.setParentContract(tokenMinterAddress);
     bridge.setTokenMinter(tokenMinterAddress);
     tokenContract.changeMinter(tokenMinterAddress);
 
@@ -73,9 +66,9 @@ describe("TokenMinter test", () => {
     it("Admin can change minter", async () => {
       const [deployer, user] = await ethers.getSigners();
       const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
-      const tokenMinter = new TokenMinter__factory(deployer).attach(tokenMinterAddress);
+      const tokenMinter = new TokenMinterETH__factory(deployer).attach(tokenMinterAddress);
 
-      const tokenMinterUser = new TokenMinter__factory(user).attach(tokenMinterAddress);
+      const tokenMinterUser = new TokenMinterETH__factory(user).attach(tokenMinterAddress);
 
       await expect(tokenMinterUser.transferMintRole(deployer.address)).to.be.revertedWith("OwnableUnauthorizedAccount");
 
@@ -92,8 +85,8 @@ describe("TokenMinter test", () => {
     it("Admin can change owner", async () => {
       const [deployer, user] = await ethers.getSigners();
       const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
-      const tokenMinter = new TokenMinter__factory(deployer).attach(tokenMinterAddress);
-      const tokenMinterUser = new TokenMinter__factory(user).attach(tokenMinterAddress);
+      const tokenMinter = new TokenMinterETH__factory(deployer).attach(tokenMinterAddress);
+      const tokenMinterUser = new TokenMinterETH__factory(user).attach(tokenMinterAddress);
 
       await expect(tokenMinterUser.transferOwnership(deployer.address)).to.be.revertedWith(
         "OwnableUnauthorizedAccount",
@@ -114,37 +107,27 @@ describe("TokenMinter test", () => {
 
     it("Admin can set daily limit", async () => {
       const [deployer, user] = await ethers.getSigners();
-      const tokenMinter = new TokenMinter__factory(deployer).attach(tokenMinterAddress);
-      const dailyLimit = new DailyLimit__factory(deployer).attach(dailyLimitAddress);
-
-      await dailyLimit.setDayLimit(0);
+      const tokenMinter = new TokenMinterETH__factory(deployer).attach(tokenMinterAddress);
+    
+      await tokenMinter.setDayLimit(0);
       await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.be.revertedWith("DailyLimit: limit reached");
       await time.increase(86400 * 1 + 1);
       await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.be.revertedWith("DailyLimit: limit reached");
 
-      await expect(dailyLimit.setDayLimit(DAILY_LIMIT)).to.emit(dailyLimit, "DelayedActionRequested");
+      await expect(tokenMinter.setDayLimit(DAILY_LIMIT)).to.emit(tokenMinter, "DelayedActionRequested");
       await time.increase(86400 * 13);
-      await expect(dailyLimit.finishSetDayLimit()).to.be.revertedWith("Two weeks delay has not passed.");
+      await expect(tokenMinter.finishSetDayLimit()).to.be.revertedWith("Two weeks delay has not passed.");
       await time.increase(86400 * 1 + 1);
-      await expect(dailyLimit.finishSetDayLimit()).to.emit(dailyLimit, "DayLimitChanged");
+      await expect(tokenMinter.finishSetDayLimit()).to.emit(tokenMinter, "DayLimitChanged");
 
       await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.not.be.reverted;
       await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.be.revertedWith("DailyLimit: limit reached");
-      await dailyLimit.setDayLimit(0);
+      await tokenMinter.setDayLimit(0);
       await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.be.revertedWith("DailyLimit: limit reached");
-    });
-    it("Admin can change daily limit contract", async () => {
-      const [deployer, user] = await ethers.getSigners();
-      const tokenMinter = new TokenMinter__factory(deployer).attach(tokenMinterAddress);
-      await expect(tokenMinter.setDailyLimit(deployer.address)).to.emit(tokenMinter, "DelayedActionRequested");
-      await time.increase(86400 * 13);
-      await expect(tokenMinter.finishSetDailyLimit()).to.be.revertedWith("Two weeks delay has not passed.");
-      await time.increase(86400 * 1 + 1);
-      await expect(tokenMinter.finishSetDailyLimit()).to.emit(tokenMinter, "DelayedActionExecuted");
     });
     it("Cant mint more than daily limit", async () => {
       const [deployer, user] = await ethers.getSigners();
-      const tokenMinter = new TokenMinter__factory(deployer).attach(tokenMinterAddress);
+      const tokenMinter = new TokenMinterETH__factory(deployer).attach(tokenMinterAddress);
       const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
 
       await tokenMinter.mint(deployer.address, DAILY_LIMIT);

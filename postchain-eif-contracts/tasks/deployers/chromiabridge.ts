@@ -5,14 +5,33 @@ import {
   IValidator,
   Validator__factory,
   ManagedValidator__factory,
-  DailyLimit,
-  DailyLimit__factory,
-  TokenMinter,
-  TokenMinter__factory,
+  TokenMinterBase,
+  TokenMinterETH__factory,
   Chromia,
   Chromia__factory,
 } from "../../src/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
+
+interface KnownArtifacts {
+  multiSigOwner: string;
+  chromiaTokenAddress: string;
+}
+
+
+const known_artifacts_by_network: { [key: string]: KnownArtifacts } = {
+  "ethereum": {
+    "multiSigOwner": "0x734eEdaD58606EfF1AAf6fF3699fa4ae4f36E8C1", // system.ops.wallets
+    "chromiaTokenAddress": "0x8A2279d4A90B6fe1C4B30fa660cC9f926797bAA2", // chr.tokens
+  },
+  "bsc": {
+    "multiSigOwner": "0xe33D5C1DFDEde024f612c33C90B1D4a3d3504da0", // system.ops.wallets
+    "chromiaTokenAddress": "0xf9CeC8d50f6c8ad3Fb6dcCEC577e05aA32B224FE", // chr.tokens
+  },
+  "hardhat": {
+    "multiSigOwner": "0x6e8187435d5140214552ef3989ddb1457f4a663a", // nonsense
+    "chromiaTokenAddress": "0x8A22279d4A90B6fe1C4B30fa660cC9f926797bAA2", // nonsense
+  }
+}
 
 task("deploy:chromiabridge")
   .addOptionalParam("app", "app node, not needed when using managed validator")
@@ -20,6 +39,9 @@ task("deploy:chromiabridge")
   .addOptionalParam("directoryValidator", "Contract address of directory chain validator, supply this to use managed validator contract")
   .addFlag("verify", "Verify contracts at Etherscan")
   .setAction(async ({verify, app, offset, directoryValidator}, hre) => {
+
+    let multiSigOwner = known_artifacts_by_network[hre.network.name].multiSigOwner;
+
     // deploy validator smart contract
       let validator;
       let validators;
@@ -41,33 +63,38 @@ task("deploy:chromiabridge")
     );
     await bridge.deployed();
 
-    const dailyLimitFactory: DailyLimit__factory = await hre.ethers.getContractFactory("DailyLimit");
-    const DAILY_LIMIT = 10000000000000;
-    const dailyLimit: DailyLimit = await dailyLimitFactory.deploy(DAILY_LIMIT);
-    await dailyLimit.deployed();
-    console.log("Daily Limit deployed to: ", dailyLimit.address);
+    console.log("Token bridge deployed to: ", bridge.address);
+    const proxyAdmin = await hre.upgrades.erc1967.getAdminAddress(bridge.address);
+    console.log("Proxy admin address is: ", proxyAdmin);
+    await hre.upgrades.admin.transferProxyAdminOwnership(
+      multiSigOwner
+    );
+
+    const DAILY_LIMIT = 1000000 * 1000000; // agreed on weekly meeting 2024-06-19
 
     let signers = await hre.ethers.getSigners();
     let signerAddress = await signers[0].getAddress();
 
+    // Import the Chromia token contract
     const tokenFactory: Chromia__factory = await hre.ethers.getContractFactory("Chromia");
-    const token: Chromia = await tokenFactory.deploy(signerAddress, 0);
-    await token.deployed();
-    console.log("Token deployed to: ", token.address);
+    const token: Chromia = tokenFactory.attach(
+      known_artifacts_by_network[hre.network.name].chromiaTokenAddress
+    );
 
-    const tokenMinterFactory: TokenMinter__factory = await hre.ethers.getContractFactory("TokenMinter");
-    const tokenMinter: TokenMinter = await tokenMinterFactory.deploy(dailyLimit.address, token.address, bridge.address);
+    const tokenMinterFactory: TokenMinterETH__factory = await hre.ethers.getContractFactory("TokenMinterETH"); // transferFromNative ETH mainnet
+    const tokenMinter: TokenMinterBase = await tokenMinterFactory.deploy(DAILY_LIMIT, token.address, bridge.address, multiSigOwner);
     await tokenMinter.deployed();
     console.log("Token Minter deployed to: ", tokenMinter.address);
 
-    await token.changeMinter(tokenMinter.address);
-    await dailyLimit.setParentContract(tokenMinter.address);
-    await bridge.setTokenMinter(tokenMinter.address);
-    await bridge.allowToken(token.address);
+    console.log('bridge.setTokenMinter');
+    console.log(await bridge.setTokenMinter(tokenMinter.address));
 
-    console.log("Token bridge deployed to: ", bridge.address);
-    const proxyAdmin = await hre.upgrades.erc1967.getAdminAddress(bridge.address);
-    console.log("Proxy admin address is: ", proxyAdmin);
+    console.log('bridge.allowToken');
+    console.log(await bridge.allowToken(token.address));
+
+    console.log('bridge.transferOwnership');
+    console.log(await bridge.transferOwnership(multiSigOwner));
+    // note: it needs to be accepted by the multisig
 
     if (verify) {
       // When redeploy new smart contracts, etherscan can automatically verify the smart contract
@@ -90,12 +117,8 @@ task("deploy:chromiabridge")
           constructorArguments: [signerAddress, 0],
         });
         await hre.run("verify:verify", {
-          address: dailyLimit.address,
-          constructorArguments: [DAILY_LIMIT],
-        });
-        await hre.run("verify:verify", {
           address: tokenMinter.address,
-          constructorArguments: [dailyLimit.address, token.address, bridge.address],
+          constructorArguments: [DAILY_LIMIT, token.address, bridge.address, multiSigOwner],
         });
       } catch (e) {
         console.log(e);
@@ -127,8 +150,37 @@ function delay(ms: number) {
 function getNodes(nodes: string) {
   return nodes.split(",");
 }
-// Daily Limit deployed to:  0x2794dd2Dc422b4f13bc7f695ba75Be8a634dd801
-// Token deployed to:  0x150eC0e8c1FDBd9770371EEE0B41d800A925462c
-// Token Minter deployed to:  0x4a1e10a352B4e4C3526afE93b260Af0aA160350e
-// Token bridge deployed to:  0x559285b20867ceDCd0e03c0b13e84941A9C402dF
-// Proxy admin address is:  0xb5C634f56a5c58285ccaF5A60dfbEa2dD9Bfd0D1
+
+/*
+BSC mainnet:
+  validator deployed to:  0xD42284814389978dC43c53F8807e8bC0AC6BD5Fe // deploy:directoryValidator
+  validator deployed to:  0x27925011C2B08DDEF233dDA44958876E8a4D8401 // deploy:chromiabridge
+  Token bridge deployed to:  0xE4B1Abd25D10BBca3d656f866D50d4b322E2B722
+  Proxy admin address is:  0xCee55D7b22C407dEcBaaa9C2Ac468c0D0a7C06ff
+  Token Minter deployed to:  0x83dB85F7ef4447524D3A31c0F4664a89173C68Eb
+*/
+
+/*
+ETH mainnet:
+  validator deployed to:  0x18d808d6A604b1335E5a4759950902628D409122 // deploy:directoryValidator
+  validator deployed to:  0x445D203F46fB91B79Af30f8Bf5F779C91e941aCb // deploy:chromiabridge
+  Token bridge deployed to:  0x0444d0F8799272AE52644264873de86aa28D222A
+  Proxy admin address is:  0x6E8187435D5140214552ef3989DDb1457f4A663A
+  Token Minter deployed to:  0x17533B33DeaD940E35835C352a9B9c54398eFD68
+*/
+
+
+
+
+// If the above deployments of ChromiaTokenBridge and DailyLimit work, the contracts instances can be obtained like this:
+    /*
+    const factory: ChromiaTokenBridge__factory = await hre.ethers.getContractFactory("ChromiaTokenBridge");
+    const bridge: ChromiaTokenBridge = factory.attach(
+      "0x6e8187435d5140214552ef3989ddb1457f4a663a",
+    );
+
+    const dailyLimitFactory: DailyLimit__factory = await hre.ethers.getContractFactory("DailyLimit");
+    const dailyLimit: DailyLimit = dailyLimitFactory.attach(
+      "0x0444d0F8799272AE52644264873de86aa28D222A",
+    );
+    */

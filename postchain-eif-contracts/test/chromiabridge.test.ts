@@ -7,7 +7,8 @@ import {
   DailyLimit__factory,
   TokenBridgeDelegator__factory,
   Validator__factory,
-  TokenMinter__factory, Address,
+  TokenMinterBase,
+  TokenMinterETH__factory, Address,
 } from "../src/types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BytesLike, hexZeroPad, keccak256 } from "ethers/lib/utils";
@@ -33,6 +34,7 @@ describe("ChromiaToken Bridge Test", () => {
   let validatorAddress: string;
   let dailyLimitAddress: string;
   let tokenMinterAddress: string;
+  let tokenMinterContract: TokenMinterBase;
   let bridgeDelegatorAddress: string;
   let migrationAddress: string;
   let admin: SignerWithAddress;
@@ -64,14 +66,9 @@ describe("ChromiaToken Bridge Test", () => {
     const bridgeDelegator = await bridgeDelegatorFactory.deploy(bridgeAddress);
     bridgeDelegatorAddress = bridgeDelegator.address;
 
-    const dailyLimitFactory = new DailyLimit__factory(admin);
-    const dailyLimitContract = await dailyLimitFactory.deploy(DAILY_LIMIT);
-    dailyLimitAddress = dailyLimitContract.address;
-
-    const tokenMinterFactory = new TokenMinter__factory(admin);
-    const tokenMinterContract = await tokenMinterFactory.deploy(dailyLimitAddress, tokenAddress, bridgeAddress);
+    const tokenMinterFactory = new TokenMinterETH__factory(admin);
+    tokenMinterContract = await tokenMinterFactory.deploy(DAILY_LIMIT, tokenAddress, bridgeAddress, deployer.address);
     tokenMinterAddress = tokenMinterContract.address;
-    dailyLimitContract.setParentContract(tokenMinterAddress);
     bridge.setTokenMinter(tokenMinterAddress);
 
     await expect(bridge.allowToken(constants.AddressZero)).to.be.revertedWith("TokenBridge: token address is invalid");
@@ -201,7 +198,6 @@ describe("ChromiaToken Bridge Test", () => {
       expect(await tokenInstance.totalSupply()).to.eq(toMint);
 
       const bridgeOwner = new ChromiaTokenBridge__factory(deployer).attach(bridgeAddress);
-      const dailyLimitOwner = new DailyLimit__factory(deployer).attach(dailyLimitAddress);
       const bridge = new ChromiaTokenBridge__factory(user).attach(bridgeAddress);
       const validatorAdmin = new Validator__factory(admin).attach(validatorAddress);
       const toDeposit = ethers.utils.parseEther("100");
@@ -671,14 +667,14 @@ describe("ChromiaToken Bridge Test", () => {
         await tokenInstance.changeMinter(tokenMinterAddress);
 
         // Set the daily limit to one less than withdraw amount
-        await dailyLimitOwner.setDayLimit(toDeposit.sub(1));
+        await tokenMinterContract.setDayLimit(toDeposit.sub(1));
         await expect(
           bridge.withdraw(DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)), user.address),
         ).to.be.revertedWith("DailyLimit: limit reached");
         // Set the daily limit to more than withdraw amount, now user can withdraw
-        await dailyLimitOwner.setDayLimit(toDeposit.add(1));
+        await tokenMinterContract.setDayLimit(toDeposit.add(1));
         await time.increase(86400 * 14 + 1);
-        await dailyLimitOwner.finishSetDayLimit();
+        await tokenMinterContract.finishSetDayLimit();
         await expect(
           bridge.withdraw(DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)), user.address),
         )

@@ -1,0 +1,166 @@
+blockchains:
+  eif_event_receiver_mainnet:
+    module: eif_event_receiver
+    config:
+      gtx:
+        modules:
+          - "net.postchain.eif.EifGTXModule"
+          - "net.postchain.d1.icmf.IcmfSenderGTXModule"
+      sync_ext:
+        - "net.postchain.eif.EifSynchronizationInfrastructureExtension"
+      eif:
+        chains:
+          bsc:
+            network_id: 56
+            evm_read_offset: 100
+            contracts:
+              - '0xE4B1Abd25D10BBca3d656f866D50d4b322E2B722' # bridge
+              - '0x6414FbBf1CC9d9253125e106435619577bAAc2aC' # staking
+            skip_to_height: 7743093
+            events: !include configs/events.yml
+          ethereum:
+            network_id: 1
+            evm_read_offset: 50
+            contracts:
+              - '0x0444d0F8799272AE52644264873de86aa28D222A' # bridge
+              - '0xC7b0F970c1EFBB181194Fc15ccD5C4a2c2Ab863B' # staking
+            skip_to_height: 11223368
+            events: !include configs/events.yml
+
+  eif_event_receiver_price_oracle_mainnet:
+    module: eif_event_receiver
+    config:
+      gtx:
+        modules:
+          - "net.postchain.eif.EifGTXModule"
+          - "net.postchain.d1.icmf.IcmfSenderGTXModule"
+      sync_ext:
+        - "net.postchain.eif.EifSynchronizationInfrastructureExtension"
+      eif:
+        chains:
+          bsc:
+            network_id: 56
+            evm_read_offset: 100
+            contracts:
+              - '0x6045931E511EF7e53A4A817F971e0CA28c758809'
+              - '0x16b9a82891338f9ba80e2d6970fdda79d1eb0dae'
+            skip_to_height: -1000
+            events: !include configs/events_price_oracle.yml
+          ethereum:
+            network_id: 1
+            evm_read_offset: 50
+            contracts:
+              - '0xd366Ed22F5b2262A2Da4C32D8A4607C93690134a'
+              - '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+            skip_to_height: -1000
+            events: !include configs/events_price_oracle.yml
+
+  transaction_submitter:
+    module: transaction_submitter
+    moduleArgs:
+      transaction_submitter:
+        # List of public keys that are allowed to reset failed signer list updates
+        manual_admins:
+          - 0319852651DB3ACA5D5DFDF71D8600566345FE1713BCBC7F2C1B6434B7A8C88C6F # Chromaway provider
+        directory_chain_config:
+          blockchain_rid: x"1B5E66B1B2AAFF1B2EF636F21A81C99796067B2D79000E8C021FCDE3B1B09A36"
+          validator_contracts:
+            - address: "18d808d6A604b1335E5a4759950902628D409122"
+              network_id: 1
+            - address: "D42284814389978dC43c53F8807e8bC0AC6BD5Fe"
+              network_id: 56
+        # Omit this to disable anchoring
+        system_anchoring_chain_config:
+          blockchain_rid: x"90FE15AD988445BDC4661DC40A93181BE914B741DCF52A48EE1C917AB0DC939A"
+          anchoring_contracts:
+            - address: "27925011C2B08DDEF233dDA44958876E8a4D8401"
+              validator_contract: "D42284814389978dC43c53F8807e8bC0AC6BD5Fe"
+              network_id: 1
+        # economy-chain
+        system_chain_bridges:
+          - blockchain_rid: x"1D093856187A1DF0274E1E425220BC09AD775832FB93783C9ACD564889001CDD"
+            bridge_contracts:
+              - address: "0444d0F8799272AE52644264873de86aa28D222A"
+                validator_contract: "445D203F46fB91B79Af30f8Bf5F779C91e941aCb"
+                network_id: 1
+              - address: "E4B1Abd25D10BBca3d656f866D50d4b322E2B722"
+                validator_contract: "27925011C2B08DDEF233dDA44958876E8a4D8401"
+                network_id: 56
+        contract_tx_rate_limit: 60000
+        tx_node_submit_timeout: 1800000 # 30m
+        tx_timeout: 86400000 # 24h
+        node_retry_strategy: SUPERMAJORITY
+        network_configs:
+          - id: 56
+            currency_symbol: "BNB"
+          - id: 1
+            currency_symbol: "ETH"
+        system_max_priority_fee_per_gas: 25000000000
+        system_max_fee_per_gas: 25000000000
+      transaction_submitter.anchoring:
+        anchoring_interval: 3600000 # every 1 hour
+    config:
+      gtx:
+        modules:
+          - "net.postchain.eif.transaction.TransactionSubmitterGTXModule"
+          - "net.postchain.d1.icmf.IcmfReceiverGTXModule"
+          - "net.postchain.d1.icmf.IcmfSenderGTXModule"
+      transaction_submitter:
+        chains:
+          bsc:
+            network_id: 56
+            max_gas_price: 4500000000000000 # per transaction
+            min_wallet_balance: 10000000000000000
+            gas_limit: 150000 # change to 300000
+            #gas_limit_margin: 0.1
+            node_tx_verification_evm_blocks: 100
+            tx_verification_time: 20000
+          ethereum:
+            network_id: 1
+            max_gas_price: 4500000000000000 # per transaction
+            min_wallet_balance: 10000000000000000
+            gas_limit: 150000 # change to 300000
+            #gas_limit_margin: 0.1
+            node_tx_verification_evm_blocks: 50
+            tx_verification_time: 20000
+        node_tx_verification_timeout: 1500000 # 25 min - a bit less than tx_node_submit_timeout
+      sync_ext:
+        - "net.postchain.eif.transaction.TransactionSubmitterSynchronizationInfrastructureExtension"
+        - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"
+      icmf:
+        receiver:
+          directory-chain:
+            topics:
+              - L_signer_list_update
+          local:
+            - bc-rid: x"1D093856187A1DF0274E1E425220BC09AD775832FB93783C9ACD564889001CDD" # economy-chain
+              topic: "L_bridge_mapping"
+          global:
+            topics:
+              - G_evm_submit_transaction
+
+
+compile:
+  source: src
+  target: target
+  rellVersion: 0.13.12
+
+libs:
+  ft4:
+    registry: https://bitbucket.org/chromawallet/ft3-lib
+    path: rell/src/lib/ft4
+    tagOrBranch: v0.8.0r
+    rid: x"B6AE6AC82AC735BFB9E4E412FFB76BF95380E94F371F5F6A14E71A3AA7D5FEF6"
+    insecure: false
+  iccf:
+    registry: https://gitlab.com/chromaway/core/directory-chain
+    path: src/iccf
+    tagOrBranch: 1.45.0
+    rid: x"1D567580C717B91D2F188A4D786DB1D41501086B155A68303661D25364314A4D"
+    insecure: false
+  icmf:
+    registry: https://gitlab.com/chromaway/core/directory-chain
+    path: src/messaging/icmf
+    tagOrBranch: 1.45.0
+    rid: x"19D6BC28D527E6D2239843608486A84F44EDCD244E253616F13D1C65893F35F6"
+    insecure: false
