@@ -59,6 +59,7 @@ struct erc20_withdrawal_info {
  * @property from marks the beginning of a time interval. If not null, withdrawals occurring before `from` are excluded.
  * @property to marks the end of a time interval. If not null, withdrawals occurring after `to` are excluded.
  * @property tx_rid transaction RID in which the withdrawals were initiated
+ * @property statuses withdrawal status list. If null or empty, all status are considered.
  */
 struct withdrawal_filter {
     network_id: integer? = null;
@@ -67,6 +68,7 @@ struct withdrawal_filter {
     from: timestamp? = null;
     to: timestamp? = null;
     tx_rid: byte_array? = null;
+    statuses: list<withdrawal_status>? = null;
 }
 
 function map_withdrawal(withdrawal: erc20_withdrawal) = erc20_withdrawal_info(
@@ -77,7 +79,7 @@ function map_withdrawal(withdrawal: erc20_withdrawal) = erc20_withdrawal_info(
     amount = withdrawal.amount,
     timestamp = withdrawal.timestamp,
     event_hash = withdrawal.event_hash,
-    status = erc20_withdrawal_history @ { withdrawal } (@omit @max .rowid, .withdrawal_status),
+    status = erc20_withdrawal_history @ { withdrawal } (@omit @sort_desc .rowid, .withdrawal_status) limit 1,
 );
 
 function update_withdrawal_status(withdrawal_event_hash: byte_array, status: withdrawal_status) {
