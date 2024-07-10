@@ -270,13 +270,13 @@ libs:
     insecure: false
   iccf:
     registry: https://gitlab.com/chromaway/core/directory-chain
-    path: src/iccf
-    tagOrBranch: 1.45.0
-    rid: x"1D567580C717B91D2F188A4D786DB1D41501086B155A68303661D25364314A4D"
+    path: src/lib/iccf
+    tagOrBranch: 1.55.6
+    rid: x"926C1F73F5032C113F5272FCCC0B2074D38CE51DA5B992B4AD714C66480F8B7A"
     insecure: false
   icmf:
     registry: https://gitlab.com/chromaway/core/directory-chain
-    path: src/messaging/icmf
-    tagOrBranch: 1.45.0
+    path: src/lib/icmf
+    tagOrBranch: 1.55.6
     rid: x"19D6BC28D527E6D2239843608486A84F44EDCD244E253616F13D1C65893F35F6"
     insecure: false
