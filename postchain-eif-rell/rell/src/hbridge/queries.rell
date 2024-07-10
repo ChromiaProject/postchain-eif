@@ -34,8 +34,8 @@ query get_erc20_withdrawals(filter: withdrawal_filter, page_size: integer?, page
         filter.network_id == null or .network_id == filter.network_id,
         filter.token_address == null or .token_address == filter.token_address,
         filter.beneficiary == null or .beneficiary == filter.beneficiary,
-        filter.from == null or .timestamp >= filter.from!!,
-        filter.to == null or .timestamp < filter.to!!,
+        filter.from == null or .transaction.block.timestamp >= filter.from!!,
+        filter.to == null or .transaction.block.timestamp < filter.to!!,
         filter.tx_rid == null or .transaction.tx_rid == filter.tx_rid!!,
         empty(filter.statuses) or ((erc20_withdrawal_history @ { .erc20_withdrawal.rowid == $.rowid } (@omit @sort_desc .rowid, .withdrawal_status) limit 1) in filter.statuses!!),
         .rowid > (before_rowid ?: rowid(0))

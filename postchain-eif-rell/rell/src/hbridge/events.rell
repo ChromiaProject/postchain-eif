@@ -220,7 +220,6 @@ function emit_withdrawal_event(network_id: integer, token_address: byte_array, b
         token_address,
         beneficiary,
         amount,
-        timestamp = op_context.last_block_time,
         event_hash
     );
 

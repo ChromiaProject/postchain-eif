@@ -9,7 +9,6 @@
     index network_id, token_address;
     index beneficiary: byte_array;
     amount: big_integer;
-    timestamp;
     index event_hash: byte_array;
 }
 
@@ -57,7 +56,7 @@ struct erc20_withdrawal_info {
  * @property token_address EVM token address. If null, all token addresses are considered.
  * @property beneficiary EVM beneficiary address. If null, all beneficiaries are considered.
  * @property from marks the beginning of a time interval. If not null, withdrawals occurring before `from` are excluded.
- * @property to marks the end of a time interval. If not null, withdrawals occurring after `to` are excluded.
+ * @property to marks the end of a time interval. If not null, withdrawals occurring at `to` and after `to` are excluded.
  * @property tx_rid transaction RID in which the withdrawals were initiated
  * @property statuses withdrawal status list. If null or empty, all status are considered.
  */
@@ -77,7 +76,7 @@ function map_withdrawal(withdrawal: erc20_withdrawal) = erc20_withdrawal_info(
     token_address = withdrawal.token_address,
     beneficiary = withdrawal.beneficiary,
     amount = withdrawal.amount,
-    timestamp = withdrawal.timestamp,
+    timestamp = withdrawal.transaction.block.timestamp,
     event_hash = withdrawal.event_hash,
     status = erc20_withdrawal_history @ { withdrawal } (@omit @sort_desc .rowid, .withdrawal_status) limit 1,
 );
