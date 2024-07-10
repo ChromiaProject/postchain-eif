@@ -79,7 +79,10 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     event FundedERC20(address indexed sender, IERC20 indexed token, uint amount);
     event DepositedERC20(address indexed sender, IERC20 indexed token, uint amount, bytes32 accountID);
     event WithdrawRequest(address indexed beneficiary, IERC20 indexed token, uint256 value, uint height, bytes32 blockRid);
+    event WithdrawRequestHash(bytes32 indexed hash);
     event Withdrawal(address indexed beneficiary, IERC20 indexed token, uint256 value);
+    event WithdrawalHash(bytes32 indexed hash);
+    event WithdrawalToPostchain(bytes32 indexed hash);
     event LinkAccountID(address indexed sender, bytes32 accountID, bool isContract);
 
     modifier isAllowToken(IERC20 token) {
@@ -268,6 +271,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
             wd.status = Status.Withdrawable;
             _withdraw[hash] = wd;
             emit WithdrawRequest(beneficiary, token, amount, height, blockRid);
+            emit WithdrawRequestHash(hash);
         }
         return true;
     }
@@ -283,6 +287,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         // only support user to withdraw the token that be funded enough on the EVM bridge
         transferWithdraw(wd.token, beneficiary, value);
         emit Withdrawal(beneficiary, wd.token, value);
+        emit WithdrawalHash(_hash);
     }
 
     function transferWithdraw(IERC20 token, address beneficiary, uint value) internal virtual {
@@ -301,6 +306,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         uint amount = wd.amount;
         wd.amount = 0;
         emit DepositedERC20(msg.sender, wd.token, amount, 0x0); // accountID will be determined from sender
+        emit WithdrawalToPostchain(_hash);
     }
 
     /**

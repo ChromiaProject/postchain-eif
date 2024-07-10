@@ -1,5 +1,4 @@
 
-// withdrawal from EVM to FT4
 @log entity erc20_withdrawal {
     op_index: integer = op_context.op_index;
     index transaction, op_index;
@@ -10,11 +9,43 @@
     index network_id, token_address;
     index beneficiary: byte_array;
     amount: big_integer;
-    timestamp;
     index event_hash: byte_array;
 }
 
+@log entity erc20_withdrawal_history {
+    op_index: integer = op_context.op_index;
+    index transaction, op_index;
+
+    index erc20_withdrawal;
+    withdrawal_status;
+}
+
+struct erc20_withdrawal_history_entry {
+    withdrawal_id: integer;
+    status: withdrawal_status;
+    timestamp;
+}
+
+/**
+    +-----------------------------------+---------------------------------+
+    |             Chromia               |               EVM               |
+    +-----------------------------------+---------------------------------+
+    | created                           |                                 |
+    | requested                         |  Withdrawable                   |
+    | pending <-> requested             |  Pending <-> Withdrawable       |
+    | withdrawn | withdrawn_to_chromia  |  Withdrawn | PostchainWithdrawn |
+    +-----------------------------------+---------------------------------+
+ */
+enum withdrawal_status {
+    created,
+    requested,
+    pending,
+    withdrawn,
+    withdrawn_to_chromia,
+}
+
 struct erc20_withdrawal_info {
+    id: rowid;
     serial: integer;
     network_id: integer;
     token_address: byte_array;
@@ -22,6 +53,7 @@ struct erc20_withdrawal_info {
     amount: big_integer;
     timestamp;
     event_hash: byte_array;
+    status: withdrawal_status;
 }
 
 /**
@@ -31,8 +63,9 @@ struct erc20_withdrawal_info {
  * @property token_address EVM token address. If null, all token addresses are considered.
  * @property beneficiary EVM beneficiary address. If null, all beneficiaries are considered.
  * @property from marks the beginning of a time interval. If not null, withdrawals occurring before `from` are excluded.
- * @property to marks the end of a time interval. If not null, withdrawals occurring after `to` are excluded.
+ * @property to marks the end of a time interval. If not null, withdrawals occurring at `to` and after `to` are excluded.
  * @property tx_rid transaction RID in which the withdrawals were initiated
+ * @property statuses withdrawal status list. If null or empty, all status are considered.
  */
 struct withdrawal_filter {
     network_id: integer? = null;
@@ -41,14 +74,30 @@ struct withdrawal_filter {
     from: timestamp? = null;
     to: timestamp? = null;
     tx_rid: byte_array? = null;
+    statuses: list<withdrawal_status>? = null;
 }
 
 function map_withdrawal(withdrawal: erc20_withdrawal) = erc20_withdrawal_info(
+    id = withdrawal.rowid,
     serial = withdrawal.serial,
     network_id = withdrawal.network_id,
     token_address = withdrawal.token_address,
     beneficiary = withdrawal.beneficiary,
     amount = withdrawal.amount,
-    timestamp = withdrawal.timestamp,
+    timestamp = withdrawal.transaction.block.timestamp,
     event_hash = withdrawal.event_hash,
+    status = erc20_withdrawal_history @ { withdrawal } (@omit @sort_desc .rowid, .withdrawal_status) limit 1,
 );
+
+function update_withdrawal_status(withdrawal_event_hash: byte_array, status: withdrawal_status) {
+    val withdrawal = erc20_withdrawal @? { .event_hash == withdrawal_event_hash };
+    if (empty(withdrawal)) {
+        log("Withdrawal event with hash %s not found".format(withdrawal_event_hash));
+        return;
+    }
+
+    create erc20_withdrawal_history(
+        erc20_withdrawal = withdrawal,
+        withdrawal_status = status
+    );
+}

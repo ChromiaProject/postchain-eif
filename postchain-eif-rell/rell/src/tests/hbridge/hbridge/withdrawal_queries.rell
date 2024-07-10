@@ -40,19 +40,19 @@ function test_get_erc20_withdrawals() {
     // Withdrawing some to EVM
     withdraw(rell.test.keypairs.alice, alice_account, alice_auth_descriptor, network_id1, chr_asset.id, 100, alice_evm_address);
     withdraw(rell.test.keypairs.alice, alice_account, alice_auth_descriptor, network_id1, foo_asset.id, 200, alice_evm_address);
-    val t0 = rell.test.last_block_time;
+    val t0 = (block @ {} (@omit @sort_desc .rowid, .timestamp) limit 1) + 1;
     // Alice
     for (wdr in range(5)) {
         withdraw(rell.test.keypairs.alice, alice_account, alice_auth_descriptor, network_id1, chr_asset.id, 300, alice_evm_address);
         withdraw(rell.test.keypairs.alice, alice_account, alice_auth_descriptor, network_id1, foo_asset.id, 400, alice_evm_address);
     }
-    val t1 = rell.test.last_block_time;
+    val t1 = (block @ {} (@omit @sort_desc .rowid, .timestamp) limit 1) + 1;
     // Bob
     for (wdr in range(5)) {
         withdraw(rell.test.keypairs.bob, bob_account, bob_auth_descriptor, network_id1, foo_asset.id, 500, bob_evm_address);
         withdraw(rell.test.keypairs.bob, bob_account, bob_auth_descriptor, network_id2, bar_asset.id, 600, bob_evm_address);
     }
-    val t2 = rell.test.last_block_time;
+    val t2 = (block @ {} (@omit @sort_desc .rowid, .timestamp) limit 1) + 1;
     withdraw(rell.test.keypairs.bob, bob_account, bob_auth_descriptor, network_id2, bar_asset.id, 700, bob_evm_address);
     withdraw(rell.test.keypairs.bob, bob_account, bob_auth_descriptor, network_id2, bar_asset.id, 800, bob_evm_address);
 
@@ -155,6 +155,50 @@ function test_get_erc20_withdrawals() {
         (wdr11_actual2.network_id, wdr11_actual2.token_address, wdr11_actual2.beneficiary, wdr11_actual2.amount),
         (network_id1, CHR.token_address, alice_evm_address, 100L)
     );
+
+    // Withdrawal history
+    //  - unknown withdrawal
+    try_call(get_erc20_withdrawal_history(rowid(integer.MAX_VALUE), *));
+    //  - withdrawal wdr1[0] -> requested
+    trigger_withdrawal_status_on_evm(wdr1[0].event_hash, evm_events.withdraw_request_event);
+    assert_equals(
+        get_erc20_withdrawal_history(wdr1[0].id),
+        [
+            erc20_withdrawal_history_entry(
+                withdrawal_id = wdr1[0].id.to_integer(),
+                status = withdrawal_status.created,
+                timestamp = wdr1[0].timestamp
+            ),
+            erc20_withdrawal_history_entry(
+                withdrawal_id = wdr1[0].id.to_integer(),
+                status = withdrawal_status.requested,
+                timestamp = block @ {} (@omit @sort_desc .rowid, .timestamp) limit 1
+            ),
+        ]
+    );
+    //  - withdrawal wdr1[0] -> pending
+    trigger_withdrawal_status_on_evm(wdr1[0].event_hash, evm_events.pending_withdraw_event, block_height = 2);
+    assert_equals(
+        get_erc20_withdrawal_history(wdr1[0].id),
+        [
+            erc20_withdrawal_history_entry(
+                withdrawal_id = wdr1[0].id.to_integer(),
+                status = withdrawal_status.created,
+                timestamp = wdr1[0].timestamp
+            ),
+            erc20_withdrawal_history_entry(
+                withdrawal_id = wdr1[0].id.to_integer(),
+                status = withdrawal_status.requested,
+                timestamp = block @ {} (@omit @sort_desc .rowid, .timestamp) offset 1 limit 1
+            ),
+            erc20_withdrawal_history_entry(
+                withdrawal_id = wdr1[0].id.to_integer(),
+                status = withdrawal_status.pending,
+                timestamp = block @ {} (@omit @sort_desc .rowid, .timestamp) limit 1
+            ),
+        ]
+    );
+
 }
 
 function withdraw(
