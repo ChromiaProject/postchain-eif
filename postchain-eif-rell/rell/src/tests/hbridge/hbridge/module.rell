@@ -25,7 +25,14 @@ import ^.helpers;
 
 val admin_privkey = x"3132333435363738393031323334353637383930313233343536373839303131";
 
-val event_name = "DepositedERC20";
+namespace evm_events {
+    val deposited_erc20_name = "DepositedERC20";
+    val pending_withdraw_event = "PendingWithdraw";
+    val unpending_withdraw_event = "UnpendingWithdraw";
+    val withdraw_request_event = "WithdrawRequestHash";
+    val withdrawal_hash_event = "WithdrawalHash";
+    val withdrawal_to_postchain_event = "WithdrawalToPostchain";
+}
 
 val contract_address = x"b7eB5d60Dd5610A82A4844Beb3F7d750316d3D32";
 val network_id1 = 1;
@@ -123,12 +130,34 @@ function deposit_from_evm(
             log_index = 1,
             signature = ("SIG", block_height).hash(),
             contract_address = contract_address,
-            name = event_name,
+            name = evm_events.deposited_erc20_name,
             indexed_values = [sender_address.to_gtv(), asset.token_address.to_gtv()],
             non_indexed_values = [amount.to_gtv(), account_id.to_gtv()]
         )
     ];
-    val account_number_1 = 1;
+    val block_hash = ("BLOCK", block_height).hash();
+    rell.test.tx().nop().op(
+        evm_block_op(network_id, block_height, block_hash, events)
+    ).run();
+}
+
+function trigger_withdrawal_status_on_evm(
+    withdrawal_event_hash: byte_array,
+    event_name: text,
+    block_height: integer = 1,
+    network_id: integer = network_id1,
+) {
+    val events = [
+        event_data(
+            tnx_hash = ("TX", block_height).hash(),
+            log_index = 1,
+            signature = ("SIG", block_height).hash(),
+            contract_address = contract_address,
+            name = event_name,
+            indexed_values = [withdrawal_event_hash.to_gtv()],
+            non_indexed_values = []
+        )
+    ];
     val block_hash = ("BLOCK", block_height).hash();
     rell.test.tx().nop().op(
         evm_block_op(network_id, block_height, block_hash, events)

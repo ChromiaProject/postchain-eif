@@ -16,8 +16,14 @@
     op_index: integer = op_context.op_index;
     index transaction, op_index;
 
-    key erc20_withdrawal;
+    index erc20_withdrawal;
     withdrawal_status;
+}
+
+struct erc20_withdrawal_history_entry {
+    withdrawal_id: integer;
+    status: withdrawal_status;
+    timestamp;
 }
 
 /**
@@ -39,6 +45,7 @@ enum withdrawal_status {
 }
 
 struct erc20_withdrawal_info {
+    id: rowid;
     serial: integer;
     network_id: integer;
     token_address: byte_array;
@@ -71,6 +78,7 @@ struct withdrawal_filter {
 }
 
 function map_withdrawal(withdrawal: erc20_withdrawal) = erc20_withdrawal_info(
+    id = withdrawal.rowid,
     serial = withdrawal.serial,
     network_id = withdrawal.network_id,
     token_address = withdrawal.token_address,

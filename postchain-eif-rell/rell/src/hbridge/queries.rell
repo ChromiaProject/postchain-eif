@@ -131,3 +131,26 @@ query get_erc20_deposit_history(deposit_id: rowid): list<erc20_deposit_history_e
 
     return history;
 }
+
+/**
+ * Retrieves the history of an ERC20 withdrawal based on the specified withdrawal ID.
+ *
+ * @param withdrawal_id A `rowid` type identifier for the withdrawal.
+ *
+ * @return A list of `erc20_withdrawal_history_entry` objects, each representing a record in the
+ * history of the specified withdrawal.
+ */
+query get_erc20_withdrawal_history(withdrawal_id: rowid): list<erc20_withdrawal_history_entry> {
+    val withdrawal = require(erc20_withdrawal @? { .rowid == withdrawal_id }, "Withdrawal not found: " + withdrawal_id);
+
+    val history = erc20_withdrawal_history @* { withdrawal } (
+        @sort @omit .rowid,
+        erc20_withdrawal_history_entry(
+            withdrawal_id = withdrawal.rowid.to_integer(),
+            status = .withdrawal_status,
+            timestamp = .transaction.block.timestamp
+        )
+    );
+
+    return history;
+}
