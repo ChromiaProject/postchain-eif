@@ -84,7 +84,7 @@ class EifSynchronizationInfrastructureExtension(
                     BigInteger.valueOf(eifEvmBlockchainConfig.evmReadOffset),
                     BigInteger.valueOf(eifEvmBlockchainConfig.readOffset),
                     evmConfig.maxReadAhead,
-                    evmConfig.maxQueueSize,
+                    eifEvmBlockchainConfig.maxQueueSize,
                     BigInteger.valueOf(eifEvmBlockchainConfig.skipToHeight),
                     BigInteger.valueOf(evmConfig.lastEvmBlockHeight),
                     engine,
