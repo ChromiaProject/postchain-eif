@@ -26,12 +26,27 @@ function create_deposited_erc20_event(event: messaging.event_data) = deposited_e
     evm_tx_hash = event.tnx_hash,
 );
 
+function create_withdrawal_event(event: messaging.event_data) = withdrawal_event(
+    hash = byte_array.from_gtv(event.indexed_values[0]),
+);
+
+struct withdrawal_event {
+    hash: byte_array;
+}
+
 @extend(messaging.handle_evm_block)
 function (evm_block: messaging.evm_block_message) {
     for (event in evm_block.events) {
         when (event.name) {
+            // deposit
             "LinkAccountID" -> process_link_account_event(evm_block.network_id, create_link_account_id_event(event));
             "DepositedERC20" -> process_deposit_erc20_event(evm_block.network_id, create_deposited_erc20_event(event));
+            // withdrawal
+            "PendingWithdraw" -> process_pending_withdraw_event(evm_block.network_id, create_withdrawal_event(event));
+            "UnpendingWithdraw" -> process_unpending_withdraw_event(evm_block.network_id, create_withdrawal_event(event));
+            "WithdrawRequestHash" -> process_withdraw_request_event(evm_block.network_id, create_withdrawal_event(event));
+            "WithdrawalHash" -> process_withdrawal_event(evm_block.network_id, create_withdrawal_event(event));
+            "WithdrawalToPostchain" -> process_withdrawal_to_postchain_event(evm_block.network_id, create_withdrawal_event(event));
         }
     }
 }
@@ -162,6 +177,26 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
     }
 }
 
+function process_pending_withdraw_event(network_id: integer, event: withdrawal_event) {
+    update_withdrawal_status(event.hash, withdrawal_status.pending);
+}
+
+function process_unpending_withdraw_event(network_id: integer, event: withdrawal_event) {
+    update_withdrawal_status(event.hash, withdrawal_status.requested);
+}
+
+function process_withdraw_request_event(network_id: integer, event: withdrawal_event) {
+    update_withdrawal_status(event.hash, withdrawal_status.requested);
+}
+
+function process_withdrawal_event(network_id: integer, event: withdrawal_event) {
+    update_withdrawal_status(event.hash, withdrawal_status.withdrawn);
+}
+
+function process_withdrawal_to_postchain_event(network_id: integer, event: withdrawal_event) {
+    update_withdrawal_status(event.hash, withdrawal_status.withdrawn_to_chromia);
+}
+
 // return deposit if we cannot credit it to the account
 function bounce_deposit_event(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
     emit_withdrawal_event(network_id, token_address, beneficiary, amount);
@@ -179,7 +214,7 @@ function emit_withdrawal_event(network_id: integer, token_address: byte_array, b
         amount
     );
 
-    create erc20_withdrawal(
+    val withdrawal = create erc20_withdrawal(
         serial = next_serial,
         network_id,
         token_address,
@@ -187,6 +222,11 @@ function emit_withdrawal_event(network_id: integer, token_address: byte_array, b
         amount,
         timestamp = op_context.last_block_time,
         event_hash
+    );
+
+    create erc20_withdrawal_history(
+        erc20_withdrawal = withdrawal,
+        withdrawal_status = withdrawal_status.created
     );
 
     val withdraw_info = [

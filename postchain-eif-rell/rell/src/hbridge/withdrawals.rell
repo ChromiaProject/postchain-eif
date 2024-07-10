@@ -1,5 +1,4 @@
 
-// withdrawal from EVM to FT4
 @log entity erc20_withdrawal {
     op_index: integer = op_context.op_index;
     index transaction, op_index;
@@ -14,6 +13,32 @@
     index event_hash: byte_array;
 }
 
+@log entity erc20_withdrawal_history {
+    op_index: integer = op_context.op_index;
+    index transaction, op_index;
+
+    key erc20_withdrawal;
+    withdrawal_status;
+}
+
+/**
+    +-----------------------------------+---------------------------------+
+    |             Chromia               |               EVM               |
+    +-----------------------------------+---------------------------------+
+    | created                           |                                 |
+    | requested                         |  Withdrawable                   |
+    | pending <-> requested             |  Pending <-> Withdrawable       |
+    | withdrawn | withdrawn_to_chromia  |  Withdrawn | PostchainWithdrawn |
+    +-----------------------------------+---------------------------------+
+ */
+enum withdrawal_status {
+    created,
+    requested,
+    pending,
+    withdrawn,
+    withdrawn_to_chromia,
+}
+
 struct erc20_withdrawal_info {
     serial: integer;
     network_id: integer;
@@ -22,6 +47,7 @@ struct erc20_withdrawal_info {
     amount: big_integer;
     timestamp;
     event_hash: byte_array;
+    status: withdrawal_status;
 }
 
 /**
@@ -51,4 +77,18 @@ function map_withdrawal(withdrawal: erc20_withdrawal) = erc20_withdrawal_info(
     amount = withdrawal.amount,
     timestamp = withdrawal.timestamp,
     event_hash = withdrawal.event_hash,
+    status = erc20_withdrawal_history @ { withdrawal } (@omit @max .rowid, .withdrawal_status),
 );
+
+function update_withdrawal_status(withdrawal_event_hash: byte_array, status: withdrawal_status) {
+    val withdrawal = erc20_withdrawal @? { .event_hash == withdrawal_event_hash };
+    if (empty(withdrawal)) {
+        log("Withdrawal event with hash %s not found".format(withdrawal_event_hash));
+        return;
+    }
+
+    create erc20_withdrawal_history(
+        erc20_withdrawal = withdrawal,
+        withdrawal_status = status
+    );
+}
