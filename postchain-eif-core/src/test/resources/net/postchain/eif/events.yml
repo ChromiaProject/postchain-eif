@@ -1,4 +1,6 @@
 ---
+# Bridge
+## Deposits
 - anonymous: 0
   inputs:
     - indexed: 1
@@ -19,6 +21,7 @@
       type: bytes32
   name: DepositedERC20
   type: event
+
 - anonymous: 0
   inputs:
     - indexed: 1
@@ -35,3 +38,72 @@
       type: bool
   name: LinkAccountID
   type: event
+
+## Withdrawals
+- anonymous: 0
+  inputs:
+    - indexed: 1
+      internalType: bytes32
+      name: hash
+      type: bytes32
+  name: PendingWithdraw
+  type: event
+- anonymous: 0
+  inputs:
+    - indexed: 1
+      internalType: bytes32
+      name: hash
+      type: bytes32
+  name: UnpendingWithdraw
+  type: event
+- anonymous: 0
+  inputs:
+    - indexed: 1
+      internalType: bytes32
+      name: hash
+      type: bytes32
+  name: WithdrawRequestHash
+  type: event
+- anonymous: 0
+  inputs:
+    - indexed: 1
+      internalType: bytes32
+      name: hash
+      type: bytes32
+  name: WithdrawalHash
+  type: event
+- anonymous: 0
+  inputs:
+    - indexed: 1
+      internalType: bytes32
+      name: hash
+      type: bytes32
+  name: WithdrawalToPostchain
+  type: event
+
+
+# Staking
+- anonymous: 0
+  name: StakeUpdate
+  type: event
+  inputs:
+    - indexed: 1
+      internalType: address
+      name: from
+      type: address
+    - indexed: 0
+      internalType:
+      name: balance
+      type: uint64
+- anonymous: 0
+  name: WithdrawRequest
+  type: event
+  inputs:
+    - indexed: 1
+      internalType: address
+      name: from
+      type: address
+    - indexed: 0
+      internalType:
+      name: until
+      type: uint64
