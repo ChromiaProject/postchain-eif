@@ -9,6 +9,7 @@
     index network_id, token_address;
     index beneficiary: byte_array;
     amount: big_integer;
+    timestamp;
     index event_hash: byte_array;
 }
 
