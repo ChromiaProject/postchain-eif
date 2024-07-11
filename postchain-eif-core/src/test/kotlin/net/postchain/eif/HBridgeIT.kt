@@ -135,7 +135,6 @@ class HBridgeIT : EifBaseIntegrationTest() {
         with(configOverrides) {
             setProperty("infrastructure", net.postchain.devtools.testinfra.BaseTestInfrastructureFactory::class.qualifiedName)
             setProperty("ethereum.maxReadAhead", 200)
-            setProperty("ethereum.maxQueueSize", 100)
             setProperty("evm.maxTryErrors", 1)
         }
     }

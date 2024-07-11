@@ -22,5 +22,8 @@ data class EifEvmBlockchainConfig(
         val evmReadOffset: Long,
         @Name("read_offset")
         @DefaultValue(defaultLong = 2)
-        val readOffset: Long
+        val readOffset: Long,
+        @Name("max_queue_size")
+        @DefaultValue(defaultLong = 2_000)
+        val maxQueueSize: Long
 )
