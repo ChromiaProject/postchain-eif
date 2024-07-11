@@ -223,10 +223,7 @@ function emit_withdrawal_event(network_id: integer, token_address: byte_array, b
         event_hash
     );
 
-    create erc20_withdrawal_history(
-        erc20_withdrawal = withdrawal,
-        withdrawal_status = withdrawal_status.created
-    );
+    update_withdrawal_status(event_hash, withdrawal_status.created);
 
     val withdraw_info = [
         next_serial.to_gtv(),

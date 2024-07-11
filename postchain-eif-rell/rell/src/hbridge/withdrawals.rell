@@ -12,6 +12,11 @@
     index event_hash: byte_array;
 }
 
+entity erc20_withdrawal_status {
+    key erc20_withdrawal;
+    mutable withdrawal_status;
+}
+
 @log entity erc20_withdrawal_history {
     op_index: integer = op_context.op_index;
     index transaction, op_index;
@@ -77,7 +82,7 @@ struct withdrawal_filter {
     statuses: list<withdrawal_status>? = null;
 }
 
-function map_withdrawal(withdrawal: erc20_withdrawal) = erc20_withdrawal_info(
+function map_withdrawal(withdrawal: erc20_withdrawal, status: withdrawal_status? = null) = erc20_withdrawal_info(
     id = withdrawal.rowid,
     serial = withdrawal.serial,
     network_id = withdrawal.network_id,
@@ -86,7 +91,7 @@ function map_withdrawal(withdrawal: erc20_withdrawal) = erc20_withdrawal_info(
     amount = withdrawal.amount,
     timestamp = withdrawal.transaction.block.timestamp,
     event_hash = withdrawal.event_hash,
-    status = erc20_withdrawal_history @ { withdrawal } (@omit @sort_desc .rowid, .withdrawal_status) limit 1,
+    status = status ?: erc20_withdrawal_status @ { withdrawal } ( .withdrawal_status ),
 );
 
 function update_withdrawal_status(withdrawal_event_hash: byte_array, status: withdrawal_status) {
@@ -94,6 +99,15 @@ function update_withdrawal_status(withdrawal_event_hash: byte_array, status: wit
     if (empty(withdrawal)) {
         log("Withdrawal event with hash %s not found".format(withdrawal_event_hash));
         return;
+    }
+
+    if (empty(erc20_withdrawal_status @? { withdrawal })) {
+        create erc20_withdrawal_status(
+            erc20_withdrawal = withdrawal,
+            withdrawal_status = status
+        );
+    } else {
+        update erc20_withdrawal_status @ { withdrawal } ( .withdrawal_status = status );
     }
 
     create erc20_withdrawal_history(
