@@ -13,11 +13,11 @@ const val NETWORK_ID_TAG = "network_id"
 
 class EifMetricsRegistry {
 
-    private val meters = mutableMapOf<BlockchainRid, Meter>()
+    private val meters = mutableMapOf<BlockchainRid, MutableList<Meter>>()
 
     fun registerMetrics(chainIID: Long, blockchainRid: BlockchainRid, networkId: Long, eventProcessor: EventProcessor) {
         if (eventProcessor is EvmEventProcessor) {
-            meters[blockchainRid] = Gauge.builder("eif.last_read_evm_block_height") { eventProcessor.lastReadLogBlockHeight }
+            val gauge = Gauge.builder("eif.last_read_evm_block_height") { eventProcessor.lastReadLogBlockHeight }
                     .description(
                             "Last read evm block height. " +
                                     "Note that we will not attempt to process events from this block until we have seen the configured 'read_offset' more blocks."
@@ -26,13 +26,13 @@ class EifMetricsRegistry {
                     .tag(BLOCKCHAIN_RID_TAG, blockchainRid.toHex())
                     .tag(NETWORK_ID_TAG, networkId.toString())
                     .register(Metrics.globalRegistry)
+
+            meters.getOrPut(blockchainRid) { mutableListOf(gauge) }.add(gauge)
         }
     }
 
     fun unregisterMetrics(blockchainRid: BlockchainRid) {
-        meters.remove(blockchainRid)?.also {
-            Metrics.globalRegistry.remove(it)
-        }
+        meters.remove(blockchainRid)?.onEach { Metrics.globalRegistry.remove(it) }
     }
 
     fun unregisterAllMetrics() {
