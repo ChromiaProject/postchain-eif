@@ -94,6 +94,29 @@ task("import:bridge")
         console.log("Token bridge has been imported");
     });
 
+task("setBlockchainRid:bridge")
+    .addParam('address', 'Bridge contract address')
+    .addParam('blockchainRid', 'Blockchain RID of bridge chain')
+    .addOptionalParam('managedValidator', 'Contract address of managed validator for bridge (if any)')
+    .setAction(async ({address, blockchainRid, managedValidator}, hre) => {
+        const factory: TokenBridge__factory = await hre.ethers.getContractFactory("TokenBridge")
+        const bridge: TokenBridge = factory.attach(
+            address
+        )
+        console.log("Updating brid for bridge")
+        console.log(await bridge.setBlockchainRid(blockchainRid))
+
+        if (managedValidator !== undefined) {
+            const validatorFactory: ManagedValidator__factory = await hre.ethers.getContractFactory("ManagedValidator");
+            const validator = validatorFactory.attach(
+                managedValidator
+            )
+
+            console.log("Updating brid for managed validator")
+            console.log(await validator.setBlockchainRid(blockchainRid))
+        }
+    });
+
 async function verifyProxyContract(hre: HardhatRuntimeEnvironment, proxyAddress: string) {
     // We need to wait a little bit to verify the contract after deployment
     const implementationAddress = await hre.upgrades.erc1967.getImplementationAddress(proxyAddress);
