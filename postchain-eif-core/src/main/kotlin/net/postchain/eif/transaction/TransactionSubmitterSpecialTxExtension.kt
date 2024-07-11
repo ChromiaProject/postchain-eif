@@ -313,9 +313,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
         val txSubmitter = transactionSubmitters[networkId]
         if (txSubmitter == null) {
-            logger.warn("Ignoring tx since there is no submitter for ${networkId}")
-        } else if (!txSubmitter.isHealthy()) {
-            logger.warn("Ignoring tx since the submitter for ${networkId} is unhealthy")
+            logger.warn("Ignoring tx since there is no submitter for $networkId")
         } else {
             function(txSubmitter)
         }
@@ -332,15 +330,20 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         queuedTransactions.forEach { transaction ->
 
             withTxSubmitter(transaction.networkId) {
-                bctx.addAfterCommitHook { it.enqueue(EvmSubmitTxRequest.fromRell(transaction)) }
-                operations.add(
-                        buildTxUpdateOp(transaction.rowId, RellTransactionStatus.TAKEN)
-                )
 
-                // Status TAKEN can be set multiple times due to retry - add a no op for them
-                addNoOp(operations, bctx)
+                if (!it.isHealthy()) {
+                    logger.warn("Node did not take this tx since the submitter for ${it.networkId} is unhealthy")
+                } else {
+                    bctx.addAfterCommitHook { it.enqueue(EvmSubmitTxRequest.fromRell(transaction)) }
+                    operations.add(
+                            buildTxUpdateOp(transaction.rowId, RellTransactionStatus.TAKEN)
+                    )
 
-                logger.info { "Transaction ${transaction.rowId} taken to be processed by this node" }
+                    // Status TAKEN can be set multiple times due to retry - add a no op for them
+                    addNoOp(operations, bctx)
+
+                    logger.info { "Transaction ${transaction.rowId} taken to be processed by this node" }
+                }
             }
         }
     }
