@@ -73,6 +73,9 @@ test:
             - address: "system_bridge_address1"
               validator_contract: "system_bridge_validator1"
               network_id: 11155111
+            - address: "system_bridge_address"
+              validator_contract: "system_bridge_validator"
+              network_id: 56
       contract_tx_rate_limit: 60000
       tx_node_submit_timeout: 1800000 # 30m - set a bit more than node_tx_verification_timeout
       tx_timeout: 86400000 #24h

@@ -111,22 +111,24 @@ function get_currency_symbol(network_id: integer) {
 
 query fetch_oldest_queued_transactions_per_contract(exclude_taken_by_key: pubkey? = null) {
     val result = list<evm_submit_transaction_data>();
-    val contract_addresses_with_eligible_queued_transaction =
+    val contracts_with_eligible_queued_transaction =
         evm_submit_transaction @* {
             .status == transaction_status.QUEUED,
             .rowid not in evm_submit_transaction_taken_by @* { .provider == exclude_taken_by_key ?: x"" } ( .transaction.rowid )
-    } ( @group .contract_address, @omit @min .created );
+    } ( @group .contract_address, @group .network_id, @omit @min .created );
 
     val last_blocktime = get_last_blocktime();
-    for (contract_address in contract_addresses_with_eligible_queued_transaction) {
+    for ((contract_address, network_id) in contracts_with_eligible_queued_transaction) {
         val latest_taken_transaction_timestamp = evm_submit_transaction @? {
             .status == transaction_status.TAKEN,
-            .contract_address == contract_address
+            .contract_address == contract_address,
+            .network_id == network_id
         } ( @max .taken_timestamp ) ?: chain_context.args.contract_tx_rate_limit.to_integer() * -1;
         if (last_blocktime - latest_taken_transaction_timestamp >= chain_context.args.contract_tx_rate_limit) {
             val evm_submit_transaction = evm_submit_transaction @ {
                 .status == transaction_status.QUEUED,
                 .contract_address == contract_address,
+                .network_id == network_id,
                 .rowid not in evm_submit_transaction_taken_by @* { .provider == exclude_taken_by_key ?: x"" } ( .transaction.rowid )
             } (
                 evm_submit_transaction_data(

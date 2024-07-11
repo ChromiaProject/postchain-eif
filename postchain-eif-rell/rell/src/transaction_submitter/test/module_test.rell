@@ -132,6 +132,31 @@ function test_fetch_oldest_queued_transactions_per_contract_and_rate_limit() {
     assert_equals(fetch_oldest_queued_transactions_per_contract().size(), 1);
 }
 
+/**
+ * 4 transactions for 2 identical contracts on 2 networks. Should return the 2 latest
+ * transactions for each contract on each network.
+ */
+function test_fetch_oldest_queued_transactions_per_contract_and_network() {
+
+    rell.test.block().run();
+    rell.test.tx().op(
+        create_evm_submit_transaction_op("system_bridge_address","myFunction1", network_id = 1),
+        create_evm_submit_transaction_op("system_bridge_address","myFunction2", network_id = 1),
+        create_evm_submit_transaction_op("system_bridge_address","myFunction3", network_id = 56),
+        create_evm_submit_transaction_op("system_bridge_address","myFunction4", network_id = 56)
+    ).run();
+
+    val evm_submit_transaction = fetch_oldest_queued_transactions_per_contract();
+
+    assert_equals(evm_submit_transaction.size(), 2);
+    assert_equals(evm_submit_transaction[0].contract_address, "system_bridge_address");
+    assert_equals(evm_submit_transaction[0].function_name, "myFunction1");
+    assert_equals(evm_submit_transaction[0].network_id, 1);
+    assert_equals(evm_submit_transaction[1].contract_address, "system_bridge_address");
+    assert_equals(evm_submit_transaction[1].function_name, "myFunction3");
+    assert_equals(evm_submit_transaction[1].network_id, 56);
+}
+
 function test_fail_transactions_with_enough_retries_strategy_all() {
 
     // Submit 2 transactions - 1 not to be touched, 1 to be failed

@@ -89,7 +89,7 @@ open class TransactionSubmitter(
             if (txSubmit.txHash == null) {
                 // Transaction taken but not yet submitted
 
-                logger.info { "Adding transaction ${txSubmit.rowId} to the queue to be submitted" }
+                logger.info { "Adding transaction ${txSubmit.rowId} to the queue to be submitted on network $networkId" }
                 queue.offer(txSubmit)
 
             } else if (!txSubmit.bcPersisted) {
@@ -213,7 +213,7 @@ open class TransactionSubmitter(
         var txReceipt: TransactionReceipt? = null
 
         if (txPending.blockNumber == null) {
-            logger.info { "Fetching receipt for pending transaction ${txPending.rowId} / ${txPending.txHash}" }
+            logger.info { "Fetching receipt for pending transaction ${txPending.rowId} / ${txPending.txHash} on network $networkId" }
 
             val txReceiptResult = fetchTransactionReceipt(txPending.txHash, txPending.rowId)
 
@@ -222,7 +222,7 @@ open class TransactionSubmitter(
                 txReceipt = txReceiptResult.transactionReceipt.get()
                 txPending.blockNumber = txReceipt.blockNumber
 
-                logger.info { "Transaction ${txPending.rowId} first receipt found at block number ${txPending.blockNumber}: $txReceipt" }
+                logger.info { "Transaction ${txPending.rowId} on network $networkId first receipt found at block number ${txPending.blockNumber}: $txReceipt" }
             }
         }
 
@@ -251,7 +251,7 @@ open class TransactionSubmitter(
                     }
                 }
             } else {
-                logger.info { "Receipt for transaction ${txPending.rowId} will be verified in ${nodeTxVerificationTimeout - blocksSinceReceipt} EVM blocks" }
+                logger.info { "Receipt for transaction ${txPending.rowId} on network $networkId will be verified in ${nodeTxVerificationTimeout - blocksSinceReceipt} EVM blocks" }
             }
         }
     }
@@ -276,7 +276,7 @@ open class TransactionSubmitter(
             currentBlockHeight: BigInteger
     ) {
 
-        logger.info { "Verify receipt of transaction ${txPending.rowId}" }
+        logger.info { "Verify receipt of transaction ${txPending.rowId} on network $networkId" }
 
         if (txReceipt.blockNumber != txPending.blockNumber) {
             // Some kind of re-org happened, store the new block number and return, will be polled again
@@ -316,7 +316,7 @@ open class TransactionSubmitter(
             ) {
                 txPending.status = PendingTxStatus.REVERTED
                 logger.error {
-                    "Transaction ${txPending.rowId} does not match original. " +
+                    "Transaction ${txPending.rowId} on network $networkId does not match original. " +
                             "Node function data: $functionData Node contract address: ${txPending.contractAddress} " +
                             "EVM function data: ${transaction.input} EVM contract address: $transactionToAddress"
                 }
@@ -329,7 +329,7 @@ open class TransactionSubmitter(
             try {
                 web3jRequestHandler.sendWeb3jRequest { it.ethGetTransactionReceipt(txHash) }
             } catch (e: Exception) {
-                val errorMessage = "Failed to poll for receipt for request id $rowId: ${e.message}"
+                val errorMessage = "Failed to poll for receipt for request id $rowId on network $networkId: ${e.message}"
                 logger.error(e) { errorMessage }
                 throw ProgrammerMistake(errorMessage, e)
             }
@@ -347,7 +347,7 @@ open class TransactionSubmitter(
 
     private fun sendTransaction(txRequest: EvmSubmitTxRequest) {
 
-        logger.info { "Submitting transaction ${txRequest.rowId}" }
+        logger.info { "Submitting transaction ${txRequest.rowId} on network $networkId" }
 
         val fromAddress = transactionManagers.values.first().fromAddress
 
@@ -360,7 +360,7 @@ open class TransactionSubmitter(
 
         val feeEstimator = feeEstimatorFactory.createEstimate(txRequest.contractAddress, functionData, fromAddress, chainId)
 
-        logger.info { "Estimated gas and fees for transaction ${txRequest.rowId}: $feeEstimator" }
+        logger.info { "Estimated gas and fees for transaction ${txRequest.rowId} on network $networkId: $feeEstimator" }
 
         feeEstimator.validateRequestFees(txRequest)
 
@@ -371,7 +371,7 @@ open class TransactionSubmitter(
                         networkId,
                         feeEstimator.maxPriorityFeePerGas,
                         feeEstimator.maxFeePerGas,
-                        feeEstimatorFactory.gasLimit,
+                        feeEstimator.estimatedGasLimit,
                         txRequest.contractAddress,
                         functionData,
                         BigInteger.ZERO
@@ -390,7 +390,7 @@ open class TransactionSubmitter(
 
                 submitTxUpdates.add(EvmSubmitTransactionResult(txRequest.rowId, RellTransactionStatus.PENDING, response.transactionHash))
 
-                logger.info { "Transaction ${txRequest.rowId} submitted successfully with maxPriorityFeePerGas=${feeEstimator.maxPriorityFeePerGas}, maxFeePerGas=${feeEstimator.maxFeePerGas}, gasLimit=$feeEstimatorFactory.gasLimit" }
+                logger.info { "Transaction ${txRequest.rowId} on network $networkId submitted successfully with maxPriorityFeePerGas=${feeEstimator.maxPriorityFeePerGas}, maxFeePerGas=${feeEstimator.maxFeePerGas}, gasLimit=${feeEstimator.estimatedGasLimit}" }
 
                 return
 
@@ -407,7 +407,7 @@ open class TransactionSubmitter(
 
     fun enqueue(evmSubmitTxRellRequest: EvmSubmitTxRequest) {
 
-        logger.info { "Enqueue transaction ${evmSubmitTxRellRequest.rowId}" }
+        logger.info { "Enqueue transaction ${evmSubmitTxRellRequest.rowId} on network $networkId" }
 
         withWriteConnection(storage, chainId) {
             databaseOperations.queueTransaction(it, evmSubmitTxRellRequest, networkId)
@@ -447,7 +447,7 @@ open class TransactionSubmitter(
 
             pendingTransactions[txPending.txHash] = txPending
 
-            logger.info { "Transaction ${txPending.rowId} / ${txPending.txHash} added for verification" }
+            logger.info { "Transaction ${txPending.rowId} / ${txPending.txHash} added for verification on network $networkId" }
         }
     }
 
@@ -472,7 +472,7 @@ open class TransactionSubmitter(
 
     fun removePendingTx(requestId: Long) {
 
-        logger.info { "Removed pending transaction $requestId" }
+        logger.info { "Removed pending transaction $requestId on network $networkId" }
 
         pendingTransactions
                 .filterValues { it.rowId == requestId }
@@ -482,7 +482,7 @@ open class TransactionSubmitter(
 
     fun removeSubmitTx(bctx: BlockEContext, requestId: Long) {
 
-        logger.info { "Removed submit transaction $requestId" }
+        logger.info { "Removed submit transaction $requestId on network $networkId" }
 
         databaseOperations.removeTransaction(bctx, requestId)
     }
