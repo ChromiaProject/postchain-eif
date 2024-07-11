@@ -30,19 +30,22 @@ query get_erc20_withdrawal(network_id: integer, token_address: byte_array, benef
 query get_erc20_withdrawals(filter: withdrawal_filter, page_size: integer?, page_cursor: text?): ft4.utils.paged_result {
     val before_rowid = ft4.utils.before_rowid(page_cursor);
 
-    val paginated_result = erc20_withdrawal @* {
-        filter.network_id == null or .network_id == filter.network_id,
-        filter.token_address == null or .token_address == filter.token_address,
-        filter.beneficiary == null or .beneficiary == filter.beneficiary,
-        filter.from == null or .transaction.block.timestamp >= filter.from!!,
-        filter.to == null or .transaction.block.timestamp < filter.to!!,
-        filter.tx_rid == null or .transaction.tx_rid == filter.tx_rid!!,
-        empty(filter.statuses) or ((erc20_withdrawal_history @ { .erc20_withdrawal.rowid == $.rowid } (@omit @sort_desc .rowid, .withdrawal_status) limit 1) in filter.statuses!!),
-        .rowid > (before_rowid ?: rowid(0))
+    val paginated_result = (
+        w: erc20_withdrawal,
+        s: erc20_withdrawal_status @* { .erc20_withdrawal == w }
+    ) @* {
+        filter.network_id == null or w.network_id == filter.network_id,
+        filter.token_address == null or w.token_address == filter.token_address,
+        filter.beneficiary == null or w.beneficiary == filter.beneficiary,
+        filter.from == null or w.transaction.block.timestamp >= filter.from!!,
+        filter.to == null or w.transaction.block.timestamp < filter.to!!,
+        filter.tx_rid == null or w.transaction.tx_rid == filter.tx_rid!!,
+        empty(filter.statuses) or s.withdrawal_status in filter.statuses!!,
+        w.rowid > (before_rowid ?: rowid(0))
     } (
         ft4.utils.pagination_result(
-            data = map_withdrawal($).to_gtv_pretty(),
-            rowid = .rowid
+            data = map_withdrawal(w, s.withdrawal_status).to_gtv_pretty(),
+            rowid = w.rowid
         )
     ) limit ft4.utils.fetch_data_size(page_size);
 

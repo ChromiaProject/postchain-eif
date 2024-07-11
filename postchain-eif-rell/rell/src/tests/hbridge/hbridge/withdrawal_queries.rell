@@ -198,7 +198,36 @@ function test_get_erc20_withdrawals() {
             ),
         ]
     );
+    //  - withdrawal wdr1[1] -> requested -> pending
+    trigger_withdrawal_status_on_evm(wdr1[1].event_hash, evm_events.withdraw_request_event, block_height = 3);
+    trigger_withdrawal_status_on_evm(wdr1[1].event_hash, evm_events.pending_withdraw_event, block_height = 4);
 
+    // - filter by null or empty statuses
+    assert_equals(parse_paged_withdrawals(get_erc20_withdrawals(withdrawal_filter(), null, null)).size(), 24);
+    assert_equals(parse_paged_withdrawals(get_erc20_withdrawals(withdrawal_filter(statuses = []), null, null)).size(), 24);
+
+    // - filter by status = pending
+    val res12 = get_erc20_withdrawals(withdrawal_filter(statuses = [withdrawal_status.pending]), null, null);
+    val wdr12 = parse_paged_withdrawals(res12);
+    assert_equals(wdr12.size(), 2);
+    assert_equals(wdr12 @ {} (@set .token_address), set([CHR.token_address, FOO.token_address]));
+    assert_equals(wdr12 @ {} (@set .amount), set([100L, 200L]));
+
+    // - filter by status = pending | requested
+    trigger_withdrawal_status_on_evm(wdr1[1].event_hash, evm_events.unpending_withdraw_event, block_height = 5);
+    val res13 = get_erc20_withdrawals(withdrawal_filter(statuses = [withdrawal_status.pending, withdrawal_status.requested]), null, null);
+    val wdr13 = parse_paged_withdrawals(res13);
+    assert_equals(wdr13.size(), 2);
+    assert_equals(wdr13 @ {} (@set .token_address), set([CHR.token_address, FOO.token_address]));
+    assert_equals(wdr13 @ {} (@set .amount), set([100L, 200L]));
+
+    // - filter by status = pending | requested | withdrawn (there are no withdrawn entries)
+    assert_true(empty(erc20_withdrawal_status @* { withdrawal_status.withdrawn }));
+    val res14 = get_erc20_withdrawals(withdrawal_filter(statuses = [withdrawal_status.pending, withdrawal_status.requested, withdrawal_status.withdrawn]), null, null);
+    val wdr14 = parse_paged_withdrawals(res14);
+    assert_equals(wdr14.size(), 2);
+    assert_equals(wdr14 @ {} (@set .token_address), set([CHR.token_address, FOO.token_address]));
+    assert_equals(wdr14 @ {} (@set .amount), set([100L, 200L]));
 }
 
 function withdraw(
