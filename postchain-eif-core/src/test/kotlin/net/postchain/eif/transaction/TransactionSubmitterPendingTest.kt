@@ -76,7 +76,7 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
 
         assertThat(txPending.status).isEqualTo(PendingTxStatus.REVERTED)
 
-        testLogAppender.assertError("Transaction 0 does not match original")
+        testLogAppender.assertError("Transaction 0 on network 0 does not match original")
     }
 
     @Test
