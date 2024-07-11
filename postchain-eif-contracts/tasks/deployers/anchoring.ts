@@ -44,8 +44,3 @@ function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/*
-ETH mainnet:
-  validator deployed to:  0xD42284814389978dC43c53F8807e8bC0AC6BD5Fe // deploy:anchoring
-  anchoring deployed to:  0x27925011C2B08DDEF233dDA44958876E8a4D8401 // deploy:anchoring
-*/
