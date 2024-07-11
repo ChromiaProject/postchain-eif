@@ -14,7 +14,7 @@ blockchains:
             network_id: 56
             evm_read_offset: 100
             contracts:
-              - '0xE4B1Abd25D10BBca3d656f866D50d4b322E2B722' # bridge
+              - '0xc5B2d0F1F659A72c3c94E6E654C859771161eFD3' # bridge
               - '0x6414FbBf1CC9d9253125e106435619577bAAc2aC' # staking
             skip_to_height: 7743093
             events: !include configs/events.yml
@@ -22,7 +22,7 @@ blockchains:
             network_id: 1
             evm_read_offset: 50
             contracts:
-              - '0x0444d0F8799272AE52644264873de86aa28D222A' # bridge
+              - '0xb1632e7de8B3d18277Cc3C99B6819795bBDe8654' # bridge
               - '0xC7b0F970c1EFBB181194Fc15ccD5C4a2c2Ab863B' # staking
             skip_to_height: 11223368
             events: !include configs/events.yml
@@ -44,7 +44,7 @@ blockchains:
             contracts:
               - '0x6045931E511EF7e53A4A817F971e0CA28c758809'
               - '0x16b9a82891338f9ba80e2d6970fdda79d1eb0dae'
-            skip_to_height: -1000
+            skip_to_height: 40347862
             events: !include configs/events_price_oracle.yml
           ethereum:
             network_id: 1
@@ -52,7 +52,7 @@ blockchains:
             contracts:
               - '0xd366Ed22F5b2262A2Da4C32D8A4607C93690134a'
               - '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
-            skip_to_height: -1000
+            skip_to_height: 20275380
             events: !include configs/events_price_oracle.yml
 
   transaction_submitter:
@@ -63,32 +63,32 @@ blockchains:
         manual_admins:
           - 0319852651DB3ACA5D5DFDF71D8600566345FE1713BCBC7F2C1B6434B7A8C88C6F # Chromaway provider
         directory_chain_config:
-          blockchain_rid: x"1B5E66B1B2AAFF1B2EF636F21A81C99796067B2D79000E8C021FCDE3B1B09A36"
+          blockchain_rid: x"7E5BE539EF62E48DDA7035867E67734A70833A69D2F162C457282C319AA58AE4"
           validator_contracts:
-            - address: "18d808d6A604b1335E5a4759950902628D409122"
+            - address: "c755927508b7Ac3f7B31c9Ed396F3bE91C723d00"
               network_id: 1
-            - address: "D42284814389978dC43c53F8807e8bC0AC6BD5Fe"
+            - address: "c755927508b7Ac3f7B31c9Ed396F3bE91C723d00"
               network_id: 56
         # Omit this to disable anchoring
         system_anchoring_chain_config:
-          blockchain_rid: x"90FE15AD988445BDC4661DC40A93181BE914B741DCF52A48EE1C917AB0DC939A"
+          blockchain_rid: x"B497391373BB74944193205EB37C84B0520D474F491E2EF4743F16F670DB289B"
           anchoring_contracts:
-            - address: "27925011C2B08DDEF233dDA44958876E8a4D8401"
-              validator_contract: "D42284814389978dC43c53F8807e8bC0AC6BD5Fe"
+            - address: "EB6915F71BB18BcD8a6763187Fcb004Ff91e8695"
+              validator_contract: "988414f24040429E0c0A595fc62cE5EABCdF767F"
               network_id: 1
         # economy-chain
         system_chain_bridges:
-          - blockchain_rid: x"1D093856187A1DF0274E1E425220BC09AD775832FB93783C9ACD564889001CDD"
+          - blockchain_rid: x"15C0CA99BEE60A3B23829968771C50E491BD00D2E3AE448580CD48A8D71E7BBA"
             bridge_contracts:
-              - address: "0444d0F8799272AE52644264873de86aa28D222A"
-                validator_contract: "445D203F46fB91B79Af30f8Bf5F779C91e941aCb"
+              - address: "b1632e7de8B3d18277Cc3C99B6819795bBDe8654"
+                validator_contract: "58D384e2B43779B85C70b4C15A36b7051384149E"
                 network_id: 1
-              - address: "E4B1Abd25D10BBca3d656f866D50d4b322E2B722"
-                validator_contract: "27925011C2B08DDEF233dDA44958876E8a4D8401"
+              - address: "c5B2d0F1F659A72c3c94E6E654C859771161eFD3"
+                validator_contract: "5843EEBE89e91866ADC18df07eB5C943DA581585"
                 network_id: 56
         contract_tx_rate_limit: 60000
         tx_node_submit_timeout: 1800000 # 30m
-        tx_timeout: 86400000 # 24h
+        tx_timeout: 3600000 # 60m
         node_retry_strategy: SUPERMAJORITY
         network_configs:
           - id: 56
@@ -111,16 +111,16 @@ blockchains:
             network_id: 56
             max_gas_price: 4500000000000000 # per transaction
             min_wallet_balance: 10000000000000000
-            gas_limit: 150000 # change to 300000
-            #gas_limit_margin: 0.1
+            gas_limit: 1000000 # 300 000 was too low
+            gas_limit_margin: 0.1
             node_tx_verification_evm_blocks: 100
             tx_verification_time: 20000
           ethereum:
             network_id: 1
             max_gas_price: 4500000000000000 # per transaction
             min_wallet_balance: 10000000000000000
-            gas_limit: 150000 # change to 300000
-            #gas_limit_margin: 0.1
+            gas_limit: 1000000 # 300 000 was too low
+            gas_limit_margin: 0.1
             node_tx_verification_evm_blocks: 50
             tx_verification_time: 20000
         node_tx_verification_timeout: 1500000 # 25 min - a bit less than tx_node_submit_timeout
@@ -133,7 +133,7 @@ blockchains:
             topics:
               - L_signer_list_update
           local:
-            - bc-rid: x"1D093856187A1DF0274E1E425220BC09AD775832FB93783C9ACD564889001CDD" # economy-chain
+            - bc-rid: x"15C0CA99BEE60A3B23829968771C50E491BD00D2E3AE448580CD48A8D71E7BBA" # economy-chain
               topic: "L_bridge_mapping"
           global:
             topics:
