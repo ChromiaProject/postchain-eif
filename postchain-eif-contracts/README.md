@@ -67,7 +67,7 @@ There are two versions of the Bridge contract, TokenBridge and ChromiaTokenBridg
 
 The ChromiaTokenBridge is meant to be used for tokens that are native to Chromia. This contract overrides the deposit/withdraw functions to burn the ERC20 tokens on deposit and mint them on withdraw. This is done since the total avaliable supply of tokens should be handled on the Chromia side, and to enable users to directly withdraw FT4 tokens to EVM without the need for tokens already being held in the contract.
 
-To deploy the normal TokenBridge, run the deploy script:
+#### To deploy the normal TokenBridge, run the deploy script:
 
 With managed validator contract:
 
@@ -88,7 +88,14 @@ With manually updated validator contract
 $ yarn deploy --network sepolia --verify --app 0xCaf200436270A60Cda6543602F2Ea4224E31351d --offset 2
 ```
 
-To deploy the ChromiaTokenBridge, run the deploy:native script:
+After deploying bridge chain on Chromia retrieve the blockchain RID of that chain and run (omit --managed-validator if
+you have a manually updated validator contract):
+
+```sh
+$ yarn setBlockchainRid:bridge --network sepolia --address {BRIDGE_CONTRACT_ADDRESS} --blockchain-rid {BRIDGE_BLOCKCHAIN_RID} --managed-validator {MANAGED_VALIDATOR_CONTRACT_ADDRESS}
+```
+
+#### To deploy the ChromiaTokenBridge, run the deploy:native script:
 
 With managed validator contract:
 
@@ -109,13 +116,20 @@ With manually updated validator contract
 $ yarn deploy:native --network sepolia --verify --app 0xCaf200436270A60Cda6543602F2Ea4224E31351d,0x9F4daAfc3F52C1c92e4583413824523679ABc9a3,0x4cBe97487b517b66B43943AD97Ad8394b9DEa7dC,0x4FC783e3a3beF0270858Dc5FbB837fA6f8fDbFc6 --offset 2
 ```
 
-You also can deploy ALICE token for test
+After deploying bridge chain on Chromia retrieve the blockchain RID of that chain and run (omit --managed-validator if
+you have a manually updated validator contract):
+
+```sh
+$ yarn setBlockchainRid:bridge --network sepolia --address {BRIDGE_CONTRACT_ADDRESS} --blockchain-rid {BRIDGE_BLOCKCHAIN_RID} --managed-validator {MANAGED_VALIDATOR_CONTRACT_ADDRESS}
+```
+
+#### To deploy ALICE token for test
 
 ```sh
 $ yarn deploy:alice --network sepolia --verify
 ```
 
-Deploying anchoring contract:
+#### Deploying anchoring contract
 
 ```sh
 $ yarn deploy:anchoring --network sepolia --verify --blockchain-rid {SYSTEM_ANCHORING_CHAIN_RID} --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS}
