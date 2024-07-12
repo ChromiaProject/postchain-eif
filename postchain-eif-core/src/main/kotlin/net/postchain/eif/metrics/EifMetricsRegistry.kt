@@ -27,7 +27,7 @@ class EifMetricsRegistry {
                     .tag(NETWORK_ID_TAG, networkId.toString())
                     .register(Metrics.globalRegistry)
 
-            meters.getOrPut(blockchainRid) { mutableListOf(gauge) }.add(gauge)
+            meters.getOrPut(blockchainRid) { mutableListOf() }.add(gauge)
         }
     }
 
