@@ -4,6 +4,7 @@ import {
   ChromiaTokenBridge__factory,
   IValidator,
   Validator__factory,
+  ManagedValidator,
   ManagedValidator__factory,
   TokenMinterBase,
   TokenMinterETH__factory,
@@ -66,9 +67,9 @@ task("deploy:chromiabridge")
     console.log("Token bridge deployed to: ", bridge.address);
     const proxyAdmin = await hre.upgrades.erc1967.getAdminAddress(bridge.address);
     console.log("Proxy admin address is: ", proxyAdmin);
-    await hre.upgrades.admin.transferProxyAdminOwnership(
-      multiSigOwner
-    );
+    //await hre.upgrades.admin.transferProxyAdminOwnership(
+    //  multiSigOwner
+    //);
 
     const DAILY_LIMIT = 1000000 * 1000000; // agreed on weekly meeting 2024-06-19
 
@@ -82,7 +83,7 @@ task("deploy:chromiabridge")
     );
 
     const tokenMinterFactory: TokenMinterETH__factory = await hre.ethers.getContractFactory("TokenMinterETH"); // transferFromNative ETH mainnet
-    const tokenMinter: TokenMinterBase = await tokenMinterFactory.deploy(DAILY_LIMIT, token.address, bridge.address, multiSigOwner);
+    const tokenMinter: TokenMinterBase = await tokenMinterFactory.deploy(DAILY_LIMIT, token.address, bridge.address);
     await tokenMinter.deployed();
     console.log("Token Minter deployed to: ", tokenMinter.address);
 
@@ -92,8 +93,8 @@ task("deploy:chromiabridge")
     console.log('bridge.allowToken');
     console.log(await bridge.allowToken(token.address));
 
-    console.log('bridge.transferOwnership');
-    console.log(await bridge.transferOwnership(multiSigOwner));
+    //console.log('bridge.transferOwnership');
+    //console.log(await bridge.transferOwnership(multiSigOwner));
     // note: it needs to be accepted by the multisig
 
     if (verify) {
@@ -118,7 +119,7 @@ task("deploy:chromiabridge")
         });
         await hre.run("verify:verify", {
           address: tokenMinter.address,
-          constructorArguments: [DAILY_LIMIT, token.address, bridge.address, multiSigOwner],
+          constructorArguments: [DAILY_LIMIT, token.address, bridge.address],
         });
       } catch (e) {
         console.log(e);

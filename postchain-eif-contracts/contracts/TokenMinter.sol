@@ -39,9 +39,8 @@ abstract contract TokenMinterBase is TwoWeekDelay, Ownable2Step {
     constructor(
         uint _dayLimit,
         address _tokenContractAddress,
-        address _bridgeContractAddress,
-        address _owner
-    ) Ownable(_owner) {
+        address _bridgeContractAddress
+    ) Ownable(msg.sender) {
         dayLimit = _dayLimit;
         dayStart = block.timestamp;
         dayAmount = 0;
@@ -118,9 +117,8 @@ contract TokenMinterETH is TokenMinterBase {
     constructor(
         uint _dayLimit,
         address _tokenContractAddress,
-        address _bridgeContractAddress,
-        address _owner
-    ) TokenMinterBase(_dayLimit, _tokenContractAddress, _bridgeContractAddress, _owner) {}
+        address _bridgeContractAddress
+    ) TokenMinterBase(_dayLimit, _tokenContractAddress, _bridgeContractAddress) {}
 
     function mint(address to, uint256 amount) external virtual onlyBridge {
         updateDayAmount(amount);
@@ -137,9 +135,8 @@ contract TokenMinterBSC is TokenMinterBase {
     constructor(
         uint _dayLimit,
         address _tokenContractAddress,
-        address _bridgeContractAddress,
-        address _owner
-    ) TokenMinterBase(_dayLimit, _tokenContractAddress, _bridgeContractAddress, _owner) {}
+        address _bridgeContractAddress
+    ) TokenMinterBase(_dayLimit, _tokenContractAddress, _bridgeContractAddress) {}
     
     function mint(address to, uint256 amount) external virtual onlyBridge {
         updateDayAmount(amount);
