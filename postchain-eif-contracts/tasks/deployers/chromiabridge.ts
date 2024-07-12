@@ -157,7 +157,7 @@ BSC mainnet:
   validator deployed to:  0x5843EEBE89e91866ADC18df07eB5C943DA581585    // deploy:chromiabridge
   Token bridge deployed to:  0xc5B2d0F1F659A72c3c94E6E654C859771161eFD3 // deploy:chromiabridge
   Proxy admin address is:  0xCee55D7b22C407dEcBaaa9C2Ac468c0D0a7C06ff   // deploy:chromiabridge
-  Token Minter deployed to:  0x7603D95231a2392b9855731dAD8c3D5A605A8483 // deploy:chromiabridge
+  Token Minter deployed to:  0x640ea7D9b85E883A3d1fFe532c58A7348eD1Eb7d // deploy:chromiabridge
 
 OLD BSC mainnet:
   validator deployed to:  0xD42284814389978dC43c53F8807e8bC0AC6BD5Fe    // deploy:directoryValidator
@@ -173,7 +173,7 @@ ETH mainnet:
   validator deployed to:  0x58D384e2B43779B85C70b4C15A36b7051384149E    // deploy:chromiabridge
   Token bridge deployed to:  0xb1632e7de8B3d18277Cc3C99B6819795bBDe8654 // deploy:chromiabridge
   Proxy admin address is:  0x6E8187435D5140214552ef3989DDb1457f4A663A   // deploy:chromiabridge
-  Token Minter deployed to:  0xed40a10f97b54E3B50D7F0bf709C44aeA049c8e5 // deploy:chromiabridge
+  Token Minter deployed to:  0xFEA65e5437B00DA910FD97b2771255006208Aa01 // deploy:chromiabridge
   validator deployed to:  0x988414f24040429E0c0A595fc62cE5EABCdF767F    // deploy:anchoring
   anchoring deployed to:  0xEB6915F71BB18BcD8a6763187Fcb004Ff91e8695    // deploy:anchoring
 
