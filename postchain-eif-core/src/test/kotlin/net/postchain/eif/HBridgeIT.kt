@@ -147,7 +147,6 @@ class HBridgeIT : EifBaseIntegrationTest() {
     @AfterAll
     fun tearDownAfterAll() {
         super.tearDown() // Calling @AfterEach IntegrationTestSetup.tearDown()
-        web3j.shutdown()
         evmContainer.stop()
     }
 
@@ -411,6 +410,8 @@ class HBridgeIT : EifBaseIntegrationTest() {
                 "signatures" to gtv(newBlockWitness.map { gtv(it.data) }),
         )).get().toObject<EventMerkleProof>()
 
+        verifyWithdrawalStatusOnPostchain(eventHash, WithdrawalStatus.created)
+
         logger.info { "\trequesting withdrawal using the new confirmation proof" }
         val receipt = bridge.withdrawRequest(
                 eventProof2.web3EventData(),
@@ -426,9 +427,23 @@ class HBridgeIT : EifBaseIntegrationTest() {
             val block = web3j.ethGetBlockByNumber(DefaultBlockParameter.valueOf(receipt.blockNumber.add(BigInteger.TWO)), false).send()
             block.block != null
         }
+
+        verifyWithdrawalStatusOnPostchain(eventHash, WithdrawalStatus.requested)
+
+        // Making withdrawal pending
+        bridge.pendingWithdraw(Bytes32(eventHash)).send()
+        verifyWithdrawalStatusOnPostchain(eventHash, WithdrawalStatus.pending)
+
+        // Making withdrawal withdrawable again
+        bridge.unpendingWithdraw(Bytes32(eventHash)).send()
+        verifyWithdrawalStatusOnPostchain(eventHash, WithdrawalStatus.requested)
+
         bridge.withdraw(Bytes32(eventHash), Address(userEvmAddress)).send()
         userBalance = testToken.balanceOf(Address(userEvmAddress)).send()
         assertEquals(userBalance.value, initialMint - depositAmount + withdrawAmount)
+
+        // Verifying that the withdrawal is completed
+        verifyWithdrawalStatusOnPostchain(eventHash, WithdrawalStatus.withdrawn)
     }
 
     @Test
@@ -969,6 +984,15 @@ class HBridgeIT : EifBaseIntegrationTest() {
         assertArrayEquals(newValidators, getContractValidatorList().toTypedArray())
     }
 
+    private fun verifyWithdrawalStatusOnPostchain(eventHash: ByteArray, expectedStatus: WithdrawalStatus) {
+        Awaitility.await().pollInterval(Duration.TWO_SECONDS).atMost(Duration.ONE_MINUTE).untilAsserted {
+            sealBlock()
+
+            val withdrawal = blockQuery.query("eif.hbridge.get_erc20_withdrawal_by_event_hash", gtv("event_hash" to gtv(eventHash))).get()
+            assertThat(withdrawal.asDict()["status"]?.asString()).isEqualTo(expectedStatus.name)
+        }
+    }
+
     private fun getContractValidatorList(): List<Address> {
         val count = validator.validatorCount.send().value.toLong()
         val validators = mutableListOf<Address>()
@@ -996,4 +1020,13 @@ class HBridgeIT : EifBaseIntegrationTest() {
             "eif.hbridge.get_erc20_withdrawal_by_tx",
             gtv("tx_rid" to gtv(txRid), "op_index" to gtv(1))
     ).get().asDict()["event_hash"]!!.asByteArray()
+
+    @Suppress("EnumEntryName")
+    private enum class WithdrawalStatus {
+        created,
+        requested,
+        pending,
+        withdrawn,
+        withdrawn_to_chromia,
+    }
 }
