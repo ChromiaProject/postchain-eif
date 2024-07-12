@@ -251,7 +251,10 @@ open class TransactionSubmitter(
                     }
                 }
             } else {
-                logger.info { "Receipt for transaction ${txPending.rowId} on network $networkId will be verified in ${nodeTxVerificationTimeout - blocksSinceReceipt} EVM blocks" }
+                val awaitingBlocks = nodeTxVerificationEvmBlocks - blocksSinceReceipt
+                if (awaitingBlocks.mod(10) == 0) {
+                    logger.info { "Receipt for transaction ${txPending.rowId} on network $networkId will be verified in $awaitingBlocks EVM blocks" }
+                }
             }
         }
     }
