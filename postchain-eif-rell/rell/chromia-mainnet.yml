@@ -112,7 +112,7 @@ blockchains:
             max_gas_price: 4500000000000000 # per transaction
             min_wallet_balance: 10000000000000000
             gas_limit: 1000000 # 300 000 was too low
-            gas_limit_margin: 0.1
+            gas_limit_margin: 5 # 500%
             node_tx_verification_evm_blocks: 100
             tx_verification_time: 20000
           ethereum:
@@ -120,7 +120,7 @@ blockchains:
             max_gas_price: 4500000000000000 # per transaction
             min_wallet_balance: 10000000000000000
             gas_limit: 1000000 # 300 000 was too low
-            gas_limit_margin: 0.1
+            gas_limit_margin: 5 # 500%
             node_tx_verification_evm_blocks: 50
             tx_verification_time: 20000
         node_tx_verification_timeout: 1500000 # 25 min - a bit less than tx_node_submit_timeout
