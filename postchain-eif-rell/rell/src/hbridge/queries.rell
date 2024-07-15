@@ -58,15 +58,20 @@ query get_erc20_withdrawals(filter: withdrawal_filter, page_size: integer?, page
  * @param tx_rid transaction RID in which the withdrawal was initiated
  * @param op_index index of the operation within the transaction in which the withdrawal was initiated
  */
-query get_erc20_withdrawal_by_tx(tx_rid: byte_array, op_index: integer): erc20_withdrawal_info? {
-    return erc20_withdrawal @? { .transaction.tx_rid == tx_rid, op_index } ( map_withdrawal($) );
-}
+query get_erc20_withdrawal_by_tx(tx_rid: byte_array, op_index: integer): erc20_withdrawal_info? =
+        erc20_withdrawal @? { .transaction.tx_rid == tx_rid, op_index } ( map_withdrawal($) );
+
+query get_erc20_withdrawal_by_event_hash(event_hash: byte_array): erc20_withdrawal_info? =
+        erc20_withdrawal @? { .event_hash == event_hash } ( map_withdrawal($) );
+
+query get_erc20_withdrawal_by_id(withdrawal_id: rowid): erc20_withdrawal_info? =
+        erc20_withdrawal @? { .rowid == withdrawal_id } ( map_withdrawal($) );
 
 query get_account_for_eoa_address(evm_address: byte_array): byte_array? =
-    evm_eoa_account_link @? { .address == evm_address } (.account.id);
+        evm_eoa_account_link @? { .address == evm_address } (.account.id);
 
 query get_account_for_sc_address (evm_address: byte_array, network_id: integer): byte_array? =
-    evm_sc_account_link @? { .address == evm_address, network_id } (.account.id);
+        evm_sc_account_link @? { .address == evm_address, network_id } (.account.id);
 
 query get_eoa_addresses_for_account(account_id: byte_array): list<byte_array> {
     val account = ft4.accounts.Account(account_id);
