@@ -171,9 +171,49 @@ query get_transaction(row_id: integer): evm_submit_transaction_data {
         processed_by = .processed_by));
 }
 
-query get_transactions(): list<evm_submit_transaction_data> {
+/**
+ * Get list of nodes that have `taken` a transaction and tried to submit it.
+ *
+ * @returns A list of node pubkeys - please note this is not the provider key even if the entity says it is.
+ */
+query get_transaction_taken_by(row_id: integer): list<pubkey> {
 
-    return evm_submit_transaction @* {} (evm_submit_transaction_data(
+    return evm_submit_transaction_taken_by @* { .transaction.rowid == rowid(row_id) } ( .provider );
+}
+
+/**
+ * Get at most 50 transactions from transaction submitter sorted in descending order. Filtering is optional.
+ *
+ * @param contract_address Filter on EVM contract address. Value without "0x" prefix.
+ * @param function_name Filter on EVM function name.
+ * @param network_id Filter on network id.
+ * @param status Filter on status in list.
+ * @param tx_hash Filter on specific EVM transaction hash.
+ * @param from_row_id Return transactions from this row id, inclusive.
+ * @param count Max number of transactions returned. Default value is 20 and maximum 50.
+ *
+ * @returns List of `evm_submit_transaction_data`.
+ */
+query get_transactions(
+    contract_address: text? = null,
+    function_name: text? = null,
+    network_id: integer? = null,
+    status: list<transaction_status>? = null,
+    tx_hash: text? = null,
+    from_row_id: rowid? = null,
+    count: integer = 20,
+): list<evm_submit_transaction_data> {
+
+    require(count <= 50, "No more than 50 transactions can be requested at the time");
+
+    return evm_submit_transaction @* {
+        contract_address == null or .contract_address == contract_address,
+        function_name == null or .function_name == function_name,
+        network_id == null or .network_id == network_id,
+        status == null or .status in status,
+        tx_hash == null or .tx_hash == tx_hash,
+        from_row_id == null or .rowid >= from_row_id,
+    } (@omit @sort_desc .rowid, evm_submit_transaction_data(
         row_id = .rowid.to_integer(),
         contract_address = .contract_address,
         function_name = .function_name,
@@ -186,9 +226,14 @@ query get_transactions(): list<evm_submit_transaction_data> {
         status = .status,
         created = .created,
         tx_hash = .tx_hash,
-        processed_by = .processed_by));
+        processed_by = .processed_by)) limit count;
 }
 
+/**
+ * Get all transactions with status PENDING.
+ *
+ * @returns List of `evm_submit_transaction_data`.
+ */
 query get_pending_transactions(): list<evm_submit_transaction_data> {
 
     return evm_submit_transaction @* { .status == transaction_status.PENDING } (evm_submit_transaction_data(
@@ -207,6 +252,12 @@ query get_pending_transactions(): list<evm_submit_transaction_data> {
         processed_by = .processed_by));
 }
 
+/**
+ * Returns status of a transaction.
+ *
+ * @param row_id The transaction row id.
+ * @returns A `transaction_status` or null if no transaction exists by that id.
+ */
 query get_evm_transaction_status(row_id: integer): transaction_status? {
     return evm_submit_transaction @? { rowid(row_id) }.status;
 }

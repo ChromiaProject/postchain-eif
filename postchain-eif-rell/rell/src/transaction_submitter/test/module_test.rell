@@ -385,3 +385,72 @@ function test_update_evm_transaction_status_SUCCESS() {
 
     assert_events(("icmf_message",(topic = evm_transaction_submitter_cost_topic, body = expected.to_gtv()).to_gtv_pretty()));
 }
+
+function test_get_transaction_taken_by() {
+
+    // Submit 3 transactions:
+    // 1 - not taken
+    // 2 - taken by alice
+    // 3 - taken by alice and bob
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "system_bridge_address", "myFunction-0", transaction_status.TAKEN, 1),
+        create_test_evm_submit_transaction(x"01", "system_bridge_address", "myFunction-1", transaction_status.TAKEN, 1),
+        create_test_evm_submit_transaction(x"02", "system_bridge_address", "myFunction-2", transaction_status.TAKEN, 1),
+        add_transaction_taken_by(x"01", rell.test.keypairs.alice.pub),
+        add_transaction_taken_by(x"02", rell.test.keypairs.alice.pub),
+        add_transaction_taken_by(x"02", rell.test.keypairs.bob.pub),
+    ).sign(rell.test.keypairs.alice).run();
+
+    assert_equals(get_transaction_taken_by(evm_submit_transaction @ { .id == x"00" } ( .rowid.to_integer() )).size(), 0);
+    assert_equals(get_transaction_taken_by(evm_submit_transaction @ { .id == x"01" } ( .rowid.to_integer() )).size(), 1);
+    assert_equals(get_transaction_taken_by(evm_submit_transaction @ { .id == x"02" } ( .rowid.to_integer() )).size(), 2);
+}
+
+function test_get_transactions() {
+
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "contract00", "myFunction-0", transaction_status.TAKEN, 1),
+        create_test_evm_submit_transaction(x"01", "contract01", "myFunction-1", transaction_status.PENDING, 1),
+        create_test_evm_submit_transaction(x"02", "contract02", "myFunction-2", transaction_status.SUCCESS, 1),
+    ).sign(rell.test.keypairs.alice).run();
+
+    // No filter
+    var txs = get_transactions();
+    assert_equals(txs.size(), 3);
+    assert_equals(txs[0].contract_address, "contract02");
+    assert_equals(txs[1].contract_address, "contract01");
+    assert_equals(txs[2].contract_address, "contract00");
+
+    // count limit
+    txs = get_transactions(count = 1);
+    assert_equals(txs.size(), 1);
+    assert_equals(txs[0].contract_address, "contract02");
+
+    // count and from filter
+    txs = get_transactions(from_row_id = rowid(1), count = 2);
+    assert_equals(txs.size(), 2);
+    assert_equals(txs[0].contract_address, "contract02");
+    assert_equals(txs[1].contract_address, "contract01");
+
+    // contract_address filter
+    txs = get_transactions(contract_address = "contract00");
+    assert_equals(txs.size(), 1);
+    assert_equals(txs[0].contract_address, "contract00");
+
+    // function_name filter
+    txs = get_transactions(function_name = "myFunction-2");
+    assert_equals(txs.size(), 1);
+    assert_equals(txs[0].contract_address, "contract02");
+
+    // network_id filter
+    txs = get_transactions(network_id = 1);
+    assert_equals(txs.size(), 3);
+    txs = get_transactions(network_id = -1);
+    assert_equals(txs.size(), 0);
+
+    // status filter
+    txs = get_transactions(status = [transaction_status.TAKEN, transaction_status.PENDING]);
+    assert_equals(txs.size(), 2);
+    assert_equals(txs[0].contract_address, "contract01");
+    assert_equals(txs[1].contract_address, "contract00");
+}
