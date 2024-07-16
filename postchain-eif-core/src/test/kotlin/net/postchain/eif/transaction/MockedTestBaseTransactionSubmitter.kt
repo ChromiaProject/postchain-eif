@@ -200,7 +200,7 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
         val feeEstimatorFactoryMock = mock<EIP1559FeeEstimatorFactory> {
             on { gasLimit } doReturn gasLimitValue.toBigInteger()
             on { maxGasPrice } doReturn maxGasPriceValue.toBigInteger()
-            on { createEstimate(anyString(), anyString(), anyString(), anyLong()) } doAnswer {
+            on { createEstimate(anyString(), anyString(), anyString(), anyLong(), any(), any()) } doAnswer {
                 EIP1559LastBlockFeeEstimatorMock(1.toBigInteger(), 1.toBigInteger(), 1.toBigInteger(), 1.toBigInteger(), gasUsed = gasUsed, gasLimitValue, maxGasPriceValue, walletBalance = walletBalance)
             }
         }

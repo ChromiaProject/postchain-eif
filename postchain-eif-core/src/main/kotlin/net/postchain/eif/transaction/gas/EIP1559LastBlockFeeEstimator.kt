@@ -20,7 +20,9 @@ class EIP1559LastBlockFeeEstimator(
         contractAddress: String,
         functionData: String,
         fromAddress: String,
-        chainId: Long
+        chainId: Long,
+        private val txMaxPriorityFeePerGas: BigInteger,
+        private val txMaxFeePerGas: BigInteger
 ) : EIP1559FeeEstimator {
 
     override val blockNumber: BigInteger
@@ -47,23 +49,11 @@ class EIP1559LastBlockFeeEstimator(
         blockNumber = block.number
         baseFeePerGas = getBaseFeePerGas(block.baseFeePerGas)
         maxPriorityFeePerGas = getEstimatedMaxPriorityFeePerGas()
-        maxFeePerGas = baseFeePerGas.add(maxPriorityFeePerGas)
+        maxFeePerGas = getMaxFeePerGas(baseFeePerGas, maxPriorityFeePerGas)
         estimatedTotalGasFee = estimatedGasUsage * maxFeePerGas
     }
 
     override fun validateRequestFees(txRequest: EvmSubmitTxRequest) {
-
-        if (txRequest.maxFeePerGas < baseFeePerGas) {
-            throw UserMistake("Max fee per gas less than block base fee. maxFeePerGas: ${txRequest.maxFeePerGas} estimated required baseFeePerGas: $baseFeePerGas")
-        }
-
-        if (txRequest.maxFeePerGas < maxFeePerGas) {
-            logger.warn { "Transaction ${txRequest.rowId} fee might be too low. maxFeePerGas: ${txRequest.maxFeePerGas} estimated require: $maxFeePerGas" }
-        }
-
-        if (txRequest.maxPriorityFeePerGas < maxPriorityFeePerGas) {
-            logger.warn { "Transaction ${txRequest.rowId} fee might be too low. maxPriorityFeePerGas: ${txRequest.maxPriorityFeePerGas} estimated require: $maxPriorityFeePerGas" }
-        }
 
         if (estimatedGasUsage > gasLimit) {
             throw UserMistake("Estimated gas usage $estimatedGasUsage for tx ${txRequest.rowId} exceeds configured limit of $gasLimit")
@@ -129,8 +119,9 @@ class EIP1559LastBlockFeeEstimator(
         try {
             val maxPriorityFeePerGas = web3jRequestHandler.sendWeb3jRequest { it.ethMaxPriorityFeePerGas() }
                     .maxPriorityFeePerGas
-            return maxPriorityFeePerGas
+            val maxPriorityFeePerGasWithMargin = maxPriorityFeePerGas
                     .add(maxPriorityFeePerGas.toBigDecimal().times(priorityFeePerGasMargin).toBigInteger())
+            return maxPriorityFeePerGasWithMargin.min(txMaxPriorityFeePerGas)
         } catch (e: Exception) {
             val errorMessage = "Failed to get max priority fee per gas: ${e.message}"
             logger.error(e) { errorMessage }
@@ -142,6 +133,11 @@ class EIP1559LastBlockFeeEstimator(
         return baseFeePerGas.add(baseFeePerGas.toBigDecimal().times(baseFeePerGasMargin).toBigInteger())
     }
 
+    private fun getMaxFeePerGas(baseFeePerGas: BigInteger, maxPriorityFeePerGas: BigInteger): BigInteger {
+        val maxFeePerGas = baseFeePerGas.add(maxPriorityFeePerGas)
+        return maxFeePerGas.min(txMaxFeePerGas)
+    }
+
     private fun getEstimatedGasLimit(estimatedGasUsage: BigInteger, gasLimitMargin: BigDecimal): BigInteger {
 
         return estimatedGasUsage.add(estimatedGasUsage
@@ -151,6 +147,6 @@ class EIP1559LastBlockFeeEstimator(
     }
 
     override fun toString(): String {
-        return "gasLimit=$gasLimit, maxGasPrice=$maxGasPrice, gasLimitMargin=$gasLimitMargin, baseFeePerGasMargin=$baseFeePerGasMargin, priorityFeePerGasMargin=$priorityFeePerGasMargin, blockNumber=$blockNumber, baseFeePerGas=$baseFeePerGas, maxPriorityFeePerGas=$maxPriorityFeePerGas, maxFeePerGas=$maxFeePerGas, estimatedGasUsage=$estimatedGasUsage, estimatedGasLimit=$estimatedGasLimit, estimatedTotalGasFee=$estimatedTotalGasFee, walletBalance=$walletBalance"
+        return "gasLimit=$gasLimit, maxGasPrice=$maxGasPrice, gasLimitMargin=$gasLimitMargin, baseFeePerGasMargin=$baseFeePerGasMargin, priorityFeePerGasMargin=$priorityFeePerGasMargin, txMaxPriorityFeePerGas=$txMaxPriorityFeePerGas, txMaxFeePerGas=$txMaxFeePerGas, blockNumber=$blockNumber, baseFeePerGas=$baseFeePerGas, maxPriorityFeePerGas=$maxPriorityFeePerGas, maxFeePerGas=$maxFeePerGas, estimatedGasUsage=$estimatedGasUsage, estimatedGasLimit=$estimatedGasLimit, estimatedTotalGasFee=$estimatedTotalGasFee, walletBalance=$walletBalance"
     }
 }

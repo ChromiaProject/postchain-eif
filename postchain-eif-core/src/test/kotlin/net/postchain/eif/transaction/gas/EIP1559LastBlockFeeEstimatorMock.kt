@@ -38,7 +38,9 @@ class EIP1559LastBlockFeeEstimatorMock(
                 "contractAddress",
                 "contractData",
                 "fromAddress",
-                0L
+                0L,
+                BigInteger.valueOf(Long.MAX_VALUE),
+                BigInteger.valueOf(Long.MAX_VALUE),
         )
     }
 

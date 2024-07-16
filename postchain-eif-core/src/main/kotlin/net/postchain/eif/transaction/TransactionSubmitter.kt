@@ -18,7 +18,6 @@ import net.postchain.core.Storage
 import net.postchain.eif.GtvToTypeMapper
 import net.postchain.eif.Web3jRequestHandler
 import net.postchain.eif.transaction.gas.EIP1559FeeEstimatorFactory
-import net.postchain.eif.upperCaseHex
 import net.postchain.gtv.Gtv
 import okhttp3.internal.toImmutableList
 import org.web3j.abi.FunctionEncoder
@@ -313,10 +312,10 @@ open class TransactionSubmitter(
             val functionData =
                     encodeFunction(txPending.functionName, txPending.parameterTypes, txPending.parameterValues)
 
-            val transactionToAddress = transaction.to.upperCaseHex()
+            val transactionToAddress = transaction.to
             if (
                     functionData != transaction.input ||
-                    !transactionToAddress.contains(txPending.contractAddress)
+                    !transactionToAddress.contains(txPending.contractAddress, ignoreCase = true)
             ) {
                 txPending.status = PendingTxStatus.REVERTED
                 logger.error {
@@ -362,7 +361,14 @@ open class TransactionSubmitter(
             true
         }
 
-        val feeEstimator = feeEstimatorFactory.createEstimate(txRequest.contractAddress, functionData, fromAddress, chainId)
+        val feeEstimator = feeEstimatorFactory.createEstimate(
+                txRequest.contractAddress,
+                functionData,
+                fromAddress,
+                chainId,
+                txRequest.maxPriorityFeePerGas,
+                txRequest.maxFeePerGas
+        )
 
         logger.info { "Estimated gas and fees for transaction ${txRequest.rowId} on network $networkId: $feeEstimator" }
 
