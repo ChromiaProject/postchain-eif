@@ -18,6 +18,8 @@ class EIP1559LastBlockFeeEstimatorMock(
         override val estimatedTotalGasFee: BigInteger = 1.toBigInteger(),
         override val estimatedGasLimit: BigInteger = 1.toBigInteger(),
         gasLimitMargin: BigDecimal = 0.1.toBigDecimal(),
+        baseFeePerGasMargin: BigDecimal = 5.toBigDecimal(),
+        priorityFeePerGasMargin: BigDecimal = 0.001.toBigDecimal(),
 ) : EIP1559FeeEstimator {
 
     private val feeEstimator: EIP1559LastBlockFeeEstimator
@@ -31,6 +33,8 @@ class EIP1559LastBlockFeeEstimatorMock(
                 gasLimit.toBigInteger(),
                 maxGasPrice.toBigInteger(),
                 gasLimitMargin,
+                baseFeePerGasMargin,
+                priorityFeePerGasMargin,
                 "contractAddress",
                 "contractData",
                 "fromAddress",

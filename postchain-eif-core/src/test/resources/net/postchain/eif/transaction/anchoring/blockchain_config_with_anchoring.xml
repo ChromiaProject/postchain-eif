@@ -44,13 +44,13 @@
                                 <int>1337</int>
                             </entry>
                             <entry key="max_gas_price">
-                                <int>300000000000000</int>
+                                <int>500000000000000</int>
                             </entry>
                             <entry key="min_wallet_balance">
                                 <int>100000000000</int>
                             </entry>
                             <entry key="gas_limit">
-                                <int>9000000</int>
+                                <int>90000000</int>
                             </entry>
                             <entry key="gas_limit_margin">
                                 <string>0.1</string>

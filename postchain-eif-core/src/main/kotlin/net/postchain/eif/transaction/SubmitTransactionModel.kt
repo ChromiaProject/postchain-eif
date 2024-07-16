@@ -12,6 +12,7 @@ import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_PARAMETER_VALUES
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_REQUEST_ID
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_SENDER
+import net.postchain.eif.upperCaseHex
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvDecoder
 import net.postchain.gtv.mapper.Name
@@ -62,9 +63,9 @@ open class EvmSubmitTxRellRequest(
         @Name("processed_by")
         val processedBy: ByteArray?,
 ) {
-    val contractAddress: String = contractAddress.uppercase()
+    val contractAddress: String = contractAddress.upperCaseHex()
     var txHash: String? = txHash
-        set(value) { field = value?.uppercase() }
+        set(value) { field = value?.upperCaseHex() }
 }
 
 class EvmSubmitTxRequest(
@@ -125,8 +126,8 @@ class EvmPendingTx(
         var effectiveGasPrice: BigInteger? = null,
         var gasUsed: BigInteger? = null,
 ) {
-    val contractAddress: String = contractAddress.uppercase()
-    val txHash: String = txHash.uppercase()
+    val contractAddress: String = contractAddress.upperCaseHex()
+    val txHash: String = txHash.upperCaseHex()
     var status: PendingTxStatus = PendingTxStatus.VERIFYING
         set(value) {
             field = value
@@ -140,7 +141,7 @@ class EvmPendingTx(
         private set
     var blockHash: String? = null
         set(value) {
-            field = value?.uppercase()
+            field = value?.upperCaseHex()
         }
 
     companion object {

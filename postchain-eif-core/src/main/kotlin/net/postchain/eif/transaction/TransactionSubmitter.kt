@@ -18,6 +18,7 @@ import net.postchain.core.Storage
 import net.postchain.eif.GtvToTypeMapper
 import net.postchain.eif.Web3jRequestHandler
 import net.postchain.eif.transaction.gas.EIP1559FeeEstimatorFactory
+import net.postchain.eif.upperCaseHex
 import net.postchain.gtv.Gtv
 import okhttp3.internal.toImmutableList
 import org.web3j.abi.FunctionEncoder
@@ -312,7 +313,7 @@ open class TransactionSubmitter(
             val functionData =
                     encodeFunction(txPending.functionName, txPending.parameterTypes, txPending.parameterValues)
 
-            val transactionToAddress = transaction.to.uppercase()
+            val transactionToAddress = transaction.to.upperCaseHex()
             if (
                     functionData != transaction.input ||
                     !transactionToAddress.contains(txPending.contractAddress)

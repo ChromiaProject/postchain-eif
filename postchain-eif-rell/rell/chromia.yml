@@ -241,7 +241,9 @@ blockchains:
             node_tx_verification_evm_blocks: 10
             tx_verification_time: 20000
             gas_limit: 9000000
-            gas_limit_margin: "5" # 500%
+            gas_limit_margin: "0.2" # 20%
+            base_fee_per_gas_margin: "5" # 600% (base_fee + base_fee * 5)
+            priority_fee_per_gas_margin: "0.000001" # 0.00001% # Small margin to pass the default priority fees
         node_tx_verification_timeout: 1500000 # 25 min - a bit less than tx_node_submit_timeout
       sync_ext:
         - "net.postchain.eif.transaction.TransactionSubmitterSynchronizationInfrastructureExtension"

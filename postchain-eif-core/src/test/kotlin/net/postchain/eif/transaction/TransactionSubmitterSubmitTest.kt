@@ -92,10 +92,10 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
 
         val exception = assertThrows<RuntimeException>("Expected thrown exception") {
             ts.submitTransaction(
-                    mkEvmSubmitTxRequest(4)
+                    mkEvmSubmitTxRequest(20)
             )
         }
-        assertThat(exception.message).isEqualTo("Estimated total gas fee 4 for tx exceeds configured limit of 3")
+        assertThat(exception.message).isEqualTo("Estimated total gas fee 19 for tx exceeds configured limit of 3")
 
         verify(databaseOperations).recordTransactionGas(
                 any(),
@@ -103,7 +103,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
                 eq(BigInteger.valueOf(3)),
                 eq(BigInteger.valueOf(10))
         )
-        testLogAppender.assertError("Estimated total gas fee 4 for tx exceeds configured limit of 3")
+        testLogAppender.assertError("Estimated total gas fee 19 for tx exceeds configured limit of 3")
     }
 
     @Test
@@ -116,14 +116,14 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
                 transactionManagers,
-                mockFeeEstimatorFactory(10, 5)
+                mockFeeEstimatorFactory(10, 20)
         )
 
         mockTakenBy()
 
         val exception = assertThrows<RuntimeException>("Expected thrown exception") {
             ts.submitTransaction(
-                    mkEvmSubmitTxRequest(4)
+                    mkEvmSubmitTxRequest(20)
             )
         }
         assertThat(exception.message).isEqualTo("Failed to send transaction to all 1 nodes")
@@ -131,7 +131,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         verify(databaseOperations).recordTransactionGas(
                 any(),
                 eq(0L),
-                eq(BigInteger.valueOf(5)),
+                eq(BigInteger.valueOf(20)),
                 eq(BigInteger.valueOf(10))
         )
 
@@ -151,14 +151,14 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
                 transactionManagers,
-                mockFeeEstimatorFactory(10, 5)
+                mockFeeEstimatorFactory(10, 20)
         )
 
         mockTakenBy()
 
         val exception = assertThrows<RuntimeException>("Expected thrown exception") {
             ts.submitTransaction(
-                    mkEvmSubmitTxRequest(4)
+                    mkEvmSubmitTxRequest(20)
             )
         }
         assertThat(exception.message).isEqualTo("Failed to send transaction to all 2 nodes")
@@ -166,7 +166,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         verify(databaseOperations).recordTransactionGas(
                 any(),
                 eq(0L),
-                eq(BigInteger.valueOf(5)),
+                eq(BigInteger.valueOf(20)),
                 eq(BigInteger.valueOf(10))
         )
 

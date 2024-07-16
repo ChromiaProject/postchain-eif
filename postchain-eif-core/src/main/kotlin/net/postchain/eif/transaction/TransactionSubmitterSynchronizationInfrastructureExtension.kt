@@ -84,7 +84,9 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                                 web3jRequestHandler,
                                 BigInteger.valueOf(networkBlockchainConfig.gasLimit),
                                 BigInteger.valueOf(networkBlockchainConfig.maxGasPrice),
-                                networkBlockchainConfig.gasLimitMargin
+                                networkBlockchainConfig.gasLimitMargin,
+                                networkBlockchainConfig.baseFeePerGasMargin,
+                                networkBlockchainConfig.priorityFeePerGasMargin
                         )
                         val transactionSubmitter = TransactionSubmitter(
                                 web3jRequestHandler,
