@@ -8,12 +8,12 @@ import java.math.BigInteger
 interface EIP1559FeeEstimator {
 
     val blockNumber: BigInteger             // EVM block number fees are based on
-    val baseFeePerGas: BigInteger           // Latest block base fee
-    val maxPriorityFeePerGas: BigInteger    // Estimated max priority fee
+    val baseFeePerGas: BigInteger           // Latest block base fee + margin
+    val maxPriorityFeePerGas: BigInteger    // Estimated max priority fee + margin
     val maxFeePerGas: BigInteger            // Max total fee per gas to spend on this transaction (including base fee + priority fee)
     val estimatedGasUsage: BigInteger       // Estimated gas usage for this transaction
     val estimatedTotalGasFee: BigInteger    // Estimated total gas cost (estimatedGasUsage * maxFeePerGas)
-    val estimatedGasLimit: BigInteger       // Estimated gas limit (estimatedTotalGasFee * margin).
+    val estimatedGasLimit: BigInteger       // Estimated gas limit (estimatedTotalGasFee + margin).
                                             // Wallet needs funds to cover for this * maxFeePerGas
 
     fun validateRequestFees(txRequest: EvmSubmitTxRequest)
@@ -32,9 +32,12 @@ open class EIP1559FeeEstimatorFactory(
             contractAddress: String,
             functionData: String,
             fromAddress: String,
-            chainId: Long
+            chainId: Long,
+            txMaxPriorityFeePerGas: BigInteger,
+            txMaxFeePerGas: BigInteger
     ): EIP1559FeeEstimator {
         return EIP1559LastBlockFeeEstimator(web3jRequestHandler, gasLimit, maxGasPrice, gasLimitMargin,
-                baseFeePerGasMargin, priorityFeePerGasMargin, contractAddress, functionData, fromAddress, chainId)
+                baseFeePerGasMargin, priorityFeePerGasMargin, contractAddress, functionData, fromAddress,
+                chainId, txMaxPriorityFeePerGas, txMaxFeePerGas)
     }
 }

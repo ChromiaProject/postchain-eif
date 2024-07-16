@@ -147,7 +147,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
                 val valid = withTxPending(requestId) { _, txPending ->
 
-                    val match = txPending.blockHash != null && txPending.blockHash == blockHash &&
+                    val match = txPending.blockHash != null && txPending.blockHash.equals(blockHash, ignoreCase = true) &&
                             txPending.effectiveGasPrice != null && txPending.effectiveGasPrice!! == effectiveGasPrice &&
                             txPending.gasUsed != null && txPending.gasUsed!! == gasUsage
 
