@@ -9,8 +9,8 @@ interface EIP1559FeeEstimator {
 
     val blockNumber: BigInteger             // EVM block number fees are based on
     val baseFeePerGas: BigInteger           // Latest block base fee
-    val maxPriorityFeePerGas: BigInteger    // Estimated max priority fee to be included in next block
-    val maxFeePerGas: BigInteger            // Max total fee per gas to spend on this transaction
+    val maxPriorityFeePerGas: BigInteger    // Estimated max priority fee
+    val maxFeePerGas: BigInteger            // Max total fee per gas to spend on this transaction (including base fee + priority fee)
     val estimatedGasUsage: BigInteger       // Estimated gas usage for this transaction
     val estimatedTotalGasFee: BigInteger    // Estimated total gas cost (estimatedGasUsage * maxFeePerGas)
     val estimatedGasLimit: BigInteger       // Estimated gas limit (estimatedTotalGasFee * margin).
@@ -24,6 +24,8 @@ open class EIP1559FeeEstimatorFactory(
         open val gasLimit: BigInteger,           // TX submitter hard max gas limit
         open val maxGasPrice: BigInteger,        // TX submitter hard max gas price (base + priority)
         open val gasLimitMargin: BigDecimal,     // TX submitter gas limit margin to add to estimated gas limit for a transaction
+        open val baseFeePerGasMargin: BigDecimal,         // TX submitter base fee per gas margin: last_block_price + last_block_price * margin
+        open val priorityFeePerGasMargin: BigDecimal,     // TX submitter priority fee per gas margin: estimated_priority_fee + estimated_priority_fee * margin
 ) {
     // Creates instance based on latest evm block fees
     open fun createEstimate(
@@ -32,6 +34,7 @@ open class EIP1559FeeEstimatorFactory(
             fromAddress: String,
             chainId: Long
     ): EIP1559FeeEstimator {
-        return EIP1559LastBlockFeeEstimator(web3jRequestHandler, gasLimit, maxGasPrice, gasLimitMargin, contractAddress, functionData, fromAddress, chainId)
+        return EIP1559LastBlockFeeEstimator(web3jRequestHandler, gasLimit, maxGasPrice, gasLimitMargin,
+                baseFeePerGasMargin, priorityFeePerGasMargin, contractAddress, functionData, fromAddress, chainId)
     }
 }

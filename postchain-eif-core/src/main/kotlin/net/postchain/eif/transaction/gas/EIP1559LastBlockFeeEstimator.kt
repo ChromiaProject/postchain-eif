@@ -12,9 +12,11 @@ import java.math.BigInteger
 
 class EIP1559LastBlockFeeEstimator(
         private val web3jRequestHandler: Web3jRequestHandler,
-        val gasLimit: BigInteger,
-        val maxGasPrice: BigInteger,
-        val gasLimitMargin: BigDecimal,
+        private val gasLimit: BigInteger,
+        private val maxGasPrice: BigInteger,
+        private val gasLimitMargin: BigDecimal,
+        private val baseFeePerGasMargin: BigDecimal,
+        private val priorityFeePerGasMargin: BigDecimal,
         contractAddress: String,
         functionData: String,
         fromAddress: String,
@@ -43,7 +45,7 @@ class EIP1559LastBlockFeeEstimator(
             throw ProgrammerMistake(errorMessage, e)
         }
         blockNumber = block.number
-        baseFeePerGas = block.baseFeePerGas
+        baseFeePerGas = getBaseFeePerGas(block.baseFeePerGas)
         maxPriorityFeePerGas = getEstimatedMaxPriorityFeePerGas()
         maxFeePerGas = baseFeePerGas.add(maxPriorityFeePerGas)
         estimatedTotalGasFee = estimatedGasUsage * maxFeePerGas
@@ -52,7 +54,7 @@ class EIP1559LastBlockFeeEstimator(
     override fun validateRequestFees(txRequest: EvmSubmitTxRequest) {
 
         if (txRequest.maxFeePerGas < baseFeePerGas) {
-            throw UserMistake("Max fee per gas less than block base fee. maxFeePerGas: ${txRequest.maxFeePerGas} evm baseFeePerGas: $baseFeePerGas")
+            throw UserMistake("Max fee per gas less than block base fee. maxFeePerGas: ${txRequest.maxFeePerGas} estimated required baseFeePerGas: $baseFeePerGas")
         }
 
         if (txRequest.maxFeePerGas < maxFeePerGas) {
@@ -124,14 +126,20 @@ class EIP1559LastBlockFeeEstimator(
     private fun getEstimatedMaxPriorityFeePerGas(): BigInteger {
         // estimate of how much you can pay as a priority fee to get a transaction included in the current block.
         // https://docs.alchemy.com/reference/eth-maxpriorityfeepergas
-        return try {
-            web3jRequestHandler.sendWeb3jRequest { it.ethMaxPriorityFeePerGas() }
+        try {
+            val maxPriorityFeePerGas = web3jRequestHandler.sendWeb3jRequest { it.ethMaxPriorityFeePerGas() }
                     .maxPriorityFeePerGas
+            return maxPriorityFeePerGas
+                    .add(maxPriorityFeePerGas.toBigDecimal().times(priorityFeePerGasMargin).toBigInteger())
         } catch (e: Exception) {
             val errorMessage = "Failed to get max priority fee per gas: ${e.message}"
             logger.error(e) { errorMessage }
             throw ProgrammerMistake(errorMessage, e)
         }
+    }
+
+    private fun getBaseFeePerGas(baseFeePerGas: BigInteger): BigInteger {
+        return baseFeePerGas.add(baseFeePerGas.toBigDecimal().times(baseFeePerGasMargin).toBigInteger())
     }
 
     private fun getEstimatedGasLimit(estimatedGasUsage: BigInteger, gasLimitMargin: BigDecimal): BigInteger {
@@ -143,6 +151,6 @@ class EIP1559LastBlockFeeEstimator(
     }
 
     override fun toString(): String {
-        return "gasLimit=$gasLimit, maxGasPrice=$maxGasPrice, blockNumber=$blockNumber, baseFeePerGas=$baseFeePerGas, maxPriorityFeePerGas=$maxPriorityFeePerGas, maxFeePerGas=$maxFeePerGas, estimatedGasUsage=$estimatedGasUsage, estimatedTotalGasFee=$estimatedTotalGasFee, estimatedGasLimit=$estimatedGasLimit, gasLimitMargin=$gasLimitMargin, walletBalance=$walletBalance"
+        return "gasLimit=$gasLimit, maxGasPrice=$maxGasPrice, gasLimitMargin=$gasLimitMargin, baseFeePerGasMargin=$baseFeePerGasMargin, priorityFeePerGasMargin=$priorityFeePerGasMargin, blockNumber=$blockNumber, baseFeePerGas=$baseFeePerGas, maxPriorityFeePerGas=$maxPriorityFeePerGas, maxFeePerGas=$maxFeePerGas, estimatedGasUsage=$estimatedGasUsage, estimatedGasLimit=$estimatedGasLimit, estimatedTotalGasFee=$estimatedTotalGasFee, walletBalance=$walletBalance"
     }
 }

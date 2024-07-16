@@ -78,3 +78,10 @@ data class DecodedBlockHeaderDataForEVM(
         return expectedRid.contentEquals(blockRid.data)
     }
 }
+
+fun String.upperCaseHex(): String {
+    if (this.startsWith("0x")) {
+        return "0x" + this.substring(2).uppercase()
+    }
+    return this.uppercase()
+}
