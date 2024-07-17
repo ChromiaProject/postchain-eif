@@ -39,7 +39,8 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     private lateinit var module: GTXModule
     private lateinit var privKey: ByteArray
     private lateinit var pubKey: ByteArray
-    private var verifyTransactions: Boolean = true
+    private var validateSpecialOps: () -> Boolean = { false }
+    private var pollEvmReceipts = false
 
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
 
@@ -102,7 +103,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
                     val txPending = getBcTransaction(bctx, requestId)
 
-                    if (verifyTransactions) {
+                    if (pollEvmReceipts) {
                         withTxSubmitter(txPending.networkId) {
                             it.removeSubmitTx(bctx, requestId)
                             it.addPendingTransaction(EvmPendingTx.fromEvmSubmitTxRellRequest(txPending, txHash))
@@ -110,35 +111,41 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                     }
                 }
 
-                if (verifyTransactions && (newTxStatus == RellTransactionStatus.FAILURE || newTxStatus == RellTransactionStatus.SUCCESS)) {
+                if (newTxStatus == RellTransactionStatus.FAILURE || newTxStatus == RellTransactionStatus.SUCCESS) {
+                    if (validateSpecialOps()) {
 
-                    // A pending transaction must be verified
-                    val txStatusMatchesThisNode = withTxPending(requestId) { txSubmitter, txPending ->
+                        // A pending transaction must be verified
+                        val txStatusMatchesThisNode = withTxPending(requestId) { txSubmitter, txPending ->
 
-                        val acceptable =
-                                (newTxStatus == RellTransactionStatus.SUCCESS && txPending.status == PendingTxStatus.SUCCESS) ||
-                                        (newTxStatus == RellTransactionStatus.FAILURE && txPending.status == PendingTxStatus.REVERTED)
+                            val acceptable =
+                                    (newTxStatus == RellTransactionStatus.SUCCESS && txPending.status == PendingTxStatus.SUCCESS) ||
+                                            (newTxStatus == RellTransactionStatus.FAILURE && txPending.status == PendingTxStatus.REVERTED)
 
-                        if (acceptable) {
-                            bctx.addAfterCommitHook { txSubmitter.removePendingTx(requestId) }
+                            if (acceptable) {
+                                bctx.addAfterCommitHook { txSubmitter.removePendingTx(requestId) }
+                            }
+
+                            acceptable
+                        }
+                        if (txStatusMatchesThisNode != true) {
+                            logger.warn { "Validation failed. Transaction $requestId can not be set to status $newTxStatus because the status can't be approved by this node" }
+                            return false
                         }
 
-                        acceptable
-                    }
-                    if (txStatusMatchesThisNode != true) {
-                        logger.warn { "Validation failed. Transaction $requestId can not be set to status $newTxStatus because the status can't be approved by this node" }
-                        return false
-                    }
-
-                    // A SUCCESS must contain a receipt in same transaction
-                    if (newTxStatus == RellTransactionStatus.SUCCESS && getOpsForTx(ops, UPDATE_EVM_TRANSACTION_RECEIPT, requestId).isEmpty()) {
-                        logger.warn { "Validation failed. Transaction $requestId is set to ${RellTransactionStatus.SUCCESS.name} but without a receipt" }
+                        // A SUCCESS must contain a receipt in the same transaction
+                        if (newTxStatus == RellTransactionStatus.SUCCESS && getOpsForTx(ops, UPDATE_EVM_TRANSACTION_RECEIPT, requestId).isEmpty()) {
+                            logger.warn { "Validation failed. Transaction $requestId is set to ${RellTransactionStatus.SUCCESS.name} but without a receipt" }
 //                        return false TODO enable in future for additional validation
-                    }
+                        }
 
-                    logger.info { "Transaction $requestId is verified as $newTxStatus" }
+                        logger.info { "Transaction $requestId is verified as $newTxStatus" }
+                    } else {
+                        withTxPending(requestId) { txSubmitter, _ ->
+                            bctx.addAfterCommitHook { txSubmitter.removePendingTx(requestId) }
+                        }
+                    }
                 }
-            } else if (verifyTransactions && op.opName == UPDATE_EVM_TRANSACTION_RECEIPT) {
+            } else if (validateSpecialOps() && op.opName == UPDATE_EVM_TRANSACTION_RECEIPT) {
 
                 val requestId = op.args[0].asInteger()
                 val blockHash = op.args[1].asString()
@@ -378,13 +385,19 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
     fun getTransactionSubmitter(networkId: Long) = transactionSubmitters[networkId]
 
-    fun setConfig(privKey: ByteArray, pubKey: ByteArray, verifyTransactions: Boolean) {
+    fun setConfig(
+            privKey: ByteArray,
+            pubKey: ByteArray,
+            validateSpecialOps: () -> Boolean,
+            pollEvmReceipts: Boolean
+    ) {
         this.privKey = privKey
         this.pubKey = pubKey
         this.sigMaker = cryptoSystem.buildSigMaker(KeyPair(pubKey, privKey))
-        this.verifyTransactions = verifyTransactions
+        this.validateSpecialOps = validateSpecialOps
+        this.pollEvmReceipts = pollEvmReceipts
 
-        logger.info { "Transaction submitter special tx extension config: verifyTransactions: $verifyTransactions" }
+        logger.info { "Transaction submitter special tx extension config: pollEvmReceipts: ${this.pollEvmReceipts}" }
     }
 
     private fun addNoOp(operations: MutableList<OpData>, bctx: BlockEContext) {
