@@ -46,6 +46,7 @@ class TransactionSubmitterSpecialTxExtensionTest {
         txExtension.setConfig(
                 updatedSigner.privKey.data,
                 updatedSigner.pubKey.data,
+                { true },
                 true
         )
     }

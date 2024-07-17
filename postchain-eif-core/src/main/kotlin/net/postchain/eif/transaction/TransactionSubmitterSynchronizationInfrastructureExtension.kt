@@ -49,10 +49,11 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                 ext.setConfig(
                         postchainContext.appConfig.privKeyByteArray,
                         postchainContext.appConfig.pubKeyByteArray,
-                        !nodeIsReplica
+                        validateSpecialOps = process::isSigner,
+                        pollEvmReceipts = !nodeIsReplica
                 )
 
-                // Create the tx submitters only if we build blocks
+                // Do not start the transaction submitter if we are a replica node
                 if (!nodeIsReplica) {
                     for ((evmBlockchainName, networkBlockchainConfig) in transactionSubmitterBlockchainConfig.chains) {
                         val networkId = networkBlockchainConfig.networkId
