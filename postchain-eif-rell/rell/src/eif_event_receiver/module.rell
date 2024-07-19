@@ -44,6 +44,7 @@ function _evm_block(
             log_index = event.log_index.to_integer(),
             event_signature = event.signature,
             contract_address = event.contract_address,
+            name = event.name,
             indexed_values = event.indexed_values.to_gtv().to_bytes(),
             non_indexed_values = event.non_indexed_values.to_gtv().to_bytes()
         );

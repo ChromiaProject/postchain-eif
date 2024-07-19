@@ -1,0 +1,202 @@
+@test module;
+
+import ^.helpers.*;
+import ^^^.eif.messaging.*;
+
+val contract_address = x"c5B2d0F1F659A72c3c94E6E654C859771161eFD3";
+
+function event(name: text, height: integer, log_index: integer, nonce: integer) = event_data(
+    tnx_hash = ("TX", nonce).hash(),
+    log_index = log_index,
+    signature = ("SIG", nonce).hash(),
+    contract_address = contract_address,
+    name = name,
+    indexed_values = [nonce.to_gtv()],
+    non_indexed_values = [nonce.to_gtv()]
+);
+
+function setup_test_data() {
+    // network: 56
+    var block_height = 10;
+    var block_hash = ("BLOCK", block_height).hash();
+    rell.test.tx().nop().op(
+        evm_block_op(56, block_height, block_hash, [event("LinkAccountID", block_height, 0, nonce = 0)])
+    ).run();
+
+    block_height = 20;
+    block_hash = ("BLOCK", block_height).hash();
+    rell.test.tx().nop().op(
+        evm_block_op(56, block_height, block_hash, [
+            event("DepositedERC20", block_height, 0, nonce = 1),
+            event("PendingWithdraw", block_height, 1, nonce = 2)
+        ])
+    ).run();
+
+    block_height = 30;
+    block_hash = ("BLOCK", block_height).hash();
+    rell.test.tx().nop().op(
+        evm_block_op(56, block_height, block_hash, list<event_data>()) // block without events
+    ).run();
+
+    block_height = 40;
+    block_hash = ("BLOCK", block_height).hash();
+    rell.test.tx().nop().op(
+        evm_block_op(56, block_height, block_hash, [event("UnpendingWithdraw", block_height, 0, nonce = 3)])
+    ).run();
+
+    // network: 1
+    block_height = 500;
+    block_hash = ("BLOCK", block_height).hash();
+    rell.test.tx().nop().op(
+        evm_block_op(1, block_height, block_hash, [
+            event("WithdrawRequestHash", block_height, 0, nonce = 4),
+            event("WithdrawalHash", block_height, 1, nonce = 5),
+            event("WithdrawalHash", block_height, 3, nonce = 6),
+        ])
+    ).run();
+
+    block_height = 600;
+    block_hash = ("BLOCK", block_height).hash();
+    rell.test.tx().nop().op(
+        evm_block_op(1, block_height, block_hash, [event("WithdrawalToPostchain", block_height, 0, nonce = 7)])
+    ).run();
+}
+
+function test_get_last_evm_block_returns_null_if_no_events() {
+    assert_null(get_last_evm_block(network_id = 56));
+}
+
+function test_get_last_evm_block() {
+    setup_test_data();
+
+    val last56 = get_last_evm_block(network_id = 56);
+    assert_equals(last56, expected_block(40));
+
+    val last1 = get_last_evm_block(network_id = 1);
+    assert_equals(last1, expected_block(600));
+}
+
+function test_get_last_evm_block_data_returns_null_if_no_blocks() {
+    assert_null(get_last_evm_block_data(network_id = 56));
+}
+
+function test_get_last_evm_block_data() {
+    setup_test_data();
+
+    assert_equals(
+        get_last_evm_block_data(network_id = 56),
+        evm_block_data(network_id = 56, block_height = 40, block_hash = block_hash(40), prev_block_height = 30)
+    );
+
+    assert_equals(
+        get_last_evm_block_data(network_id = 1),
+        evm_block_data(network_id = 1, block_height = 600, block_hash = block_hash(600), prev_block_height = 500)
+    );
+}
+
+function test_get_last_evm_block_data_with_events_returns_null_if_no_blocks() {
+    assert_null(get_last_evm_block_data_with_events(network_id = 56));
+}
+
+function test_get_last_evm_block_data_with_events() {
+    setup_test_data();
+
+    // network_id = 56
+    val last56 = get_last_evm_block_data_with_events(network_id = 56);
+    assert_not_null(last56);
+    assert_equals(
+        last56[0],
+        evm_block_data(network_id = 56, block_height = 40, block_hash = block_hash(40), prev_block_height = 30)
+    );
+    assert_equals(
+        last56[1] @* {} (_ = .name, _ = .log_index, _ = .indexed_values),
+        [("UnpendingWithdraw", 0, [(3).to_gtv()])]
+    );
+
+    // network_id = 1
+    val last1 = get_last_evm_block_data_with_events(network_id = 1);
+    assert_not_null(last1);
+    assert_equals(
+        last1[0],
+        evm_block_data(network_id = 1, block_height = 600, block_hash = block_hash(600), prev_block_height = 500)
+    );
+    assert_equals(
+        last1[1] @* {} (_ = .name, _ = .log_index, _ = .indexed_values),
+        [("WithdrawalToPostchain", 0, [(7).to_gtv()])]
+    );
+}
+
+function test_get_evm_block_data_returns_null() {
+    // if no blocks
+    assert_null(get_evm_block_data(network_id = 56, height = 40));
+
+    setup_test_data();
+
+    // if no block 123456
+    assert_null(get_evm_block_data(network_id = 56, height = 123456));
+}
+
+function test_get_evm_block_data() {
+    setup_test_data();
+
+    // network_id = 56
+    // the first block
+    assert_equals(
+        get_evm_block_data(network_id = 56, height = 10),
+        evm_block_data(network_id = 56, block_height = 10, block_hash = block_hash(10), prev_block_height = null)
+    );
+    // block without events
+    assert_equals(
+        get_evm_block_data(network_id = 56, height = 30),
+        evm_block_data(network_id = 56, block_height = 30, block_hash = block_hash(30), prev_block_height = 20)
+    );
+
+    // network_id = 1
+    assert_equals(
+        get_evm_block_data(network_id = 1, height = 600),
+        evm_block_data(network_id = 1, block_height = 600, block_hash = block_hash(600), prev_block_height = 500)
+    );
+}
+
+function test_get_evm_block_data_with_events() {
+    setup_test_data();
+
+    // the first block
+    val last56_10 = get_evm_block_data_with_events(network_id = 56, height = 10);
+    assert_not_null(last56_10);
+    assert_equals(
+        last56_10[0],
+        evm_block_data(network_id = 56, block_height = 10, block_hash = block_hash(10), prev_block_height = null)
+    );
+    assert_equals(
+        last56_10[1] @* {} (_ = .name, _ = .log_index, _ = .indexed_values),
+        [("LinkAccountID", 0, [(0).to_gtv()])]
+    );
+    // block without events
+    val last56_30 = get_evm_block_data_with_events(network_id = 56, height = 30);
+    assert_not_null(last56_30);
+    assert_equals(
+        last56_30[0],
+        evm_block_data(network_id = 56, block_height = 30, block_hash = block_hash(30), prev_block_height = 20)
+    );
+    assert_equals(
+        last56_30[1] @* {} (_ = .name, _ = .log_index, _ = .indexed_values),
+        list<(text, integer, list<gtv>)>()
+    );
+
+    // network_id = 1
+    val last1_500 = get_evm_block_data_with_events(network_id = 1, height = 500);
+    assert_not_null(last1_500);
+    assert_equals(
+        last1_500[0],
+        evm_block_data(network_id = 1, block_height = 500, block_hash = block_hash(500), prev_block_height = null)
+    );
+    assert_equals(
+        last1_500[1] @* {} (_ = .name, _ = .log_index, _ = .indexed_values),
+        [
+            ("WithdrawRequestHash", 0, [(4).to_gtv()]),
+            ("WithdrawalHash", 1, [(5).to_gtv()]),
+            ("WithdrawalHash", 3, [(6).to_gtv()]),
+        ]
+    );
+}
