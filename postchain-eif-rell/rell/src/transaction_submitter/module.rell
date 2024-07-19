@@ -7,23 +7,33 @@ import .utils.*;
 import lib.icmf.*;
 import lib.icmf.receiver.{ receive_icmf_message };
 
-// Limit the overall time for a transaction to be submitted and verified
+/** Limit the overall time for a transaction to be submitted and verified */
 function timeout_evm_transactions() {
     val timeout_timestamp = get_last_blocktime() - chain_context.args.tx_timeout;
     val row_ids = evm_submit_transaction @* { .status != transaction_status.SUCCESS and .status != transaction_status.FAILURE and .created < timeout_timestamp } ( .rowid );
     for (row_id in row_ids) {
         log("Total time expired for transaction %s, status changed to %s".format(row_id, transaction_status.FAILURE));
-        update_evm_transaction_status(row_id.to_integer(), transaction_status.FAILURE);
+        update_transaction_status(row_id.to_integer(), transaction_status.FAILURE);
     }
 }
 
-// Limit the time for each node to submit a transaction before it is passed on to the next node
+/** Timeout transactions that can't be verified within a given time period. This will set TX in QUEUE status for another submitter node to try submitting it. */
+function timeout_verify_evm_transactions() {
+    val timeout_timestamp = get_last_blocktime() - chain_context.args.tx_verification_timeout;
+    val row_ids = evm_submit_transaction @* { .status == transaction_status.PENDING and .taken_timestamp < timeout_timestamp } ( .rowid );
+    for (row_id in row_ids) {
+        log("Verification time expired for transaction %s, status changed to %s".format(row_id, transaction_status.QUEUED));
+        update_transaction_status(row_id.to_integer(), transaction_status.QUEUED);
+    }
+}
+
+/** Limit the time for each node to submit a transaction before it is passed on to the next node */
 function timeout_submit_evm_transactions() {
     val timeout_timestamp = get_last_blocktime() - chain_context.args.tx_node_submit_timeout;
     val transactions = evm_submit_transaction @* { .status == transaction_status.TAKEN and .taken_timestamp < timeout_timestamp } ( .rowid, .processed_by );
     for (transaction in transactions) {
-        log("Submit time for node %s expired for transaction, status changed to %s".format(
-            transaction.rowid, transaction.processed_by, transaction_status.QUEUED));
+        log("Submit time for node %s expired for transaction %s, status changed to %s".format(
+            transaction.processed_by, transaction.rowid, transaction_status.QUEUED));
         update evm_submit_transaction @ { transaction.rowid } (status = transaction_status.QUEUED);
     }
 }
@@ -39,12 +49,34 @@ operation __update_evm_transaction_status(row_id: integer, status: transaction_s
     update_evm_transaction_status(row_id, status, tx_hash, signer);
 }
 
+function update_evm_transaction_status(row_id: integer, status: transaction_status, tx_hash: text?, signer: pubkey) {
+    require_correct_signer_for_update(row_id, status, signer);
+    update_transaction_status(row_id, status, tx_hash, signer);
+}
+
+function require_correct_signer_for_update(row_id: integer, status: transaction_status, signer: pubkey) {
+
+    val transaction = evm_submit_transaction @ { rowid(row_id) };
+
+    if (status == transaction_status.TAKEN) {
+
+        require(transaction.processed_by == x"", "Transaction can't be taken while processed by other node");
+        require(evm_submit_transaction_taken_by @? { .transaction.rowid == rowid(row_id), signer } == null, "Each node can only process one transaction once");
+
+    } else if (status == transaction_status.QUEUED) {
+
+        require(transaction.processed_by == signer, "Only the node currently processing the transaction can change the status back to QUEUE");
+
+    }
+}
+
 operation __update_evm_transaction_receipt(row_id: integer, block_hash: text, effective_gas_price: big_integer, gas_usage: big_integer) {
     update evm_submit_transaction @ { rowid(row_id) } ( .block_hash = block_hash, .effective_gas_price = effective_gas_price, .gas_usage = gas_usage );
 }
 
 operation __begin_block(height: integer) {
     timeout_evm_transactions();
+    timeout_verify_evm_transactions();
     timeout_submit_evm_transactions();
     fail_transactions_with_enough_retries(chain_context.args.node_retry_strategy);
 }
@@ -273,10 +305,10 @@ function fail_transactions_with_enough_retries(strategy: node_retry_strategy) {
 
     for (transaction in transactions) {
         if (strategy == node_retry_strategy.ALL and transaction.providers >= signers) {
-            update_evm_transaction_status(transaction.rowid.to_integer(), transaction_status.FAILURE);
+            update_transaction_status(transaction.rowid.to_integer(), transaction_status.FAILURE);
             log("Transaction %s failed - all available nodes failed to execute transaction".format(transaction.rowid));
         } else if (strategy == node_retry_strategy.SUPERMAJORITY and is_supermajority(transaction.providers, signers)) {
-            update_evm_transaction_status(transaction.rowid.to_integer(), transaction_status.FAILURE);
+            update_transaction_status(transaction.rowid.to_integer(), transaction_status.FAILURE);
             log("Transaction %s failed - A supermajority of nodes failed to execute transaction".format(transaction.rowid));
         }
     }
@@ -304,22 +336,16 @@ function get_last_blocktime() {
     return block @ {} (@max .timestamp) ?: 0;
 }
 
-function update_evm_transaction_status(row_id: integer, status: transaction_status, tx_hash: text? = null, signer: pubkey = x"") {
+function update_transaction_status(row_id: integer, status: transaction_status, tx_hash: text? = null, signer: pubkey = x"") {
 
     val transaction = evm_submit_transaction @ { rowid(row_id) };
 
     if (status == transaction_status.TAKEN) {
-
-        require(transaction.processed_by == x"", "Transaction can't be taken while processed by other node");
-        require(evm_submit_transaction_taken_by @? { .transaction.rowid == rowid(row_id), signer } == null, "Each node can only process one transaction once");
-
         transaction.taken_timestamp = get_last_blocktime();
         transaction.processed_by = signer;
         create evm_submit_transaction_taken_by(transaction, signer);
 
     } else if (status == transaction_status.QUEUED) {
-
-        require(transaction.processed_by == signer, "Only the node currently processing the transaction can change the status back to QUEUE");
 
         transaction.processed_by = x"";
 

@@ -77,7 +77,8 @@ test:
               validator_contract: "system_bridge_validator"
               network_id: 56
       contract_tx_rate_limit: 60000
-      tx_node_submit_timeout: 1800000 # 30m - set a bit more than node_tx_verification_timeout
+      tx_node_submit_timeout: 1800000 # 30m
+      tx_verification_timeout: 5400000 # 90m
       tx_timeout: 86400000 #24h
       node_retry_strategy: SUPERMAJORITY
       network_configs:
@@ -216,7 +217,8 @@ blockchains:
         #                validator_contract: "ec_validator_contract"
         #                network_id: 11155111
         contract_tx_rate_limit: 60000
-        tx_node_submit_timeout: 1800000 # 30m - set a bit more than node_tx_verification_timeout
+        tx_node_submit_timeout: 1800000 # 30m
+        tx_verification_timeout: 5400000 # 90m - from the time a TX was TAKEN
         tx_timeout: 86400000 #24h
         node_retry_strategy: SUPERMAJORITY
         network_configs:
@@ -242,9 +244,8 @@ blockchains:
             tx_verification_time: 20000
             gas_limit: 9000000
             gas_limit_margin: "0.2" # 20%
-            base_fee_per_gas_margin: "5" # 600% (base_fee + base_fee * 5)
+            base_fee_per_gas_margin: "0.85" # +85% (base_fee + base_fee * 0.85)
             priority_fee_per_gas_margin: "0.000001" # 0.00001% # Small margin to pass the default priority fees
-        node_tx_verification_timeout: 1500000 # 25 min - a bit less than tx_node_submit_timeout
       sync_ext:
         - "net.postchain.eif.transaction.TransactionSubmitterSynchronizationInfrastructureExtension"
         - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"

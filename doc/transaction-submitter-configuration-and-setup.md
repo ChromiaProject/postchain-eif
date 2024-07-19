@@ -2,11 +2,7 @@
 
 ## Transaction Submitter Chain Configuration
 
-| Name                              | Description                                                                                                                                                                                                                                                                                                                                                | Type | Required           | Default  |
-|-----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------|--------------------|----------|
-| `node_tx_verification_timeout`    | Time out for a transaction submission to be verified as processed on EVM side in milliseconds, if this deadline is passed the transaction submission attempt is considered to have failed and the transaction can be retried by another node. Should never be set to a shorter time than `node_tx_verification_evm_blocks` + `tx_verification_time` takes. | int  |                    | 240000   |
-
-Transaction submitter blockchain configuration also contains configuration per EVM under configuration
+Transaction submitter blockchain configuration contains configuration per EVM under configuration
 parameter `chains`. Each item in the list have the following configuration properties:
 
 | Name                              | Description                                                                                                                                                                                              | Type   | Required           | Default |
@@ -21,21 +17,13 @@ parameter `chains`. Each item in the list have the following configuration prope
 
 ### Module args
 
-The transaction submitter chain has the following module args:
+Read the `module_arg` struct in `postchain-eif-rell/rell/src/transaction_submitter/model.rell` for descriptions or follow the links in the table below for more details on some arguments.
 
 | Name                              | Description                                                                                                                                                                                                     | Type         | Required           | Default |
 |-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|--------------------|---------|
 | `directory_chain_config`          | See details under [setup](#Setup) section                                                                                                                                                                       | gtv          | :white_check_mark: |         |
 | `system_anchoring_chain_config`   | See details under [setup with anchoring](#Setup-with-anchoring) section                                                                                                                                         | gtv          | :white_check_mark: |         |
 | `system_chain_bridges`            | See details under [connect system chain bridge](#connect-system-chain-bridge) section                                                                                                                           | gtv          | :white_check_mark: |         |
-| `contract_tx_rate_limit`          | Rate limit for transaction submission (applied per contract)                                                                                                                                                    | int          | :white_check_mark: |         |
-| `tx_node_submit_timeout`          | Time out for a transaction to be submitted by a node in milliseconds, if this deadline is passed the node is considered to not be able to submit the transaction and another node will try to submit it instead | int          | :white_check_mark: |         |
-| `tx_timeout`                      | Time out for a transaction to be submitted and verified by all nodes in milliseconds, if this deadline is passed the transaction is considered to have failed                                                   | int          | :white_check_mark: |         |
-| `node_retry_strategy`             | Strategy for how many nodes that should retry a transaction before considering it to have failed. `ALL` or `SUPERMAJORITY`.                                                                                     | text         | :white_check_mark: |         |
-| `network_configs`                 | Mapping of native currency for each network `id` to `currency_symbol`                                                                                                                                           | array<gtv>   |                    | []      |
-| `manual_admins`                   | Public keys for manual admins. See [manual reset of failed signer updates](#manual-reset-of-failed-signer-updates).                                                                                             | array<bytea> | :white_check_mark: |         |
-| `system_max_priority_fee_per_gas` | Max priority fee to use for system transactions.                                                                                                                                                                | int          | :white_check_mark: |         |
-| `system_max_fee_per_gas`          | Max gas to use for system transactions.                                                                                                                                                                         | int          | :white_check_mark: |         |
 
 The transaction submitter chain anchoring module has the following module args:
 
@@ -80,7 +68,6 @@ Example:
                 validator_contract: "ec_validator_contract"
                 network_id: 11155111
         contract_tx_rate_limit: 60000
-        tx_node_submit_timeout: 1800000 # 30m
         tx_timeout: 86400000 #24h
         node_retry_strategy: SUPERMAJORITY
         network_configs:

@@ -65,9 +65,6 @@
                     </entry>
                 </dict>
             </entry>
-            <entry key="node_tx_verification_timeout">
-                <int>10000</int> <!-- 10s for test -->
-            </entry>
         </dict>
     </entry>
     <entry key="gtx">

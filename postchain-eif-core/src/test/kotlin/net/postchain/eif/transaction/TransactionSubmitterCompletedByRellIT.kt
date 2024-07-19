@@ -1,13 +1,8 @@
 package net.postchain.eif.transaction
 
-import assertk.assertThat
-import assertk.assertions.isEqualTo
-import assertk.assertions.isNotNull
-import net.postchain.common.hexStringToByteArray
 import net.postchain.devtools.getModules
 import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.contracts.Validator
-import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_HASH
 import org.awaitility.Awaitility
 import org.awaitility.Duration
 import org.junit.jupiter.api.BeforeEach
@@ -47,54 +42,6 @@ class TransactionSubmitterCompletedByRellIT : EifBaseIntegrationTest() {
         contractAddress = contract.contractAddress.substring(2)
 
         TransactionSubmitterTestGTXModule.updateTxStatus = true
-    }
-
-    /*
-    This will emulate a node processing a transaction but it timed out in rell before the node had the chance to update the status
-
-    1. TX is submitted on BC.
-    2. Nodes takes TX.
-    3. Node submits TX.
-    4. Node updates BC status to PENDING. <- this test rejects the TX here when BC has the status changed unexpected to FAILED.
-    4. Node polls TX to verify it.
-     */
-    @Test
-    fun `do not update tx status due to status set to FAILED by rell`() {
-
-        val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config.xml")
-        val node = nodes[0]
-
-        val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
-
-        val txSubmit = mkEvmSubmitTxRellRequest(0, contractAddress, processedBy = node.pubKey.hexStringToByteArray())
-
-        txSubmitterTestModule.addTransactionsAvailableToTake(txSubmit)
-
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
-            buildBlock(1L)
-            assertNoQueuedTxs(txSubmitterTestModule)
-            assertStatusOperation(txSubmitterTestModule, txSubmit.rowId, RellTransactionStatus.TAKEN)
-        }
-
-        Awaitility.await().atMost(Duration.TEN_SECONDS).untilAsserted {
-            logger.info { "Waiting for tx to be submitted..." }
-            withDbTransactions(node, txSubmit.rowId) {
-                assertThat(it.size).isEqualTo(1)
-                assertThat(EVM_TX_SUBMIT_COLUMN_HASH.get(it[0])).isNotNull()
-            }
-        }
-
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
-            // Set BC status to FAILURE
-            val txSubmitOnBc = mkEvmSubmitTxRellRequest(0, contractAddress,
-                    status = RellTransactionStatus.FAILURE
-            )
-            txSubmitterTestModule.addTransaction(txSubmitOnBc)
-
-            buildBlock(1L)
-
-            testLogAppender.assertWarn("Transaction 0 blockchain status is set to completed. This node will stop processing this transaction.")
-        }
     }
 
     /*

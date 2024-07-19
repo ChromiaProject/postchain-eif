@@ -101,7 +101,6 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                                 queue,
                                 BigInteger.valueOf(networkBlockchainConfig.minWalletBalance),
                                 appConfig.healthCheckInterval,
-                                transactionSubmitterBlockchainConfig.nodeTxVerificationTimeout,
                                 networkBlockchainConfig.nodeTxVerificationEvmBlocks,
                                 networkBlockchainConfig.txVerificationTime,
                         )

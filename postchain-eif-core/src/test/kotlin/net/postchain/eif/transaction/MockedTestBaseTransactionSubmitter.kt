@@ -177,7 +177,6 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
                 LinkedBlockingQueue(),
                 BigInteger.valueOf(10),
                 -1,
-                24 * 60 * 60000,
                 5,
                 0,
         )

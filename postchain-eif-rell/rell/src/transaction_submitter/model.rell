@@ -41,29 +41,67 @@ struct evm_submit_transaction_data {
 }
 
 enum transaction_status {
+
+    /** Transaction available for a node to submit it. The transaction is either a new transaction or a failed transaction which has is retried. */
     QUEUED,
+
+    /** Transaction taken by a node to submit it */
     TAKEN,
+
+    /** A transaction was submitted successfully and now awaits verification */
     PENDING,
+
+    /** The transaction is successfully submitted and confirmed on EVM */
     SUCCESS,
+
+    /** Transaction failed either due to timeout, failing rpc connection or rejected by EVM */
     FAILURE
 }
 
+/** Strategies available for submitting transaction retries */
 enum node_retry_strategy {
+    /** If necessary let all nodes try submitting the transaction before failing it */
     ALL,
+
+    /** Let a super majority retry submitting the transaction before failing it */
     SUPERMAJORITY
 }
 
 struct module_args {
+    /** List of system chain bridges, se README.md for more details */
     system_chain_bridges: gtv;
+
+    /** Directory chain rid and validator contracts, se README.md for more details */
     directory_chain_config: gtv;
+
+    /** System anchoring blockchain rid and validator contracts, se README.md for more details */
     system_anchoring_chain_config: gtv?;
+
+    /** Rate limit for transaction submission (applied per contract) */
     contract_tx_rate_limit: big_integer;
+
+    /** How much time each node has to submit the transaction */
     tx_node_submit_timeout: big_integer;
+
+    /** How much time to spend on verification before the attempt is aborted. Based on the time a transaction was TAKEN */
+    tx_verification_timeout: big_integer;
+
+    /** Time out for a transaction to be submitted and verified by all nodes in milliseconds, if this deadline is passed the transaction is considered to have failed */
     tx_timeout: big_integer;
+
+    /** Strategy for how many nodes that should retry a transaction before considering it to have failed */
     node_retry_strategy;
+
+    /** Mapping of native currency for each network `id` to `currency_symbol` */
     network_configs: gtv = list<network_config>().to_gtv();
+
+    /** Public keys for manual admins used to reset failed signer updates */
     manual_admins: gtv;
+
+    /** Max priority fee to use for system transactions */
     system_max_priority_fee_per_gas: integer;
+
+    /** Max gas to use for system transactions */
     system_max_fee_per_gas: integer;
 }
 

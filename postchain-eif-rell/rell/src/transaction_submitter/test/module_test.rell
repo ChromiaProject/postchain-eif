@@ -5,6 +5,7 @@ import ^.helper_operations.*;
 
 struct module_args {
     network_configs: gtv = list<network_config>().to_gtv();
+    tx_verification_timeout: big_integer = 5400000;
 }
 
 struct network_config {
@@ -210,15 +211,13 @@ function test_is_supermajority() {
     assert_true(is_supermajority(41, 60));
 }
 
-function timeout_evm_transactions() {
-
+function test_timeout_evm_transactions() {
     rell.test.set_next_block_time(86400000);
     rell.test.block().run();
     rell.test.tx().op(
         create_test_evm_submit_transaction(x"00", "should-time-out", "myFunction", transaction_status.QUEUED, 0),
         create_test_evm_submit_transaction(x"01", "should-not-time-out", "myFunction", transaction_status.QUEUED, 86400000),
-        create_test_evm_submit_transaction(x"02", "should-not-time-out", "myFunction", transaction_status.TAKEN, 86400000),
-        create_test_evm_submit_transaction(x"03", "should-not-time-out", "myFunction", transaction_status.FAILURE, 86400000)
+        create_test_evm_submit_transaction(x"02", "should-not-time-out", "myFunction", transaction_status.FAILURE, 86400000)
     ).run();
     rell.test.block().run();
 
@@ -226,12 +225,31 @@ function timeout_evm_transactions() {
     assert_equals(transactions, [
         (id = x"00", status = transaction_status.FAILURE), // Only one changed
         (id = x"01", status = transaction_status.QUEUED),
-        (id = x"02", status = transaction_status.TAKEN),
-        (id = x"03", status = transaction_status.FAILURE)
+        (id = x"02", status = transaction_status.FAILURE)
     ]);
 }
 
-function timeout_submit_evm_transaction() {
+function test_timeout_verification_evm_transactions() {
+    val block_time = 18000000;
+    rell.test.set_next_block_time(block_time);
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "should-time-out", "myFunction", transaction_status.PENDING, block_time, taken_timestamp = block_time - chain_context.args.tx_verification_timeout.to_integer() - 1),
+        create_test_evm_submit_transaction(x"01", "should-not-time-out", "myFunction", transaction_status.PENDING, block_time, taken_timestamp = block_time - chain_context.args.tx_verification_timeout.to_integer() + 1),
+        create_test_evm_submit_transaction(x"02", "should-not-time-out", "myFunction", transaction_status.QUEUED, block_time, taken_timestamp = block_time - chain_context.args.tx_verification_timeout.to_integer() - 1),
+        create_test_evm_submit_transaction(x"03", "should-not-time-out", "myFunction", transaction_status.QUEUED, block_time, taken_timestamp = block_time - chain_context.args.tx_verification_timeout.to_integer() + 1),
+    ).run();
+    rell.test.block().run();
+
+    val transactions = evm_submit_transaction @* { } ( .id, .status );
+    assert_equals(transactions, [
+        (id = x"00", status = transaction_status.QUEUED),
+        (id = x"01", status = transaction_status.PENDING),
+        (id = x"02", status = transaction_status.QUEUED),
+        (id = x"03", status = transaction_status.QUEUED),
+    ]);
+}
+
+function test_timeout_submit_evm_transaction() {
     rell.test.set_next_block_time(1800000);
     rell.test.block().run();
     rell.test.tx().op(
@@ -293,8 +311,10 @@ function test_update_evm_transaction_status_taken_to_queued() {
 
 function test_update_evm_transaction_status_taken_only_once() {
 
+    rell.test.set_next_block_time(1);
+    rell.test.block().run();
     rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "system_bridge_address","myFunction", transaction_status.QUEUED, 0)
+        create_test_evm_submit_transaction(x"00", "system_bridge_address","myFunction", transaction_status.QUEUED)
     ).run();
 
     val tx_row_id = evm_submit_transaction @ { } ( .rowid );
