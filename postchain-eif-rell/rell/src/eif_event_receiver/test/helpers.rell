@@ -12,3 +12,9 @@ operation evm_block_op(
 ) {
     _evm_block(network_id, evm_block_height, evm_block_hash, events);
 }
+
+function expected_block(height: integer) =
+    (evm_block_height = height, evm_block_hash = ("BLOCK", height).hash());
+
+function block_hash(height: integer) = ("BLOCK", height).hash();
+
