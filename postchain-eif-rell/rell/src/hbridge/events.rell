@@ -86,6 +86,11 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
         return;
     }
 
+    if (event.amount <= 0) {
+        log("Deposit event ignored: amount must be greater than 0: ERC20 token %s, sender %s".format(event.token_address, event.sender));
+        return;
+    }
+
     var ft4_account: ft4.accounts.account? = null;
     if (deposit_from_smart_contract) {
         ft4_account = ft4.accounts.account @? { .id == beneficiary };
