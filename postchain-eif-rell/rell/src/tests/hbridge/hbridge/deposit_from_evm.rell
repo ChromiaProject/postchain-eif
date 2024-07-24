@@ -66,6 +66,12 @@ function test_deposit_foreign_token_from_evm_with_already_created_and_linked_acc
     deposit_from_evm(evm_address, 8000, block_height = 2);
     deposit_from_evm(evm_address, 10000000, block_height = 3);
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), 10008001L);
+
+    // Deposits with zero or negative amount are not allowed
+    val nr_of_deposits = erc20_deposit @ {} (@sum 1);
+    deposit_from_evm(evm_address, 0, block_height = 4);
+    deposit_from_evm(evm_address, -1, block_height = 5);
+    assert_equals(erc20_deposit @ {} (@sum 1), nr_of_deposits);
 }
 
 function test_deposit_foreign_token_from_evm_before_account_creation() {
