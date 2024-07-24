@@ -78,7 +78,7 @@ class NoOpEventProcessor : EventProcessor {
         for (op in ops) {
             if (op.opName == OP_EVM_BLOCK) {
                 if (!isValidEvmBlockFormat(op.args)) {
-                    logger.error("Received malformed operation of type $OP_EVM_BLOCK")
+                    logger.warn("Received malformed operation of type $OP_EVM_BLOCK")
                     return false
                 }
             } else {
@@ -223,7 +223,7 @@ class EvmEventProcessor(
         // If there are too many rejections, readOffset should be increased
         if (ops.size > eventBlocks.size) {
             // We don't have all these blocks
-            logger.error("Received unexpected blocks")
+            logger.warn("Received unexpected blocks")
             return false
         }
         for ((index, eventBlock) in eventBlocks.withIndex()) {
@@ -232,7 +232,7 @@ class EvmEventProcessor(
             val op = ops[index]
             if (op.opName == OP_EVM_BLOCK) {
                 if (op.args.size != 4) {
-                    logger.error("Got $OP_EVM_BLOCK operation with wrong number of arguments: ${op.args.size}")
+                    logger.warn("Got $OP_EVM_BLOCK operation with wrong number of arguments: ${op.args.size}")
                     return false
                 }
 
@@ -244,7 +244,7 @@ class EvmEventProcessor(
                 val eventBlockHash = eventBlock[EncodedBlock.HASH.index]
 
                 if (opNetworkId != eventNetworkId || opBlockNumber != eventBlockNumber || opBlockHash != eventBlockHash) {
-                    logger.error(
+                    logger.warn(
                             "Received unexpected block $opBlockNumber with hash $opBlockHash in network $opNetworkId." +
                                     " Expected block $eventBlockNumber with hash $eventBlockHash in network $eventNetworkId"
                     )
@@ -252,7 +252,7 @@ class EvmEventProcessor(
                 }
 
                 if (op.args[EncodedBlock.EVENTS.index] != eventBlock[EncodedBlock.EVENTS.index]) {
-                    logger.error("Events in received block $opBlockNumber do not match expected events")
+                    logger.warn("Events in received block $opBlockNumber do not match expected events")
                     return false
                 }
             } else {
