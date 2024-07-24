@@ -15,12 +15,12 @@ task("deploy:anchoring", "Deploy anchoring contract")
       const validator: ManagedValidator = <ManagedValidator>await validatorFactory.deploy(directoryValidator);
       await validator.deployed();
       await validator.setBlockchainRid(blockchainRid)
-      console.log("validator deployed to: ", validator.address);
+      console.log("Validator deployed to: ", validator.address);
 
       const anchoringFactory: Anchoring__factory = await hre.ethers.getContractFactory("Anchoring");
       const anchoring: Anchoring = <Anchoring>await anchoringFactory.deploy(validator.address, blockchainRid);
       await anchoring.deployed();
-      console.log("anchoring deployed to: ", anchoring.address);
+      console.log("Anchoring deployed to: ", anchoring.address);
 
       if (verify) {
         // We need to wait a little bit to verify the contract after deployment

@@ -43,17 +43,17 @@ task("deploy:chromiabridge")
     let multiSigOwner = known_artifacts_by_network[hre.network.name].multiSigOwner;
 
     // deploy validator smart contract
-      let validator;
-      let validators;
-      if (directoryValidator === undefined) {
-        const validatorFactory: Validator__factory = await hre.ethers.getContractFactory("Validator");
-        validators = app === undefined ? [] : getNodes(app);
-        validator = <IValidator>await validatorFactory.deploy(validators);
-      } else {
-        const validatorFactory: ManagedValidator__factory = await hre.ethers.getContractFactory("ManagedValidator");
-        validator = <IValidator>await validatorFactory.deploy(directoryValidator);
-      }
-      console.log("validator deployed to: ", validator.address);
+    let validator;
+    let validators;
+    if (directoryValidator === undefined) {
+      const validatorFactory: Validator__factory = await hre.ethers.getContractFactory("Validator");
+      validators = app === undefined ? [] : getNodes(app);
+      validator = <IValidator>await validatorFactory.deploy(validators);
+    } else {
+      const validatorFactory: ManagedValidator__factory = await hre.ethers.getContractFactory("ManagedValidator");
+      validator = <IValidator>await validatorFactory.deploy(directoryValidator);
+    }
+    console.log("Validator deployed to: ", validator.address);
     const withdrawOffset = offset === undefined ? 0 : parseInt(offset);
 
     // deploy token bridge smart contracts
