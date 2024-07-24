@@ -122,3 +122,36 @@ function test_can_not_withdraw_to_ethereum_with_insufficient_balance() {
         .sign(rell.test.keypairs.alice)
         .run_must_fail("Insufficient balance");
 }
+
+function test_can_not_withdraw_negative_or_zero_amount_to_ethereum() {
+    val ft_asset = register_foreign_asset();
+
+    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val account_id = rell.test.pubkeys.alice.hash();
+    rell.test.tx().op(
+        admin.external.register_account(auth_descriptor)
+    ).sign(admin_privkey).run();
+    val ft_account = accounts.Account(account_id);
+
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+    link_account(
+        rell.test.keypairs.eve,
+        rell.test.keypairs.alice,
+        account_id,
+        auth_descriptor.hash()
+    );
+
+    // 0
+    rell.test.tx()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft4_token_to_evm(network_id1, ft_asset.id, 0L, evm_address))
+        .sign(rell.test.keypairs.alice)
+        .run_must_fail("Parameter amount: value must be non-zero positive, actual: 0");
+
+    // -1
+    rell.test.tx()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft4_token_to_evm(network_id1, ft_asset.id, -1L, evm_address))
+        .sign(rell.test.keypairs.alice)
+        .run_must_fail("Parameter amount: value must be non-zero positive, actual: -1");
+}
