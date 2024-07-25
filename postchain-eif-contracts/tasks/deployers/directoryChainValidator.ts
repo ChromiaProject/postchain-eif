@@ -8,7 +8,7 @@ task("deploy:directoryValidator", "Deploy directory chain validator contract")
       const validatorFactory: DirectoryChainValidator__factory = await hre.ethers.getContractFactory("DirectoryChainValidator");
       const validator: DirectoryChainValidator = <DirectoryChainValidator>await validatorFactory.deploy(blockchainRid);
       await validator.deployed();
-      console.log("validator deployed to: ", validator.address);
+      console.log("Validator deployed to: ", validator.address);
 
       if (verify) {
         // We need to wait a little bit to verify the contract after deployment

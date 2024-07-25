@@ -16,17 +16,17 @@ task("deploy:bridge")
   .setAction(async ({verify, app, offset, directoryValidator}, hre) => {
     // deploy validator smart contract
     const withdrawOffset = offset === undefined ? 0 : parseInt(offset)
-      let validator;
-      let validators;
-      if (directoryValidator === undefined) {
-        const validatorFactory: Validator__factory = await hre.ethers.getContractFactory("Validator");
-        validators = app === undefined ? [] : getNodes(app);
-        validator = <IValidator>await validatorFactory.deploy(validators);
-      } else {
-        const validatorFactory: ManagedValidator__factory = await hre.ethers.getContractFactory("ManagedValidator");
-        validator = <IValidator>await validatorFactory.deploy(directoryValidator);
-      }
-      console.log("validator deployed to: ", validator.address);
+    let validator;
+    let validators;
+    if (directoryValidator === undefined) {
+      const validatorFactory: Validator__factory = await hre.ethers.getContractFactory("Validator");
+      validators = app === undefined ? [] : getNodes(app);
+      validator = <IValidator>await validatorFactory.deploy(validators);
+    } else {
+      const validatorFactory: ManagedValidator__factory = await hre.ethers.getContractFactory("ManagedValidator");
+      validator = <IValidator>await validatorFactory.deploy(directoryValidator);
+    }
+    console.log("Validator deployed to: ", validator.address);
 
     // deploy token bridge smart contracts
     const factory: TokenBridge__factory = await hre.ethers.getContractFactory("TokenBridge")
