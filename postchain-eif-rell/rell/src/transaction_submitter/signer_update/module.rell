@@ -224,16 +224,19 @@ function handle_signer_update_message(sender: byte_array, topic: text, body: gtv
             }
         } else {
             // If latest directory chain update is not completed we need to park this update
-            val latest_directory_update_status = latest_signer_list_update_status(update_message.blockchain_rid);
-            if (latest_directory_update_status != null and
-            latest_directory_update_status != signer_list_update_status.COMPLETED
-            ) {
-                create parked_directory_signer_list_update (
-                    serial = update_message.serial,
-                    signers = update_message.signers,
-                    confirmed_in_directory_at_height = update_message.confirmed_in_directory_at_height
-                );
-                return;
+            // Unless it was at the same height, then we can just cancel it
+            val latest_directory_update = signer_list_update @? { .blockchain_rid == update_message.blockchain_rid } (@omit @sort_desc .rowid, $);
+            if (latest_directory_update != null) {
+                if (latest_directory_update.confirmed_in_directory_at_height == update_message.confirmed_in_directory_at_height) {
+                    latest_directory_update.status = signer_list_update_status.CANCELLED;
+                } else if (latest_directory_update.status != signer_list_update_status.COMPLETED) {
+                    create parked_directory_signer_list_update (
+                        serial = update_message.serial,
+                        signers = update_message.signers,
+                        confirmed_in_directory_at_height = update_message.confirmed_in_directory_at_height
+                    );
+                    return;
+                }
             }
         }
 
