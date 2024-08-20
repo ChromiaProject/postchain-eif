@@ -13,6 +13,8 @@ import net.postchain.eif.config.EifEvmBlockchainConfig
 import net.postchain.eif.config.EvmConfig
 import net.postchain.eif.metrics.EifMetricsRegistry
 import net.postchain.eif.metrics.RpcUsageMetrics
+import net.postchain.eif.web3j.Web3jRequestHandler
+import net.postchain.eif.web3j.Web3jServiceFactory
 import net.postchain.gtv.mapper.toObject
 import net.postchain.gtx.GTXModuleAware
 import java.math.BigInteger

@@ -15,6 +15,7 @@ import net.postchain.common.hexStringToByteArray
 import net.postchain.concurrent.util.get
 import net.postchain.core.BlockchainEngine
 import net.postchain.core.Shutdownable
+import net.postchain.eif.web3j.Web3jRequestHandler
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvBigInteger

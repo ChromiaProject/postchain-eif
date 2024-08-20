@@ -4,16 +4,21 @@ import assertk.assertThat
 import assertk.assertions.isTrue
 import net.postchain.base.SpecialTransactionPosition
 import net.postchain.common.BlockchainRid
+import net.postchain.common.hexStringToByteArray
 import net.postchain.core.BlockEContext
+import net.postchain.crypto.KeyPair
 import net.postchain.crypto.Secp256K1CryptoSystem
 import net.postchain.eif.TestLogAppender
 import org.apache.logging.log4j.Level
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
+import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.times
+import org.mockito.kotlin.verify
 import java.math.BigInteger
 
 class TransactionSubmitterSpecialTxExtensionTest {
@@ -22,6 +27,7 @@ class TransactionSubmitterSpecialTxExtensionTest {
     lateinit var transactionSubmitter: TransactionSubmitter
     lateinit var txExtension: TransactionSubmitterSpecialTxExtension
     lateinit var module: TransactionSubmitterTestGTXModule
+    lateinit var updatedSigner: KeyPair
 
     @BeforeEach
     fun setup() {
@@ -38,7 +44,7 @@ class TransactionSubmitterSpecialTxExtensionTest {
         txExtension.addTransactionSubmitter(transactionSubmitter, 1)
 
         val cryptoSystem = Secp256K1CryptoSystem()
-        val updatedSigner = cryptoSystem.generateKeyPair()
+        updatedSigner = cryptoSystem.generateKeyPair()
 
         module = TransactionSubmitterTestGTXModule()
 
@@ -99,7 +105,6 @@ class TransactionSubmitterSpecialTxExtensionTest {
         testLogAppender.assertWarn("Validation failed. Receipt for transaction ${txDb.rowId} set without any ${RellTransactionStatus.SUCCESS.name} status update op")
     }
 
-
     @Test
     fun `validate - success update and receipt`() {
 
@@ -120,5 +125,33 @@ class TransactionSubmitterSpecialTxExtensionTest {
         )
 
         assertThat(txExtension.validateSpecialOperations(SpecialTransactionPosition.Begin, mock<BlockEContext>(), ops)).isTrue()
+    }
+
+    /**
+     * This tests a changed "processedBy" scenario which will make the extension:
+     * - remove the pending transaction (stop trying to verify if on evm side)
+     * - "cancel" it if submitted by this node.
+     */
+    @Test
+    fun `cancel transaction taken by other node`() {
+
+        // Mock the same transaction but in different phases. The First one processed by this node and the second one changed to be processed by a different node (this should trigger a cancel)
+        val txProcessedByMe = mkEvmSubmitTxRellRequest(rowId = 0, contractAddress = "00", status = RellTransactionStatus.PENDING, processedBy = updatedSigner.pubKey.data)
+        val txProcessedByOther = mkEvmSubmitTxRellRequest(rowId = 0, contractAddress = "00", status = RellTransactionStatus.PENDING, processedBy = "AABBCC".hexStringToByteArray())
+
+        // Mock required empty collections and one with our pending transaction
+        Mockito.`when`(transactionSubmitter.getVerifiedTransactions()).thenReturn(mutableListOf())
+        Mockito.`when`(transactionSubmitter.getSubmitTxUpdates()).thenReturn(mutableListOf())
+        Mockito.`when`(transactionSubmitter.getPendingTxs()).thenReturn(mutableMapOf("00" to EvmPendingTx.fromEvmSubmitTxRellRequest(txProcessedByMe, "AA")))
+
+        // Make the new transaction (processed by the other node) available
+        module.addTransaction(txProcessedByOther)
+
+        // Run the extension which should detect this transaction no longer is processed by us
+        txExtension.createSpecialOperations(SpecialTransactionPosition.Begin, mock<BlockEContext>())
+
+        // Make sure it was cancelled
+        verify(transactionSubmitter, times(1)).cancelPendingTx(any())
+        verify(transactionSubmitter, times(1)).removePendingTx(any())
     }
 }

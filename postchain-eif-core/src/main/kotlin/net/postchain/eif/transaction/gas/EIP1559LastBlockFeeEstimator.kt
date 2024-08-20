@@ -2,7 +2,7 @@ package net.postchain.eif.transaction.gas
 
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.exception.UserMistake
-import net.postchain.eif.Web3jRequestHandler
+import net.postchain.eif.web3j.Web3jRequestHandler
 import net.postchain.eif.transaction.EvmSubmitTxRequest
 import net.postchain.eif.transaction.TransactionSubmitter.Companion.logger
 import org.web3j.protocol.core.DefaultBlockParameterName

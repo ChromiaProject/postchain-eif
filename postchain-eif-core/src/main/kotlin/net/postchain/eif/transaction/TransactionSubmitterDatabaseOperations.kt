@@ -1,6 +1,5 @@
 package net.postchain.eif.transaction
 
-import net.postchain.core.BlockEContext
 import net.postchain.core.EContext
 import java.math.BigInteger
 
@@ -23,5 +22,5 @@ interface TransactionSubmitterDatabaseOperations {
 
     fun getQueuedTransactions(ctx: EContext, networkId: Long): List<EvmSubmitTxRequest>
 
-    fun removeTransaction(bctx: EContext, requestId: Long)
+    fun removeTransaction(bctx: EContext, requestId: Long): Boolean
 }

@@ -17,17 +17,18 @@ import net.postchain.core.EContext
 import net.postchain.core.Shutdownable
 import net.postchain.core.Storage
 import net.postchain.eif.GtvToTypeMapper
-import net.postchain.eif.Web3jRequestHandler
 import net.postchain.eif.transaction.gas.EIP1559FeeEstimatorFactory
+import net.postchain.eif.web3j.Web3jRawTransactionHandler
+import net.postchain.eif.web3j.Web3jRequestHandler
 import net.postchain.gtv.Gtv
 import okhttp3.internal.toImmutableList
 import okhttp3.internal.toImmutableMap
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.TypeReference
 import org.web3j.abi.datatypes.Function
+import org.web3j.crypto.RawTransaction
 import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.methods.response.TransactionReceipt
-import org.web3j.tx.TransactionManager
 import org.web3j.utils.Numeric
 import java.math.BigInteger
 import java.time.Instant
@@ -40,7 +41,7 @@ import kotlin.coroutines.cancellation.CancellationException
 
 open class TransactionSubmitter(
         private val web3jRequestHandler: Web3jRequestHandler,
-        private val transactionManagers: Map<String, TransactionManager>,
+        private val transactionHandler: Web3jRawTransactionHandler,
         private val feeEstimatorFactory: EIP1559FeeEstimatorFactory,
         private val databaseOperations: TransactionSubmitterDatabaseOperations,
         val storage: Storage,
@@ -69,9 +70,11 @@ open class TransactionSubmitter(
 
     private val txSubmitJob: Job
     private val txStatusPollJob: Job
+    private val txCancelJob: Job
     private val healthCheckJob: Job
     private val healthy = AtomicBoolean(true)
     private val queue = LinkedBlockingQueue<EvmSubmitTxRequest>()
+    private val cancelQueue = LinkedBlockingQueue<EvmPendingTx>()
     private val pendingTransactions = ConcurrentHashMap<String, EvmPendingTx>()
     private val submitTxUpdates: MutableList<EvmSubmitTransactionResult> = Collections.synchronizedList(mutableListOf())
 
@@ -130,6 +133,23 @@ open class TransactionSubmitter(
                         }
                     }
                 }
+        txCancelJob =
+                CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-transaction-tx-cancel") + MDCContext()) {
+                    while (isActive) {
+                        try {
+                            val txPending = cancelQueue.take()
+                            try {
+                                cancelTransaction(txPending)
+                            } catch (e: Exception) {
+                                logger.error("Failed to cancel EVM transaction ${txPending.rowId}: ${e.message}", e)
+                            }
+                        } catch (e: CancellationException) {
+                            break
+                        } catch (e: Exception) {
+                            logger.error("Unable to cancel transaction: ${e.message}", e)
+                        }
+                    }
+                }
         healthCheckJob =
                 CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-health-check") + MDCContext()) {
                     while (isActive && healthCheckInterval >= 0) {
@@ -150,7 +170,7 @@ open class TransactionSubmitter(
         val walletBalance = try {
             // This will implicitly test our RPC connections
             web3jRequestHandler.ethGetBalance(
-                        transactionManagers.values.first().fromAddress,
+                    transactionHandler.fromAddress,
                         DefaultBlockParameterName.LATEST
                 )
         } catch (e: Exception) {
@@ -214,6 +234,9 @@ open class TransactionSubmitter(
                 txPending.blockNumber = txReceipt.blockNumber
 
                 logger.info { "Transaction ${txPending.rowId} on network $networkId first receipt found at block number ${txPending.blockNumber}: $txReceipt" }
+            } else {
+
+                logger.info { "No receipt found for transaction ${txPending.rowId}" }
             }
         }
 
@@ -329,8 +352,6 @@ open class TransactionSubmitter(
 
         logger.info { "Submitting transaction ${txRequest.rowId} on network $networkId" }
 
-        val fromAddress = transactionManagers.values.first().fromAddress
-
         val functionData = encodeFunction(txRequest.functionName, txRequest.parameterTypes, txRequest.parameterValues)
 
         withWriteConnection(storage, chainId) {
@@ -341,7 +362,7 @@ open class TransactionSubmitter(
         val feeEstimator = feeEstimatorFactory.createEstimate(
                 txRequest.contractAddress,
                 functionData,
-                fromAddress,
+                transactionHandler.fromAddress,
                 chainId,
                 txRequest.maxPriorityFeePerGas,
                 txRequest.maxFeePerGas
@@ -351,45 +372,73 @@ open class TransactionSubmitter(
 
         feeEstimator.validateRequestFees(txRequest)
 
-        for ((rpcUrl, transactionManager) in transactionManagers) {
-            try {
-
-                val response = transactionManager.sendEIP1559Transaction(
-                        networkId,
-                        feeEstimator.maxPriorityFeePerGas,
-                        feeEstimator.maxFeePerGas,
-                        feeEstimator.estimatedGasLimit,
-                        txRequest.contractAddress,
-                        functionData,
-                        BigInteger.ZERO
-                )
-
-                if (response.hasError()) {
-                    val errorMessage =
-                            "Web3j request failed with error code: ${response.error.code} and message: ${response.error.message}"
-                    logger.error(errorMessage)
-                    throw ProgrammerMistake(errorMessage)
-                }
-
-                withReadWriteConnection(storage, chainId) {
-                    databaseOperations.recordTransactionHash(it, txRequest.rowId, response.transactionHash)
-                }
-
-                submitTxUpdates.add(EvmSubmitTransactionResult(txRequest.rowId, RellTransactionStatus.PENDING, response.transactionHash))
-
-                logger.info { "Transaction ${txRequest.rowId} on network $networkId submitted successfully with maxPriorityFeePerGas=${feeEstimator.maxPriorityFeePerGas}, maxFeePerGas=${feeEstimator.maxFeePerGas}, gasLimit=${feeEstimator.estimatedGasLimit}, txHash=${response.transactionHash}" }
-
-                return
-
-            } catch (e: Exception) {
-
-                val error = "Failed to send transaction ${txRequest.rowId} to $rpcUrl: ${e.message}"
-                logger.error { error }
-            }
+        val response = transactionHandler.sendWeb3jTransaction(txRequest.rowId) {
+            it.sendEIP1559Transaction(
+                    networkId,
+                    feeEstimator.maxPriorityFeePerGas,
+                    feeEstimator.maxFeePerGas,
+                    feeEstimator.estimatedGasLimit,
+                    txRequest.contractAddress,
+                    functionData,
+                    BigInteger.ZERO
+            )
         }
 
-        val errorMessage = "Failed to send transaction to all ${transactionManagers.size} nodes"
-        throw ProgrammerMistake(errorMessage)
+        withReadWriteConnection(storage, chainId) {
+            databaseOperations.recordTransactionHash(it, txRequest.rowId, response.transactionHash)
+        }
+
+        submitTxUpdates.add(EvmSubmitTransactionResult(txRequest.rowId, RellTransactionStatus.PENDING, response.transactionHash))
+
+        logger.info { "Transaction ${txRequest.rowId} on network $networkId submitted successfully with maxPriorityFeePerGas=${feeEstimator.maxPriorityFeePerGas}, maxFeePerGas=${feeEstimator.maxFeePerGas}, gasLimit=${feeEstimator.estimatedGasLimit}, txHash=${response.transactionHash}" }
+    }
+
+    internal fun cancelTransaction(txPending: EvmPendingTx) {
+        try {
+            sendCancelTransaction(txPending)
+        } catch (e: Exception) {
+            val errorMessage = e.message ?: "Unknown error"
+            logger.error(e) { errorMessage }
+            throw e
+        }
+    }
+
+    private fun sendCancelTransaction(txPending: EvmPendingTx) {
+
+        logger.info { "Cancelling transaction ${txPending.rowId} / ${txPending.txHash}" }
+
+        val evmTransaction = web3jRequestHandler.sendWeb3jRequest { it.ethGetTransactionByHash(txPending.txHash) }
+        if (evmTransaction.transaction.isEmpty) {
+            throw ProgrammerMistake("Transaction ${txPending.rowId} / ${txPending.txHash} not found")
+        }
+
+        val transaction = evmTransaction.transaction.get()
+        if (transaction.blockNumberRaw != null) {
+            throw ProgrammerMistake("Transaction ${txPending.rowId} / ${txPending.txHash} confirmed in block ${transaction.blockNumber} and can't be cancelled")
+        }
+
+        // We need to increase gas fee by 10% and priority fee by 1 for the node to accept the replacement
+        val maxPriorityFeePerGas = transaction.maxPriorityFeePerGas.add(BigInteger.ONE)
+        val maxFeePerGas = transaction.maxFeePerGas.toBigDecimal().multiply(1.1.toBigDecimal()).toBigInteger()
+
+        // We will also remove the function data and set our own address instead of contract address to simplify the transaction
+        val rawTransaction = RawTransaction.createTransaction(
+                networkId,
+                transaction.nonce,
+                transaction.gas,
+                transactionHandler.fromAddress,
+                0.toBigInteger(),
+                "",
+                maxPriorityFeePerGas,
+                maxFeePerGas,
+        )
+
+        val response = transactionHandler.sendWeb3jTransaction(txPending.rowId) {
+            it.signAndSend(rawTransaction)
+        }
+
+        logger.info { "Cancel transaction for ${txPending.rowId} sent with txHash: ${response.transactionHash}, " +
+                "gasLimit: ${rawTransaction.gasLimit}, maxPriorityFeePerGas: $maxPriorityFeePerGas (prev. ${transaction.maxPriorityFeePerGas}), maxFeePerGas: $maxFeePerGas (prev. ${transaction.maxFeePerGas})" }
     }
 
     fun enqueue(evmSubmitTxRellRequest: EvmSubmitTxRequest) {
@@ -403,7 +452,7 @@ open class TransactionSubmitter(
         queue.offer(evmSubmitTxRellRequest)
     }
 
-    fun getSubmitTxUpdates(): List<EvmSubmitTransactionResult> {
+    open fun getSubmitTxUpdates(): List<EvmSubmitTransactionResult> {
         return submitTxUpdates.toImmutableList()
     }
 
@@ -414,6 +463,7 @@ open class TransactionSubmitter(
     override fun shutdown() {
         txSubmitJob.cancel()
         txStatusPollJob.cancel()
+        txCancelJob.cancel()
         healthCheckJob.cancel()
         web3jRequestHandler.close()
     }
@@ -433,7 +483,7 @@ open class TransactionSubmitter(
         }
     }
 
-    fun getVerifiedTransactions(): List<EvmPendingTx> {
+    open fun getVerifiedTransactions(): List<EvmPendingTx> {
 
         return pendingTransactions.values
                 .filter {
@@ -452,7 +502,7 @@ open class TransactionSubmitter(
         databaseOperations.setSubmitTxBCPersisted(bctx, rowId)
     }
 
-    fun removePendingTx(requestId: Long) {
+    open fun removePendingTx(requestId: Long) {
 
         logger.info { "Removed pending transaction $requestId on network $networkId" }
 
@@ -464,12 +514,18 @@ open class TransactionSubmitter(
 
     fun removeSubmitTx(bctx: EContext, requestId: Long) {
 
-        logger.info { "Removed submit transaction $requestId on network $networkId" }
+        if (queue.removeIf { it.rowId == requestId }) {
+            logger.info { "Removed submit transaction $requestId on network $networkId" }
+        }
 
         databaseOperations.removeTransaction(bctx, requestId)
     }
 
-    fun getPendingTxs(): Map<String, EvmPendingTx> {
+    open fun getPendingTxs(): Map<String, EvmPendingTx> {
         return pendingTransactions.toImmutableMap()
+    }
+
+    open fun cancelPendingTx(txPending: EvmPendingTx) {
+        cancelQueue.offer(txPending)
     }
 }

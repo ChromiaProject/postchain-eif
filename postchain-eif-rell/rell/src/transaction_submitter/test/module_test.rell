@@ -158,6 +158,24 @@ function test_fetch_oldest_queued_transactions_per_contract_and_network() {
     assert_equals(evm_submit_transaction[1].network_id, 56);
 }
 
+function test_fail_transactions_with_enough_retries_strategy_all_by_status_update() {
+
+    // Submit 2 transactions - 1 not to be touched, 1 to be failed
+    rell.test.tx().op(
+        create_test_evm_submit_transaction(x"00", "system_bridge_address", "myFunction-0", transaction_status.QUEUED, 1),
+        create_test_evm_submit_transaction(x"01", "system_bridge_address", "myFunction-1", transaction_status.PENDING, 1, processed_by = x"AABBCC"),
+        add_transaction_taken_by(x"01", rell.test.keypairs.alice.pub),
+        update_transaction_status_op(2, transaction_status.QUEUED),
+    ).sign(rell.test.keypairs.alice).run();
+
+    assert_equals(evm_submit_transaction @ { .id == x"00"} (.status), transaction_status.QUEUED);
+    assert_equals(evm_submit_transaction @ { .id == x"01"} (.status), transaction_status.FAILURE);
+
+    // Taken entities cleaned up and processed_by removed
+    assert_true(empty(evm_submit_transaction_taken_by @* {}));
+    assert_equals(evm_submit_transaction @ { .id == x"01" } ( .processed_by ), x"");
+}
+
 function test_fail_transactions_with_enough_retries_strategy_all() {
 
     // Submit 2 transactions - 1 not to be touched, 1 to be failed
@@ -314,22 +332,21 @@ function test_update_evm_transaction_status_taken_only_once() {
     rell.test.set_next_block_time(1);
     rell.test.block().run();
     rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "system_bridge_address","myFunction", transaction_status.QUEUED)
+        create_test_evm_submit_transaction(x"00", "system_bridge_address","myFunction", transaction_status.QUEUED),
+        add_transaction_taken_by(x"00", x"AA"),
     ).run();
 
     val tx_row_id = evm_submit_transaction @ { } ( .rowid );
 
     rell.test.tx().op(
-        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"01"),
-        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.QUEUED, x"01"),
-        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"01")
+        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.TAKEN, x"AA")
     ).run_must_fail("Each node can only process one transaction once");
 }
 
 function test_update_evm_transaction_status_rejects() {
 
     rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "system_bridge_address","myFunction", transaction_status.QUEUED, 0)
+        create_test_evm_submit_transaction(x"00", "system_bridge_address","myFunction", transaction_status.QUEUED, created = 99999999999999999)
     ).run();
 
     val tx_row_id = evm_submit_transaction @ { } ( .rowid );
@@ -358,7 +375,7 @@ function test_update_evm_transaction_status_rejects() {
 function test_update_evm_transaction_status_tx_hash() {
 
     rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "system_bridge_address","myFunction", transaction_status.QUEUED, 0)
+        create_test_evm_submit_transaction(x"00", "system_bridge_address","myFunction", transaction_status.QUEUED, created = 99999999999999999)
     ).run();
 
     val tx_row_id = evm_submit_transaction @ { } ( .rowid );
@@ -378,7 +395,13 @@ function test_update_evm_transaction_status_tx_hash() {
 function test_update_evm_transaction_status_SUCCESS() {
 
     rell.test.tx().op(
-        create_test_evm_submit_transaction(x"00", "system_bridge_address","myFunction", transaction_status.QUEUED, 0)
+        create_test_evm_submit_transaction(
+            x"00",
+                "system_bridge_address",
+                "myFunction",
+                transaction_status.QUEUED,
+                created = 99999999999999999 // avoid being timed out
+        )
     ).run();
 
     val tx_row_id = evm_submit_transaction @ { } ( .rowid );

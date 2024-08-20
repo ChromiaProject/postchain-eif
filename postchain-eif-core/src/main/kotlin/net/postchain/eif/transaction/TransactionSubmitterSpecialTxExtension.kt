@@ -47,6 +47,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         val operations = mutableListOf<OpData>()
 
         removeCompletedTxs(bctx)
+        removeTxsWithUpdatedProcessedByValue(bctx)
         takeTransactions(bctx, operations)
         updateTransactionStatuses(bctx, operations)
 
@@ -126,13 +127,12 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                     }
                 }
 
-                // Only dapp can set status FAILURE, a node can only pass it on to next node to re-try it
-                if (newTxStatus == RellTransactionStatus.FAILURE) {
-                    logger.warn { "Validation failed. Transaction $requestId can't be set to status ${RellTransactionStatus.FAILURE} from extension" }
+                if (newTxStatus == RellTransactionStatus.QUEUED && currentTxStatus != RellTransactionStatus.TAKEN) {
+                    logger.warn { "Validation failed. Only rell or a the node submitting a transaction can set status to ${RellTransactionStatus.QUEUED}" }
+                    return false
                 }
 
-                // Statuses based on polling result requires consensus
-                if (currentTxStatus != RellTransactionStatus.TAKEN && newTxStatus == RellTransactionStatus.QUEUED || newTxStatus == RellTransactionStatus.SUCCESS) {
+                if (newTxStatus == RellTransactionStatus.FAILURE || newTxStatus == RellTransactionStatus.SUCCESS) {
                     if (validateSpecialOps()) {
 
                         // A pending transaction must be verified
@@ -140,7 +140,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
                             val acceptable =
                                     (newTxStatus == RellTransactionStatus.SUCCESS && txPending.status == PendingTxStatus.SUCCESS) ||
-                                            (newTxStatus == RellTransactionStatus.QUEUED && txPending.status == PendingTxStatus.REVERTED)
+                                            (newTxStatus == RellTransactionStatus.FAILURE && txPending.status == PendingTxStatus.REVERTED)
 
                             if (acceptable) {
                                 bctx.addAfterCommitHook { txSubmitter.removePendingTx(requestId) }
@@ -246,7 +246,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
             txSubmitter.getVerifiedTransactions().forEach {
 
                 val rellStatus =
-                        if (it.status == PendingTxStatus.SUCCESS) RellTransactionStatus.SUCCESS else RellTransactionStatus.QUEUED
+                        if (it.status == PendingTxStatus.SUCCESS) RellTransactionStatus.SUCCESS else RellTransactionStatus.FAILURE
 
                 // Update receipt only if transaction has a receipt
                 if (it.blockHash != null) {
@@ -453,5 +453,28 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     private fun getOpsForTx(ops: List<OpData>, opName: String, requestId: Long): List<OpData> {
         return ops
                 .filter { op -> op.opName == opName && op.args[0].asInteger() == requestId}
+    }
+
+    // If the processedBy value is updated it means another node has been assigned the task to submit this transaction
+    // instead. Stop verifying this transaction and if it was submitted by this node also "cancel" it on evm side.
+    private fun removeTxsWithUpdatedProcessedByValue(bctx: BlockEContext) {
+
+        transactionSubmitters.values.forEach { txSubmitter ->
+
+            val removeTxs = txSubmitter.getPendingTxs().values.filter {
+                val tx = getBcTransaction(bctx, it.rowId)
+                tx.processedBy == null || !tx.processedBy.contentEquals(it.processedBy)
+            }
+
+            removeTxs.forEach { tx: EvmPendingTx ->
+
+                logger.info { "Transaction ${tx.rowId} is retried by another node" }
+
+                if (tx.processedBy.contentEquals(pubKey)) {
+                    txSubmitter.cancelPendingTx(tx)
+                }
+                txSubmitter.removePendingTx(tx.rowId)
+            }
+        }
     }
 }

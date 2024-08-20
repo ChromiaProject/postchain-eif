@@ -2,7 +2,8 @@ package net.postchain.eif.transaction
 
 import assertk.assertThat
 import assertk.assertions.isEqualTo
-import net.postchain.eif.Web3jRequestHandler
+import mockWeb3jRequestHandler
+import net.postchain.eif.web3j.Web3jRequestHandler
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.any
@@ -170,7 +171,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         )
 
         testLogAppender.assertError("Failed to send transaction 0 to http://evm-node-1:9999: Oh dear")
-        testLogAppender.assertError("Failed to send transaction 0 to http://evm-node-2:9999: Web3j request failed with error code: 404 and message: Not found")
+        testLogAppender.assertError("Failed to send transaction 0 to rpc http://evm-node-2:9999 with error code: 404 and message: Not found")
         testLogAppender.assertError("Failed to send transaction to all 2 nodes")
     }
 }

@@ -104,7 +104,7 @@ fun mkEvmSubmitTxRellRequest(
         txHash: String? = null,
         functionName: String = "updateValidators",
         processedByNode: PostchainTestNode? = null,
-        processedBy: ByteArray? = null
+        processedBy: ByteArray? = "AA".toByteArray()
 ) = EvmSubmitTxRellRequest(
         rowId,
         contractAddress,
@@ -153,8 +153,8 @@ fun mkEvmPendingDbTx(blockNumber: Long? = null, networkId: Long = 1337) = EvmPen
         "functionName",
         listOf("address[]"),
         listOf(GtvFactory.gtv(listOf(GtvFactory.gtv(ByteArray(20) { 1 })))),
+        "".toByteArray(),
         "0x" + ByteArray(32) { 123 }.toHex(),
-        System.currentTimeMillis(),
         blockNumber = blockNumber?.let { BigInteger.valueOf(blockNumber) })
 
 fun <T> withTxSubmitter(

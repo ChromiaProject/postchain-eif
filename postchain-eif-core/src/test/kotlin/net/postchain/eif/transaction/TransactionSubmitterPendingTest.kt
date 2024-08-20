@@ -4,7 +4,7 @@ import assertk.assertThat
 import assertk.assertions.isEqualTo
 import assertk.assertions.isNotNull
 import assertk.assertions.isTrue
-import net.postchain.eif.Web3jRequestHandler
+import net.postchain.eif.web3j.Web3jRequestHandler
 import org.apache.logging.log4j.Level
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito

@@ -118,10 +118,10 @@ class EvmPendingTx(
         val functionName: String,
         val parameterTypes: List<String>,
         val parameterValues: List<Gtv>,
+        val processedBy: ByteArray,
         txHash: String,
 
         // Not persisted
-        var created: Long = System.currentTimeMillis(),
         var blockNumber: BigInteger? = null,
         var effectiveGasPrice: BigInteger? = null,
         var gasUsed: BigInteger? = null,
@@ -153,6 +153,7 @@ class EvmPendingTx(
                     txPending.functionName,
                     txPending.parameterTypes,
                     txPending.parameterValues,
+                    txPending.processedBy!!,
                     txHash,
             )
         }

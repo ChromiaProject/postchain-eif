@@ -226,7 +226,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
     }
 
     // This test brings up 4 nodes for processing an evm transaction.
-    // node[0] is configured with a incorrect evm rpc url which will make it fail
+    // node[0] is configured with an incorrect evm rpc url which will make it fail
     // Once node[0] fails node[1] till retry and succeed.
     @Test
     fun `submit transaction in multi node env - successfully but with one failing node`() {
