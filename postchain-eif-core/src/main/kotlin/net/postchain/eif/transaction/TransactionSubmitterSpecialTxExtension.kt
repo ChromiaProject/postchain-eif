@@ -53,16 +53,16 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         return operations
     }
 
-    // Remove and do not process transactions already completed on blockchain
+    // Stop processing transactions locally if already been marked as completed on blockchain
     private fun removeCompletedTxs(bctx: BlockEContext) {
 
         transactionSubmitters.values.forEach { txSubmitter ->
 
-            val txs = txSubmitter.getSubmitTxUpdates().map(EvmSubmitTransactionResult::requestId) +
+            val txIds = txSubmitter.getSubmitTxUpdates().map(EvmSubmitTransactionResult::requestId) +
                     txSubmitter.getPendingTxs().values.map(EvmPendingTx::rowId)
 
-            txs.forEach { tx ->
-                continueProcessTx(module, bctx, tx)
+            txIds.forEach { tx ->
+                removeTxIfAlreadyCompleted(module, bctx, tx)
             }
         }
     }
@@ -262,7 +262,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         }
     }
 
-    private fun continueProcessTx(module: GTXModule, bctx: BlockEContext, requestId: Long): Boolean {
+    private fun removeTxIfAlreadyCompleted(module: GTXModule, bctx: BlockEContext, requestId: Long) {
 
         if (isTxCompletedOnBlockchain(module, bctx, requestId)) {
             withTxPending(requestId) { txSubmitter, _ ->
@@ -271,10 +271,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
             transactionSubmitters.values.forEach { txSubmitter ->
                 txSubmitter.removeSubmitTx(bctx, requestId)
             }
-            return false
         }
-
-        return true
     }
 
     fun buildTxReceiptOp(txPending: EvmPendingTx): OpData {
