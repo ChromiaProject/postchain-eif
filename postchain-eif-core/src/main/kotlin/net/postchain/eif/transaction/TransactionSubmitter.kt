@@ -13,6 +13,7 @@ import net.postchain.base.withReadWriteConnection
 import net.postchain.base.withWriteConnection
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.core.BlockEContext
+import net.postchain.core.EContext
 import net.postchain.core.Shutdownable
 import net.postchain.core.Storage
 import net.postchain.eif.GtvToTypeMapper
@@ -20,6 +21,7 @@ import net.postchain.eif.Web3jRequestHandler
 import net.postchain.eif.transaction.gas.EIP1559FeeEstimatorFactory
 import net.postchain.gtv.Gtv
 import okhttp3.internal.toImmutableList
+import okhttp3.internal.toImmutableMap
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.TypeReference
 import org.web3j.abi.datatypes.Function
@@ -48,7 +50,6 @@ open class TransactionSubmitter(
         initQueue: Collection<EvmSubmitTxRequest>,
         val minWalletBalance: BigInteger,
         val healthCheckInterval: Long,
-        val nodeTxVerificationTimeout: Long,
         val nodeTxVerificationEvmBlocks: Long,
         val txVerificationTime: Long,
 ) : Shutdownable {
@@ -79,8 +80,7 @@ open class TransactionSubmitter(
         logger.info {
             "Initializing transaction submitter - chainId: $chainId, networkId: $networkId, " +
                     "txPollInterval: $txPollInterval, healthCheckInterval: $healthCheckInterval, " +
-                    "nodeTxVerificationTimeout: $nodeTxVerificationTimeout" +
-                    ", nodeTxVerificationEvmBlocks: $nodeTxVerificationEvmBlocks, txVerificationTime: $txVerificationTime"
+                    "nodeTxVerificationEvmBlocks: $nodeTxVerificationEvmBlocks, txVerificationTime: $txVerificationTime"
         }
 
         // Add transactions to queue and recover states lost on node restart
@@ -192,13 +192,6 @@ open class TransactionSubmitter(
                     pollPendingTransaction(txPending, currentBlockHeight)
                 } catch (e: Exception) {
                     logger.error(e) { "Failed to process pending transaction ${txPending.rowId}" }
-                } finally {
-
-                    try {
-                        checkTransactionTimeout(txPending)
-                    } catch (e: Exception) {
-                        logger.error(e) { "Failed to verify timeout of transaction ${txPending.rowId}" }
-                    }
                 }
             }
         }
@@ -255,20 +248,6 @@ open class TransactionSubmitter(
                 if (awaitingBlocks.mod(10) == 0) {
                     logger.info { "Receipt for transaction ${txPending.rowId} on network $networkId will be verified in $awaitingBlocks EVM blocks" }
                 }
-            }
-        }
-    }
-
-    private fun checkTransactionTimeout(txPending: EvmPendingTx) {
-        if (!txPending.status.isCompleted()) {
-            try {
-                isTimeout(txPending.rowId, txPending.created, nodeTxVerificationTimeout)
-            } catch (e: EvmTransactionTimeoutException) {
-                logger.warn { "Transaction ${txPending.rowId} timed out" }
-
-                txPending.status = PendingTxStatus.REVERTED
-                submitTxUpdates.add(EvmSubmitTransactionResult(txPending.rowId, RellTransactionStatus.QUEUED))
-                return
             }
         }
     }
@@ -400,7 +379,7 @@ open class TransactionSubmitter(
 
                 submitTxUpdates.add(EvmSubmitTransactionResult(txRequest.rowId, RellTransactionStatus.PENDING, response.transactionHash))
 
-                logger.info { "Transaction ${txRequest.rowId} on network $networkId submitted successfully with maxPriorityFeePerGas=${feeEstimator.maxPriorityFeePerGas}, maxFeePerGas=${feeEstimator.maxFeePerGas}, gasLimit=${feeEstimator.estimatedGasLimit}" }
+                logger.info { "Transaction ${txRequest.rowId} on network $networkId submitted successfully with maxPriorityFeePerGas=${feeEstimator.maxPriorityFeePerGas}, maxFeePerGas=${feeEstimator.maxFeePerGas}, gasLimit=${feeEstimator.estimatedGasLimit}, txHash=${response.transactionHash}" }
 
                 return
 
@@ -434,16 +413,6 @@ open class TransactionSubmitter(
         this.submitTxUpdates.removeAll(updatesToRemove)
     }
 
-    // One for submitting and one for polling?
-    private fun isTimeout(requestId: Long, time: Long, timeoutMs: Long) {
-        if (System.currentTimeMillis() - time > timeoutMs) {
-            val message =
-                    "Transaction $requestId with timestamp $time was not processed within $timeoutMs ms and timed out"
-            logger.warn { message }
-            throw EvmTransactionTimeoutException(message)
-        }
-    }
-
     override fun shutdown() {
         txSubmitJob.cancel()
         txStatusPollJob.cancel()
@@ -452,6 +421,11 @@ open class TransactionSubmitter(
     }
 
     fun addPendingTransaction(txPending: EvmPendingTx) {
+
+        if (pendingTransactions.values.any { it.rowId == txPending.rowId }) {
+            logger.info { "Already polls transaction ${txPending.rowId} for verification - replaces it" }
+            removePendingTx(txPending.rowId)
+        }
 
         if (!pendingTransactions.containsKey(txPending.txHash)) {
 
@@ -490,12 +464,14 @@ open class TransactionSubmitter(
                 .forEach { pendingTransactions.remove(it) }
     }
 
-    fun removeSubmitTx(bctx: BlockEContext, requestId: Long) {
+    fun removeSubmitTx(bctx: EContext, requestId: Long) {
 
         logger.info { "Removed submit transaction $requestId on network $networkId" }
 
         databaseOperations.removeTransaction(bctx, requestId)
     }
-}
 
-class EvmTransactionTimeoutException(message: String) : RuntimeException(message)
+    fun getPendingTxs(): Map<String, EvmPendingTx> {
+        return pendingTransactions.toImmutableMap()
+    }
+}

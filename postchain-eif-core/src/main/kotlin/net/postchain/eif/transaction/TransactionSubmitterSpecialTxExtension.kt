@@ -46,10 +46,25 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
         val operations = mutableListOf<OpData>()
 
+        removeCompletedTxs(bctx)
         takeTransactions(bctx, operations)
         updateTransactionStatuses(bctx, operations)
 
         return operations
+    }
+
+    // Stop processing transactions locally if already been marked as completed on blockchain
+    private fun removeCompletedTxs(bctx: BlockEContext) {
+
+        transactionSubmitters.values.forEach { txSubmitter ->
+
+            val txIds = txSubmitter.getSubmitTxUpdates().map(EvmSubmitTransactionResult::requestId) +
+                    txSubmitter.getPendingTxs().values.map(EvmPendingTx::rowId)
+
+            txIds.forEach { tx ->
+                removeTxIfAlreadyCompleted(module, bctx, tx)
+            }
+        }
     }
 
     override fun validateSpecialOperations(
@@ -111,7 +126,13 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                     }
                 }
 
-                if (newTxStatus == RellTransactionStatus.FAILURE || newTxStatus == RellTransactionStatus.SUCCESS) {
+                // Only dapp can set status FAILURE, a node can only pass it on to next node to re-try it
+                if (newTxStatus == RellTransactionStatus.FAILURE) {
+                    logger.warn { "Validation failed. Transaction $requestId can't be set to status ${RellTransactionStatus.FAILURE} from extension" }
+                }
+
+                // Statuses based on polling result requires consensus
+                if (currentTxStatus != RellTransactionStatus.TAKEN && newTxStatus == RellTransactionStatus.QUEUED || newTxStatus == RellTransactionStatus.SUCCESS) {
                     if (validateSpecialOps()) {
 
                         // A pending transaction must be verified
@@ -119,7 +140,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
                             val acceptable =
                                     (newTxStatus == RellTransactionStatus.SUCCESS && txPending.status == PendingTxStatus.SUCCESS) ||
-                                            (newTxStatus == RellTransactionStatus.FAILURE && txPending.status == PendingTxStatus.REVERTED)
+                                            (newTxStatus == RellTransactionStatus.QUEUED && txPending.status == PendingTxStatus.REVERTED)
 
                             if (acceptable) {
                                 bctx.addAfterCommitHook { txSubmitter.removePendingTx(requestId) }
@@ -135,7 +156,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                         // A SUCCESS must contain a receipt in the same transaction
                         if (newTxStatus == RellTransactionStatus.SUCCESS && getOpsForTx(ops, UPDATE_EVM_TRANSACTION_RECEIPT, requestId).isEmpty()) {
                             logger.warn { "Validation failed. Transaction $requestId is set to ${RellTransactionStatus.SUCCESS.name} but without a receipt" }
-//                        return false TODO enable in future for additional validation
+                            return false
                         }
 
                         logger.info { "Transaction $requestId is verified as $newTxStatus" }
@@ -173,7 +194,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                 if (!getOpsForTx(ops, UPDATE_EVM_TRANSACTION_STATUS, requestId)
                                 .any { RellTransactionStatus.entries[it.args[1].asInteger().toInt()] == RellTransactionStatus.SUCCESS }) {
                     logger.warn { "Validation failed. Receipt for transaction $requestId set without any ${RellTransactionStatus.SUCCESS.name} status update op" }
-//                    return false TODO enable in future for additional validation
+                    return false
                 }
             }
         }
@@ -204,21 +225,18 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
             val submitTxUpdates = txSubmitter.getSubmitTxUpdates()
             submitTxUpdates.forEach { result ->
 
-                if (continueProcessTx(module, bctx, result.requestId)) {
+                operations.add(
+                        buildTxUpdateOp(result.requestId, result.status, result.txHash)
+                )
 
-                    operations.add(
-                            buildTxUpdateOp(result.requestId, result.status, result.txHash)
-                    )
+                // Status QUEUE can be set multiple times due to retry - add a no op for them
+                if (result.status == RellTransactionStatus.QUEUED) {
+                    addNoOp(operations, bctx)
+                }
 
-                    // Status QUEUE can be set multiple times due to retry - add a no op for them
-                    if (result.status == RellTransactionStatus.QUEUED) {
-                        addNoOp(operations, bctx)
-                    }
-
-                    // We have processed this TX - cleanup
-                    if (result.status != RellTransactionStatus.TAKEN) {
-                        txSubmitter.setSubmitBCPersisted(bctx, result.requestId)
-                    }
+                // We have processed this TX - cleanup
+                if (result.status != RellTransactionStatus.TAKEN) {
+                    txSubmitter.setSubmitBCPersisted(bctx, result.requestId)
                 }
             }
 
@@ -227,37 +245,33 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
             // Verified transaction updates
             txSubmitter.getVerifiedTransactions().forEach {
 
-                if (continueProcessTx(module, bctx, it.rowId)) {
+                val rellStatus =
+                        if (it.status == PendingTxStatus.SUCCESS) RellTransactionStatus.SUCCESS else RellTransactionStatus.QUEUED
 
-                    val rellStatus =
-                            if (it.status == PendingTxStatus.SUCCESS) RellTransactionStatus.SUCCESS else RellTransactionStatus.FAILURE
-
-                    // Update receipt only if transaction has a receipt
-                    if (it.blockHash != null) {
-                        operations.add(
-                                buildTxReceiptOp(it)
-                        )
-                    }
-
+                // Update receipt only if transaction has a receipt
+                if (it.blockHash != null) {
                     operations.add(
-                            buildTxUpdateOp(it.rowId, rellStatus)
+                            buildTxReceiptOp(it)
                     )
                 }
+
+                operations.add(
+                        buildTxUpdateOp(it.rowId, rellStatus)
+                )
             }
         }
     }
 
-    private fun continueProcessTx(module: GTXModule, eContext: EContext, requestId: Long): Boolean {
+    private fun removeTxIfAlreadyCompleted(module: GTXModule, bctx: BlockEContext, requestId: Long) {
 
-        if (isTxCompletedOnBlockchain(module, eContext, requestId)) {
-
+        if (isTxCompletedOnBlockchain(module, bctx, requestId)) {
             withTxPending(requestId) { txSubmitter, _ ->
                 txSubmitter.removePendingTx(requestId)
             }
-            return false
+            transactionSubmitters.values.forEach { txSubmitter ->
+                txSubmitter.removeSubmitTx(bctx, requestId)
+            }
         }
-
-        return true
     }
 
     fun buildTxReceiptOp(txPending: EvmPendingTx): OpData {

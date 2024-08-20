@@ -68,9 +68,6 @@
                     </entry>
                 </dict>
             </entry>
-            <entry key="node_tx_verification_timeout">
-                <int>240000</int> <!-- 4 minutes -->
-            </entry>
         </dict>
     </entry>
     <entry key="gtx">
