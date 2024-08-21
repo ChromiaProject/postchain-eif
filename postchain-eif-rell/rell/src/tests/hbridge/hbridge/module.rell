@@ -71,27 +71,35 @@ val BAR = asset_info(
 );
 
 function register_foreign_asset(asset: asset_info = CHR, network_id: integer = network_id1): assets.asset {
-    val asset_id = (asset.token_name, chain_context.blockchain_rid).hash();
+    val ft4_asset = register_ft4_asset(asset, network_id);
+    register_erc20_asset(ft4_asset, asset, network_id);
+    return ft4_asset;
+}
+
+function register_ft4_asset(asset_info: asset_info, network_id: integer): assets.asset {
+    val asset_id = (asset_info.token_name, chain_context.blockchain_rid).hash();
 
     rell.test.tx().op(
-        admin.external.register_asset(asset.token_name, asset.token_symbol, asset.token_decimal, asset.token_icon_url)
+        admin.external.register_asset(asset_info.token_name, asset_info.token_symbol, asset_info.token_decimal, asset_info.token_icon_url)
     ).sign(admin_privkey).run();
 
+    return assets.Asset(asset_id);
+}
+
+function register_erc20_asset(ft4_asset: assets.asset, asset_info: asset_info, network_id: integer) {
     rell.test.tx().op(
-        helpers.register_erc20_asset(network_id, asset.token_address, asset_id, hbridge.bridge_mode.foreign)
+        helpers.register_erc20_asset_op(network_id, asset_info.token_address, ft4_asset, hbridge.bridge_mode.foreign)
     ).run();
 
     assert_equals(
-        hbridge.get_erc20_for_asset(asset_id),
-        [
-            hbridge.erc20_info(
-                network_id, token_address = asset.token_address, hbridge.bridge_mode.foreign, virtual_blockchain_rid =
-                    hbridge.compute_virtual_blockchain_rid(network_id, asset.token_address)
-            )
-        ]
+        hbridge.get_erc20_for_asset(ft4_asset.id) @? { .network_id == network_id, .token_address == asset_info.token_address },
+        hbridge.erc20_info(
+            network_id,
+            token_address = asset_info.token_address,
+            bridge_mode = hbridge.bridge_mode.foreign,
+            virtual_blockchain_rid = hbridge.compute_virtual_blockchain_rid(network_id, asset_info.token_address)
+        )
     );
-
-    return assets.Asset(asset_id);
 }
 
 function link_account(
