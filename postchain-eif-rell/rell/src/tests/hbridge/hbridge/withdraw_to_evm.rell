@@ -1,27 +1,8 @@
-function test_withdraw_foreign_ERC20_token_to_ethereum_with_already_linked_account() {
+function test_withdraw_to_ethereum_with_already_linked_account() {
     val ft_asset = register_foreign_asset();
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
 
-    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
-    val account_id = rell.test.pubkeys.alice.hash();
-    rell.test.tx().op(
-        admin.external.register_account(auth_descriptor)
-    ).sign(admin_privkey).run();
-    val ft_account = accounts.Account(account_id);
-
-    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
-    link_account(
-        rell.test.keypairs.eve,
-        rell.test.keypairs.alice,
-        account_id,
-        auth_descriptor.hash()
-    );
-
-    val amount = 10000000000000000000L;
-
-    rell.test.tx().op(
-        admin.external.mint(account_id, ft_asset.id, amount)
-    ).sign(admin_privkey).run();
-
+    val amount = _mint(ft_account, ft_asset);
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
 
     rell.test.tx()
@@ -34,6 +15,56 @@ function test_withdraw_foreign_ERC20_token_to_ethereum_with_already_linked_accou
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount / 2);
 }
 
+function test_withdraw_to_ethereum_using_most_recent_erc20_token_address_by_default() {
+    val ft_asset = register_ft4_asset(CHR, network_id1);
+    register_erc20_asset(ft_asset, CHR, network_id1);
+    register_erc20_asset(ft_asset, FOO, network_id1);
+
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
+
+    val amount = _mint(ft_account, ft_asset);
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
+
+    rell.test.tx()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft4_token_to_evm(network_id1, ft_asset.id, amount / 2, evm_address))
+        .sign(rell.test.keypairs.alice).run();
+
+    // withdrawal to FOO token contract, by default
+    assert_withdraw(1, evm_address, amount / 2, asset = FOO);
+    // no withdrawals to the CHR token contract
+    assert_true(empty(
+        hbridge.get_erc20_withdrawal(network_id1, CHR.token_address, evm_address)
+    ));
+
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount / 2);
+}
+
+function test_withdraw_to_ethereum_using_specific_erc20_token_address() {
+    val ft_asset = register_ft4_asset(CHR, network_id1);
+    register_erc20_asset(ft_asset, CHR, network_id1);
+    register_erc20_asset(ft_asset, FOO, network_id1);
+
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
+
+    val amount = _mint(ft_account, ft_asset);
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
+
+    rell.test.tx()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft4_token_to_evm_contract(network_id1, ft_asset.id, amount / 2, evm_address, CHR.token_address))
+        .sign(rell.test.keypairs.alice).run();
+
+    // withdrawal to CHR token contract
+    assert_withdraw(1, evm_address, amount / 2, asset = CHR);
+    // no withdrawals to the FOO token contract
+    assert_true(empty(
+        hbridge.get_erc20_withdrawal(network_id1, FOO.token_address, evm_address)
+    ));
+
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount / 2);
+}
+
 function test_can_not_withdraw_to_ethereum_without_linked_token() {
     val asset_id = (CHR.token_name, chain_context.blockchain_rid).hash();
     rell.test.tx().op(
@@ -41,27 +72,9 @@ function test_can_not_withdraw_to_ethereum_without_linked_token() {
     ).sign(admin_privkey).run();
     val ft_asset = assets.Asset(asset_id);
 
-    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
-    val account_id = rell.test.pubkeys.alice.hash();
-    rell.test.tx().op(
-        admin.external.register_account(auth_descriptor)
-    ).sign(admin_privkey).run();
-    val ft_account = accounts.Account(account_id);
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
 
-    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
-    link_account(
-        rell.test.keypairs.eve,
-        rell.test.keypairs.alice,
-        account_id,
-        auth_descriptor.hash()
-    );
-
-    val amount = 10000000000000000000L;
-
-    rell.test.tx().op(
-        admin.external.mint(account_id, ft_asset.id, amount)
-    ).sign(admin_privkey).run();
-
+    val amount = _mint(ft_account, ft_asset);
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
 
     rell.test.tx()
@@ -74,21 +87,9 @@ function test_can_not_withdraw_to_ethereum_without_linked_token() {
 function test_can_not_withdraw_to_ethereum_without_linked_account() {
     val ft_asset = register_foreign_asset();
 
-    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
-    val account_id = rell.test.pubkeys.alice.hash();
-    rell.test.tx().op(
-        admin.external.register_account(auth_descriptor)
-    ).sign(admin_privkey).run();
-    val ft_account = accounts.Account(account_id);
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address(false);
 
-    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
-
-    val amount = 10000000000000000000L;
-
-    rell.test.tx().op(
-        admin.external.mint(account_id, ft_asset.id, amount)
-    ).sign(admin_privkey).run();
-
+    val amount = _mint(ft_account, ft_asset);
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
 
     rell.test.tx()
@@ -100,21 +101,7 @@ function test_can_not_withdraw_to_ethereum_without_linked_account() {
 
 function test_can_not_withdraw_to_ethereum_with_insufficient_balance() {
     val ft_asset = register_foreign_asset();
-
-    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
-    val account_id = rell.test.pubkeys.alice.hash();
-    rell.test.tx().op(
-        admin.external.register_account(auth_descriptor)
-    ).sign(admin_privkey).run();
-    val ft_account = accounts.Account(account_id);
-
-    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
-    link_account(
-        rell.test.keypairs.eve,
-        rell.test.keypairs.alice,
-        account_id,
-        auth_descriptor.hash()
-    );
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
 
     rell.test.tx()
         .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
@@ -125,21 +112,7 @@ function test_can_not_withdraw_to_ethereum_with_insufficient_balance() {
 
 function test_can_not_withdraw_negative_or_zero_amount_to_ethereum() {
     val ft_asset = register_foreign_asset();
-
-    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
-    val account_id = rell.test.pubkeys.alice.hash();
-    rell.test.tx().op(
-        admin.external.register_account(auth_descriptor)
-    ).sign(admin_privkey).run();
-    val ft_account = accounts.Account(account_id);
-
-    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
-    link_account(
-        rell.test.keypairs.eve,
-        rell.test.keypairs.alice,
-        account_id,
-        auth_descriptor.hash()
-    );
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
 
     // 0
     rell.test.tx()
@@ -154,4 +127,40 @@ function test_can_not_withdraw_negative_or_zero_amount_to_ethereum() {
         .op(hbridge.bridge_ft4_token_to_evm(network_id1, ft_asset.id, -1L, evm_address))
         .sign(rell.test.keypairs.alice)
         .run_must_fail("Parameter amount: value must be non-zero positive, actual: -1");
+}
+
+function _register_ft_account_and_link_evm_address(link_evm_account: boolean = true) {
+    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val account_id = rell.test.pubkeys.alice.hash();
+    rell.test.tx().op(
+        admin.external.register_account(auth_descriptor)
+    ).sign(admin_privkey).run();
+    val ft_account = accounts.Account(account_id);
+
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+
+    if (link_evm_account) {
+        link_account(
+            rell.test.keypairs.eve,
+            rell.test.keypairs.alice,
+            account_id,
+            auth_descriptor.hash()
+        );
+    }
+
+    return (
+        auth_descriptor = auth_descriptor,
+        ft_account = ft_account,
+        evm_address = evm_address,
+    );
+}
+
+function _mint(accounts.account, assets.asset) {
+    val amount = 10000000000000000000L;
+
+    rell.test.tx().op(
+        admin.external.mint(account.id, asset.id, amount)
+    ).sign(admin_privkey).run();
+
+    return amount;
 }
