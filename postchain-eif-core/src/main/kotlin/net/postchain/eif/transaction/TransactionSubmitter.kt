@@ -427,7 +427,7 @@ open class TransactionSubmitter(
                 transaction.nonce,
                 transaction.gas,
                 transactionHandler.fromAddress,
-                0.toBigInteger(),
+                BigInteger.ZERO,
                 "",
                 maxPriorityFeePerGas,
                 maxFeePerGas,

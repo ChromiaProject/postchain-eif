@@ -128,7 +128,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                 }
 
                 if (newTxStatus == RellTransactionStatus.QUEUED && currentTxStatus != RellTransactionStatus.TAKEN) {
-                    logger.warn { "Validation failed. Only rell or a the node submitting a transaction can set status to ${RellTransactionStatus.QUEUED}" }
+                    logger.warn { "Validation failed. Only rell or the node submitting a transaction can set status to ${RellTransactionStatus.QUEUED}" }
                     return false
                 }
 

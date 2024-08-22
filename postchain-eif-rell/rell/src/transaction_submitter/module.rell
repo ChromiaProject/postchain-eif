@@ -374,7 +374,6 @@ function update_transaction_status(row_id: integer, status: transaction_status, 
                     cost = transaction.gas_usage * transaction.effective_gas_price,
                     currency_symbol = transaction.currency_symbol).to_gtv());
         } else {
-            log("NO COST");
             transaction.processed_by = x"";
         }
         on_transaction_completed(transaction, status);
