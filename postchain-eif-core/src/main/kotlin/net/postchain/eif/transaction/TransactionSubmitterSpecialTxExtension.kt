@@ -74,6 +74,9 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
             ops: List<OpData>
     ): Boolean {
 
+        removeCompletedTxs(bctx)
+        removeTxsWithUpdatedProcessedByValue(bctx)
+
         if (!isNoOpValid(ops, bctx.height)) {
             logger.warn { "Validation failed. Invalid no op. Operations: $ops" }
             return false
