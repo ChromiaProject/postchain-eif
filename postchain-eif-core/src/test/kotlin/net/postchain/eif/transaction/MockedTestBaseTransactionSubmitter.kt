@@ -16,7 +16,6 @@ import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito
 import org.mockito.kotlin.any
-import org.mockito.kotlin.argThat
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.doThrow
@@ -33,9 +32,6 @@ import org.web3j.tx.TransactionManager
 import java.math.BigInteger
 import java.util.Optional
 import java.util.concurrent.LinkedBlockingQueue
-import kotlin.reflect.KClass
-import kotlin.reflect.jvm.ExperimentalReflectionOnLambdas
-import kotlin.reflect.jvm.reflect
 
 open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
 
@@ -61,20 +57,6 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
 
         testLogAppender = TestLogAppender.addAppender(listOf(Level.WARN, Level.ERROR))
         testLogAppender.clear()
-    }
-
-    @OptIn(ExperimentalReflectionOnLambdas::class)
-    fun <T : Response<*>> mockWeb3jRequest(
-            web3jRequestHandler: Web3jRequestHandler,
-            kClass: KClass<T>,
-            mock: T
-    ) {
-
-        Mockito.`when`(web3jRequestHandler.sendWeb3jRequest<T>(argThat { arg ->
-            arg != null && arg.reflect()!!.returnType.arguments[1].type!!.classifier == kClass
-        })).doAnswer {
-            mock
-        }
     }
 
     fun createTransactionManager(

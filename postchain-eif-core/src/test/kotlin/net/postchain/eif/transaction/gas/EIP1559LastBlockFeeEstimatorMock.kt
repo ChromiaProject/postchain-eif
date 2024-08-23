@@ -1,6 +1,6 @@
 package net.postchain.eif.transaction.gas
 
-import mockWeb3jRequestHandler
+import net.postchain.eif.transaction.mockWeb3jRequestHandler
 import net.postchain.eif.transaction.EvmSubmitTxRequest
 import java.math.BigDecimal
 import java.math.BigInteger

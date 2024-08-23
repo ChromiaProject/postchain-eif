@@ -39,7 +39,7 @@ class EIP1559LastBlockFeeEstimator(
     init {
 
         val block = try {
-            web3jRequestHandler.sendWeb3jRequest { it.ethGetBlockByNumber(DefaultBlockParameterName.LATEST, false) }
+            web3jRequestHandler.ethGetBlockByNumber(DefaultBlockParameterName.LATEST, false)
                     .block
         } catch (e: Exception) {
             val errorMessage = "Failed to get latest evm block: ${e.message}"
@@ -92,9 +92,7 @@ class EIP1559LastBlockFeeEstimator(
                 maxFeePerGas
         )
         return try {
-            web3jRequestHandler.sendWeb3jRequest {
-                it.ethEstimateGas(transaction)
-            }.amountUsed
+            web3jRequestHandler.ethEstimateGas(transaction).amountUsed
         } catch (e: Exception) {
             val errorMessage = "Failed to estimate gas usage: ${e.message}"
             logger.error(e) { errorMessage }
@@ -104,7 +102,7 @@ class EIP1559LastBlockFeeEstimator(
 
     private fun getWalletBalance(fromAddress: String): BigInteger {
         return try {
-            web3jRequestHandler.sendWeb3jRequest { it.ethGetBalance(fromAddress, DefaultBlockParameterName.LATEST) }
+            web3jRequestHandler.ethGetBalance(fromAddress, DefaultBlockParameterName.LATEST)
                     .balance
         } catch (e: Exception) {
             val errorMessage = "Failed to get balance for request: ${e.message}"
@@ -117,7 +115,7 @@ class EIP1559LastBlockFeeEstimator(
         // estimate of how much you can pay as a priority fee to get a transaction included in the current block.
         // https://docs.alchemy.com/reference/eth-maxpriorityfeepergas
         try {
-            val maxPriorityFeePerGas = web3jRequestHandler.sendWeb3jRequest { it.ethMaxPriorityFeePerGas() }
+            val maxPriorityFeePerGas = web3jRequestHandler.ethMaxPriorityFeePerGas()
                     .maxPriorityFeePerGas
             val maxPriorityFeePerGasWithMargin = maxPriorityFeePerGas
                     .add(maxPriorityFeePerGas.toBigDecimal().times(priorityFeePerGasMargin).toBigInteger())

@@ -7,16 +7,13 @@ import assertk.assertions.isTrue
 import net.postchain.eif.Web3jRequestHandler
 import org.apache.logging.log4j.Level
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.mock
-import org.web3j.protocol.Web3j
-import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.methods.response.EthBlockNumber
-import org.web3j.protocol.core.methods.response.EthGetBalance
-import org.web3j.protocol.core.methods.response.EthGetTransactionReceipt
-import org.web3j.protocol.core.methods.response.EthTransaction
 import java.lang.reflect.AccessibleObject
 import java.math.BigInteger
 
@@ -28,15 +25,18 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         val blockNumber = mock<EthBlockNumber> {
             on { blockNumber } doReturn BigInteger.valueOf(10)
         }
+        val txReceipt = mockTransactionReceiptResponse(5, true)
 
         val web3jRequestHandler = mock<Web3jRequestHandler> {
-            on { sendWeb3jRequest(requestFactory = any<(Web3j) -> Request<*, EthGetBalance>>()) } doThrow RuntimeException(
+            on { ethGetBalance(any(), any()) } doThrow RuntimeException(
                     "Oh dear"
             )
+            on { ethGetTransactionReceipt(any()) } doReturn txReceipt
+            on { ethBlockNumber() } doReturn blockNumber
+            on { ethGetTransactionByHash(any()) } doThrow RuntimeException(
+                "Oh dear"
+            )
         }
-        mockWeb3jRequest(web3jRequestHandler, EthGetTransactionReceipt::class, mockTransactionReceiptResponse(5, true))
-
-        mockWeb3jRequest(web3jRequestHandler, EthBlockNumber::class, blockNumber)
 
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
@@ -57,7 +57,17 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
     @Test
     fun `fail verifying transaction`() {
 
-        val web3jRequestHandler = mock<Web3jRequestHandler>()
+        val web3jRequestHandler = mock<Web3jRequestHandler> {
+            on { ethBlockNumber() } doAnswer {
+                mockBlockNumber(BigInteger.valueOf(20))
+            }
+            on { ethGetTransactionByHash(any()) } doAnswer {
+                mockEthTransactionResponse("contract-address-no-match", "0x4c6240000")
+            }
+            on { ethGetTransactionReceipt(any()) } doAnswer {
+                mockTransactionReceiptResponse(5, true)
+            }
+        }
 
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
@@ -67,10 +77,6 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
 
         val txPending = mkEvmPendingDbTx(10)
         txPending.blockNumber = BigInteger.TEN
-
-        mockWeb3jRequest(web3jRequestHandler, EthBlockNumber::class, mockBlockNumber(BigInteger.valueOf(20)))
-        mockWeb3jRequest(web3jRequestHandler, EthTransaction::class, mockEthTransactionResponse("contract-address-no-match", "0x4c6240000"))
-        mockWeb3jRequest(web3jRequestHandler, EthGetTransactionReceipt::class, mockTransactionReceiptResponse(5, true))
 
         ts.pollPendingTransaction(txPending, BigInteger.valueOf(15))
 
@@ -82,7 +88,20 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
     @Test
     fun `reverted transaction`() {
 
-        val web3jRequestHandler = mock<Web3jRequestHandler>()
+        val web3jRequestHandler = mock<Web3jRequestHandler> {
+            on { ethBlockNumber() } doAnswer {
+                mockBlockNumber(BigInteger.TEN)
+            }
+            on { ethGetTransactionByHash(any()) } doAnswer {
+                mockEthTransactionResponse(
+                        "contractAddress",
+                        "0x9329efad000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000101010101010101010101010101010101010101"
+                )
+            }
+            on { ethGetTransactionReceipt(any()) } doAnswer {
+                mockTransactionReceiptResponse(5, false)
+            }
+        }
 
         val ts = createTransactionSubmitter(
                 web3jRequestHandler,
@@ -92,12 +111,6 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
 
         val txPending = mkEvmPendingDbTx(5)
 
-        mockWeb3jRequest(web3jRequestHandler, EthGetTransactionReceipt::class, mockTransactionReceiptResponse(5, false))
-        mockWeb3jRequest(web3jRequestHandler, EthBlockNumber::class, mockBlockNumber(BigInteger.TEN))
-        mockWeb3jRequest(web3jRequestHandler, EthTransaction::class, mockEthTransactionResponse(
-                "contractAddress",
-                "0x9329efad000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000101010101010101010101010101010101010101"
-        ))
         ts.pollPendingTransaction(txPending, BigInteger.valueOf(ts.nodeTxVerificationEvmBlocks + 15))
 
         assertThat(txPending.status).isEqualTo(PendingTxStatus.REVERTED)
@@ -119,24 +132,30 @@ class TransactionSubmitterPendingTest : MockedTestBaseTransactionSubmitter() {
         val txPending = mkEvmPendingDbTx()
 
         // First poll - get receipt and store block number
-        mockWeb3jRequest(web3jRequestHandler, EthGetTransactionReceipt::class, mockTransactionReceiptResponse(5, true))
+        Mockito.`when`(web3jRequestHandler.ethGetTransactionReceipt(any())).doAnswer {
+            mockTransactionReceiptResponse(5, true)
+        }
         ts.pollPendingTransaction(txPending, BigInteger.valueOf(5))
 
         assertThat(txPending.blockNumber!!.toLong()).isEqualTo(5)
         assertThat(txPending.status).isEqualTo(PendingTxStatus.VERIFYING)
 
         // Second poll with block number 6 - nothing has changed since we wait for 5 blocks
-        mockWeb3jRequest(web3jRequestHandler, EthBlockNumber::class, mockBlockNumber(BigInteger.valueOf(6)))
+        Mockito.`when`(web3jRequestHandler.ethBlockNumber()).doAnswer {
+            mockBlockNumber(6.toBigInteger())
+        }
         ts.pollPendingTransaction(txPending, BigInteger.valueOf(6))
 
         assertThat(txPending.blockNumber!!.toLong()).isEqualTo(5)
         assertThat(txPending.status).isEqualTo(PendingTxStatus.VERIFYING)
 
         // Third poll with block number 10 - evm has built 5 blocks - lets verify everything
-        mockWeb3jRequest(web3jRequestHandler, EthTransaction::class, mockEthTransactionResponse(
-                "contractAddress",
-                "0x9329efad000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000101010101010101010101010101010101010101"
-        ))
+        Mockito.`when`(web3jRequestHandler.ethGetTransactionByHash(any())).doAnswer {
+            mockEthTransactionResponse(
+                    "contractAddress",
+                    "0x9329efad000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000101010101010101010101010101010101010101"
+            )
+        }
         ts.pollPendingTransaction(txPending, BigInteger.valueOf(10))
 
         assertThat(txPending.blockNumber!!.toLong()).isEqualTo(5)
