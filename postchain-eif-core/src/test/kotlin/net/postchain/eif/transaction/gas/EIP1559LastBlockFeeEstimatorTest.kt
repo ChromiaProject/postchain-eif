@@ -2,7 +2,7 @@ package net.postchain.eif.transaction.gas
 
 import assertk.assertThat
 import assertk.assertions.isEqualTo
-import mockWeb3jRequestHandler
+import net.postchain.eif.transaction.mockWeb3jRequestHandler
 import org.junit.jupiter.api.Test
 import java.math.BigInteger
 

@@ -351,7 +351,7 @@ class EvmEventProcessor(
 
         if (skipToHeight < BigInteger.ZERO) {
 
-            val blockNumberReply = web3jRequestHandler.sendWeb3jRequest { it.ethBlockNumber() }
+            val blockNumberReply = web3jRequestHandler.ethBlockNumber()
             return blockNumberReply.blockNumber.plus(skipToHeight)
         }
 

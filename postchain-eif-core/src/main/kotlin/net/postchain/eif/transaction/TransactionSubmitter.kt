@@ -149,12 +149,10 @@ open class TransactionSubmitter(
     private fun healthCheck() {
         val walletBalance = try {
             // This will implicitly test our RPC connections
-            web3jRequestHandler.sendWeb3jRequest {
-                it.ethGetBalance(
+            web3jRequestHandler.ethGetBalance(
                         transactionManagers.values.first().fromAddress,
                         DefaultBlockParameterName.LATEST
                 )
-            }
         } catch (e: Exception) {
             val previouslyHealthy = healthy.getAndSet(false)
             if (previouslyHealthy) {
@@ -181,7 +179,7 @@ open class TransactionSubmitter(
         if (pendingTransactions.isNotEmpty()) {
 
             val currentBlockHeight = try {
-                web3jRequestHandler.sendWeb3jRequest { it.ethBlockNumber() }.blockNumber
+                web3jRequestHandler.ethBlockNumber().blockNumber
             } catch (e: Exception) {
                 logger.error("Unable to query for current EVM block number. Will retry next poll.", e)
                 return
@@ -210,7 +208,7 @@ open class TransactionSubmitter(
 
             val txReceiptResult = fetchTransactionReceipt(txPending.txHash, txPending.rowId)
 
-            if (txReceiptResult != null && txReceiptResult.transactionReceipt.isPresent) {
+            if (txReceiptResult.transactionReceipt.isPresent) {
 
                 txReceipt = txReceiptResult.transactionReceipt.get()
                 txPending.blockNumber = txReceipt.blockNumber
@@ -227,7 +225,7 @@ open class TransactionSubmitter(
 
                 val txReceiptResult = fetchTransactionReceipt(txPending.txHash, txPending.rowId)
 
-                    if (txReceiptResult != null && txReceiptResult.transactionReceipt.isPresent) {
+                    if (txReceiptResult.transactionReceipt.isPresent) {
                         txReceipt = txReceiptResult.transactionReceipt.get()
                     }
                 } else {
@@ -284,7 +282,7 @@ open class TransactionSubmitter(
         logger.info { "Verify structure of transaction ${txPending.rowId}" }
 
         val transactionByHashResponse =
-                web3jRequestHandler.sendWeb3jRequest { it.ethGetTransactionByHash(txPending.txHash) }
+                web3jRequestHandler.ethGetTransactionByHash(txPending.txHash)
         if (transactionByHashResponse.transaction.isPresent) {
 
             val transaction = transactionByHashResponse.transaction.get()
@@ -309,7 +307,7 @@ open class TransactionSubmitter(
 
     private fun fetchTransactionReceipt(txHash: String, rowId: Long) =
             try {
-                web3jRequestHandler.sendWeb3jRequest { it.ethGetTransactionReceipt(txHash) }
+                web3jRequestHandler.ethGetTransactionReceipt(txHash)
             } catch (e: Exception) {
                 val errorMessage = "Failed to poll for receipt for request id $rowId on network $networkId: ${e.message}"
                 logger.error(e) { errorMessage }

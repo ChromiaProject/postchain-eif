@@ -6,8 +6,17 @@ import mu.KLogging
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.eif.metrics.RpcUsageMetrics
 import org.web3j.protocol.Web3j
+import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.Response
+import org.web3j.protocol.core.methods.request.Transaction
+import org.web3j.protocol.core.methods.response.EthBlock
+import org.web3j.protocol.core.methods.response.EthBlockNumber
+import org.web3j.protocol.core.methods.response.EthEstimateGas
+import org.web3j.protocol.core.methods.response.EthGetBalance
+import org.web3j.protocol.core.methods.response.EthGetTransactionReceipt
+import org.web3j.protocol.core.methods.response.EthMaxPriorityFeePerGas
+import org.web3j.protocol.core.methods.response.EthTransaction
 import org.web3j.protocol.exceptions.ClientConnectionException
 import java.io.Closeable
 import kotlin.coroutines.coroutineContext
@@ -93,5 +102,33 @@ open class Web3jRequestHandler(
 
     override fun close() {
         web3jServices.forEach { it.shutdown() }
+    }
+
+    open fun ethBlockNumber(): EthBlockNumber {
+        return sendWeb3jRequest { it.ethBlockNumber() }
+    }
+
+    open fun ethEstimateGas(transaction: Transaction): EthEstimateGas {
+        return sendWeb3jRequest { it.ethEstimateGas(transaction) }
+    }
+
+    open fun ethGetTransactionReceipt(transactionHash: String): EthGetTransactionReceipt {
+        return sendWeb3jRequest { it.ethGetTransactionReceipt(transactionHash) }
+    }
+
+    open fun ethMaxPriorityFeePerGas(): EthMaxPriorityFeePerGas {
+        return sendWeb3jRequest { it.ethMaxPriorityFeePerGas() }
+    }
+
+    open fun ethGetBalance(address: String, defaultBlockParameter: DefaultBlockParameter): EthGetBalance {
+        return sendWeb3jRequest { it.ethGetBalance(address, defaultBlockParameter) }
+    }
+
+    open fun ethGetBlockByNumber(defaultBlockParameter: DefaultBlockParameter, returnFullTransactionObjects: Boolean): EthBlock {
+        return sendWeb3jRequest { it.ethGetBlockByNumber(defaultBlockParameter, returnFullTransactionObjects) }
+    }
+    
+    open fun ethGetTransactionByHash(transactionHash: String): EthTransaction {
+        return sendWeb3jRequest { it.ethGetTransactionByHash(transactionHash) }
     }
 }

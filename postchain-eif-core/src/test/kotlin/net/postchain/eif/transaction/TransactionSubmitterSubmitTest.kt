@@ -2,7 +2,6 @@ package net.postchain.eif.transaction
 
 import assertk.assertThat
 import assertk.assertions.isEqualTo
-import mockWeb3jRequestHandler
 import net.postchain.eif.Web3jRequestHandler
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
