@@ -337,18 +337,7 @@ open class TransactionSubmitter(
                 throw ProgrammerMistake(errorMessage, e)
             }
 
-    internal fun submitTransaction(transactionRequest: EvmSubmitTxRequest) {
-        try {
-            sendTransaction(transactionRequest)
-        } catch (e: Exception) {
-
-            val errorMessage = e.message ?: "Unknown error"
-            logger.error(e) { errorMessage }
-            throw e
-        }
-    }
-
-    private fun sendTransaction(txRequest: EvmSubmitTxRequest) {
+    internal fun submitTransaction(txRequest: EvmSubmitTxRequest) {
 
         logger.info { "Submitting transaction ${txRequest.rowId} on network $networkId" }
 
@@ -394,16 +383,6 @@ open class TransactionSubmitter(
     }
 
     internal fun cancelTransaction(txPending: EvmPendingTx) {
-        try {
-            sendCancelTransaction(txPending)
-        } catch (e: Exception) {
-            val errorMessage = e.message ?: "Unknown error"
-            logger.error(e) { errorMessage }
-            throw e
-        }
-    }
-
-    private fun sendCancelTransaction(txPending: EvmPendingTx) {
 
         logger.info { "Cancelling transaction ${txPending.rowId} / ${txPending.txHash}" }
 
