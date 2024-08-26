@@ -110,7 +110,7 @@ function emit_erc20_state(state_slot: state_slot, balance_records: list<balance_
     state_parts.add(ERC20_STATE_TAG.to_gtv());
     state_parts.add(state_slot_data.network_id.to_gtv());
     state_parts.add(state_slot_data.recipient_address.to_gtv());
-    //state_parts.add(state_slot_data.bridge_address.to_gtv()); // TODO: add this
+    state_parts.add(ERC20_STATE_TAG.to_gtv()); // TODO: this is reserved for bridge contract address
     
     for (balance_record in balance_records) {
         state_parts.add(balance_record.token_address.to_gtv());
@@ -178,19 +178,47 @@ function emit_local_erc20_state_slot(state_slot) {
     }
 }
 
+/*
+ * A remote state slots are used to track balances in other blockchains on Chromia
+ * which are downstream of the bridge.
+ * 
+ * Given that we don't update balances synchronously, remote might be slightly out of sync.
+ * We still need to enforce that the sum of balances in remote state slots is is less than 
+ * or equal to the balance of the downstream blockchain.
+ * Updates which violate these balance make state slots temporarily inactive.
+ * They can be reactivated when the remote balance is updated.
+ **/
+
+/*
+
+ // Implementation of remote state slots is not part of the current release,
+ // the commented out code is a sketch for the future implementation.
+
+entity remote_blokchain_erc20_state_sum {
+    key blockchain_rid: byte_array, erc20_asset;
+    mutable amount: big_integer;
+}
+
 entity remote_erc20_state_slot {
     key state_slot;
     blockchain_rid: byte_array;
     erc20_asset;
     mutable balance: big_integer;
+    mutable active: boolean; // slot is inactive when 
 }
 
 function emit_remote_erc20_state_slot(slot: remote_erc20_state_slot) {
-    val state_slot_data = slot.to_struct();
+    val state_data = slot.to_struct();
     val balance_records = list<balance_record>();
-    if (state_slot_data.balance > 0) {
-        balance_records.add(balance_record(state_slot_data.blockchain_rid, state_slot_data.balance));
+    if (state_data.balance > 0) {
+        balance_records.add(balance_record(state_data.erc20_asset.token_address, state_data.balance));
     }
-    emit_erc20_state(state_slot_data.state_slot, balance_records);
+    emit_erc20_state(state_data.state_slot, balance_records);
 }
 
+function update_remote_erc20_state_slot(slot: remote_erc20_state_slot, balance: big_integer) {
+    val old_balance = slot.balance;
+    val delta = balance - old_balance;
+    val sum = remote_blokchain_erc20_state_sum @ { slot.blockchain_rid, slot.erc20_asset } .amount;
+}    
+*/

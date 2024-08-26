@@ -17,7 +17,7 @@ import "./IValidator.sol";
 // Some instructions are also not allowed. Read more at: https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable
 // Note: To enhance the security & decentralization, we should call transferOwnership() to external multi-sig owner after deploy the smart contract
 contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeable, ReentrancyGuardUpgradeable {
-    uint8 constant ERC20_ACCOUNT_STATE_BYTE_SIZE = 64;
+    
     uint constant EMERGENCY_DURATION = 90 days;
 
     using Postchain for bytes32;
@@ -57,16 +57,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     struct PostchainBlock {
         uint height;
         bytes32 blockRid;
-    }
-
-    struct ERC20AccountState {
-        IERC20 token;
-        uint amount;
-    }
-
-    struct AccountStateNumber {
-        uint blockHeight;
-        uint accountNumber;
     }
 
     event Initialize(IValidator indexed _validator, uint256 _withdrawOffset);
