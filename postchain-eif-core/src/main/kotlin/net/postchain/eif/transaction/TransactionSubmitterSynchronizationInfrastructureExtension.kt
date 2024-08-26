@@ -99,6 +99,7 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                                 appConfig.healthCheckInterval,
                                 networkBlockchainConfig.nodeTxVerificationEvmBlocks,
                                 networkBlockchainConfig.txVerificationTime,
+                                networkBlockchainConfig.cancelFeeMargin,
                         )
                         transactionSubmitters[networkId] = transactionSubmitter
                         ext.addTransactionSubmitter(transactionSubmitter, networkId)

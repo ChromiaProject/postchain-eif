@@ -30,6 +30,7 @@ import org.web3j.protocol.core.methods.response.EthTransaction
 import org.web3j.protocol.core.methods.response.Transaction
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.tx.RawTransactionManager
+import java.math.BigDecimal
 import java.math.BigInteger
 import java.util.Optional
 import java.util.concurrent.LinkedBlockingQueue
@@ -170,6 +171,7 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
                 -1,
                 5,
                 0,
+                BigDecimal("1.1"),
         )
     }
 

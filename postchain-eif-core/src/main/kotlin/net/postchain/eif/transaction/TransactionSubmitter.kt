@@ -55,6 +55,7 @@ open class TransactionSubmitter(
         val healthCheckInterval: Long,
         val nodeTxVerificationEvmBlocks: Long,
         val txVerificationTime: Long,
+        val cancelFeeMargin: BigDecimal,
 ) : Shutdownable {
 
     companion object : KLogging() {
@@ -85,7 +86,8 @@ open class TransactionSubmitter(
         logger.info {
             "Initializing transaction submitter - chainId: $chainId, networkId: $networkId, " +
                     "txPollInterval: $txPollInterval, healthCheckInterval: $healthCheckInterval, " +
-                    "nodeTxVerificationEvmBlocks: $nodeTxVerificationEvmBlocks, txVerificationTime: $txVerificationTime"
+                    "cancelFeeMargin: $cancelFeeMargin, nodeTxVerificationEvmBlocks: $nodeTxVerificationEvmBlocks, " +
+                    "txVerificationTime: $txVerificationTime"
         }
 
         // Add transactions to queue and recover states lost on node restart
@@ -399,8 +401,8 @@ open class TransactionSubmitter(
         }
 
         //  We need to increase gas fees by 10% for the network to accept the replacement
-        val maxPriorityFeePerGas = multiplyAndRoundUp(transaction.maxPriorityFeePerGas, BigDecimal("1.1"))
-        val maxFeePerGas = multiplyAndRoundUp(transaction.maxFeePerGas, BigDecimal("1.1"))
+        val maxPriorityFeePerGas = multiplyAndRoundUp(transaction.maxPriorityFeePerGas, cancelFeeMargin)
+        val maxFeePerGas = multiplyAndRoundUp(transaction.maxFeePerGas, cancelFeeMargin)
 
         logger.info { "Sending cancel transaction for ${txPending.rowId} / ${txPending.txHash} " +
                 "gasLimit: ${transaction.gas}, maxPriorityFeePerGas: $maxPriorityFeePerGas (prev. ${transaction.maxPriorityFeePerGas}), maxFeePerGas: $maxFeePerGas (prev. ${transaction.maxFeePerGas})" }
