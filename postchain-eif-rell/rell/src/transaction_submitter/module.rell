@@ -357,11 +357,7 @@ function update_transaction_status(row_id: integer, status: transaction_status, 
         require(transaction.processed_by == signer, "Only the node currently processing the transaction can change the status to PENDING");
         require(tx_hash, "Status PENDING requires providing transaction hash");
 
-        if (tx_hash != transaction.tx_hash) {
-            require(transaction.tx_hash == "", "Transaction hash can only be set once");
-            transaction.tx_hash = tx_hash;
-        }
-
+        transaction.tx_hash = tx_hash;
         transaction.processed_by = signer;
 
     } else if (status == transaction_status.SUCCESS or status == transaction_status.FAILURE) {

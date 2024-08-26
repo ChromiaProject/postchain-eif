@@ -31,7 +31,7 @@ class TransactionSubmitterSubmitRetryIT : EifBaseIntegrationTest(
     }
 
     @Test
-    fun `submit transaction fails 2 times and then succeeds`() {
+    fun `1 node - submit transaction fails 2 times and then succeeds`() {
 
         // Deploy validator contract
         val encodedConstructor =

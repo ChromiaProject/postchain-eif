@@ -30,7 +30,9 @@ import org.web3j.crypto.RawTransaction
 import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.utils.Numeric
+import java.math.BigDecimal
 import java.math.BigInteger
+import java.math.RoundingMode
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.Collections
@@ -396,9 +398,12 @@ open class TransactionSubmitter(
             throw ProgrammerMistake("Transaction ${txPending.rowId} / ${txPending.txHash} confirmed in block ${transaction.blockNumber} and can't be cancelled")
         }
 
-        // We need to increase gas fee by 10% and priority fee by 1 for the node to accept the replacement
-        val maxPriorityFeePerGas = transaction.maxPriorityFeePerGas.add(BigInteger.ONE)
-        val maxFeePerGas = transaction.maxFeePerGas.toBigDecimal().multiply(1.1.toBigDecimal()).toBigInteger()
+        //  We need to increase gas fees by 10% for the network to accept the replacement
+        val maxPriorityFeePerGas = multiplyAndRoundUp(transaction.maxPriorityFeePerGas, BigDecimal("1.1"))
+        val maxFeePerGas = multiplyAndRoundUp(transaction.maxFeePerGas, BigDecimal("1.1"))
+
+        logger.info { "Sending cancel transaction for ${txPending.rowId} / ${txPending.txHash} " +
+                "gasLimit: ${transaction.gas}, maxPriorityFeePerGas: $maxPriorityFeePerGas (prev. ${transaction.maxPriorityFeePerGas}), maxFeePerGas: $maxFeePerGas (prev. ${transaction.maxFeePerGas})" }
 
         // We will also remove the function data and set our own address instead of contract address to simplify the transaction
         val rawTransaction = RawTransaction.createTransaction(
@@ -506,5 +511,11 @@ open class TransactionSubmitter(
 
     open fun cancelPendingTx(txPending: EvmPendingTx) {
         cancelQueue.offer(txPending)
+    }
+
+    private fun multiplyAndRoundUp(value: BigInteger, multiplicand: BigDecimal): BigInteger {
+        return value.toBigDecimal()
+                .multiply(multiplicand)
+                .setScale(0, RoundingMode.UP).toBigInteger()
     }
 }

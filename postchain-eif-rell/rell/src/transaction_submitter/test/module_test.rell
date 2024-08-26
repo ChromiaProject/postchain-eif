@@ -385,10 +385,6 @@ function test_update_evm_transaction_status_tx_hash() {
         update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.PENDING, x"01", tx_hash = "00")
     ).run();
 
-    rell.test.tx().op(
-        update_evm_transaction_status_op(tx_row_id.to_integer(), transaction_status.PENDING, x"01", tx_hash = "01")
-    ).run_must_fail("Transaction hash can only be set once");
-
     assert_equals(evm_submit_transaction @ { tx_row_id } ( .tx_hash ), "00");
 }
 
