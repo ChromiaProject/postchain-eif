@@ -180,7 +180,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         return true;
     }
 
-    function isContract(address addr) internal returns (bool) {
+    function isContract(address addr) internal view returns (bool) {
         // Note: We are aware of the fact that this might return false even when the address is a contract.
         // It is fine for our purposes. We want to prevent EOA from calling depositToAccountID.
         return addr.code.length > 0;

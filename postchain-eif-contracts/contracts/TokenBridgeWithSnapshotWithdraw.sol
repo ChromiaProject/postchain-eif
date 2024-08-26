@@ -34,18 +34,12 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
     function withdrawBySnapshot(
         bytes calldata snapshot,
         Data.Proof memory stateProof,
-        bytes memory blockHeader,
-        bytes[] memory sigs,
-        address[] memory signers,
         Data.ExtraProofData memory extraProof
     ) public virtual whenMassExit whenNotPaused nonReentrant {
         require(_snapshots[stateProof.leaf] == false, "TokenBridge: snapshot already used");
         require(stateProof.leaf == keccak256(snapshot), "TokenBridge: snapshot data is not correct");
         require(Hash.hashGtvBytes64Leaf(extraProof.leaf) == extraProof.hashedLeaf, "Postchain: invalid EIF extra data");
-        (uint height, bytes32 blockRid) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
         bytes32 stateRoot = _bytesToBytes32(extraProof.leaf, 32);
-        require(blockRid == massExitBlock.blockRid && height == massExitBlock.height, "TokenBridge: snapshot block should be the same with mass exit block");
-        if (!validator.isValidSignatures(blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
         if (!MerkleProof.verify(stateProof.merkleProofs, stateProof.leaf, stateProof.position, stateRoot))
             revert("TokenBridge: invalid merkle proof");
 
