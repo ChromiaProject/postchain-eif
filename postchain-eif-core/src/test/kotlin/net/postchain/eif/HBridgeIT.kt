@@ -622,9 +622,6 @@ class HBridgeIT : EifBaseIntegrationTest() {
         bridge.withdrawBySnapshot(
                 stateProof.web3StateData(),
                 stateProof.web3StateProof(),
-                stateProof.web3BlockHeader(),
-                stateProof.web3Signatures(),
-                stateProof.web3Signers(),
                 stateProof.web3ExtraProofData()
         ).send()
 
@@ -641,9 +638,6 @@ class HBridgeIT : EifBaseIntegrationTest() {
         bridge.withdrawBySnapshot(
                 otherState.web3StateData(),
                 otherState.web3StateProof(),
-                otherState.web3BlockHeader(),
-                otherState.web3Signatures(),
-                otherState.web3Signers(),
                 otherState.web3ExtraProofData()
         ).send()
 
