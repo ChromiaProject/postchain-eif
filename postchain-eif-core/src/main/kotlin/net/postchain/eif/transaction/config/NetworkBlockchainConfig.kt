@@ -22,6 +22,9 @@ data class NetworkBlockchainConfig(
         @Name("priority_fee_per_gas_margin")            // Margin to be added to transaction priority fee per gas limit (estimated priority fee + margin)
         @DefaultValue(defaultDecimal = "0.000001")
         val priorityFeePerGasMargin: BigDecimal,
+        @Name("cancel_fee_margin")                      // Margin to be added to fee (base and priority) for cancel transactions
+        @DefaultValue(defaultDecimal = "1.1")
+        val cancelFeeMargin: BigDecimal,
         @Name("node_tx_verification_evm_blocks")        // Number of EVM blocks to await before verification
         @DefaultValue(100)
         val nodeTxVerificationEvmBlocks: Long,

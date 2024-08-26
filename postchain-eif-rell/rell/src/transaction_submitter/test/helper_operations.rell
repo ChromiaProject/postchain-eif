@@ -52,7 +52,8 @@ operation create_test_evm_submit_transaction(
     status: transaction_status,
     created: timestamp = 0,
     network_id: integer = 1,
-    taken_timestamp: integer = 0
+    taken_timestamp: integer = 0,
+    processed_by: pubkey = x"",
 ) {
     create evm_submit_transaction (
         id = id,
@@ -67,7 +68,9 @@ operation create_test_evm_submit_transaction(
         sender = x"",
         status = status,
         created = created,
-        taken_timestamp = taken_timestamp);
+        taken_timestamp = taken_timestamp,
+        processed_by = processed_by,
+    );
 }
 
 operation timeout_evm_transactions_op(){
@@ -77,3 +80,9 @@ operation timeout_evm_transactions_op(){
 operation bridge_mapping_message_op(bridge_mapping_message) {
     handle_bridge_mapping_message(x"", bridge_mapping_topic, bridge_mapping_message.to_gtv());
 }
+
+operation update_transaction_status_op(row_id: integer, status: transaction_status, tx_hash: text? = null, signer: pubkey = x"") {
+
+    update_transaction_status(row_id, status, tx_hash, signer);
+}
+

@@ -67,6 +67,7 @@ class TransactionSubmitterQueuedTransactionNoLongerTakenByNodeTestGTXModule : Tr
 
 class TransactionSubmitterPendingTransactionTestGTXModule : TransactionSubmitterTestGTXModule() {
     override fun initializeDB(ctx: EContext) {
+        val txHash = "0x69bd52e4dc62f87850eee57632793710bd9c7e1c25706ead6f68275fcace95ad"
         val transactionSubmitterDatabaseOperations = TransactionSubmitterDatabaseOperationsImpl()
         transactionSubmitterDatabaseOperations.initialize(ctx)
 
@@ -85,12 +86,18 @@ class TransactionSubmitterPendingTransactionTestGTXModule : TransactionSubmitter
                     .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_MAX_FEE_PER_GAS, 4)
                     .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_NETWORK_ID, 1337)
                     .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_SENDER, "".toByteArray())
-                    .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_HASH, "00")
+                    .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_HASH, txHash)
                     .set(TransactionSubmitterDatabaseOperationsImpl.EVM_TX_SUBMIT_COLUMN_BC_PERSISTED, true)
                     .execute()
         }
 
-        this.addTransaction(mkEvmSubmitTxRellRequest(0, "", RellTransactionStatus.PENDING, txHash = "tx-hash"))
+        this.addTransaction(mkEvmSubmitTxRellRequest(
+                0,
+                "",
+                RellTransactionStatus.PENDING,
+                txHash = txHash,
+                processedBy = "03A301697BDFCD704313BA48E51D567543F2A182031EFD6915DDC07BBCC4E16070".hexStringToByteArray()
+        ))
     }
 }
 

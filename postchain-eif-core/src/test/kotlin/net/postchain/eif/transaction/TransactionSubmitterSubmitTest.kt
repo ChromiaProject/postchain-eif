@@ -2,7 +2,7 @@ package net.postchain.eif.transaction
 
 import assertk.assertThat
 import assertk.assertions.isEqualTo
-import net.postchain.eif.Web3jRequestHandler
+import net.postchain.eif.web3j.Web3jRequestHandler
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.any
@@ -102,7 +102,6 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
                 eq(BigInteger.valueOf(3)),
                 eq(BigInteger.valueOf(10))
         )
-        testLogAppender.assertError("Estimated total gas fee 19 for tx exceeds configured limit of 3")
     }
 
     @Test
@@ -135,7 +134,6 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         )
 
         testLogAppender.assertError("Failed to send transaction 0 to http://127.0.0.1:9999: Oh dear")
-        testLogAppender.assertError("Failed to send transaction to all 1 nodes")
     }
 
     @Test
@@ -170,7 +168,6 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
         )
 
         testLogAppender.assertError("Failed to send transaction 0 to http://evm-node-1:9999: Oh dear")
-        testLogAppender.assertError("Failed to send transaction 0 to http://evm-node-2:9999: Web3j request failed with error code: 404 and message: Not found")
-        testLogAppender.assertError("Failed to send transaction to all 2 nodes")
+        testLogAppender.assertError("Failed to send transaction 0 to rpc http://evm-node-2:9999 with error code: 404 and message: Not found")
     }
 }

@@ -7,6 +7,7 @@ import net.postchain.core.BlockchainEngine
 import net.postchain.core.block.BlockQueries
 import net.postchain.eif.contracts.TestToken
 import net.postchain.eif.contracts.TokenBridge
+import net.postchain.eif.web3j.Web3jRequestHandler
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvNull
 import net.postchain.gtx.data.OpData

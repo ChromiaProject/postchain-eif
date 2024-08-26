@@ -78,7 +78,6 @@ operation __begin_block(height: integer) {
     timeout_evm_transactions();
     timeout_verify_evm_transactions();
     timeout_submit_evm_transactions();
-    fail_transactions_with_enough_retries(chain_context.args.node_retry_strategy);
 }
 
 function create_evm_submit_transaction(evm_submit_transaction_message: evm_submit_transaction_message, sender: byte_array) {
@@ -305,11 +304,11 @@ function fail_transactions_with_enough_retries(strategy: node_retry_strategy) {
 
     for (transaction in transactions) {
         if (strategy == node_retry_strategy.ALL and transaction.providers >= signers) {
-            update_transaction_status(transaction.rowid.to_integer(), transaction_status.FAILURE);
             log("Transaction %s failed - all available nodes failed to execute transaction".format(transaction.rowid));
-        } else if (strategy == node_retry_strategy.SUPERMAJORITY and is_supermajority(transaction.providers, signers)) {
             update_transaction_status(transaction.rowid.to_integer(), transaction_status.FAILURE);
+        } else if (strategy == node_retry_strategy.SUPERMAJORITY and is_supermajority(transaction.providers, signers)) {
             log("Transaction %s failed - A supermajority of nodes failed to execute transaction".format(transaction.rowid));
+            update_transaction_status(transaction.rowid.to_integer(), transaction_status.FAILURE);
         }
     }
 }
@@ -340,6 +339,9 @@ function update_transaction_status(row_id: integer, status: transaction_status, 
 
     val transaction = evm_submit_transaction @ { rowid(row_id) };
 
+    log("New status for transaction %s on network %s: %s".format(row_id, transaction.network_id, status));
+    transaction.status = status;
+
     if (status == transaction_status.TAKEN) {
         transaction.taken_timestamp = get_last_blocktime();
         transaction.processed_by = signer;
@@ -348,17 +350,14 @@ function update_transaction_status(row_id: integer, status: transaction_status, 
     } else if (status == transaction_status.QUEUED) {
 
         transaction.processed_by = x"";
+        fail_transactions_with_enough_retries(chain_context.args.node_retry_strategy);
 
     } else if (status == transaction_status.PENDING) {
 
         require(transaction.processed_by == signer, "Only the node currently processing the transaction can change the status to PENDING");
         require(tx_hash, "Status PENDING requires providing transaction hash");
 
-        if (tx_hash != transaction.tx_hash) {
-            require(transaction.tx_hash == "", "Transaction hash can only be set once");
-            transaction.tx_hash = tx_hash;
-        }
-
+        transaction.tx_hash = tx_hash;
         transaction.processed_by = signer;
 
     } else if (status == transaction_status.SUCCESS or status == transaction_status.FAILURE) {
@@ -370,11 +369,11 @@ function update_transaction_status(row_id: integer, status: transaction_status, 
                     processed_by = transaction.processed_by,
                     cost = transaction.gas_usage * transaction.effective_gas_price,
                     currency_symbol = transaction.currency_symbol).to_gtv());
+        } else {
+            transaction.processed_by = x"";
         }
         on_transaction_completed(transaction, status);
     }
-
-    transaction.status = status;
 }
 
 function get_manual_admins() = set<byte_array>.from_gtv(chain_context.args.manual_admins);

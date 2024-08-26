@@ -1,4 +1,4 @@
-package net.postchain.eif
+package net.postchain.eif.web3j
 
 import okhttp3.OkHttpClient
 import org.web3j.protocol.Web3j

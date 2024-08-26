@@ -10,8 +10,8 @@ import net.postchain.common.exception.UserMistake
 import net.postchain.core.BlockchainProcess
 import net.postchain.core.NODE_ID_READ_ONLY
 import net.postchain.core.SynchronizationInfrastructureExtension
-import net.postchain.eif.Web3jRequestHandler
-import net.postchain.eif.Web3jServiceFactory
+import net.postchain.eif.web3j.Web3jRequestHandler
+import net.postchain.eif.web3j.Web3jServiceFactory
 import net.postchain.eif.metrics.RpcUsageMetrics
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.GET_TRANSACTION
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension
@@ -26,8 +26,7 @@ import net.postchain.gtx.GTXModuleAware
 import net.postchain.core.EContext
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.logger
 import net.postchain.eif.transaction.gas.EIP1559FeeEstimatorFactory
-import org.web3j.crypto.Credentials
-import org.web3j.tx.RawTransactionManager
+import net.postchain.eif.web3j.Web3jRawTransactionHandler
 import java.math.BigInteger
 
 class TransactionSubmitterSynchronizationInfrastructureExtension(private val postchainContext: PostchainContext) : SynchronizationInfrastructureExtension {
@@ -76,10 +75,7 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                                 metrics
                         )
 
-                        val credentials = Credentials.create(appConfig.privateKey)
-                        val transactionManagers =
-                                web3jServicesMap.map { it.key to RawTransactionManager(it.value, credentials) }
-                                        .toMap()
+                        val transactionHandler = Web3jRawTransactionHandler(web3jServicesMap, appConfig.privateKey)
                         val queue = loadTxQueue(process.blockchainEngine.chainID, databaseOperations, networkId, blockchainConfig.module)
                         val feeEstimatorFactory = EIP1559FeeEstimatorFactory(
                                 web3jRequestHandler,
@@ -91,7 +87,7 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                         )
                         val transactionSubmitter = TransactionSubmitter(
                                 web3jRequestHandler,
-                                transactionManagers,
+                                transactionHandler,
                                 feeEstimatorFactory,
                                 databaseOperations,
                                 postchainContext.sharedStorage,
@@ -103,6 +99,7 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                                 appConfig.healthCheckInterval,
                                 networkBlockchainConfig.nodeTxVerificationEvmBlocks,
                                 networkBlockchainConfig.txVerificationTime,
+                                networkBlockchainConfig.cancelFeeMargin,
                         )
                         transactionSubmitters[networkId] = transactionSubmitter
                         ext.addTransactionSubmitter(transactionSubmitter, networkId)

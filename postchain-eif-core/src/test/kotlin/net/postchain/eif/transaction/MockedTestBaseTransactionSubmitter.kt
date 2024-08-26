@@ -4,10 +4,11 @@ import net.postchain.core.EContext
 import net.postchain.core.Storage
 import net.postchain.devtools.IntegrationTestSetup
 import net.postchain.eif.TestLogAppender
-import net.postchain.eif.Web3jRequestHandler
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.GET_TRANSACTION
 import net.postchain.eif.transaction.gas.EIP1559FeeEstimatorFactory
 import net.postchain.eif.transaction.gas.EIP1559LastBlockFeeEstimatorMock
+import net.postchain.eif.web3j.Web3jRawTransactionHandler
+import net.postchain.eif.web3j.Web3jRequestHandler
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtx.GTXModule
 import org.apache.logging.log4j.Level
@@ -28,7 +29,8 @@ import org.web3j.protocol.core.methods.response.EthSendTransaction
 import org.web3j.protocol.core.methods.response.EthTransaction
 import org.web3j.protocol.core.methods.response.Transaction
 import org.web3j.protocol.core.methods.response.TransactionReceipt
-import org.web3j.tx.TransactionManager
+import org.web3j.tx.RawTransactionManager
+import java.math.BigDecimal
 import java.math.BigInteger
 import java.util.Optional
 import java.util.concurrent.LinkedBlockingQueue
@@ -64,9 +66,9 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
             fromAddress: String,
             exception: String? = null,
             hasErrorMsg: String? = null
-    ): Pair<String, TransactionManager> {
+    ): Pair<String, RawTransactionManager> {
 
-        val transactionManager = mock<TransactionManager> {
+        val transactionManager = mock<RawTransactionManager> {
             on { getFromAddress() } doReturn (fromAddress)
             if (exception != null) {
                 on {
@@ -143,7 +145,15 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
 
     fun createTransactionSubmitter(
             web3jRequestHandler: Web3jRequestHandler,
-            transactionManagers: Map<String, TransactionManager>,
+            transactionManagers: Map<String, RawTransactionManager>,
+            feeEstimatorFactory: EIP1559FeeEstimatorFactory
+    ): TransactionSubmitter {
+        return createTransactionSubmitter(web3jRequestHandler, Web3jRawTransactionHandler(transactionManagers), feeEstimatorFactory)
+    }
+
+    fun createTransactionSubmitter(
+            web3jRequestHandler: Web3jRequestHandler,
+            transactionManagers: Web3jRawTransactionHandler,
             feeEstimatorFactory: EIP1559FeeEstimatorFactory
     ): TransactionSubmitter {
 
@@ -161,6 +171,7 @@ open class MockedTestBaseTransactionSubmitter : IntegrationTestSetup() {
                 -1,
                 5,
                 0,
+                BigDecimal("1.1"),
         )
     }
 

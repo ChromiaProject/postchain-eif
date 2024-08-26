@@ -1,4 +1,4 @@
-package net.postchain.eif
+package net.postchain.eif.web3j
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive

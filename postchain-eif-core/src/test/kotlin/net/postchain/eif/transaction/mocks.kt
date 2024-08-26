@@ -1,6 +1,6 @@
 package net.postchain.eif.transaction
 
-import net.postchain.eif.Web3jRequestHandler
+import net.postchain.eif.web3j.Web3jRequestHandler
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.doReturn

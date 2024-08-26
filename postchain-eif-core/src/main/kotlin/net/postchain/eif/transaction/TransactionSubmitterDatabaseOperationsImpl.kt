@@ -136,13 +136,13 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
         }
     }
 
-    override fun removeTransaction(bctx: EContext, requestId: Long) {
+    override fun removeTransaction(bctx: EContext, requestId: Long): Boolean {
         DatabaseAccess.of(bctx).apply {
             val jooq = createJooq(bctx)
 
-            jooq.delete(table(tableEvmTxSubmit(bctx)))
+            return jooq.delete(table(tableEvmTxSubmit(bctx)))
                     .where(EVM_TX_SUBMIT_COLUMN_REQUEST_ID.`in`(requestId))
-                    .execute()
+                    .execute() > 0
         }
     }
 

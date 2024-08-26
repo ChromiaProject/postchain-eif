@@ -89,7 +89,7 @@ class TransactionSubmitterStartupIT : EifBaseIntegrationTest() {
             buildBlock(1L)
 
             // It will fail since the transaction is not actually submitted
-            testLogAppender.assertError("Failed to poll for receipt for request id 0 on network 1337: Failed to send web3j request to all 1 nodes")
+            testLogAppender.assertInfo("No receipt found for transaction")
         }
     }
 
