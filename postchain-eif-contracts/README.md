@@ -190,7 +190,7 @@ yarn import:bridge --network sepolia --address PROXY_ADDRESS
 
 - Allows token.
 
-`triggerMassExit(uint height, bytes32 blockRid)`
+`triggerMassExit(uint height, bytes32 blockRid)` TODO: parameters are wrong
 
 - Triggers mass exit.
 

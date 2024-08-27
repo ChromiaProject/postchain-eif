@@ -72,7 +72,7 @@ val BAR = asset_info(
 
 function register_foreign_asset(asset: asset_info = CHR, network_id: integer = network_id1): assets.asset {
     val ft4_asset = register_ft4_asset(asset, network_id);
-    register_erc20_asset(ft4_asset, asset, network_id);
+    register_erc20_asset(ft4_asset, asset, network_id, true); // snapshots enabled
     return ft4_asset;
 }
 
@@ -86,9 +86,9 @@ function register_ft4_asset(asset_info: asset_info, network_id: integer): assets
     return assets.Asset(asset_id);
 }
 
-function register_erc20_asset(ft4_asset: assets.asset, asset_info: asset_info, network_id: integer) {
+function register_erc20_asset(ft4_asset: assets.asset, asset_info: asset_info, network_id: integer, enable_snapshots: boolean = false) {
     rell.test.tx().op(
-        helpers.register_erc20_asset_op(network_id, asset_info.token_address, ft4_asset, hbridge.bridge_mode.foreign)
+        helpers.register_erc20_asset_op(network_id, asset_info.token_address, ft4_asset, hbridge.bridge_mode.foreign, enable_snapshots)
     ).run();
 
     assert_equals(
@@ -187,7 +187,14 @@ function assert_withdraw(serial: integer, evm_address: byte_array, amount: big_i
         eif_utils.evm_address_to_32_byte_array(evm_address).to_gtv(),
         amount.to_gtv()
     ];
-    assert_equals(rell.test.get_events()[0], ("eif_event", withdraw_info.to_gtv_pretty()));
+
+    val events = rell.test.get_events();
+    val event_data = if (events.size() > 1)
+        events[1] // first event is snapshot
+    else
+        events[0];
+
+    assert_equals(event_data, ("eif_event", withdraw_info.to_gtv_pretty()));
 
     val wdrs = hbridge.get_erc20_withdrawal(network_id1, asset.token_address, evm_address);
     assert_equals(wdrs.size(), expected_nr_withdrawals);

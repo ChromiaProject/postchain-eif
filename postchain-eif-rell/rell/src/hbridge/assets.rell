@@ -20,17 +20,22 @@ function register_erc20_asset(
     network_id: integer,
     token_address: byte_array,
     ft4.assets.asset,
-    mode: bridge_mode
-) {
+    mode: bridge_mode,
+    use_snapshots: boolean = false
+): erc20_asset {
     require(mode == bridge_mode.foreign, "native mode not supported yet");
     require(empty(erc20_asset @? { network_id, token_address }), "token already exists");
-    create erc20_asset (
+    val erc20_asset = create erc20_asset (
         network_id,
         token_address = token_address,
         mode,
         asset,
         virtual_blockchain_rid = compute_virtual_blockchain_rid(network_id, token_address)
     );
+    if (use_snapshots) {
+        enable_erc20_asset_snapshots(erc20_asset);
+    }
+    return erc20_asset;
 }
 
 function compute_virtual_blockchain_rid(network_id: integer, token_address: byte_array): byte_array =

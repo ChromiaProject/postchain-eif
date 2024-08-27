@@ -133,60 +133,6 @@ describe("ChromiaToken Bridge Test", () => {
     });
   });
 
-  describe("Emergency Withdraw", async () => {
-    it("Emergency Withdraw", async () => {
-      const [deployer, user, beneficiary] = await ethers.getSigners();
-      const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
-      const toMint = ethers.utils.parseEther("10000");
-
-      await tokenInstance.transferFromChromia(user.address, toMint, ethers.utils.formatBytes32String("test"));
-      expect(await tokenInstance.totalSupply()).to.eq(toMint);
-      expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint);
-
-      const bridge = new ChromiaTokenBridge__factory(user).attach(bridgeAddress);
-      const toDeposit = ethers.utils.parseEther("100");
-      const tokenApproveInstance = new Chromia__factory(user).attach(tokenAddress);
-      await tokenApproveInstance.approve(bridgeAddress, toDeposit);
-      await bridge.deposit(tokenAddress, toDeposit);
-
-      // normal user cannot call emergencyWithdraw
-      await expect(bridge.emergencyWithdraw(tokenAddress, beneficiary.address)).to.be.revertedWith(
-        "OwnableUnauthorizedAccount",
-      );
-
-      const adminBridge = new ChromiaTokenBridge__factory(deployer).attach(bridgeAddress);
-      // admin or owner cannot call emergencyWithdraw before setting time
-      await expect(adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address)).to.be.revertedWith(
-        "TokenBridge: mass exit was not triggered yet",
-      );
-
-      await adminBridge.triggerMassExit(1, new Uint8Array(32));
-
-      // admin or owner cannot call emergencyWithdraw before emergency timestamp has passed
-      await expect(adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address)).to.be.revertedWith(
-        "TokenBridge: cannot do emergency withdrawal until 90 days after mass exit",
-      );
-
-      // admin can call emergencyWithdraw after setting time
-      expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(0);
-      expect(await tokenInstance.balanceOf(adminBridge.address)).to.eq(0);
-      const nighttyDays = 90 * 24 * 60 * 60;
-      const blockNum = await ethers.provider.getBlockNumber();
-      const block = await ethers.provider.getBlock(blockNum);
-      const timestamp = block.timestamp + nighttyDays;
-      await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp]);
-      await expect(adminBridge.emergencyWithdraw(constants.AddressZero, beneficiary.address)).to.be.revertedWith(
-        "TokenBridge: token address is invalid",
-      );
-      await expect(adminBridge.emergencyWithdraw(tokenAddress, constants.AddressZero)).to.be.revertedWith(
-        "TokenBridge: beneficiary address is invalid",
-      );
-      await tokenInstance.changeMinter(tokenMinterAddress);
-      await adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address);
-      expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(0);
-      expect(await tokenInstance.balanceOf(adminBridge.address)).to.eq(0);
-    });
-  });
 
   describe("Withdraw by normal user", async () => {
     it("User can request withdraw by providing properly proof data", async () => {
@@ -1059,46 +1005,6 @@ describe("ChromiaToken Bridge Test", () => {
           ),
         ).to.be.revertedWith("TokenBridge: fund is pending or was already claimed");
       }
-    });
-  });
-
-  describe("Mass Exit", async () => {
-    it("only admin can manage mass exit", async () => {
-      const [admin, other] = await ethers.getSigners();
-      let otherTokenBridge = new ChromiaTokenBridge__factory(other).attach(bridgeAddress);
-      let adminTokenBridge = new ChromiaTokenBridge__factory(admin).attach(bridgeAddress);
-      expect(await adminTokenBridge.isMassExit()).to.be.false;
-      let node1 = hashGtvBytes32Leaf(
-        DecodeHexStringToByteArray("977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795"),
-      );
-      let node2 = hashGtvBytes32Leaf(
-        DecodeHexStringToByteArray("49e46bf022de1515cbb2bf0f69c62c071825a9b940e8f3892acb5d2021832ba0"),
-      );
-      let blockRid = postchainMerkleNodeHash([0x7, node1, node2]);
-
-      // non admin cannot trigger mass exit
-      await expect(otherTokenBridge.triggerMassExit(100, blockRid)).to.be.revertedWith("OwnableUnauthorizedAccount");
-
-      // admin can trigger mass exit
-      await expect(adminTokenBridge.triggerMassExit(100, blockRid)).to.emit(adminTokenBridge, "TriggerMassExit");
-      expect(await adminTokenBridge.isMassExit()).to.be.true;
-      expect((await adminTokenBridge.massExitBlock()).blockRid).to.be.equal(blockRid);
-      expect((await adminTokenBridge.massExitBlock()).height).to.be.equal(100);
-
-      // postpone mass exit
-      await expect(otherTokenBridge.postponeMassExit()).to.be.revertedWith("OwnableUnauthorizedAccount");
-      await expect(adminTokenBridge.postponeMassExit()).to.emit(adminTokenBridge, "PostponeMassExit");
-      expect(await adminTokenBridge.isMassExit()).to.be.false;
-    });
-  });
-
-  describe("Ownership", async () => {
-    it("renounce ownership is not allowed", async () => {
-      const [admin, other] = await ethers.getSigners();
-      let adminTokenBridge = new ChromiaTokenBridge__factory(admin).attach(bridgeAddress);
-      await expect(adminTokenBridge.renounceOwnership()).to.be.revertedWith(
-        "TokenBridge: renounce ownership is not allowed",
-      );
     });
   });
 });

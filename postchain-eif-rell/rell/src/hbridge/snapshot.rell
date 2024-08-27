@@ -32,7 +32,11 @@ entity state_slot {
 
 entity erc20_asset_snapshots_enabled {
     key erc20_asset;
-    key ft4.assets.asset;
+    key ft4.assets.asset; // only one erc20 asset can be linked to ft4 asset when snapshots are enabled
+}
+
+function enable_erc20_asset_snapshots(erc20_asset) {
+    create erc20_asset_snapshots_enabled(erc20_asset.asset, erc20_asset);
 }
 
 /**
@@ -117,11 +121,11 @@ function emit_erc20_state(state_slot: state_slot, balance_records: list<balance_
     val state_slot_data = state_slot.to_struct();
     val state_parts = list<gtv>();
     state_parts.add(ERC20_STATE_TAG.to_gtv());
-    state_parts.add(state_slot_data.recipient_address.to_gtv());
+    state_parts.add(utils.evm_address_to_32_byte_array(state_slot_data.recipient_address).to_gtv());
     state_parts.add(state_slot_data.discriminator.to_gtv()); // discriminator already already includes network_id
 
     for (balance_record in balance_records) {
-        state_parts.add(balance_record.token_address.to_gtv());
+        state_parts.add(utils.evm_address_to_32_byte_array(balance_record.token_address).to_gtv());
         state_parts.add(balance_record.balance.to_gtv());
     }
     

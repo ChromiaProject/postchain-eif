@@ -18,8 +18,6 @@ import "./IValidator.sol";
 // Note: To enhance the security & decentralization, we should call transferOwnership() to external multi-sig owner after deploy the smart contract
 contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeable, ReentrancyGuardUpgradeable {
     
-    uint constant EMERGENCY_DURATION = 90 days;
-
     using Postchain for bytes32;
     using MerkleProof for bytes32[];
     using SafeERC20 for IERC20;
@@ -31,7 +29,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     bool public isMassExit;
     PostchainBlock public massExitBlock;
     uint256 public withdrawOffset;
-    uint256 public emergencyTimestamp;
 
     // Postchain/Chromia blockchain rid
     bytes32 internal blockchainRid;
@@ -128,18 +125,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         require(address(token) != address(0), "TokenBridge: token address is invalid");
         _allowedToken[token] = true;
         emit AllowToken(token);
-    }
-
-    /**
-     * Note: the mass exit block should be the block at which snapshot was updated
-     *          with state root was stored properly in the block header extra data.
-     */
-    function triggerMassExit(uint height, bytes32 blockRid) public onlyOwner {
-        require(!isMassExit, "TokenBridge: mass exit already set");
-        isMassExit = true;
-        massExitBlock = PostchainBlock(height, blockRid);
-        emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
-        emit TriggerMassExit(height, blockRid);
     }
 
     function postponeMassExit() public onlyOwner whenMassExit {
@@ -299,20 +284,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         emit WithdrawalToPostchain(_hash);
     }
 
-    /**
-     * @notice this function will be use only in emergency case
-     * by allow admin/owner (multi-sig wallet) to withdraw all the remaining balance after a specific period of time
-     * has passed since mass exit.
-     */
-    function emergencyWithdraw(IERC20 token, address payable beneficiary) external onlyOwner whenMassExit {
-        require(address(token) != address(0), "TokenBridge: token address is invalid");
-        require(beneficiary != address(0), "TokenBridge: beneficiary address is invalid");
-        require(block.timestamp >= emergencyTimestamp, "TokenBridge: cannot do emergency withdrawal until 90 days after mass exit");
-        uint tokenBalance = token.balanceOf(address(this));
-        if (tokenBalance > 0) {
-            token.safeTransfer(beneficiary, tokenBalance);
-        }
-    }
 
     function _bytesToBytes32(bytes memory b, uint offset) internal pure returns (bytes32) {
         bytes32 out;

@@ -5,6 +5,13 @@ import "./TokenBridge.sol";
 
 contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
 
+
+    uint constant EMERGENCY_DURATION = 90 days;
+    uint256 public emergencyTimestamp;
+
+
+    using SafeERC20 for IERC20;
+
     uint8 constant ERC20_BALANCE_RECORD_BYTE_SIZE = 64;
     uint8 constant ERC20_STATE_HEADER_BYTE_SIZE = 32 + 32 + 32;
     bytes32 constant ERC20_STATE_TAG_V1 = 0x686272696467653a65726332303a763101010101010101010101010101010101;
@@ -72,5 +79,37 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
         }
 
         emit WithdrawalBySnapshot(beneficiary);
+    }
+
+    function triggerMassExit(
+        bytes memory blockHeader,
+        bytes[] memory sigs,
+        address[] memory signers
+    ) public onlyOwner {
+        require(!isMassExit, "TokenBridge: mass exit already set");
+        Postchain.BlockHeaderData memory header = Postchain.decodeBlockHeader(blockHeader);
+        require(header.timestamp >= (block.timestamp - 3 days) * 1000, "TokenBridge: mass exit block is too old");
+        require(blockchainRid == header.blockchainRid, "TokenBridge: invalid blockchain rid");
+        require(validator.isValidSignatures(header.blockRid, sigs, signers), "TokenBridge: block signature is invalid");
+        isMassExit = true;
+        massExitBlock = PostchainBlock(header.height, header.blockRid);
+        emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
+        emit TriggerMassExit(header.height, header.blockRid);
+    }
+
+
+    /**
+     * @notice this function will be use only in emergency case
+     * by allow admin/owner (multi-sig wallet) to withdraw all the remaining balance after a specific period of time
+     * has passed since mass exit.
+     */
+    function emergencyWithdraw(IERC20 token, address payable beneficiary) external onlyOwner whenMassExit {
+        require(address(token) != address(0), "TokenBridge: token address is invalid");
+        require(beneficiary != address(0), "TokenBridge: beneficiary address is invalid");
+        require(block.timestamp >= emergencyTimestamp, "TokenBridge: cannot do emergency withdrawal until 90 days after mass exit");
+        uint tokenBalance = token.balanceOf(address(this));
+        if (tokenBalance > 0) {
+            token.safeTransfer(beneficiary, tokenBalance);
+        }
     }
 }
