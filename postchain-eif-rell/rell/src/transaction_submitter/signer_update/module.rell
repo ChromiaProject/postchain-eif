@@ -225,7 +225,7 @@ function handle_signer_update_message(sender: byte_array, topic: text, body: gtv
         } else {
             // If latest directory chain update is not completed we need to park this update
             // Unless it was at the same height, then we can just cancel it
-            val latest_directory_update = signer_list_update @? { .blockchain_rid == update_message.blockchain_rid } (@omit @sort_desc .rowid, $);
+            val latest_directory_update = signer_list_update @? { .blockchain_rid == update_message.blockchain_rid } (@omit @sort_desc .rowid, $) limit 1;
             if (latest_directory_update != null) {
                 if (latest_directory_update.confirmed_in_directory_at_height == update_message.confirmed_in_directory_at_height) {
                     latest_directory_update.status = signer_list_update_status.CANCELLED;
