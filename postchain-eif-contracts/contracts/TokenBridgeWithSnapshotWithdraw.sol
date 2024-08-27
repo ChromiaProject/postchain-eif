@@ -13,7 +13,7 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
     struct ERC20StateHeader {
         bytes32 tag;
         address beneficiary;
-        bytes32 bridgeContract;
+        uint256 discriminator;
     }
 
     struct ERC20BalanceRecord {
@@ -47,10 +47,12 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
         
         require(header.tag == ERC20_STATE_TAG_V1, "TokenBridge: invalid snapshot tag");
 
-        bytes32 bridgeContractAddress = bytes32(uint256(uint160(address(this))));
+        // assume networkId must fit in 96 bits
+        uint256 allowedDiscriminator1 = networkId << 160; // discriminator allows any bridge contract on the network
+        uint256 allowedDiscriminator2 = allowedDiscriminator1 + uint160(address(this));
 
-        require((header.bridgeContract == ERC20_STATE_TAG_V1) 
-                 || (header.bridgeContract == bridgeContractAddress), 
+        require((header.discriminator == allowedDiscriminator1) 
+                 || (header.discriminator == allowedDiscriminator2), 
                  "TokenBridge: invalid bridge contract");
         
         address beneficiary = header.beneficiary;
