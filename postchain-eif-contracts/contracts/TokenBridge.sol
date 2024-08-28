@@ -48,6 +48,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         address beneficiary;
         uint256 amount;
         uint256 block_number;
+        uint postchain_height;
         Status status;
     }
 
@@ -79,6 +80,11 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
 
     modifier whenMassExit() {
         require(isMassExit, "TokenBridge: mass exit was not triggered yet");
+        _;
+    }
+
+    modifier whenNotMassExit() {
+        require(!isMassExit, "TokenBridge: action is not allowed during mass exit");
         _;
     }
 
@@ -159,7 +165,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         return true;
     }
 
-    function deposit(IERC20 token, uint256 amount) public isAllowToken(token) whenNotPaused returns (bool) {
+    function deposit(IERC20 token, uint256 amount) public isAllowToken(token) whenNotPaused whenNotMassExit returns (bool) {
         transferDeposit(token, amount);
         emit DepositedERC20(msg.sender, token, amount, 0x0); // accountID will be determined from sender
         return true;
@@ -179,6 +185,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     function depositToAccountID(IERC20 token, uint256 amount, bytes32 accountID) public
         isAllowToken(token)
         whenNotPaused
+        whenNotMassExit
         onlyContract() // cannot be called from EOA for security reasons
         returns (bool)
     {
@@ -242,6 +249,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
             wd.token = token;
             wd.beneficiary = beneficiary;
             wd.amount = amount;
+            wd.postchain_height = height;
             wd.block_number = block.number + withdrawOffset;
             wd.status = Status.Withdrawable;
             _withdraw[hash] = wd;
@@ -254,6 +262,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     function withdraw(bytes32 _hash, address payable beneficiary) external whenNotPaused nonReentrant {
         Withdraw storage wd = _withdraw[_hash];
         require(wd.beneficiary == beneficiary, "TokenBridge: no fund for the beneficiary");
+        if (isMassExit) {
+            require(wd.postchain_height <= massExitBlock.height, "TokenBridge: cannot withdraw request after the mass exit block height");
+        }
         require(wd.block_number <= block.number, "TokenBridge: not mature enough to withdraw the fund");
         require(wd.status == Status.Withdrawable, "TokenBridge: fund is pending or was already claimed");
         wd.status = Status.Withdrawn;

@@ -92,6 +92,9 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
         require(blockchainRid == header.blockchainRid, "TokenBridge: invalid blockchain rid");
         require(validator.isValidSignatures(header.blockRid, sigs, signers), "TokenBridge: block signature is invalid");
         isMassExit = true;
+        if (paused()) {
+            _unpause();
+        }
         massExitBlock = PostchainBlock(header.height, header.blockRid);
         emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
         emit TriggerMassExit(header.height, header.blockRid);
