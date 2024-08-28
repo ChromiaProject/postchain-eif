@@ -190,6 +190,23 @@ function emit_local_erc20_state_slot(state_slot) {
     }
 }
 
+@extend(after_evm_account_linked) function (address: byte_array, account: ft4.accounts.account, network_id: integer, is_contract: boolean) {
+    if (address == find_address_for_ft4_account(account, network_id)) {
+        val has_existing_slots = exists(state_slot @? { .recipient_address == address,
+                                                .type == state_slot_type.erc20,
+                                                .local == true } limit 1);
+        if (not has_existing_slots) {
+            val assets = (b:ft4.assets.balance, e: erc20_asset_snapshots_enabled) @* {
+                b.asset == e.asset
+            } (.erc20_asset);
+            for (asset in assets) {
+                val slot = maybe_create_local_erc20_state_slot(account, asset);
+                if (exists(slot)) emit_local_erc20_state_slot(slot);
+            }
+        }
+    }
+}
+
 /*
  * A remote state slots are used to track balances in other blockchains on Chromia
  * which are downstream of the bridge.
