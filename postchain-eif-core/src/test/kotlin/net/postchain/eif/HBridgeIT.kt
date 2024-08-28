@@ -268,27 +268,9 @@ class HBridgeIT : EifBaseIntegrationTest() {
         }
         snapshotHeights.add(currentBlockHeight)
 
-        /*
-        // Check eif state for account as well
-        val expectedState = SimpleGtvEncoder.encodeGtv(gtv(
-                gtv(to32Bytes(evmAddress)), // encode gtv array with assumption that the data contains only byte32 and uint256
-                gtv(1 * 2 * 32), // 2 * 32 bytes per entry
-                gtv(to32Bytes(testToken.contractAddress.substring(2))), // encode gtv array with assumption that the data contains only byte32 and uint256
-                gtv(totalDepositedAmount)
-        ))
-        val accounts = blockQuery.query("eif.data.get_network_accounts", // we don't have this any longer
-                gtv("network_id" to gtv(networkId))).get()
-        accountNumber = accounts[0].asDict()["state_n"]!!
-
-        val args = gtv(
-                "blockHeight" to gtv(currentBlockHeight),
-                "accountNumber" to gtv(accountNumber.asInteger())
-        )
-        val accountState = blockQuery.query("get_account_state_merkle_proof", args).get().asDict()
-
-        val stateData = accountState["stateData"]!!
-        assertEquals(expectedState.toHex(), stateData.asByteArray().toHex())
-         */
+        val accounts = blockQuery.query("eif.hbridge.get_state_slot_ids_for_address",
+            gtv("recipient_address" to gtv(userEvmAddress))).get()
+        accountNumber = accounts[0].asInteger()!!
     }
 
     @Test
@@ -544,26 +526,27 @@ class HBridgeIT : EifBaseIntegrationTest() {
     }
 
     @Test
-    @Disabled
     @Order(8)
     fun `trigger mass exit`() {
         logger.info { "trigger mass exit" }
 
         // Get the last snapshot block height as mass-exit block
         lastSnapshotBlockHeight = currentBlockHeight
-        var lastBlockRID: ByteArray? = null
-        while (lastSnapshotBlockHeight >= 0) {
-            val block = blockQuery.getBlockAtHeight(lastSnapshotBlockHeight, false).get()
-            val header = block!!.header.rawData.toHex()
-            if (header.takeLast(64) != "0".repeat(64)) {
-                lastBlockRID = block.header.blockRID
-                break
-            }
-            lastSnapshotBlockHeight--
-        }
 
-        assertNotNull(lastBlockRID, "There should be valid block for mass-exit")
-        bridge.triggerMassExit(Uint256(lastSnapshotBlockHeight), Bytes32(lastBlockRID)).send()
+        // we only need block header and signatures, but it's the easiest way to get them
+        val stateProof = blockQuery.query(
+                "get_account_state_merkle_proof",
+                gtv(
+                        "blockHeight" to gtv(lastSnapshotBlockHeight),
+                        "accountNumber" to gtv(0)
+                )
+        ).get().toObject<AccountStateMerkleProof>()
+
+        bridge.triggerMassExit(
+                stateProof.web3BlockHeader(),
+                stateProof.web3Signatures(),
+                stateProof.web3Signers()
+        ).send()
     }
 
     @Test
@@ -584,7 +567,17 @@ class HBridgeIT : EifBaseIntegrationTest() {
                 gtv("eventHash" to gtv(eventHash2.toHex()))
         ).get().toObject<EventMerkleProof>()
 
-        val receipt = bridge.withdrawRequest(
+        val exception2 = assertThrows<TransactionException> {
+            bridge.withdrawRequest(
+                    eventProof2.web3EventData(),
+                    eventProof2.web3EventProof(),
+                    eventProof2.web3BlockHeader(),
+                    eventProof2.web3Signatures(),
+                    eventProof2.web3Signers(),
+                    eventProof2.web3ExtraProofData()
+            ).send()
+        }
+        /*val receipt = bridge.withdrawRequest(
                 eventProof2.web3EventData(),
                 eventProof2.web3EventProof(),
                 eventProof2.web3BlockHeader(),
@@ -601,11 +594,10 @@ class HBridgeIT : EifBaseIntegrationTest() {
         }
         bridge.withdraw(Bytes32(eventHash2), Address(userEvmAddress)).send()
         userBalance = testToken.balanceOf(Address(userEvmAddress)).send()
-        assertEquals(userBalance.value, initialMint - depositAmount + (withdrawAmount * BigInteger.TWO))
+        assertEquals(userBalance.value, initialMint - depositAmount + (withdrawAmount * BigInteger.TWO))*/
     }
 
     @Test
-    @Disabled
     @Order(10)
     fun `withdraw token to evm after mass exit using snapshot`() {
         logger.info { "withdraw token to evm after mass exit using snapshot" }
@@ -622,12 +614,9 @@ class HBridgeIT : EifBaseIntegrationTest() {
         bridge.withdrawBySnapshot(
                 stateProof.web3StateData(),
                 stateProof.web3StateProof(),
-                stateProof.web3BlockHeader(),
-                stateProof.web3Signatures(),
-                stateProof.web3Signers(),
                 stateProof.web3ExtraProofData()
         ).send()
-
+        /*
         // Withdraw the remaining token balance of other account as well
         val otherAccountNumber = accountNumber + 1
         val otherState = blockQuery.query(
@@ -641,15 +630,12 @@ class HBridgeIT : EifBaseIntegrationTest() {
         bridge.withdrawBySnapshot(
                 otherState.web3StateData(),
                 otherState.web3StateProof(),
-                otherState.web3BlockHeader(),
-                otherState.web3Signatures(),
-                otherState.web3Signers(),
                 otherState.web3ExtraProofData()
         ).send()
 
         withdrawOnPostchain(userKeyPair, accountId, authDescriptorId, assetId, withdrawAmount, userEvmAddress.hexStringToByteArray(), bcRid)
         sealBlock()
-        snapshotHeights.add(currentBlockHeight)
+        snapshotHeights.add(currentBlockHeight)*/
     }
 
     @Test
@@ -791,6 +777,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
                 gtv(networkId),
                 gtv(tokenAddress),
                 gtv(assetId),
+                gtv(true) // enable snapshots
         )
         return b.finish()
                 .sign(cryptoSystem.buildSigMaker(keyPair))

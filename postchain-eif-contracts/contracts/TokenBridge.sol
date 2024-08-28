@@ -18,8 +18,6 @@ import "./IValidator.sol";
 // Note: To enhance the security & decentralization, we should call transferOwnership() to external multi-sig owner after deploy the smart contract
 contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeable, ReentrancyGuardUpgradeable {
     
-    uint constant EMERGENCY_DURATION = 90 days;
-
     using Postchain for bytes32;
     using MerkleProof for bytes32[];
     using SafeERC20 for IERC20;
@@ -31,7 +29,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     bool public isMassExit;
     PostchainBlock public massExitBlock;
     uint256 public withdrawOffset;
-    uint256 public emergencyTimestamp;
 
     // Postchain/Chromia blockchain rid
     bytes32 internal blockchainRid;
@@ -51,6 +48,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         address beneficiary;
         uint256 amount;
         uint256 block_number;
+        uint postchain_height;
         Status status;
     }
 
@@ -82,6 +80,11 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
 
     modifier whenMassExit() {
         require(isMassExit, "TokenBridge: mass exit was not triggered yet");
+        _;
+    }
+
+    modifier whenNotMassExit() {
+        require(!isMassExit, "TokenBridge: action is not allowed during mass exit");
         _;
     }
 
@@ -130,18 +133,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         emit AllowToken(token);
     }
 
-    /**
-     * Note: the mass exit block should be the block at which snapshot was updated
-     *          with state root was stored properly in the block header extra data.
-     */
-    function triggerMassExit(uint height, bytes32 blockRid) public onlyOwner {
-        require(!isMassExit, "TokenBridge: mass exit already set");
-        isMassExit = true;
-        massExitBlock = PostchainBlock(height, blockRid);
-        emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
-        emit TriggerMassExit(height, blockRid);
-    }
-
     function postponeMassExit() public onlyOwner whenMassExit {
         isMassExit = false;
         massExitBlock = PostchainBlock(0, bytes32(0));
@@ -174,13 +165,13 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         return true;
     }
 
-    function deposit(IERC20 token, uint256 amount) public isAllowToken(token) whenNotPaused returns (bool) {
+    function deposit(IERC20 token, uint256 amount) public isAllowToken(token) whenNotPaused whenNotMassExit returns (bool) {
         transferDeposit(token, amount);
         emit DepositedERC20(msg.sender, token, amount, 0x0); // accountID will be determined from sender
         return true;
     }
 
-    function isContract(address addr) internal returns (bool) {
+    function isContract(address addr) internal view returns (bool) {
         // Note: We are aware of the fact that this might return false even when the address is a contract.
         // It is fine for our purposes. We want to prevent EOA from calling depositToAccountID.
         return addr.code.length > 0;
@@ -194,6 +185,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     function depositToAccountID(IERC20 token, uint256 amount, bytes32 accountID) public
         isAllowToken(token)
         whenNotPaused
+        whenNotMassExit
         onlyContract() // cannot be called from EOA for security reasons
         returns (bool)
     {
@@ -257,6 +249,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
             wd.token = token;
             wd.beneficiary = beneficiary;
             wd.amount = amount;
+            wd.postchain_height = height;
             wd.block_number = block.number + withdrawOffset;
             wd.status = Status.Withdrawable;
             _withdraw[hash] = wd;
@@ -269,6 +262,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     function withdraw(bytes32 _hash, address payable beneficiary) external whenNotPaused nonReentrant {
         Withdraw storage wd = _withdraw[_hash];
         require(wd.beneficiary == beneficiary, "TokenBridge: no fund for the beneficiary");
+        if (isMassExit) {
+            require(wd.postchain_height <= massExitBlock.height, "TokenBridge: cannot withdraw request after the mass exit block height");
+        }
         require(wd.block_number <= block.number, "TokenBridge: not mature enough to withdraw the fund");
         require(wd.status == Status.Withdrawable, "TokenBridge: fund is pending or was already claimed");
         wd.status = Status.Withdrawn;
@@ -299,20 +295,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         emit WithdrawalToPostchain(_hash);
     }
 
-    /**
-     * @notice this function will be use only in emergency case
-     * by allow admin/owner (multi-sig wallet) to withdraw all the remaining balance after a specific period of time
-     * has passed since mass exit.
-     */
-    function emergencyWithdraw(IERC20 token, address payable beneficiary) external onlyOwner whenMassExit {
-        require(address(token) != address(0), "TokenBridge: token address is invalid");
-        require(beneficiary != address(0), "TokenBridge: beneficiary address is invalid");
-        require(block.timestamp >= emergencyTimestamp, "TokenBridge: cannot do emergency withdrawal until 90 days after mass exit");
-        uint tokenBalance = token.balanceOf(address(this));
-        if (tokenBalance > 0) {
-            token.safeTransfer(beneficiary, tokenBalance);
-        }
-    }
 
     function _bytesToBytes32(bytes memory b, uint offset) internal pure returns (bytes32) {
         bytes32 out;

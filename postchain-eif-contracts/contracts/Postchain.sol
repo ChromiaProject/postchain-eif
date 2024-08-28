@@ -48,11 +48,13 @@ library Postchain {
         BlockHeaderData memory header = decodeBlockHeader(blockHeader);
         if (blockchainRid != header.blockchainRid) revert("Postchain: invalid blockchain rid");
         require(proof.extraRoot == header.extraDataHashedLeaf, "Postchain: invalid extra data root");
+        // TODO: check that the key in extra data pair is correct
         if (!proof.extraMerkleProofs.verifySHA256(proof.hashedLeaf, proof.position, proof.extraRoot)) {
             revert("Postchain: invalid extra merkle proof");
         }
         return (header.height, header.blockRid);
     }
+
 
     function decodeBlockHeader(
         bytes memory blockHeader

@@ -5,6 +5,13 @@ import "./TokenBridge.sol";
 
 contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
 
+
+    uint constant EMERGENCY_DURATION = 90 days;
+    uint256 public emergencyTimestamp;
+
+
+    using SafeERC20 for IERC20;
+
     uint8 constant ERC20_BALANCE_RECORD_BYTE_SIZE = 64;
     uint8 constant ERC20_STATE_HEADER_BYTE_SIZE = 32 + 32 + 32;
     bytes32 constant ERC20_STATE_TAG_V1 = 0x686272696467653a65726332303a763101010101010101010101010101010101;
@@ -13,7 +20,7 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
     struct ERC20StateHeader {
         bytes32 tag;
         address beneficiary;
-        bytes32 bridgeContract;
+        uint256 discriminator;
     }
 
     struct ERC20BalanceRecord {
@@ -34,18 +41,12 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
     function withdrawBySnapshot(
         bytes calldata snapshot,
         Data.Proof memory stateProof,
-        bytes memory blockHeader,
-        bytes[] memory sigs,
-        address[] memory signers,
         Data.ExtraProofData memory extraProof
     ) public virtual whenMassExit whenNotPaused nonReentrant {
         require(_snapshots[stateProof.leaf] == false, "TokenBridge: snapshot already used");
         require(stateProof.leaf == keccak256(snapshot), "TokenBridge: snapshot data is not correct");
         require(Hash.hashGtvBytes64Leaf(extraProof.leaf) == extraProof.hashedLeaf, "Postchain: invalid EIF extra data");
-        (uint height, bytes32 blockRid) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
         bytes32 stateRoot = _bytesToBytes32(extraProof.leaf, 32);
-        require(blockRid == massExitBlock.blockRid && height == massExitBlock.height, "TokenBridge: snapshot block should be the same with mass exit block");
-        if (!validator.isValidSignatures(blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
         if (!MerkleProof.verify(stateProof.merkleProofs, stateProof.leaf, stateProof.position, stateRoot))
             revert("TokenBridge: invalid merkle proof");
 
@@ -53,10 +54,12 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
         
         require(header.tag == ERC20_STATE_TAG_V1, "TokenBridge: invalid snapshot tag");
 
-        bytes32 bridgeContractAddress = bytes32(uint256(uint160(address(this))));
+        // assume networkId must fit in 96 bits
+        uint256 allowedDiscriminator1 = networkId << 160; // discriminator allows any bridge contract on the network
+        uint256 allowedDiscriminator2 = allowedDiscriminator1 + uint160(address(this));
 
-        require((header.bridgeContract == ERC20_STATE_TAG_V1) 
-                 || (header.bridgeContract == bridgeContractAddress), 
+        require((header.discriminator == allowedDiscriminator1) 
+                 || (header.discriminator == allowedDiscriminator2), 
                  "TokenBridge: invalid bridge contract");
         
         address beneficiary = header.beneficiary;
@@ -76,5 +79,40 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
         }
 
         emit WithdrawalBySnapshot(beneficiary);
+    }
+
+    function triggerMassExit(
+        bytes memory blockHeader,
+        bytes[] memory sigs,
+        address[] memory signers
+    ) public onlyOwner {
+        require(!isMassExit, "TokenBridge: mass exit already set");
+        Postchain.BlockHeaderData memory header = Postchain.decodeBlockHeader(blockHeader);
+        require(header.timestamp >= (block.timestamp - 3 days) * 1000, "TokenBridge: mass exit block is too old");
+        require(blockchainRid == header.blockchainRid, "TokenBridge: invalid blockchain rid");
+        require(validator.isValidSignatures(header.blockRid, sigs, signers), "TokenBridge: block signature is invalid");
+        isMassExit = true;
+        if (paused()) {
+            _unpause();
+        }
+        massExitBlock = PostchainBlock(header.height, header.blockRid);
+        emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
+        emit TriggerMassExit(header.height, header.blockRid);
+    }
+
+
+    /**
+     * @notice this function will be use only in emergency case
+     * by allow admin/owner (multi-sig wallet) to withdraw all the remaining balance after a specific period of time
+     * has passed since mass exit.
+     */
+    function emergencyWithdraw(IERC20 token, address payable beneficiary) external onlyOwner whenMassExit {
+        require(address(token) != address(0), "TokenBridge: token address is invalid");
+        require(beneficiary != address(0), "TokenBridge: beneficiary address is invalid");
+        require(block.timestamp >= emergencyTimestamp, "TokenBridge: cannot do emergency withdrawal until 90 days after mass exit");
+        uint tokenBalance = token.balanceOf(address(this));
+        if (tokenBalance > 0) {
+            token.safeTransfer(beneficiary, tokenBalance);
+        }
     }
 }
