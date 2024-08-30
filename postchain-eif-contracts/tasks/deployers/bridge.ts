@@ -117,6 +117,18 @@ task("setBlockchainRid:bridge")
         }
     });
 
+task("allowToken:bridge")
+    .addParam('bridgeAddress', 'Bridge contract address')
+    .addParam('tokenAddress', 'Token contract address')
+    .setAction(async ({bridgeAddress, tokenAddress}, hre) => {
+        const factory: TokenBridge__factory = await hre.ethers.getContractFactory("TokenBridge")
+        const bridge: TokenBridge = factory.attach(
+            bridgeAddress
+        )
+        console.log('bridge.allowToken');
+        console.log(await bridge.allowToken(tokenAddress));
+    });
+
 async function verifyProxyContract(hre: HardhatRuntimeEnvironment, proxyAddress: string) {
     // We need to wait a little bit to verify the contract after deployment
     const implementationAddress = await hre.upgrades.erc1967.getImplementationAddress(proxyAddress);

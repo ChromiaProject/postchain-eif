@@ -58,8 +58,7 @@ const config: HardhatUserConfig = {
       chainId: 1,
       url: "[[FILL ME IN]]",
     },
-/*
-    bsc: { // BSC testnet
+    bsc_testnet: { // BSC testnet
       accounts: {
         count: 10,
         initialIndex: 0,
@@ -67,19 +66,20 @@ const config: HardhatUserConfig = {
         path: "m/44'/60'/0'/0",
       },
       chainId: 97,
-      url: "[[FILL ME IN]]",
+      url: "https://data-seed-prebsc-1-s1.binance.org:8545/",
     },
-    eth: { // ETH sepolia
-      accounts: {
-        count: 10,
-        initialIndex: 0,
-        mnemonic: MNEMONIC,
-        path: "m/44'/60'/0'/0",
-      },
-      chainId: 11155111,
-      url: "[[FILL ME IN]]",
-    },
-*/
+    /*
+        eth: { // ETH sepolia
+          accounts: {
+            count: 10,
+            initialIndex: 0,
+            mnemonic: MNEMONIC,
+            path: "m/44'/60'/0'/0",
+          },
+          chainId: 11155111,
+          url: "[[FILL ME IN]]",
+        },
+    */
   },
   paths: {
     artifacts: "./src/artifacts",
