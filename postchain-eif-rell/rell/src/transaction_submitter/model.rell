@@ -1,4 +1,6 @@
-
+/**
+  * A transaction processed by the transaction submitter.
+  */
 entity evm_submit_transaction {
     key id: byte_array;
     contract_address: text;
@@ -17,7 +19,12 @@ entity evm_submit_transaction {
     mutable effective_gas_price: big_integer = -1;
     mutable gas_usage: big_integer = -1;
     mutable tx_hash: text = "";
+
+    /** Pubkey of node that is currently submitting or has been submitting the transaction to evm */
     mutable processed_by: pubkey = x"";
+
+    /** The chain to be charged and pay for the transaction  */
+    payer_chain: pubkey = x"";
 }
 
 entity evm_submit_transaction_taken_by {
@@ -110,10 +117,5 @@ struct network_config {
     currency_symbol: text;
 }
 
-struct evm_transaction_submitter_cost {
-    id: byte_array;
-    processed_by: pubkey;
-    cost: big_integer;
-    currency_symbol: text;
-}
+
 

@@ -102,7 +102,8 @@ function enqueue_signer_update_transaction_impl(
             contract.network_id,
             get_system_max_priority_fee_per_gas(),
             get_system_max_fee_per_gas(),
-            chain_context.blockchain_rid
+            sender = chain_context.blockchain_rid,
+            payer_chain = signer_list_update.blockchain_rid,
         );
 
         create signer_list_update_transaction ( transaction, signer_list_update );

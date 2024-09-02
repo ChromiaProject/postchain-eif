@@ -54,6 +54,7 @@ operation create_test_evm_submit_transaction(
     network_id: integer = 1,
     taken_timestamp: integer = 0,
     processed_by: pubkey = x"",
+    payer_chain: byte_array = x"",
 ) {
     create evm_submit_transaction (
         id = id,
@@ -65,11 +66,12 @@ operation create_test_evm_submit_transaction(
         currency_symbol = "ETH",
         max_priority_fee_per_gas = 1,
         max_fee_per_gas = 4000000000,
-        sender = x"",
+        sender = x"EEFF",
         status = status,
         created = created,
         taken_timestamp = taken_timestamp,
         processed_by = processed_by,
+        payer_chain = payer_chain,
     );
 }
 

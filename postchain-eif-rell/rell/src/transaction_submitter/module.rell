@@ -1,7 +1,7 @@
 import .anchoring.*;
 import .signer_update.*;
 
-import .utils.messaging.*;
+import .messaging.*;
 import .utils.*;
 
 import lib.icmf.*;
@@ -101,7 +101,7 @@ function create_evm_submit_transaction(evm_submit_transaction_message: evm_submi
     );
 }
 
-function add_transaction_to_queue(contract_address: text, function_name: text, parameter_types: list<text>, parameter_values: list<gtv>, network_id: integer, max_priority_fee_per_gas: big_integer, max_fee_per_gas: big_integer, sender: byte_array): evm_submit_transaction {
+function add_transaction_to_queue(contract_address: text, function_name: text, parameter_types: list<text>, parameter_values: list<gtv>, network_id: integer, max_priority_fee_per_gas: big_integer, max_fee_per_gas: big_integer, sender: byte_array, payer_chain: byte_array = x""): evm_submit_transaction {
     val evm_transaction_id = get_evm_transaction_id(
         contract_address,
         function_name,
@@ -125,7 +125,8 @@ function add_transaction_to_queue(contract_address: text, function_name: text, p
         sender = sender,
         status = transaction_status.QUEUED,
         created = op_context.last_block_time,
-        taken_timestamp = 0
+        taken_timestamp = 0,
+        payer_chain = payer_chain,
     );
 }
 
@@ -368,7 +369,9 @@ function update_transaction_status(row_id: integer, status: transaction_status, 
                     id = transaction.id,
                     processed_by = transaction.processed_by,
                     cost = transaction.gas_usage * transaction.effective_gas_price,
-                    currency_symbol = transaction.currency_symbol).to_gtv());
+                    currency_symbol = transaction.currency_symbol,
+                    payer_chain = transaction.payer_chain,
+                ).to_gtv());
         } else {
             transaction.processed_by = x"";
         }
@@ -381,8 +384,6 @@ function get_manual_admins() = set<byte_array>.from_gtv(chain_context.args.manua
 function get_system_max_priority_fee_per_gas() = chain_context.args.system_max_priority_fee_per_gas;
 
 function get_system_max_fee_per_gas() = chain_context.args.system_max_fee_per_gas;
-
-val evm_transaction_submitter_cost_topic = ICMF_TOPIC_GLOBAL_PREFIX + "evm_transaction_submitter_cost_topic";
 
 function extract_number_of_signers_from_current_configuration(): integer {
     val config = map<text, gtv>.from_gtv(chain_context.raw_config);
