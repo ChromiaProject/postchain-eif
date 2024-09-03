@@ -2,7 +2,7 @@
 
 Consider a situation where user wants to withdraw tokens from Chromia to EVM.
 On the Chromia side he calls an operation `bridge_ft4_token_to_evm_contract` which 
-emits a withrawal event.
+emits a withdrawal event.
 
 The event itself is described by the following structure:
 
@@ -77,7 +77,7 @@ require(blockchainRid != bytes32(0), "TokenBridge: blockchain rid is not set");
 // check if event with this hash was already used
 require(_events[eventProof.leaf] == false, "TokenBridge: event hash was already used");
 
-// check extraProof for internal consistentcy: leaf hash must match the hashed leaf (we could just compute hashedLeaf, but, oh, well...)
+// check extraProof for internal consistency: leaf hash must match the hashed leaf (we could just compute hashedLeaf, but, oh, well...)
 // the leaf of the extraProof concatenation of eventRootHash and stateRootHash, 64 bytes in total
 require(Hash.hashGtvBytes64Leaf(extraProof.leaf) == extraProof.hashedLeaf, "Postchain: invalid EIF extra data");
         
