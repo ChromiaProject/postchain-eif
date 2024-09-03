@@ -1,0 +1,88 @@
+blockchains:
+  eif_event_receiver_devnet1:
+    module: eif_event_receiver
+    config:
+      gtx:
+        modules:
+          - "net.postchain.eif.EifGTXModule"
+          - "net.postchain.d1.icmf.IcmfSenderGTXModule"
+      sync_ext:
+        - "net.postchain.eif.EifSynchronizationInfrastructureExtension"
+      eif:
+        chains:
+          bsc:
+            network_id: 97
+            contracts:
+              - "0x753218363422002DF74F3D0D8d67f6CB38bE32D0" # TwoWeeksNotice / staking contract
+              - "0x2Cf48D2891CC286d18596Df1261D011d1B78E03E" # TransparentUpgradeableProxy / bridge contract
+            evm_read_offset: 10
+            skip_to_height: 5801241
+            events: !include configs/events.yml
+
+  transaction_submitter_devnet1:
+    module: transaction_submitter
+    moduleArgs:
+      transaction_submitter:
+        # List of public keys that are allowed to reset failed signer list updates
+        manual_admins:
+          - 03ECD350EEBC617CBBFBEF0A1B7AE553A748021FD65C7C50C5ABB4CA16D4EA5B05 # alpha provider
+        directory_chain_config:
+          blockchain_rid: x"58FE4D15AA5BDA450CC8E55F7ED63004AB1D2535A123F860D1643FD4108809E3"
+          validator_contracts:
+            - address: "03135EBc9D10235D77e2Adfc7cEd96737A9dC9c2"
+              network_id: 97
+        # Omit this to disable anchoring
+        system_anchoring_chain_config: null
+        system_chain_bridges:
+          - blockchain_rid: x"83A9D1CC62C468A0D20854CAABB5EAD6DF50CD4DC0B2BCC2CDEC71F9DC201F9D" # economy-chain
+            bridge_contracts:
+              - address: "2Cf48D2891CC286d18596Df1261D011d1B78E03E"
+                validator_contract: "FdB06dB69e45a732bDF0B44FA590dAcb33deE281"
+                network_id: 97
+        contract_tx_rate_limit: 60000
+        tx_node_submit_timeout: 1800000 # 30m
+        tx_timeout: 1200000 # 20m
+        node_retry_strategy: SUPERMAJORITY
+        network_configs:
+          - id: 97
+            currency_symbol: "BNB"
+        system_max_priority_fee_per_gas: 25000000000
+        system_max_fee_per_gas: 180000000000
+    config:
+      gtx:
+        modules:
+          - "net.postchain.eif.transaction.TransactionSubmitterGTXModule"
+          - "net.postchain.d1.icmf.IcmfReceiverGTXModule"
+          - "net.postchain.d1.icmf.IcmfSenderGTXModule"
+      transaction_submitter:
+        chains:
+          bsc:
+            network_id: 97
+            max_gas_price: 30000000000000000
+            min_wallet_balance: 1000000000000000
+            node_tx_verification_evm_blocks: 100
+            tx_verification_time: 20000
+            gas_limit: 10000000
+            gas_limit_margin: "0.2" # 20%
+            base_fee_per_gas_margin: "1.5" # +150% (base_fee + base_fee * 1.5)
+            priority_fee_per_gas_margin: "0.000001" # 0.00001% # Small margin to pass the default priority fees
+        node_tx_verification_timeout: 1500000 # 25 min - a bit less than tx_node_submit_timeout
+      sync_ext:
+        - "net.postchain.eif.transaction.TransactionSubmitterSynchronizationInfrastructureExtension"
+        - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"
+      icmf:
+        receiver:
+          directory-chain:
+            topics:
+              - L_signer_list_update
+          local:
+            - bc-rid: x"83A9D1CC62C468A0D20854CAABB5EAD6DF50CD4DC0B2BCC2CDEC71F9DC201F9D" # economy-chain
+              topic: "L_bridge_mapping"
+          global:
+            topics:
+              - G_evm_submit_transaction
+
+compile:
+  source: src
+  target: target
+  rellVersion: 0.13.12
