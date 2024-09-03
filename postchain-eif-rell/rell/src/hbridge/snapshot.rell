@@ -122,7 +122,7 @@ function emit_erc20_state(state_slot: state_slot, balance_records: list<balance_
     val state_parts = list<gtv>();
     state_parts.add(ERC20_STATE_TAG.to_gtv());
     state_parts.add(utils.evm_address_to_32_byte_array(state_slot_data.recipient_address).to_gtv());
-    state_parts.add(state_slot_data.discriminator.to_gtv()); // discriminator already already includes network_id
+    state_parts.add(state_slot_data.discriminator.to_gtv()); // discriminator already includes network_id
 
     for (balance_record in balance_records) {
         state_parts.add(utils.evm_address_to_32_byte_array(balance_record.token_address).to_gtv());
@@ -212,7 +212,7 @@ function emit_local_erc20_state_slot(state_slot) {
  * which are downstream of the bridge.
  * 
  * Given that we don't update balances synchronously, remote might be slightly out of sync.
- * We still need to enforce that the sum of balances in remote state slots is is less than 
+ * We still need to enforce that the sum of balances in remote state slots is less than
  * or equal to the balance of the downstream blockchain.
  * Updates which violate these balance make state slots temporarily inactive.
  * They can be reactivated when the remote balance is updated.
@@ -223,7 +223,7 @@ function emit_local_erc20_state_slot(state_slot) {
  // Implementation of remote state slots is not part of the current release,
  // the commented out code is a sketch for the future implementation.
 
-entity remote_blokchain_erc20_state_sum {
+entity remote_blockchain_erc20_state_sum {
     key blockchain_rid: byte_array, erc20_asset;
     mutable amount: big_integer;
 }
@@ -248,6 +248,6 @@ function emit_remote_erc20_state_slot(slot: remote_erc20_state_slot) {
 function update_remote_erc20_state_slot(slot: remote_erc20_state_slot, balance: big_integer) {
     val old_balance = slot.balance;
     val delta = balance - old_balance;
-    val sum = remote_blokchain_erc20_state_sum @ { slot.blockchain_rid, slot.erc20_asset } .amount;
+    val sum = remote_blockchain_erc20_state_sum @ { slot.blockchain_rid, slot.erc20_asset } .amount;
 }    
 */

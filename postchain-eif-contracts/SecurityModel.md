@@ -6,7 +6,7 @@ In the normal operation of the bridge, withdrawals must be signed by a supermajo
 The supermajority is defined as 2/3 of the validators (BFT majority). 
 
 Withdrawal is a two-step process: proof is provided in withdrawRequest call, and ~3 day later
-(recommended time interval, configuratble via constructor parameter) the withdrawal is finalized.
+(recommended time interval, configurable via constructor parameter) the withdrawal is finalized.
 
 This challenge interval is needed to be able to block withdrawals in the case where a supermajority
 of providers are compromised and sign a fraudulent block header.
@@ -46,7 +46,7 @@ In the mass exit state users can withdraw their funds by providing a proof of th
 from an account state snapshot at the mass exit block. Account state snapshot is a Merkle tree,
 the root hash of which is present in "extra data" part of the block header.
 
-Owner might also be able to postpone (cancel) mass exit. This migth result in a balance
+Owner might also be able to postpone (cancel) mass exit. This might result in a balance
 deficit as some users might have withdrawn their funds already.
 
 ### Emergency withdraw
