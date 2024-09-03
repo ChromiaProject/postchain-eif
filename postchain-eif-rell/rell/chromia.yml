@@ -106,14 +106,16 @@ blockchains:
           bsc:
             network_id: 97
             contracts:
-              - "0x493D0ECf721c375E7Da44a79eA172ba4EdbA3728"
-              - "0x753218363422002DF74F3D0D8d67f6CB38bE32D0"
+              - "0x753218363422002DF74F3D0D8d67f6CB38bE32D0" # TwoWeeksNotice / staking contract
+              - "0x2Cf48D2891CC286d18596Df1261D011d1B78E03E" # TransparentUpgradeableProxy / bridge contract
+            evm_read_offset: 10
             skip_to_height: 5801241
             events: !include configs/events.yml
           sepolia:
             network_id: 11155111
             contracts:
               - "0xc50D39756779abFF28C45264D74f0352065CD248"
+            evm_read_offset: 10
             skip_to_height: 5801241
             events: !include configs/events.yml
 
@@ -260,7 +262,6 @@ blockchains:
           global:
             topics:
               - G_evm_submit_transaction
-
 
 compile:
   source: src
