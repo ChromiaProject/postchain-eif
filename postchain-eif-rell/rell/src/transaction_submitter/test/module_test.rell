@@ -396,7 +396,8 @@ function test_update_evm_transaction_status_SUCCESS() {
                 "system_bridge_address",
                 "myFunction",
                 transaction_status.QUEUED,
-                created = 99999999999999999 // avoid being timed out
+                created = 99999999999999999, // avoid being timed out
+                payer_chain = x"9999",
         )
     ).run();
 
@@ -420,7 +421,9 @@ function test_update_evm_transaction_status_SUCCESS() {
         id = tx_id,
         processed_by = x"01",
         cost = 6L,
-        currency_symbol = "ETH");
+        currency_symbol = "ETH",
+        payer_chain = x"9999",
+    );
 
     assert_events(("icmf_message",(topic = evm_transaction_submitter_cost_topic, body = expected.to_gtv()).to_gtv_pretty()));
 }

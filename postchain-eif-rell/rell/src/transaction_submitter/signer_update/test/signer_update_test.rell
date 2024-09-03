@@ -214,3 +214,9 @@ function trigger_signer_update(new_signers: list<byte_array>): signer_list_updat
 
     return signer_list_update_entity;
 }
+
+function test_directory_signer_update_payer_chain_set() {
+    val new_signers = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub];
+    val signer_list_update = trigger_signer_update(new_signers);
+    assert_equals(signer_list_update_transaction @ { signer_list_update }.evm_submit_transaction.payer_chain, test_directory_chain_brid);
+}

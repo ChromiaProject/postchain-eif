@@ -1,0 +1,29 @@
+import lib.icmf.*;
+
+// Note: unused in this chain but could be useful for other chains importing this module
+val evm_submit_transaction_topic = "G_evm_submit_transaction";
+
+struct evm_submit_transaction_message {
+    contract_address: text;
+    function_name: text;
+    parameter_types: list<text>;
+    parameter_values: list<gtv>;
+    network_id: integer;
+    max_priority_fee_per_gas: big_integer;
+    max_fee_per_gas: big_integer;
+}
+
+val evm_transaction_submitter_cost_topic = ICMF_TOPIC_GLOBAL_PREFIX + "evm_transaction_submitter_cost_topic";
+
+/**
+  * Transaction cost sent to economy chain for reward and charging user.
+  */
+struct evm_transaction_submitter_cost {
+    id: byte_array;
+    processed_by: pubkey;
+    cost: big_integer;
+    currency_symbol: text;
+
+    /** The chain to pay for this transaction */
+    payer_chain: byte_array;
+}
