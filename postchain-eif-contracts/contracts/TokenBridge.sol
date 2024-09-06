@@ -60,7 +60,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     event Initialize(IValidator indexed _validator, uint256 _withdrawOffset);
     event SetBlockchainRid(bytes32 rid);
     event AllowToken(IERC20 indexed token);
-    event TriggerMassExit(uint indexed height, bytes32 indexed blockRid);
     event PostponeMassExit();
     event PendingWithdraw(bytes32 indexed hash);
     event UnpendingWithdraw(bytes32 indexed hash);

@@ -28,6 +28,7 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
     // Each account state snapshot will be used to claim only one time.
     mapping(bytes32 => bool) internal _snapshots;
 
+    event TriggerMassExit(uint indexed height, bytes32 indexed blockRid);
     event WithdrawalBySnapshot(address indexed beneficiary);
 
     /**
