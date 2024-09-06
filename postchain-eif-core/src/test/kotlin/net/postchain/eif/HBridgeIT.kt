@@ -3,7 +3,6 @@ package net.postchain.eif
 import assertk.assertThat
 import assertk.assertions.contains
 import assertk.assertions.isEqualTo
-import assertk.assertions.isNotEqualTo
 import mu.KotlinLogging
 import net.postchain.base.BaseBlockWitness
 import net.postchain.base.configuration.KEY_SIGNERS
@@ -64,6 +63,7 @@ import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.Sign
 import org.web3j.protocol.core.DefaultBlockParameter
+import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.protocol.exceptions.TransactionException
 import org.web3j.tx.Contract
 import org.web3j.tx.FastRawTransactionManager
@@ -116,15 +116,14 @@ class HBridgeIT : EifBaseIntegrationTest() {
     private inline val Int.chr: BigInteger get() = BigInteger(this.toString() + "0".repeat(decimals), 10)
     private val initialMint = 1000_000_000.chr
     private val depositAmount = 1000.chr
-    private lateinit var withdrawAmount: BigInteger
+    private val withdrawAmount = 100.chr
+    private val multiWithdrawAmount = 1.chr
 
     // Contracts
     private lateinit var validator: Validator
     private lateinit var bridge: TokenBridgeWithSnapshotWithdraw
     private lateinit var testToken: TestToken
     private lateinit var testTokenAddress: ByteArray
-
-    private var accountNumber: Long = -1
 
     private lateinit var assetId: ByteArray
     private lateinit var node: PostchainTestNode
@@ -133,6 +132,11 @@ class HBridgeIT : EifBaseIntegrationTest() {
     private lateinit var bcRid: BlockchainRid
     private var currentBlockHeight = 0L
     private var lastSnapshotBlockHeight = -1L
+
+    private lateinit var wdTxHashInitiatedBeforeMassExit: Hash
+    private lateinit var wdTxHashRequestedBeforeMassExit: Hash
+    private lateinit var wdTxHashInitiatedAfterMassExit: Hash
+    private lateinit var lastTxReceipt: TransactionReceipt
 
     @BeforeAll
     fun setupBeforeAll() {
@@ -262,22 +266,18 @@ class HBridgeIT : EifBaseIntegrationTest() {
         bridge.deposit(Address(testToken.contractAddress), Uint256(depositAmount)).send()
 
         aliceBalance = testToken.balanceOf(aliceCredentials.evmAddress).send()
-        assertEquals(aliceBalance.value, initialMint - depositAmount)
+        assertEquals(initialMint - depositAmount, aliceBalance.value)
 
         // Check the asset balance
         await().atMost(Duration.ONE_MINUTE).untilAsserted {
             sealBlock() // keep postchain build new blocks to ensure that all evm deposits are recorded
-            val gtvBalance = blockQuery.query("ft4.get_asset_balance", gtv("account_id" to gtv(aliceAccount.accountId), "asset_id" to gtv(assetId)))
-                    .get()
-            assertThat(gtvBalance).isNotEqualTo(GtvNull)
-            val balance = gtvBalance["amount"]!!.asBigInteger()
-            assertEquals(depositAmount, balance)
+            assertEquals(depositAmount, getAssetBalance(aliceAccount))
         }
         snapshotHeights.add(currentBlockHeight)
 
-        val accounts = blockQuery.query("eif.hbridge.get_state_slot_ids_for_address",
-                gtv("recipient_address" to gtv(aliceCredentials.evmAddressStr))).get()
-        accountNumber = accounts[0].asInteger()
+        // Getting accountNum
+        aliceAccount.accountNum = blockQuery.query("eif.hbridge.get_state_slot_ids_for_address",
+                gtv("recipient_address" to gtv(aliceCredentials.evmAddressStr))).get()[0].asInteger()
     }
 
     @Test
@@ -285,7 +285,6 @@ class HBridgeIT : EifBaseIntegrationTest() {
     fun `withdraw token to evm`() {
         logger.info { "withdraw token to evm" }
 
-        withdrawAmount = 100.chr
         val txRid = withdrawOnPostchain(aliceCredentials, aliceAccount, assetId, withdrawAmount, bcRid)
         sealBlock()
         snapshotHeights.add(currentBlockHeight)
@@ -307,9 +306,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
         assertEquals(expectedState1.toHex(), stateData1.asByteArray().toHex())
         */
 
-        val balance = blockQuery.query("ft4.get_asset_balance",
-                gtv("account_id" to gtv(aliceAccount.accountId), "asset_id" to gtv(assetId))).get()["amount"]!!.asBigInteger()
-        assertEquals(depositAmount - withdrawAmount, balance)
+        assertEquals(depositAmount - withdrawAmount, getAssetBalance(aliceAccount))
 
         // Get and verify the withdrawal data
         val withdrawInfo = getLastWithdrawal(aliceCredentials)
@@ -412,9 +409,10 @@ class HBridgeIT : EifBaseIntegrationTest() {
         bridge.unpendingWithdraw(Bytes32(eventHash)).send()
         verifyWithdrawalStatusOnPostchain(eventHash, WithdrawalStatus.requested)
 
+        // Complete the withdrawal
         bridge.withdraw(Bytes32(eventHash), aliceCredentials.evmAddress).send()
         aliceBalance = testToken.balanceOf(aliceCredentials.evmAddress).send()
-        assertEquals(aliceBalance.value, initialMint - depositAmount + withdrawAmount)
+        assertEquals(initialMint - depositAmount + withdrawAmount, aliceBalance.value)
 
         // Verifying that the withdrawal is completed
         verifyWithdrawalStatusOnPostchain(eventHash, WithdrawalStatus.withdrawn)
@@ -424,23 +422,22 @@ class HBridgeIT : EifBaseIntegrationTest() {
     @Order(6)
     fun `multiple withdraws per block`() {
         // Multiple withdraws in same block to get multi-level page tree
-        val multiWithdrawAmount = 1.chr
         val multiWithdrawTimes = 30
+
         logger.info { "withdraw 1 CHR $multiWithdrawTimes times in one block" }
-        repeat(multiWithdrawTimes - 1) {
-            withdrawOnPostchain(aliceCredentials, aliceAccount, assetId, multiWithdrawAmount, bcRid)
+        val lastTxRid = (0 until multiWithdrawTimes).map {
             Thread.sleep(1) // To get unique nop
-        }
-        val lastMultiTxRid = withdrawOnPostchain(aliceCredentials, aliceAccount, assetId, multiWithdrawAmount, bcRid)
+            withdrawOnPostchain(aliceCredentials, aliceAccount, assetId, multiWithdrawAmount, bcRid)
+        }.last()
         sealBlock()
-        val balanceAfterMultiWithdraw = blockQuery.query("ft4.get_asset_balance",
-                gtv("account_id" to gtv(aliceAccount.accountId), "asset_id" to gtv(assetId))
-        ).get()["amount"]!!.asBigInteger()
-        assertEquals(depositAmount - withdrawAmount - multiWithdrawTimes.toBigInteger() * multiWithdrawAmount, balanceAfterMultiWithdraw)
+
+        assertEquals(
+                depositAmount - withdrawAmount - multiWithdrawTimes.toBigInteger() * multiWithdrawAmount,
+                getAssetBalance(aliceAccount)
+        )
 
         // Just completing the last one on EVM side
-        val lastMultiEventHash = getWithdrawalEventHashByTxRid(lastMultiTxRid)
-
+        val lastMultiEventHash = getWithdrawalEventHashByTxRid(lastTxRid)
         val lastMultiEventProof = blockQuery.query("get_event_merkle_proof",
                 gtv("eventHash" to gtv(lastMultiEventHash.toHex()))).get().toObject<EventMerkleProof>()
         logger.info { "\trequesting withdrawal of the last withdraw made" }
@@ -460,22 +457,23 @@ class HBridgeIT : EifBaseIntegrationTest() {
         }
         bridge.withdraw(Bytes32(lastMultiEventHash), aliceCredentials.evmAddress).send()
         aliceBalance = testToken.balanceOf(aliceCredentials.evmAddress).send()
-        assertEquals(aliceBalance.value, initialMint - depositAmount + withdrawAmount + multiWithdrawAmount)
+        assertEquals(initialMint - depositAmount + withdrawAmount + multiWithdrawAmount, aliceBalance.value)
 
         logger.info { "\tmaking a new withdrawal in next block" }
         val nextBlockWithdraw = withdrawOnPostchain(aliceCredentials, aliceAccount, assetId, multiWithdrawAmount, bcRid)
         sealBlock()
 
-        val balanceAfterNextBlockWithdraw = blockQuery.query("ft4.get_asset_balance",
-                gtv("account_id" to gtv(aliceAccount.accountId), "asset_id" to gtv(assetId))).get()["amount"]!!.asBigInteger()
-        assertEquals(depositAmount - withdrawAmount - (multiWithdrawTimes + 1).toBigInteger() * multiWithdrawAmount, balanceAfterNextBlockWithdraw)
+        assertEquals(
+                depositAmount - withdrawAmount - (multiWithdrawTimes + 1).toBigInteger() * multiWithdrawAmount,
+                getAssetBalance(aliceAccount)
+        )
 
         val nextBlockEventHash = getWithdrawalEventHashByTxRid(nextBlockWithdraw)
         val nextBlockEventProof = blockQuery.query("get_event_merkle_proof",
                 gtv("eventHash" to gtv(nextBlockEventHash.toHex()))
         ).get().toObject<EventMerkleProof>()
         logger.info { "\trequesting withdrawal again" }
-        val nextBlockReceipt = bridge.withdrawRequest(
+        lastTxReceipt = bridge.withdrawRequest(
                 nextBlockEventProof.web3EventData(),
                 nextBlockEventProof.web3EventProof(),
                 nextBlockEventProof.web3BlockHeader(),
@@ -485,12 +483,12 @@ class HBridgeIT : EifBaseIntegrationTest() {
         ).send()
 
         await().atMost(Duration.TEN_SECONDS).until {
-            val block = web3j.ethGetBlockByNumber(DefaultBlockParameter.valueOf(nextBlockReceipt.blockNumber.add(BigInteger.TWO)), false).send()
+            val block = web3j.ethGetBlockByNumber(DefaultBlockParameter.valueOf(lastTxReceipt.blockNumber.add(BigInteger.TWO)), false).send()
             block.block != null
         }
         bridge.withdraw(Bytes32(nextBlockEventHash), aliceCredentials.evmAddress).send()
         aliceBalance = testToken.balanceOf(aliceCredentials.evmAddress).send()
-        assertEquals(aliceBalance.value, initialMint - depositAmount + withdrawAmount + multiWithdrawAmount * BigInteger.TWO)
+        assertEquals(initialMint - depositAmount + withdrawAmount + multiWithdrawAmount * BigInteger.TWO, aliceBalance.value)
     }
 
     @Test
@@ -509,17 +507,34 @@ class HBridgeIT : EifBaseIntegrationTest() {
         }
         sealBlock()
         snapshotHeights.add(currentBlockHeight)
-
-        // Alice withdraws tokens again
-        withdrawOnPostchain(aliceCredentials, aliceAccount, assetId, withdrawAmount, bcRid)
-        sealBlock()
-        snapshotHeights.add(currentBlockHeight)
     }
 
     @Test
     @Order(8)
     fun `trigger mass exit`() {
-        logger.info { "trigger mass exit" }
+        logger.info { "trigger Mass Exit" }
+
+        // Alice withdraws tokens again before Mass Exit
+        wdTxHashInitiatedBeforeMassExit = withdrawOnPostchain(aliceCredentials, aliceAccount, assetId, withdrawAmount, bcRid)
+        sealBlock()
+        logger.info { "\tinitiating withdrawal before Mass Exit - Tx Rid: ${wdTxHashInitiatedBeforeMassExit.toHex()}" }
+        snapshotHeights.add(currentBlockHeight)
+        wdTxHashRequestedBeforeMassExit = withdrawOnPostchain(aliceCredentials, aliceAccount, assetId, withdrawAmount, bcRid)
+        sealBlock()
+        logger.info { "\tinitiating withdrawal before Mass Exit - Tx Rid: ${wdTxHashRequestedBeforeMassExit.toHex()}" }
+        snapshotHeights.add(currentBlockHeight)
+        val eventHash = getWithdrawalEventHashByTxRid(wdTxHashRequestedBeforeMassExit)
+        val eventProof = blockQuery.query("get_event_merkle_proof",
+                gtv("eventHash" to gtv(eventHash.toHex()))).get().toObject<EventMerkleProof>()
+        logger.info { "\trequesting withdrawal before Mass Exit - Tx Rid: ${wdTxHashRequestedBeforeMassExit.toHex()}" }
+        bridge.withdrawRequest(
+                eventProof.web3EventData(),
+                eventProof.web3EventProof(),
+                eventProof.web3BlockHeader(),
+                eventProof.web3Signatures(),
+                eventProof.web3Signers(),
+                eventProof.web3ExtraProofData()
+        ).send()
 
         // Get the last snapshot block height as mass-exit block
         lastSnapshotBlockHeight = currentBlockHeight
@@ -529,11 +544,11 @@ class HBridgeIT : EifBaseIntegrationTest() {
                 "get_account_state_merkle_proof",
                 gtv(
                         "blockHeight" to gtv(lastSnapshotBlockHeight),
-                        "accountNumber" to gtv(0)
+                        "accountNumber" to gtv(aliceAccount.accountNum)
                 )
         ).get().toObject<AccountStateMerkleProof>()
 
-        bridge.triggerMassExit(
+        lastTxReceipt = bridge.triggerMassExit(
                 stateProof.web3BlockHeader(),
                 stateProof.web3Signatures(),
                 stateProof.web3Signers()
@@ -541,10 +556,49 @@ class HBridgeIT : EifBaseIntegrationTest() {
     }
 
     @Test
-    @Disabled
     @Order(9)
+    fun `request and complete withdrawal initiated before Mass Exit`() {
+        logger.info { "request and complete withdrawal on evm initiated before Mass Exit" }
+
+        // Request withdrawal
+        val eventHash = getWithdrawalEventHashByTxRid(wdTxHashInitiatedBeforeMassExit)
+        val eventProof = blockQuery.query("get_event_merkle_proof",
+                gtv("eventHash" to gtv(eventHash.toHex()))).get().toObject<EventMerkleProof>()
+        logger.info { "\trequesting withdrawal initiated before Mass Exit - Tx Rid: ${wdTxHashInitiatedBeforeMassExit.toHex()}" }
+        lastTxReceipt = bridge.withdrawRequest(
+                eventProof.web3EventData(),
+                eventProof.web3EventProof(),
+                eventProof.web3BlockHeader(),
+                eventProof.web3Signatures(),
+                eventProof.web3Signers(),
+                eventProof.web3ExtraProofData()
+        ).send()
+        buildEvmBlocks()
+
+        // Complete withdrawal
+        logger.info { "\tcompleting withdrawal initiated before Mass Exit - Tx Rid: ${wdTxHashInitiatedBeforeMassExit.toHex()}" }
+        lastTxReceipt = bridge.withdraw(Bytes32(eventHash), aliceCredentials.evmAddress).send()
+        aliceBalance = testToken.balanceOf(aliceCredentials.evmAddress).send()
+        assertEquals(initialMint - depositAmount + withdrawAmount * 2.toBigInteger() + multiWithdrawAmount * 2.toBigInteger(), aliceBalance.value)
+    }
+
+    @Test
+    @Order(10)
+    fun `complete withdrawal requested before mass exit`() {
+        logger.info { "request withdrawal on evm requested before Mass Exit" }
+
+        buildEvmBlocks()
+        val eventHash = getWithdrawalEventHashByTxRid(wdTxHashRequestedBeforeMassExit)
+        bridge.withdraw(Bytes32(eventHash), aliceCredentials.evmAddress).send()
+        aliceBalance = testToken.balanceOf(aliceCredentials.evmAddress).send()
+        assertEquals(initialMint - depositAmount + withdrawAmount * 3.toBigInteger() + multiWithdrawAmount * 2.toBigInteger(), aliceBalance.value)
+    }
+
+    @Test
+    @Disabled
+    @Order(11)
     fun `withdraw after mass exit`() {
-        logger.info { "withdraw token to evm after mass exit" }
+        logger.info { "withdraw token to evm after Mass Exit" }
 
         // Withdraw request on evm for the last postchain withdraw
         val withdrawInfo2 = getLastWithdrawal(aliceCredentials)
@@ -589,24 +643,36 @@ class HBridgeIT : EifBaseIntegrationTest() {
     }
 
     @Test
-    @Order(10)
+    @Order(12)
     fun `withdraw token to evm after mass exit using snapshot`() {
-        logger.info { "withdraw token to evm after mass exit using snapshot" }
+        logger.info { "withdraw token to evm after Mass Exit using snapshot" }
+
+        val remainingBalanceOnPostchain = getAssetBalance(aliceAccount)!!
 
         // Withdraw remaining token of the account by using snapshot state with mass-exit
         val stateProof = blockQuery.query(
                 "get_account_state_merkle_proof",
                 gtv(
                         "blockHeight" to gtv(lastSnapshotBlockHeight),
-                        "accountNumber" to gtv(accountNumber)
+                        "accountNumber" to gtv(aliceAccount.accountNum)
                 )
         ).get().toObject<AccountStateMerkleProof>()
 
+        // Withdrawing by snapshot
         bridge.withdrawBySnapshot(
                 stateProof.web3StateData(),
                 stateProof.web3StateProof(),
                 stateProof.web3ExtraProofData()
         ).send()
+        buildEvmBlocks()
+
+        aliceBalance = testToken.balanceOf(aliceCredentials.evmAddress).send()
+        assertEquals(
+                initialMint - depositAmount +
+                        withdrawAmount * 3.toBigInteger() + multiWithdrawAmount * 2.toBigInteger() +
+                        remainingBalanceOnPostchain,
+                aliceBalance.value)
+
         /*
         // Withdraw the remaining token balance of other account as well
         val otherAccountNumber = accountNumber + 1
@@ -631,9 +697,9 @@ class HBridgeIT : EifBaseIntegrationTest() {
 
     @Test
     @Disabled
-    @Order(11)
+    @Order(13)
     fun `user can't withdraw token to evm after mass exit block height`() {
-        logger.info { "user can't withdraw token to evm after mass exit block height" }
+        logger.info { "user can't withdraw token to evm after Mass Exit block height" }
 
         val withdrawInfo3 = getLastWithdrawal(aliceCredentials)
         assertThat(withdrawInfo3["amount"]!!.asBigInteger()).isEqualTo(withdrawAmount)
@@ -671,7 +737,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
         val oldState = blockQuery.query("get_account_state_merkle_proof",
                 gtv(
                         "blockHeight" to gtv(oldSnapshotHeight),
-                        "accountNumber" to gtv(accountNumber)
+                        "accountNumber" to gtv(aliceAccount.accountNum)
                 )).get()
         assertEquals(oldState, GtvNull)
 
@@ -680,13 +746,13 @@ class HBridgeIT : EifBaseIntegrationTest() {
         val latestState = blockQuery.query("get_account_state_merkle_proof",
                 gtv(
                         "blockHeight" to gtv(latestSnapshotHeight),
-                        "accountNumber" to gtv(accountNumber)
+                        "accountNumber" to gtv(aliceAccount.accountNum)
                 )).get()
         assertNotNull(latestState)
     }
 
-    @Order(12)
     @Test
+    @Order(14)
     fun `pause token bridge contract`() {
         Transfer(web3j, transactionManager).sendFunds(
                 node0EvmAddress.value,
@@ -998,6 +1064,20 @@ class HBridgeIT : EifBaseIntegrationTest() {
             "eif.hbridge.get_erc20_withdrawal_by_tx",
             gtv("tx_rid" to gtv(txRid), "op_index" to gtv(1))
     ).get().asDict()["event_hash"]!!.asByteArray()
+
+    private fun getAssetBalance(userAccount: FtAccount): BigInteger? {
+        val balanceGtv = blockQuery.query("ft4.get_asset_balance",
+                gtv("account_id" to gtv(userAccount.accountId), "asset_id" to gtv(assetId))
+        ).get()
+
+        return if (balanceGtv.isNull()) null else balanceGtv["amount"]!!.asBigInteger()
+    }
+
+    private fun buildEvmBlocks(nrOfBlocks: BigInteger = BigInteger.TWO) {
+        await().atMost(Duration.TEN_SECONDS).until {
+            web3j.ethBlockNumber().send().blockNumber >= lastTxReceipt.blockNumber + nrOfBlocks
+        }
+    }
 
     @Suppress("EnumEntryName")
     private enum class WithdrawalStatus {
