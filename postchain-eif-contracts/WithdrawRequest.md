@@ -102,7 +102,7 @@ return (height, blockRid);
 ```
 
 After a call to `_withdrawRequest` we have verified correctness of a block header
-and have a event hash which is connected to said block header.
+and have an event hash which is connected to said block header.
 
 Function `_updateWithdraw` then verifies that the event data hashes to the event hash by calling
 `Postchain.verifyEvent`:
@@ -140,7 +140,7 @@ function verifyBlockHeader(
     }
 ```
 
-`decodeBlockHeader` function decodes BlockHeaderData structure and compuites GTV-hash. For efficiency reasons
+`decodeBlockHeader` function decodes BlockHeaderData structure and computes GTV-hash. For efficiency reasons
 it is unrolled to perform hashing on the tree of a fixed size.
 
 Note that BlockHeaderData is not the way Chromia block header is normally encoded, but a structure with 
@@ -158,7 +158,7 @@ Chromia node has an endpoint which returns all data necessary for withdrawReques
 Specifically, `get_event_merkle_proof` query, which can be called by postchain-client, a library
 which lets clients to communicate with Chromia node.
 
-Query is implemented in `net.postchain.eif.EifGTXModule`, more speficially function `eventMerkleProofQuery`,
+Query is implemented in `net.postchain.eif.EifGTXModule`, more specifically function `eventMerkleProofQuery`,
 see here: https://gitlab.com/chromaway/core/postchain-eif/-/blob/QuantStamp-Audit/postchain-eif-core/src/main/kotlin/net/postchain/eif/EifGTXModule.kt?ref_type=heads#L108
 
 Example data can be found in postchain-eif-contracts unit tests.
