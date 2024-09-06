@@ -5,17 +5,14 @@ import "./TokenBridge.sol";
 
 contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
 
-
     uint constant EMERGENCY_DURATION = 90 days;
     uint256 public emergencyTimestamp;
-
 
     using SafeERC20 for IERC20;
 
     uint8 constant ERC20_BALANCE_RECORD_BYTE_SIZE = 64;
     uint8 constant ERC20_STATE_HEADER_BYTE_SIZE = 32 + 32 + 32;
     bytes32 constant ERC20_STATE_TAG_V1 = 0x686272696467653a65726332303a763101010101010101010101010101010101;
-    
 
     struct ERC20StateHeader {
         bytes32 tag;
@@ -99,7 +96,6 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
         emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
         emit TriggerMassExit(header.height, header.blockRid);
     }
-
 
     /**
      * @notice this function will be use only in emergency case
