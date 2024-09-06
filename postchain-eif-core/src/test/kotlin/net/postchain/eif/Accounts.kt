@@ -16,5 +16,6 @@ data class UserCredentials(
 
 class FtAccount(
         val accountId: ByteArray,
-        val authDescriptorId: ByteArray
+        val authDescriptorId: ByteArray,
+        var accountNum: Long = -1L
 )
