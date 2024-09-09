@@ -55,6 +55,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     struct PostchainBlock {
         uint height;
         bytes32 blockRid;
+        bytes32 extraDataHashedLeaf;
     }
 
     event Initialize(IValidator indexed _validator, uint256 _withdrawOffset);
@@ -135,7 +136,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
 
     function postponeMassExit() public onlyOwner whenMassExit {
         isMassExit = false;
-        massExitBlock = PostchainBlock(0, bytes32(0));
+        massExitBlock = PostchainBlock(0, bytes32(0), bytes32(0));
         emit PostponeMassExit();
     }
 
