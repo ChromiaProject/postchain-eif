@@ -136,6 +136,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     function postponeMassExit() public onlyOwner whenMassExit {
         isMassExit = false;
         massExitBlock = PostchainBlock(0, bytes32(0));
+        if (!paused()) {
+            _pause();
+        }
         emit PostponeMassExit();
     }
 
