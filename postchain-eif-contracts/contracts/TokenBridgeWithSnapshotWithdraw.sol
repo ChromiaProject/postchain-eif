@@ -47,18 +47,19 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
         require(_snapshots[stateProof.leaf] == false, "TokenBridge: snapshot already used");
         require(stateProof.leaf == keccak256(snapshot), "TokenBridge: snapshot data is not correct");
 
+        // Check extraProof against the mass exit block and for internal consistency
         require(extraProof.extraRoot == massExitBlock.extraDataHashedLeaf, "Postchain: invalid extra data root");
         require(Hash.hashGtvBytes64Leaf(extraProof.leaf) == extraProof.hashedLeaf, "Postchain: invalid EIF extra data");
         if (!MerkleProof.verifySHA256(extraProof.extraMerkleProofs, extraProof.hashedLeaf, extraProof.position, extraProof.extraRoot)) {
             revert("Postchain: invalid extra merkle proof");
         }
 
+        // Check that state hash is in the state Merkle tree
         bytes32 stateRoot = _bytesToBytes32(extraProof.leaf, 32);
         if (!MerkleProof.verify(stateProof.merkleProofs, stateProof.leaf, stateProof.position, stateRoot))
             revert("TokenBridge: invalid merkle proof");
 
         ERC20StateHeader memory header = abi.decode(snapshot[: ERC20_STATE_HEADER_BYTE_SIZE], (ERC20StateHeader));
-        
         require(header.tag == ERC20_STATE_TAG_V1, "TokenBridge: invalid snapshot tag");
 
         // assume networkId must fit in 96 bits
