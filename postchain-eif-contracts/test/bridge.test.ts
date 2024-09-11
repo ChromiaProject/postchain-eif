@@ -56,6 +56,47 @@ describe("Token Bridge Test", () => {
         await expect(bridge.allowToken(tokenAddress)).to.emit(bridge, "AllowToken").withArgs(tokenAddress)
     });
 
+    describe("Blockchain RID", async () => {
+        it("Blockchain RID can not be finalized unless it is initialized", async () => {
+            const [deployer] = await ethers.getSigners()
+            const bridgeOwner = new TokenBridgeWithSnapshotWithdraw__factory(deployer).attach(bridgeAddress)
+            await expect(bridgeOwner.finalizeBlockchainRid())
+                .to.be.revertedWith("TokenBridge: blockchain rid is not set")
+        });
+
+        it("Blockchain RID can be set multiple times and finalized", async () => {
+            const [deployer] = await ethers.getSigners()
+            const bridgeOwner = new TokenBridgeWithSnapshotWithdraw__factory(deployer).attach(bridgeAddress)
+            let blockchainRid0 = "0x977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795"
+            let blockchainRid1 = "0x977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c796"
+            await expect(bridgeOwner.setBlockchainRid(blockchainRid0))
+                .to.emit(bridgeOwner, "SetBlockchainRid").withArgs(blockchainRid0)
+            await expect(bridgeOwner.setBlockchainRid(blockchainRid1))
+                .to.emit(bridgeOwner, "SetBlockchainRid").withArgs(blockchainRid1)
+            await expect(bridgeOwner.finalizeBlockchainRid())
+                .to.emit(bridgeOwner, "BlockchainRidFinalized").withArgs(blockchainRid1)
+        });
+
+        it("Blockchain RID can be set to zeros", async () => {
+            const [deployer] = await ethers.getSigners()
+            const bridgeOwner = new TokenBridgeWithSnapshotWithdraw__factory(deployer).attach(bridgeAddress)
+            await expect(bridgeOwner.setBlockchainRid('0x' + '0'.repeat(64)))
+                .to.be.revertedWith("TokenBridge: blockchain rid is invalid")
+        });
+
+        it("Blockchain RID can finalized only once", async () => {
+            const [deployer] = await ethers.getSigners()
+            const bridgeOwner = new TokenBridgeWithSnapshotWithdraw__factory(deployer).attach(bridgeAddress)
+            let blockchainRid0 = "0x977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795"
+            await expect(bridgeOwner.setBlockchainRid(blockchainRid0))
+                .to.emit(bridgeOwner, "SetBlockchainRid").withArgs(blockchainRid0)
+            await expect(bridgeOwner.finalizeBlockchainRid())
+                .to.emit(bridgeOwner, "BlockchainRidFinalized").withArgs(blockchainRid0)
+            await expect(bridgeOwner.finalizeBlockchainRid())
+                .to.be.revertedWith("TokenBridge: blockchain rid has been already finalized")
+        });
+    });
+
     describe("Validators", async () => {
         it("Admin can update validator(s) successfully", async () => {
             const [node1, node2, node3, other] = await ethers.getSigners()
