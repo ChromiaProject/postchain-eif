@@ -101,7 +101,7 @@ struct state_data {
     account: list<gtv>;
 }
 
-// hbridge:erc20:v1 followed by 16x 01 bytes, 32 bytes in total
+// Hexadecimal representation of the "hbridge:erc20:v1" string followed by 16x 0x01 bytes, 32 bytes in total.
 val ERC20_STATE_TAG = x"686272696467653a65726332303a763101010101010101010101010101010101";
 
 struct balance_record {

@@ -14,6 +14,7 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
 
     uint8 constant ERC20_BALANCE_RECORD_BYTE_SIZE = 64;
     uint8 constant ERC20_STATE_HEADER_BYTE_SIZE = 32 + 32 + 32;
+    // @dev Hexadecimal representation of the "hbridge:erc20:v1" string followed by 16x 0x01 bytes, 32 bytes in total.
     bytes32 constant ERC20_STATE_TAG_V1 = 0x686272696467653a65726332303a763101010101010101010101010101010101;
     
 
