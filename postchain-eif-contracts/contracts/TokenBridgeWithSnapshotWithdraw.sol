@@ -36,13 +36,13 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
     /**
      * @dev withdraw all account assets in the postchain snapshot when mass exit was triggered
      * Note: the mass exit block should be the block at which snapshot was updated
-     *          with state root was stored properly in the block header extra data.
+     * with state root was stored properly in the block header extra data.
      */
     function withdrawBySnapshot(
         bytes calldata snapshot,
         Data.Proof memory stateProof,
         Data.ExtraProofData memory extraProof
-    ) public virtual whenMassExit whenNotPaused nonReentrant {
+    ) public virtual whenMassExit nonReentrant {
 
         require(_snapshots[stateProof.leaf] == false, "TokenBridge: snapshot already used");
         require(stateProof.leaf == keccak256(snapshot), "TokenBridge: snapshot data is not correct");
