@@ -96,6 +96,7 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
         address[] memory signers
     ) public onlyOwner {
         require(!isMassExit, "TokenBridge: mass exit already set");
+        require(blockchainRid != bytes32(0), "TokenBridge: blockchain rid is not set");
         Postchain.BlockHeaderData memory header = Postchain.decodeBlockHeader(blockHeader);
         require(header.timestamp >= (block.timestamp - 3 days) * 1000, "TokenBridge: mass exit block is too old");
         require(blockchainRid == header.blockchainRid, "TokenBridge: invalid blockchain rid");
