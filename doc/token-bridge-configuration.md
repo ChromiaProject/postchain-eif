@@ -32,5 +32,5 @@ import hbridge;
 
 An example of the single-chain configuration can be found in the [chromia.yml](/postchain-eif-core/src/test/resources/net/postchain/eif/chromia.yml) file of the current repository.
 
-> **Note:** To prevent the replaying of withdrawals—whether by events or snapshots—across all bridge contracts within a single EVM network connected to a specific Chromia chain, we recommend deploying only **one ERC20 bridge contract** per EVM network for each Chromia chain. If multiple contracts must be deployed, ensure that the sets of tokens they support **do not overlap**.
+> **Note:** To prevent the replaying of withdrawals — whether by events or snapshots — across all bridge contracts within a single EVM network connected to a specific Chromia chain, we recommend deploying only **one ERC20 bridge contract** per EVM network for each Chromia chain. If multiple contracts must be deployed, ensure that the sets of tokens they support **do not overlap**.
 

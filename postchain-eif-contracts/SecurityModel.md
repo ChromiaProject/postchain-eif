@@ -49,7 +49,7 @@ the root hash of which is present in "extra data" part of the block header.
 Owner might also be able to postpone (cancel) mass exit. This migth result in a balance
 deficit as some users might have withdrawn their funds already.
 
-> **Note:** To prevent the replaying of withdrawals—whether by events or snapshots—across all bridge contracts within a single EVM network connected to a specific Chromia chain, we recommend deploying only **one ERC20 bridge contract** per EVM network for each Chromia chain. If multiple contracts must be deployed, ensure that the sets of tokens they support **do not overlap**.
+> **Note:** To prevent the replaying of withdrawals — whether by events or snapshots — across all bridge contracts within a single EVM network connected to a specific Chromia chain, we recommend deploying only **one ERC20 bridge contract** per EVM network for each Chromia chain. If multiple contracts must be deployed, ensure that the sets of tokens they support **do not overlap**.
 
 ### Emergency withdraw
 
