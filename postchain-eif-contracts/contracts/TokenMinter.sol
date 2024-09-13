@@ -56,15 +56,17 @@ abstract contract TokenMinterBase is TwoWeekDelay, Ownable2Step {
 
     // Function to modify the day limit
     function setDayLimit(uint _newDayLimit) external onlyOwner {
+        // if we already have a pending change, reset it
+        if (pendingDayLimit != 0) resetDelayForFunction(this.setDayLimit.selector);
+
         if (_newDayLimit > dayLimit) {
-            // if we already have a pending change, reset it
-            if (pendingDayLimit != 0) resetDelayForFunction(this.setDayLimit.selector);
             // Set pending day limit and start the two-week delay
             pendingDayLimit = _newDayLimit;
             startDelayedAction(this.setDayLimit.selector);
         } else {
             // If the new limit is lower, apply immediately
             dayLimit = _newDayLimit;
+            delete pendingDayLimit;
             emit DayLimitChanged(_newDayLimit);
         }
     }
