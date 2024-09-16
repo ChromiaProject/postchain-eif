@@ -30,8 +30,8 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     PostchainBlock public massExitBlock;
     uint256 public withdrawOffset;
 
-    // Postchain/Chromia blockchain rid
-    bytes32 internal blockchainRid;
+    bytes32 internal blockchainRid; // Postchain/Chromia blockchain RID
+    bool public isBlockchainRidFinalized;  // Flag to track if blockchain RID is finalized
 
     // Each postchain event will be used to claim only one time.
     mapping(bytes32 => bool) internal _events;
@@ -60,6 +60,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
 
     event Initialize(IValidator indexed _validator, uint256 _withdrawOffset);
     event SetBlockchainRid(bytes32 rid);
+    event BlockchainRidFinalized(bytes32 rid);
     event AllowToken(IERC20 indexed token);
     event TriggerMassExit(uint indexed height, bytes32 indexed blockRid);
     event PostponeMassExit();
@@ -107,6 +108,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         networkId = id;
         validator = _validator;
         withdrawOffset = _withdrawOffset;
+        isBlockchainRidFinalized = false;
         emit Initialize(_validator, _withdrawOffset);
     }
 
@@ -115,9 +117,18 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     }
 
     function setBlockchainRid(bytes32 rid) public onlyOwner {
+        require(!isBlockchainRidFinalized, "TokenBridge: blockchain rid has been finalized");
         require(rid != bytes32(0), "TokenBridge: blockchain rid is invalid");
         blockchainRid = rid;
         emit SetBlockchainRid(rid);
+    }
+
+    // Function to finalize blockchain RID
+    function finalizeBlockchainRid() public onlyOwner {
+        require(!isBlockchainRidFinalized, "TokenBridge: blockchain rid has been already finalized");
+        require(blockchainRid != bytes32(0), "TokenBridge: blockchain rid is not set");
+        isBlockchainRidFinalized = true;
+        emit BlockchainRidFinalized(blockchainRid);
     }
 
     function pause() onlyValidator public {
