@@ -48,29 +48,30 @@ class TransactionSubmitterCompletedByRellIT : EifBaseIntegrationTest() {
     This will emulate a node starting up but finds a transaction taken by the node now it completed by another node.
 
     1. Node starts up
-    2. Finds and adds a pending TX.
+    2. Find and add a pending TX.
     3. Poll and verify TX.
     4. Node updates BC status to PENDING. <- This test fails here due to BC status is already set to SUCCESS
     4. Node polls TX to verify it.
      */
-    // TODO refactor due to change ot loading transactions on startup
-//    @Test
-//    fun `verify continue pending txs on startup drop due to rell status has been changed`() {
-//
-//        val node = createNodes(1, "/net/postchain/eif/transaction/blockchain_config_pending.xml")[0]
-//        val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
-//
-//        // Set BC status to FAILURE
-//        val txSubmitOnBc = mkEvmSubmitTxRellRequest(0, contractAddress,
-//                status = RellTransactionStatus.SUCCESS
-//        )
-//        txSubmitterTestModule.addTransaction(txSubmitOnBc)
-//
-//        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
-//            buildBlock(1L)
-//
-//            // It will fail since the transaction is not actually submitted
-//            testLogAppender.assertWarn("Transaction 0 blockchain status is set to completed. This node will stop processing this transaction.")
-//        }
-//    }
+    @Test
+    fun `verify continue pending txs on startup drop due to rell status has been changed`() {
+
+        val node = createNodes(1, "/net/postchain/eif/transaction/blockchain_config_pending.xml")[0]
+        val txSubmitterTestModule = node.getModules().filterIsInstance<TransactionSubmitterTestGTXModule>().first()
+
+        buildBlock(1L)
+
+        // Set BC status to FAILURE
+        val txSubmitOnBc = mkEvmSubmitTxRellRequest(0, contractAddress,
+                status = RellTransactionStatus.SUCCESS
+        )
+        txSubmitterTestModule.addTransaction(txSubmitOnBc)
+
+        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            buildBlock(1L)
+
+            // It will fail since the transaction is not actually submitted
+            testLogAppender.assertWarn("Transaction 0 blockchain status is set to completed. This node will stop processing this transaction.")
+        }
+    }
 }
