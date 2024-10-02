@@ -104,10 +104,6 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                         transactionSubmitters[networkId] = transactionSubmitter
                         ext.addTransactionSubmitter(transactionSubmitter, networkId)
                     }
-
-                    withReadConnection(postchainContext.sharedStorage, process.blockchainEngine.chainID) {
-                        ext.addNewPendingTransactions(it)
-                    }
                 }
             }
 

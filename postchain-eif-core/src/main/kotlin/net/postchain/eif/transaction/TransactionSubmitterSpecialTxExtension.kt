@@ -41,11 +41,13 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     private lateinit var pubKey: ByteArray
     private var validateSpecialOps: () -> Boolean = { false }
     private var pollEvmReceipts = false
+    private var startupJobsRun = false
 
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
 
         val operations = mutableListOf<OpData>()
 
+        startup(bctx)
         removeCompletedTxs(bctx)
         removeTxsWithUpdatedProcessedByValue(bctx)
         takeTransactions(bctx, operations)
@@ -74,6 +76,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
             ops: List<OpData>
     ): Boolean {
 
+        startup(bctx)
         removeCompletedTxs(bctx)
         removeTxsWithUpdatedProcessedByValue(bctx)
 
@@ -305,9 +308,9 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         )
     }
 
-    fun addNewPendingTransactions(eContext: EContext) {
+    fun addNewPendingTransactions(bctx: BlockEContext) {
 
-        val queryResult = module.query(eContext, GET_PENDING_TRANSACTIONS, gtv(mapOf()))
+        val queryResult = module.query(bctx, GET_PENDING_TRANSACTIONS, gtv(mapOf()))
         val transactions = queryResult.asArray().map {
             it.toObject<EvmSubmitTxRellRequest>()
         }
@@ -478,6 +481,13 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                 }
                 txSubmitter.removePendingTx(tx.rowId)
             }
+        }
+    }
+
+    private fun startup(bctx: BlockEContext) {
+        if (!startupJobsRun) {
+            startupJobsRun = true
+            addNewPendingTransactions(bctx)
         }
     }
 }
