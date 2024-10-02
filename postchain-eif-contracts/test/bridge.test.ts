@@ -904,11 +904,12 @@ describe("Token Bridge Test", () => {
             expect((await adminTokenBridge.massExitBlock()).blockRid).to.be.equal(blockRid)
             expect((await adminTokenBridge.massExitBlock()).height).to.be.equal(100)
 
-            // postpone mass exit
-            await expect(otherTokenBridge.postponeMassExit()).to.be.revertedWith('OwnableUnauthorizedAccount')
-            await expect(adminTokenBridge.postponeMassExit())
-            .to.emit(adminTokenBridge, "PostponeMassExit")
-            expect(await adminTokenBridge.isMassExit()).to.be.false
+            // admin can re-trigger mass exit
+            await expect(adminTokenBridge.triggerMassExit(DecodeHexStringToByteArray(blockHeader), sigs, validators, {gasLimit: 10000000}))
+                .to.emit(adminTokenBridge, "TriggerMassExit")
+            expect(await adminTokenBridge.isMassExit()).to.be.true
+            expect((await adminTokenBridge.massExitBlock()).blockRid).to.be.equal(blockRid)
+            expect((await adminTokenBridge.massExitBlock()).height).to.be.equal(100)
         })
     })
 
