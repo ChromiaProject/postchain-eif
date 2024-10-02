@@ -48,12 +48,6 @@ fun AccountStateMerkleProof.web3StateProof() = TokenBridgeWithSnapshotWithdraw.P
         DynamicArray(Bytes32::class.java, stateProof!!.merkleProofs.map { Bytes32(it) })
 )
 
-fun AccountStateMerkleProof.web3BlockHeader() = DynamicBytes(blockHeader)
-
-fun AccountStateMerkleProof.web3Signatures() = DynamicArray(DynamicBytes::class.java, blockWitness!!.map { DynamicBytes(it.sig) })
-
-fun AccountStateMerkleProof.web3Signers() = DynamicArray(Address::class.java, blockWitness!!.map { Address(it.pubkey.toHex()) })
-
 fun AccountStateMerkleProof.web3ExtraProofData() = TokenBridgeWithSnapshotWithdraw.ExtraProofData(
         DynamicBytes(extraMerkleProof!!.leaf),
         Bytes32(extraMerkleProof!!.hashedLeaf),
@@ -61,3 +55,9 @@ fun AccountStateMerkleProof.web3ExtraProofData() = TokenBridgeWithSnapshotWithdr
         Bytes32(extraMerkleProof!!.extraRoot),
         DynamicArray(Bytes32::class.java, extraMerkleProof!!.extraMerkleProofs.map { Bytes32(it) })
 )
+
+fun ByteArray.web3BlockHeader() = DynamicBytes(this)
+
+fun List<EifSignature>.web3Signatures() = DynamicArray(DynamicBytes::class.java, this.map { DynamicBytes(it.sig) })
+
+fun List<EifSignature>.web3Signers() = DynamicArray(Address::class.java, this.map { Address(it.pubkey.toHex()) })

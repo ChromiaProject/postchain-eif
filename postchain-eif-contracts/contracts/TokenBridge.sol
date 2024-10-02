@@ -63,7 +63,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     event BlockchainRidFinalized(bytes32 rid);
     event AllowToken(IERC20 indexed token);
     event TriggerMassExit(uint indexed height, bytes32 indexed blockRid);
-    event PostponeMassExit();
     event PendingWithdraw(bytes32 indexed hash);
     event UnpendingWithdraw(bytes32 indexed hash);
     event FundedERC20(address indexed sender, IERC20 indexed token, uint amount);
@@ -143,12 +142,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         require(address(token) != address(0), "TokenBridge: token address is invalid");
         _allowedToken[token] = true;
         emit AllowToken(token);
-    }
-
-    function postponeMassExit() public onlyOwner whenMassExit {
-        isMassExit = false;
-        massExitBlock = PostchainBlock(0, bytes32(0), bytes32(0));
-        emit PostponeMassExit();
     }
 
     function pendingWithdraw(bytes32 _hash) onlyOwner public {

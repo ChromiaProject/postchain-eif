@@ -3,6 +3,7 @@ package net.postchain.eif
 import assertk.assertThat
 import assertk.assertions.isEqualTo
 import mu.KotlinLogging
+import net.postchain.base.BaseBlockHeader
 import net.postchain.base.BaseBlockWitness
 import net.postchain.base.configuration.KEY_SIGNERS
 import net.postchain.base.snapshot.SimpleDigestSystem
@@ -16,6 +17,7 @@ import net.postchain.core.BlockRid
 import net.postchain.core.block.BlockQueries
 import net.postchain.crypto.KeyPair
 import net.postchain.crypto.PubKey
+import net.postchain.crypto.Secp256K1CryptoSystem
 import net.postchain.crypto.devtools.KeyPairHelper
 import net.postchain.devtools.PostchainTestNode
 import net.postchain.devtools.PostchainTestNode.Companion.DEFAULT_CHAIN_IID
@@ -60,7 +62,6 @@ import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.Sign
 import org.web3j.protocol.core.DefaultBlockParameter
-import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.protocol.exceptions.TransactionException
 import org.web3j.tx.Contract
 import org.web3j.tx.FastRawTransactionManager
@@ -136,7 +137,6 @@ class HBridgeIT : EifBaseIntegrationTest() {
     private lateinit var wdTxHashInitiatedBeforeMassExit: Hash
     private lateinit var wdTxHashRequestedBeforeMassExit: Hash
     private lateinit var wdTxHashInitiatedAfterMassExit: Hash
-    private lateinit var lastTxReceipt: TransactionReceipt
 
     @BeforeAll
     fun setupBeforeAll() {
@@ -441,7 +441,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
         val lastMultiEventProof = blockQuery.query("get_event_merkle_proof",
                 gtv("eventHash" to gtv(lastMultiEventHash.toHex()))).get().toObject<EventMerkleProof>()
         logger.info { "\trequesting withdrawal of the last withdraw made" }
-        val lastMultiReceipt = bridge.withdrawRequest(
+        bridge.withdrawRequest(
                 lastMultiEventProof.web3EventData(),
                 lastMultiEventProof.web3EventProof(),
                 lastMultiEventProof.web3BlockHeader(),
@@ -449,13 +449,11 @@ class HBridgeIT : EifBaseIntegrationTest() {
                 lastMultiEventProof.web3Signers(),
                 lastMultiEventProof.web3ExtraProofData()
         ).send()
-        // wait some seconds to allow evm node to mine some new blocks
-        // that mature enough to withdraw requesting fund
-        await().atMost(Duration.TEN_SECONDS).until {
-            val block = web3j.ethGetBlockByNumber(DefaultBlockParameter.valueOf(lastMultiReceipt.blockNumber.add(BigInteger.TWO)), false).send()
-            block.block != null
-        }
+        buildEvmBlocks(2)
+
         bridge.withdraw(Bytes32(lastMultiEventHash), aliceCredentials.evmAddress).send()
+        buildEvmBlocks()
+
         aliceBalance = testToken.balanceOf(aliceCredentials.evmAddress).send()
         assertEquals(initialMint - depositAmount + withdrawAmount + multiWithdrawAmount, aliceBalance.value)
 
@@ -473,7 +471,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
                 gtv("eventHash" to gtv(nextBlockEventHash.toHex()))
         ).get().toObject<EventMerkleProof>()
         logger.info { "\trequesting withdrawal again" }
-        lastTxReceipt = bridge.withdrawRequest(
+        bridge.withdrawRequest(
                 nextBlockEventProof.web3EventData(),
                 nextBlockEventProof.web3EventProof(),
                 nextBlockEventProof.web3BlockHeader(),
@@ -481,12 +479,10 @@ class HBridgeIT : EifBaseIntegrationTest() {
                 nextBlockEventProof.web3Signers(),
                 nextBlockEventProof.web3ExtraProofData()
         ).send()
+        buildEvmBlocks(2)
 
-        await().atMost(Duration.TEN_SECONDS).until {
-            val block = web3j.ethGetBlockByNumber(DefaultBlockParameter.valueOf(lastTxReceipt.blockNumber.add(BigInteger.TWO)), false).send()
-            block.block != null
-        }
         bridge.withdraw(Bytes32(nextBlockEventHash), aliceCredentials.evmAddress).send()
+        buildEvmBlocks()
         aliceBalance = testToken.balanceOf(aliceCredentials.evmAddress).send()
         assertEquals(initialMint - depositAmount + withdrawAmount + multiWithdrawAmount * BigInteger.TWO, aliceBalance.value)
     }
@@ -536,23 +532,40 @@ class HBridgeIT : EifBaseIntegrationTest() {
                 eventProof.web3ExtraProofData()
         ).send()
 
-        // Get the last snapshot block height as mass-exit block
-        lastSnapshotBlockHeight = currentBlockHeight
+        // Build two new blocks to make account states mature enough
+        sealBlock()
+        sealBlock()
 
-        // we only need block header and signatures, but it's the easiest way to get them
-        val stateProof = blockQuery.query(
-                "get_account_state_merkle_proof",
-                gtv(
-                        "blockHeight" to gtv(lastSnapshotBlockHeight),
-                        "accountNumber" to gtv(aliceAccount.accountNum)
+        val merkleHashCalculator = GtvMerkleHashCalculator(Secp256K1CryptoSystem())
+        repeat(2) { // the 2nd iteration reassigns the mass exit block
+            // Get the last snapshot block height as mass-exit block
+            lastSnapshotBlockHeight = currentBlockHeight
+            val blockRid = blockQuery.getBlockRid(lastSnapshotBlockHeight).get()!!
+            val blockDetail = blockQuery.getBlock(blockRid, true).get()!!
+
+            val evmBlockHeader = encodeBlockHeaderDataForEVM(
+                    blockRid,
+                    BaseBlockHeader(blockDetail.header, merkleHashCalculator).blockHeaderRec,
+                    merkleHashCalculator
+            )
+
+            val evmSignatures = BaseBlockWitness.fromBytes(blockDetail.witness).getSignatures().map {
+                EifSignature(
+                        sig = encodeSignatureWithV(blockRid, it),
+                        pubkey = getEthereumAddress(it.subjectID)
                 )
-        ).get().toObject<AccountStateMerkleProof>()
+            }.sortedBy { Address(it.pubkey.toHex()).toUint().value }
 
-        lastTxReceipt = bridge.triggerMassExit(
-                stateProof.web3BlockHeader(),
-                stateProof.web3Signatures(),
-                stateProof.web3Signers()
-        ).send()
+            // trigger mass exit
+            bridge.triggerMassExit(
+                    evmBlockHeader.web3BlockHeader(),
+                    evmSignatures.web3Signatures(),
+                    evmSignatures.web3Signers()
+            ).send()
+            buildEvmBlocks()
+            sealBlock()
+        }
+
     }
 
     @Test
@@ -565,7 +578,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
         val eventProof = blockQuery.query("get_event_merkle_proof",
                 gtv("eventHash" to gtv(eventHash.toHex()))).get().toObject<EventMerkleProof>()
         logger.info { "\trequesting withdrawal initiated before mass exit - Tx Rid: ${wdTxHashInitiatedBeforeMassExit.toHex()}" }
-        lastTxReceipt = bridge.withdrawRequest(
+        bridge.withdrawRequest(
                 eventProof.web3EventData(),
                 eventProof.web3EventProof(),
                 eventProof.web3BlockHeader(),
@@ -573,11 +586,11 @@ class HBridgeIT : EifBaseIntegrationTest() {
                 eventProof.web3Signers(),
                 eventProof.web3ExtraProofData()
         ).send()
-        buildEvmBlocks()
+        buildEvmBlocks(2)
 
         // Complete withdrawal
         logger.info { "\tcompleting withdrawal initiated before mass exit - Tx Rid: ${wdTxHashInitiatedBeforeMassExit.toHex()}" }
-        lastTxReceipt = bridge.withdraw(Bytes32(eventHash), aliceCredentials.evmAddress).send()
+        bridge.withdraw(Bytes32(eventHash), aliceCredentials.evmAddress).send()
         buildEvmBlocks()
         aliceBalance = testToken.balanceOf(aliceCredentials.evmAddress).send()
         assertEquals(initialMint - depositAmount + withdrawAmount * 2.toBigInteger() + multiWithdrawAmount * 2.toBigInteger(), aliceBalance.value)
@@ -1030,9 +1043,10 @@ class HBridgeIT : EifBaseIntegrationTest() {
         return if (balanceGtv.isNull()) null else balanceGtv["amount"]!!.asBigInteger()
     }
 
-    private fun buildEvmBlocks(nrOfBlocks: BigInteger = BigInteger.TWO) {
+    private fun buildEvmBlocks(nrOfBlocks: Int = 1) {
+        val targetBlockNumber = web3j.ethBlockNumber().send().blockNumber + nrOfBlocks.toBigInteger()
         await().atMost(Duration.TEN_SECONDS).until {
-            web3j.ethBlockNumber().send().blockNumber >= lastTxReceipt.blockNumber + nrOfBlocks
+            web3j.ethBlockNumber().send().blockNumber >= targetBlockNumber
         }
     }
 
