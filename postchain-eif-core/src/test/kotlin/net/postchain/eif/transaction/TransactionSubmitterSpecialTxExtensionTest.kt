@@ -1,6 +1,7 @@
 package net.postchain.eif.transaction
 
 import assertk.assertThat
+import assertk.assertions.isFalse
 import assertk.assertions.isTrue
 import net.postchain.base.SpecialTransactionPosition
 import net.postchain.common.BlockchainRid
@@ -75,9 +76,7 @@ class TransactionSubmitterSpecialTxExtensionTest {
                 txExtension.buildTxUpdateOp(0, RellTransactionStatus.SUCCESS),
         )
 
-        // TODO enable when this validation makes the transaction fail
-        // assertThat(txExtension.validateSpecialOperations(SpecialTransactionPosition.Begin, mock<BlockEContext>(), ops)).isFalse()
-        txExtension.validateSpecialOperations(SpecialTransactionPosition.Begin, mock<BlockEContext>(), ops)
+     assertThat(txExtension.validateSpecialOperations(SpecialTransactionPosition.Begin, mock<BlockEContext>(), ops)).isFalse()
         testLogAppender.assertWarn("Validation failed. Transaction 0 is set to SUCCESS but without a receipt")
     }
 
@@ -99,9 +98,7 @@ class TransactionSubmitterSpecialTxExtensionTest {
                 txExtension.buildTxReceiptOp(txDb),
         )
 
-        // TODO enable when this validation makes the transaction fail
-        // assertThat(txExtension.validateSpecialOperations(SpecialTransactionPosition.Begin, mock<BlockEContext>(), ops)).isFalse()
-        txExtension.validateSpecialOperations(SpecialTransactionPosition.Begin, mock<BlockEContext>(), ops)
+        assertThat(txExtension.validateSpecialOperations(SpecialTransactionPosition.Begin, mock<BlockEContext>(), ops)).isFalse()
         testLogAppender.assertWarn("Validation failed. Receipt for transaction ${txDb.rowId} set without any ${RellTransactionStatus.SUCCESS.name} status update op")
     }
 
