@@ -170,7 +170,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         return true;
     }
 
-    function deposit(IERC20 token, uint256 amount) public isAllowToken(token) whenNotPaused whenNotMassExit returns (bool) {
+    function deposit(IERC20 token, uint256 amount) public isAllowToken(token) whenNotPaused whenNotMassExit onlyEOA returns (bool) {
         transferDeposit(token, amount);
         emit DepositedERC20(msg.sender, token, amount, 0x0); // accountID will be determined from sender
         return true;
@@ -187,6 +187,11 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         _;
     }
 
+    modifier onlyEOA() {
+        require(!isContract(msg.sender), "TokenBridge: only EOA can call this function");
+        _;
+    }
+
     function depositToAccountID(IERC20 token, uint256 amount, bytes32 accountID) public
         isAllowToken(token)
         whenNotPaused
@@ -194,6 +199,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         onlyContract() // cannot be called from EOA for security reasons
         returns (bool)
     {
+        require(accountID != bytes32(0), "TokenBridge: invalid accountID, cannot be zero.");
         transferDeposit(token, amount);
         emit DepositedERC20(msg.sender, token, amount, accountID);
         return true;

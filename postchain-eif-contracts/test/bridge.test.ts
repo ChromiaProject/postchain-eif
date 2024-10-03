@@ -517,18 +517,19 @@ describe("Token Bridge Test", () => {
             const tokenInstance = new TestToken__factory(deployer).attach(tokenAddress)
             const toMint = ethers.utils.parseEther("10000")
 
-            await tokenInstance.mint(bridgeDelegatorAddress, toMint);
+            await tokenInstance.mint(user.address, toMint);
             expect(await tokenInstance.totalSupply()).to.eq(toMint)
 
             const bridge = new TokenBridgeWithSnapshotWithdraw__factory(user).attach(bridgeAddress)
             const validatorAdmin = new Validator__factory(admin).attach(validatorAddress)
             const bridgeOwner = new TokenBridgeWithSnapshotWithdraw__factory(admin).attach(bridgeAddress)
-            const bridgeDelegator = new TokenBridgeDelegator__factory(user).attach(bridgeDelegatorAddress)            
+            const bridgeDelegator = new TokenBridgeDelegator__factory(user).attach(bridgeDelegatorAddress)
             const toDeposit = ethers.utils.parseEther("100")
-            await bridgeDelegator.approve(tokenAddress, bridgeAddress, toDeposit)
+            const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
+            await tokenApproveInstance.approve(bridgeAddress, toDeposit)
 
             await expect(bridge.deposit(bridgeAddress, toDeposit)).to.be.revertedWith('TokenBridge: not allow token')
-            let tx: ContractTransaction = await bridgeDelegator.deposit(tokenAddress, toDeposit)
+            let tx: ContractTransaction = await bridge.deposit(tokenAddress, toDeposit)
             let receipt: ContractReceipt = await tx.wait()
             let logs = receipt.logs
             if (logs !== undefined) {
@@ -762,7 +763,7 @@ describe("Token Bridge Test", () => {
                 await expect(bridgeOwner.unpendingWithdraw(hashEvent))
                 .to.emit(bridge, "UnpendingWithdraw")
 
-                expect(await tokenInstance.balanceOf(bridgeDelegatorAddress)).to.eq(toMint.sub(toDeposit))
+                expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint.sub(toDeposit))
                 expect(await tokenInstance.balanceOf(bridge.address)).to.eq(toDeposit)
                 await expect(bridgeDelegator.withdraw(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
@@ -775,12 +776,12 @@ describe("Token Bridge Test", () => {
                 .to.emit(bridge, "Withdrawal")
                 .withArgs(bridgeDelegatorAddress, tokenAddress, toDeposit)
                 expect(await tokenInstance.balanceOf(bridge.address)).to.eq(0)
-                expect(await tokenInstance.balanceOf(bridgeDelegatorAddress)).to.eq(toMint)
+                expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint.sub(toDeposit))
                 await expect(bridgeDelegator.withdraw(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
                     bridgeDelegatorAddress)).to.be.revertedWith('TokenBridge: fund is pending or was already claimed')
             }
-        })        
+        })
     })
 
     describe("Mass Exit", async () => {
