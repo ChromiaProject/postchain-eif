@@ -196,8 +196,9 @@ function emit_local_erc20_state_slot(state_slot) {
                                                 .type == state_slot_type.erc20,
                                                 .local == true } limit 1);
         if (not has_existing_slots) {
-            val assets = (b:ft4.assets.balance, e: erc20_asset_snapshots_enabled) @* {
-                b.asset == e.asset
+            val assets = (b: ft4.assets.balance, e: erc20_asset_snapshots_enabled) @* {
+                b.account == account,
+                b.asset == e.asset,
             } (.erc20_asset);
             for (asset in assets) {
                 val slot = maybe_create_local_erc20_state_slot(account, asset);
