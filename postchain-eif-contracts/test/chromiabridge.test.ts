@@ -640,18 +640,19 @@ describe("ChromiaToken Bridge Test", () => {
       const [deployer, user] = await ethers.getSigners();
       const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
       const toMint = ethers.utils.parseEther("10000");
-      await tokenInstance.transferFromChromia(bridgeDelegatorAddress, toMint, ethers.utils.formatBytes32String("test"));
+      await tokenInstance.transferFromChromia(user.address, toMint, ethers.utils.formatBytes32String("test"));
       expect(await tokenInstance.totalSupply()).to.eq(toMint);
 
-      const bridge = new ChromiaTokenBridge__factory(user).attach(bridgeAddress);
       const validatorAdmin = new Validator__factory(admin).attach(validatorAddress);
       const bridgeOwner = new ChromiaTokenBridge__factory(admin).attach(bridgeAddress);
+      const bridge = new ChromiaTokenBridge__factory(user).attach(bridgeAddress);
       const bridgeDelegator = new TokenBridgeDelegator__factory(user).attach(bridgeDelegatorAddress);
       const toDeposit = ethers.utils.parseEther("100");
-      await bridgeDelegator.approve(tokenAddress, bridgeAddress, toDeposit);
+      const tokenApproveInstance = new Chromia__factory(user).attach(tokenAddress)
+      await tokenApproveInstance.approve(bridgeAddress, toDeposit)
 
       await expect(bridge.deposit(bridgeAddress, toDeposit)).to.be.revertedWith("TokenBridge: not allow token");
-      let tx: ContractTransaction = await bridgeDelegator.deposit(tokenAddress, toDeposit);
+      let tx: ContractTransaction = await bridge.deposit(tokenAddress, toDeposit);
       let receipt: ContractReceipt = await tx.wait();
       let logs = receipt.logs;
 
@@ -977,7 +978,7 @@ describe("ChromiaToken Bridge Test", () => {
         // smart contract owner can set withdraw request status back to withdrawable
         await expect(bridgeOwner.unpendingWithdraw(hashEvent)).to.emit(bridge, "UnpendingWithdraw");
 
-        expect(await tokenInstance.balanceOf(bridgeDelegatorAddress)).to.eq(toMint.sub(toDeposit));
+        expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint.sub(toDeposit));
         expect(await tokenInstance.balanceOf(bridge.address)).to.eq(0);
         await expect(
           bridgeDelegator.withdraw(
@@ -997,7 +998,7 @@ describe("ChromiaToken Bridge Test", () => {
           .to.emit(bridge, "Withdrawal")
           .withArgs(bridgeDelegatorAddress, tokenAddress, toDeposit);
         expect(await tokenInstance.balanceOf(bridge.address)).to.eq(0);
-        expect(await tokenInstance.balanceOf(bridgeDelegatorAddress)).to.eq(toMint);
+        expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint.sub(toDeposit));
         await expect(
           bridgeDelegator.withdraw(
             DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
