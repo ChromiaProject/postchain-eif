@@ -861,6 +861,8 @@ class HBridgeIT : EifBaseIntegrationTest() {
                 gtv(mapOf("op_name" to opName, "op_args" to opArgs))).get().asString()
                 .replace("{blockchain_rid}", bcRid.toHex().uppercase())
                 .replace("{nonce}", nonce.toHex().uppercase())
+                .replace("{account_id}", userAccount.accountId.toHex().uppercase())
+                .replace("{auth_descriptor_id}", userAccount.authDescriptorId.toHex().uppercase())
         val evmSig = Sign.signPrefixedMessage(
                 message.toByteArray(StandardCharsets.UTF_8),
                 userCredentials.evmCredentials.ecKeyPair

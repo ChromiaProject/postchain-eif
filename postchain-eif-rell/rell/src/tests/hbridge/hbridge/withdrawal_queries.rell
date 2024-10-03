@@ -21,8 +21,8 @@ function test_get_erc20_withdrawals() {
     val bob_evm_deposit_receipient_id = bob_evm_address.hash();
 
     // Linking EVM and FT4 accounts for Alice and Bob
-    link_account(alice_evm_keypair, rell.test.keypairs.alice, alice_account.id, alice_auth_descriptor.hash());
-    link_account(bob_evm_keypair, rell.test.keypairs.bob, bob_account.id, bob_auth_descriptor.hash());
+    link_eoa_account(alice_evm_keypair, rell.test.keypairs.alice, alice_account.id, alice_auth_descriptor.hash());
+    link_eoa_account(bob_evm_keypair, rell.test.keypairs.bob, bob_account.id, bob_auth_descriptor.hash());
 
     // Minting some for Alice and Bob
     val minted = 10000L;

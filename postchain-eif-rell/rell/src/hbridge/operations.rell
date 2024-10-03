@@ -1,8 +1,14 @@
 @extend(ft4.auth.auth_handler)
 function () = ft4.auth.add_auth_handler(
     scope = rell.meta(link_evm_eoa_account).mount_name,
-    flags = ["A"]
+    flags = ["A"],
+    message = link_evm_eoa_account_auth_message(*)
 );
+
+function link_evm_eoa_account_auth_message(gtv) {
+    val args = struct<link_evm_eoa_account>.from_gtv(gtv);
+    return "Please sign the message to link Externally Owned Account %s\nto Chromia account {account_id}".format(args.address);
+}
 
 operation link_evm_eoa_account(address: byte_array) {
     val account = ft4.auth.authenticate();
@@ -13,8 +19,16 @@ operation link_evm_eoa_account(address: byte_array) {
 @extend(ft4.auth.auth_handler)
 function () = ft4.auth.add_auth_handler(
     scope = rell.meta(link_evm_sc_account).mount_name,
-    flags = ["A"]
+    flags = ["A"],
+    message = link_evm_sc_account_auth_message(*)
 );
+
+function link_evm_sc_account_auth_message(gtv) {
+    val args = struct<link_evm_sc_account>.from_gtv(gtv);
+    return "Please sign the message to link Smart Contract %s on network %d\nto Chromia account {account_id}".format(
+        args.address, args.network_id
+    );
+}
 
 operation link_evm_sc_account(address: byte_array, network_id: integer) {
     val account = ft4.auth.authenticate();

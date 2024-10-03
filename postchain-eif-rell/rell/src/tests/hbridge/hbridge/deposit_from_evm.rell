@@ -53,7 +53,7 @@ function test_deposit_foreign_token_from_evm_with_already_created_and_linked_acc
     val ft_account = accounts.Account(account_id);
 
     // Link account
-    link_account(
+    link_eoa_account(
         rell.test.keypairs.eve,
         rell.test.keypairs.alice,
         account_id,
@@ -72,6 +72,33 @@ function test_deposit_foreign_token_from_evm_with_already_created_and_linked_acc
     deposit_from_evm(evm_address, 0, block_height = 4);
     deposit_from_evm(evm_address, -1, block_height = 5);
     assert_equals(erc20_deposit @ {} (@sum 1), nr_of_deposits);
+}
+
+function test_deposit_foreign_token_from_evm_sc_with_already_created_and_linked_account() {
+    val ft_asset = register_foreign_asset();
+
+    // Account
+    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val account_id = rell.test.pubkeys.alice.hash();
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+
+    // Register account
+    rell.test.tx().op(
+        admin.external.register_account(auth_descriptor)
+    ).sign(admin_privkey).run();
+    val ft_account = accounts.Account(account_id);
+
+    link_sc_account_id_event(evm_address, account_id);
+    link_sc_account(
+        rell.test.keypairs.eve,
+        rell.test.keypairs.alice,
+        account_id,
+        auth_descriptor.hash()
+    );
+
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), 0L);
+    deposit_from_evm(evm_address, 10000000, block_height = 2);
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), 10000000L);
 }
 
 function test_deposit_foreign_token_from_evm_before_account_creation() {
@@ -119,7 +146,7 @@ function test_deposit_foreign_token_from_evm_before_account_creation() {
     assert_equals(erc20_withdrawal @* {} (.amount), [7000000L, 11000000L, 8000L, 12000000L]);
 
     // Link accounts
-    link_account(
+    link_eoa_account(
         rell.test.keypairs.eve,
         rell.test.keypairs.alice,
         account_id,
@@ -136,7 +163,7 @@ function test_deposit_foreign_token_from_evm_before_account_creation() {
 
     // Trying to link accounts again
     assert_fails("EVM address %s is already linked to FT4 account".format(evm_address),
-        link_account(
+        link_eoa_account(
             rell.test.keypairs.eve,
             rell.test.keypairs.alice,
             account_id,
@@ -152,7 +179,7 @@ function test_deposit_foreign_token_from_evm_before_account_creation() {
         admin.external.register_account(auth_descriptor2)
     ).sign(admin_privkey).run();
     assert_fails("EVM address %s is already linked to FT4 account".format(evm_address),
-        link_account(
+        link_eoa_account(
             rell.test.keypairs.eve,
             rell.test.keypairs.bob,
             account_id2,
@@ -207,7 +234,9 @@ function test_deposit_foreign_token_from_evm_will_get_pending_assets_when_regist
     assert_equals(hbridge.get_eoa_addresses_for_account(ft_account.id), [evm_address]);
 
     val op = hbridge.link_evm_eoa_account(evm_address);
-    val message2 = test_utils.create_evm_auth_message(op);
+    val message2 = test_utils.create_evm_auth_message(op)
+        .replace(auth.ACCOUNT_ID_PLACEHOLDER, recipient_id.to_hex().upper_case())
+        .replace(auth.AUTH_DESCRIPTOR_ID_PLACEHOLDER, auth_descriptor.hash().to_hex().upper_case());
     val signature2 = test_utils.evm_sign(message2, rell.test.privkeys.eve);
     rell.test.tx()
         .op(auth.evm_signatures([evm_address], [signature2]))
