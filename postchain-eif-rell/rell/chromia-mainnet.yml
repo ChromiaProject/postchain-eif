@@ -138,7 +138,7 @@ blockchains:
               - L_signer_list_update
           local:
             - bc-rid: x"15C0CA99BEE60A3B23829968771C50E491BD00D2E3AE448580CD48A8D71E7BBA" # economy-chain
-              topic: "L_bridge_mapping"
+              topic: "L__bridge_mapping"
           global:
             topics:
               - G_evm_submit_transaction

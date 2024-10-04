@@ -308,7 +308,7 @@ function check_and_resubmit_latest_update_if_needed(updated_mapping: bridge_mapp
             val old_transaction = transactions[0];
 
             val new_transaction = add_transaction_to_queue(
-                old_transaction.contract_address,
+                updated_mapping.validator_contract,
                 old_transaction.function_name,
                 old_transaction.parameter_types.split("."),
                 list<gtv>.from_gtv(gtv.from_bytes(old_transaction.parameter_values)),

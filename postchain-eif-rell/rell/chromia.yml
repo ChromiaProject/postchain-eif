@@ -258,7 +258,7 @@ blockchains:
               - L_signer_list_update
           local:
             - bc-rid: x"" # Replace with economy chain brid
-              topic: "L_bridge_mapping"
+              topic: "L__bridge_mapping"
           global:
             topics:
               - G_evm_submit_transaction
