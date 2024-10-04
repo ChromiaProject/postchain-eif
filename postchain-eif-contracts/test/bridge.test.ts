@@ -794,13 +794,15 @@ describe("Token Bridge Test", () => {
         let blockRid: string;
         let sigs: BytesLike[];
         let validators: string[];
+        let extraProof: any;
 
         beforeEach(async () => {
             blockchainRid = "977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795";
             previousBlockRid = "49e46bf022de1515cbb2bf0f69c62c071825a9b940e8f3892acb5d2021832ba0";
             merkleRootHash = "96defe74f43fcf2d12a1844bcd7a3a7bcb0d4fa191776953dae3f1efb508d866";
             dependencies = "56bfbee83edd2c9a79ff421c95fc8ec0fa0d67258dca697e47aae56f6fbc8af3";
-            extraDataMerkleRoot = "A1C05DC4AFAE5375A20F89785FA362C6BCF74310C5209F1C023C6334C31DE3C4";
+            extraDataMerkleRoot = "672D33B35488E3C965E6A393B922CDCF79C51976DA97A6B7B3079DE1DF6DB89E";
+
 
             const merkleRootHashHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(merkleRootHash));
             const dependenciesHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(dependencies));
@@ -839,6 +841,19 @@ describe("Token Bridge Test", () => {
             ];
 
             validators = [validator1.address, validator2.address, validator3.address];
+
+            let hashRootEvent = "0x728d07430504bb9ab20503de4226a073dd8407e10b6034419c8e74bfabe42ab7"
+            let hashRootState = "0x670fff953275de8667fe07d088f1e1dad999bd1d73f44f3b19b94b5c1b28fd69"
+            let eifLeaf = hashRootEvent.substring(2, hashRootEvent.length).concat(hashRootState.substring(2, hashRootState.length))
+
+            const hashedLeaf = hashGtvBytes64Leaf(DecodeHexStringToByteArray(eifLeaf));
+            extraProof = {
+                leaf: DecodeHexStringToByteArray(eifLeaf),
+                hashedLeaf: DecodeHexStringToByteArray(hashedLeaf.substring(2, hashedLeaf.length)),
+                position: 1,
+                extraRoot: DecodeHexStringToByteArray(extraDataMerkleRoot),
+                extraMerkleProofs: [DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797")],
+            }
         });
         
 
@@ -857,7 +872,7 @@ describe("Token Bridge Test", () => {
 
             // Trigger mass exit
             await adminBridge.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid));
-            await adminBridge.triggerMassExit(DecodeHexStringToByteArray(blockHeader), sigs, validators, {gasLimit: 10000000});
+            await adminBridge.triggerMassExit(DecodeHexStringToByteArray(blockHeader), sigs, validators, extraProof, {gasLimit: 10000000});
 
             // Attempt emergency withdrawal before time has passed
             await expect(adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address))
@@ -896,17 +911,17 @@ describe("Token Bridge Test", () => {
                 .to.emit(adminTokenBridge, "SetBlockchainRid");
 
             // non admin cannot trigger mass exit
-            await expect(otherTokenBridge.triggerMassExit(DecodeHexStringToByteArray(blockHeader), sigs, validators, {gasLimit: 10000000})).to.be.revertedWith('OwnableUnauthorizedAccount')
+            await expect(otherTokenBridge.triggerMassExit(DecodeHexStringToByteArray(blockHeader), sigs, validators, extraProof, {gasLimit: 10000000})).to.be.revertedWith('OwnableUnauthorizedAccount')
 
             // admin can trigger mass exit
-            await expect(adminTokenBridge.triggerMassExit(DecodeHexStringToByteArray(blockHeader), sigs, validators, {gasLimit: 10000000}))
+            await expect(adminTokenBridge.triggerMassExit(DecodeHexStringToByteArray(blockHeader), sigs, validators, extraProof, {gasLimit: 10000000}))
             .to.emit(adminTokenBridge, "TriggerMassExit")
             expect(await adminTokenBridge.isMassExit()).to.be.true
             expect((await adminTokenBridge.massExitBlock()).blockRid).to.be.equal(blockRid)
             expect((await adminTokenBridge.massExitBlock()).height).to.be.equal(100)
 
             // admin can re-trigger mass exit
-            await expect(adminTokenBridge.triggerMassExit(DecodeHexStringToByteArray(blockHeader), sigs, validators, {gasLimit: 10000000}))
+            await expect(adminTokenBridge.triggerMassExit(DecodeHexStringToByteArray(blockHeader), sigs, validators, extraProof, {gasLimit: 10000000}))
                 .to.emit(adminTokenBridge, "TriggerMassExit")
             expect(await adminTokenBridge.isMassExit()).to.be.true
             expect((await adminTokenBridge.massExitBlock()).blockRid).to.be.equal(blockRid)

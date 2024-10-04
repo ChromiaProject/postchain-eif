@@ -176,6 +176,15 @@ query get_state_slot_ids_for_account(account_id: byte_array): list<integer> {
     return local_erc20_state_slot_binding @* { account } (.state_slot.id);
 }
 
+query get_withdrawal_state_slot_ids_for_address(beneficiary: byte_array, network_id: integer): list<integer> {
+    return state_slot @* {
+        .recipient_address == beneficiary,
+        .network_id == network_id,
+        .type == state_slot_type.erc20_withdrawal,
+        .local == true
+    } (.id);
+}
+
 query get_state_slot_ids_for_address(recipient_address: byte_array): list<integer> {
     return state_slot @* { recipient_address } (.id);
 }

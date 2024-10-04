@@ -239,8 +239,9 @@ function assert_withdraw(serial: integer, evm_address: byte_array, amount: big_i
     ];
 
     val events = rell.test.get_events();
+
     val event_data = if (events.size() > 1)
-        events[1] // first event is snapshot
+        events @* { $[0] == "eif_event" } [0]
     else
         events[0];
 

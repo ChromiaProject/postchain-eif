@@ -17,6 +17,8 @@
 
 enum state_slot_type {    
     erc20,
+    // temporary state which facilitates withdrawals which are pending at the time of mass exit
+    erc20_withdrawal,
     erc721
 }
 
@@ -104,9 +106,73 @@ struct state_data {
 // Hexadecimal representation of the "hbridge:erc20:v1" string followed by 16x 0x01 bytes, 32 bytes in total.
 val ERC20_STATE_TAG = x"686272696467653a65726332303a763101010101010101010101010101010101";
 
+// hbridge:erc20_withdrawal:v1 followed by 7x 01 bytes, 32 bytes in total
+val ERC20_WITHDRAWAL_STATE_TAG = x"686272696467653a65726332305f77697468647261773a763101010101010101";
+
 struct balance_record {
     token_address: byte_array;
     balance: big_integer;
+}
+
+function emit_erc20_withdrawal_state(state_slot: state_slot, event_hashes: list<byte_array>) {
+    val state_slot_data = state_slot.to_struct();
+    val state_parts = list<gtv>();
+    state_parts.add(ERC20_WITHDRAWAL_STATE_TAG.to_gtv());
+    state_parts.add(utils.evm_address_to_32_byte_array(state_slot_data.recipient_address).to_gtv());
+    state_parts.add(state_slot_data.discriminator.to_gtv()); // discriminator already already includes network_id
+    for (event_hash in event_hashes) {
+        state_parts.add(event_hash.to_gtv());
+    }
+    op_context.emit_event("eif_state", 
+        state_data(state_slot_data.id, state_parts).to_gtv()
+    );
+}
+
+function add_erc20_withdrawal_to_snapshot(ew: erc20_withdrawal) {
+    val withdrawal_info = ew.to_struct();
+    val asset = erc20_asset @? { .token_address == withdrawal_info.token_address, 
+        .network_id == withdrawal_info.network_id };
+
+    if (not exists(asset)) return;
+    if (not exists(erc20_asset_snapshots_enabled @? { .erc20_asset == asset })) return;
+
+    val network_id = withdrawal_info.network_id;
+    val beneficiary = withdrawal_info.beneficiary;
+    
+    // Create state_slot as needed
+    var state_slot = state_slot @? {
+        .recipient_address == beneficiary,
+        .type == state_slot_type.erc20_withdrawal,
+        .network_id == network_id,
+        .discriminator == network_id_to_discriminator(network_id),
+        .local == true
+    };
+    
+    if (empty(state_slot)) {
+        state_slot = create state_slot (
+            id = get_next_state_slot_id(),
+            network_id,
+            recipient_address = beneficiary,
+            type = state_slot_type.erc20_withdrawal,
+            discriminator = network_id_to_discriminator(network_id),
+            local = true
+        );
+    }
+
+    // Collect all withdrawals for a given address with status other than withdrawn
+    val event_hashes = (
+        w: erc20_withdrawal,
+        s: erc20_withdrawal_status
+    ) @* {
+        w.beneficiary == beneficiary,
+        w.network_id == network_id,
+        s.erc20_withdrawal == w,
+        s.withdrawal_status != withdrawal_status.withdrawn,
+        s.withdrawal_status != withdrawal_status.withdrawn_to_chromia
+    } ( w.event_hash );
+
+    // Emit state
+    emit_erc20_withdrawal_state(state_slot, event_hashes);
 }
 
 function emit_erc20_state(state_slot: state_slot, balance_records: list<balance_record>) {

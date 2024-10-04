@@ -223,7 +223,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         bytes[] memory sigs,
         address[] memory signers,
         Data.ExtraProofData memory extraProof
-    ) external whenNotPaused nonReentrant {
+    ) external whenNotMassExit whenNotPaused nonReentrant {
         (uint height, bytes32 blockRid) = _withdrawRequest(eventProof, blockHeader, sigs, signers, extraProof);
         _events[eventProof.leaf] = _updateWithdraw(eventProof.leaf, _event, height, blockRid); // mark the event hash was already used.
     }
@@ -241,9 +241,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         require(Hash.hashGtvBytes64Leaf(extraProof.leaf) == extraProof.hashedLeaf, "Postchain: invalid EIF extra data");
         (uint height, bytes32 blockRid) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
         bytes32 eventRoot = _bytesToBytes32(extraProof.leaf, 0);
-        if (isMassExit) {
-            require(height <= massExitBlock.height, "TokenBridge: cannot withdraw request after the mass exit block height");
-        }
         if (!validator.isValidSignatures(blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
         if (!MerkleProof.verify(eventProof.merkleProofs, eventProof.leaf, eventProof.position, eventRoot)) revert("TokenBridge: invalid merkle proof");
 
@@ -270,12 +267,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         return true;
     }
 
-    function withdraw(bytes32 _hash, address payable beneficiary) external whenNotPaused nonReentrant {
+    function withdraw(bytes32 _hash, address payable beneficiary) external whenNotMassExit whenNotPaused nonReentrant {
         Withdraw storage wd = _withdraw[_hash];
         require(wd.beneficiary == beneficiary, "TokenBridge: no fund for the beneficiary");
-        if (isMassExit) {
-            require(wd.postchain_height <= massExitBlock.height, "TokenBridge: cannot withdraw request after the mass exit block height");
-        }
         require(wd.block_number <= block.number, "TokenBridge: not mature enough to withdraw the fund");
         require(wd.status == Status.Withdrawable, "TokenBridge: fund is pending or was already claimed");
         wd.status = Status.Withdrawn;
