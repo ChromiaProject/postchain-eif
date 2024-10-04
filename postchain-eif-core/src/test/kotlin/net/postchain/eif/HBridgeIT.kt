@@ -47,7 +47,6 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
@@ -581,53 +580,77 @@ class HBridgeIT : EifBaseIntegrationTest() {
 
     }
 
+
+    private fun indexOfSubsequence(data: ByteArray, subsequence: ByteArray): Int {
+        if (subsequence.isEmpty() || data.size < subsequence.size) return -1
+
+        for (i in 0..data.size - subsequence.size) {
+            if (data.sliceArray(i until i + subsequence.size).contentEquals(subsequence)) {
+                return i
+            }
+        }
+        return -1
+    }
+
     @Test
     @Order(9)
     fun `request and complete withdrawal initiated before mass exit`() {
         logger.info { "request and complete withdrawal on evm initiated before mass exit" }
 
-        // Request withdrawal
-        val eventHash = getWithdrawalEventHashByTxRid(wdTxHashInitiatedBeforeMassExit)
-
-        val wStateSlotID = blockQuery.query("eif.hbridge.get_withdrawal_state_slot_ids_for_address",
-            gtv("beneficiary" to gtv(aliceCredentials.evmAddressStr),
-                "network_id" to gtv(networkId),
-                )).get().asArray()[0].asInteger()
-
-        val stateProof = blockQuery.query(
-                "get_account_state_merkle_proof",
-                gtv(
-                        "blockHeight" to gtv(lastSnapshotBlockHeight),
-                        "accountNumber" to gtv(wStateSlotID)
-                )
-        ).get().toObject<AccountStateMerkleProof>()
-
-        val eventProof = blockQuery.query("get_event_merkle_proof",
-            gtv("eventHash" to gtv(eventHash.toHex()))
-        ).get().toObject<EventMerkleProof>()
-
-        logger.info { "\trequesting withdrawal initiated before mass exit - Tx Rid: ${wdTxHashInitiatedBeforeMassExit.toHex()}" }
-        bridge.completeWithdrawalBySnapshot(
-                stateProof.web3StateData(),
-                Uint64(0L), // we can find this by searching for eventHash in stateData
-                eventProof.web3EventData(),
-                stateProof.web3StateProof()
-        ).send()
-        buildEvmBlocks(2)
+        completeWithdrawalBySnapshot(wdTxHashInitiatedBeforeMassExit)
 
         aliceBalance = testToken.balanceOf(aliceCredentials.evmAddress).send()
         assertEquals(initialMint - depositAmount + withdrawAmount * 2.toBigInteger() + multiWithdrawAmount * 2.toBigInteger(), aliceBalance.value)
     }
 
+    private fun completeWithdrawalBySnapshot(wdTxHash: Hash) {
+        // Request withdrawal
+        val eventHash = getWithdrawalEventHashByTxRid(wdTxHash)
+
+        val wStateSlotID = blockQuery.query(
+            "eif.hbridge.get_withdrawal_state_slot_ids_for_address",
+            gtv(
+                "beneficiary" to gtv(aliceCredentials.evmAddressStr),
+                "network_id" to gtv(networkId),
+            )
+        ).get().asArray()[0].asInteger()
+
+        val stateProof = blockQuery.query(
+            "get_account_state_merkle_proof",
+            gtv(
+                "blockHeight" to gtv(lastSnapshotBlockHeight),
+                "accountNumber" to gtv(wStateSlotID)
+            )
+        ).get().toObject<AccountStateMerkleProof>()
+
+        val eventProof = blockQuery.query(
+            "get_event_merkle_proof",
+            gtv("eventHash" to gtv(eventHash.toHex()))
+        ).get().toObject<EventMerkleProof>()
+
+        val offset = indexOfSubsequence(stateProof.stateData, eventHash)
+        assertTrue(offset > 0)
+        assertTrue(offset % 32 == 0)
+        val n = offset / 32 - 3
+        assertTrue(n >= 0)
+
+        logger.info { "\trequesting withdrawal initiated before mass exit - Tx Rid: ${wdTxHash.toHex()}" }
+        bridge.completeWithdrawalBySnapshot(
+            stateProof.web3StateData(),
+            Uint64(n.toLong()),
+            eventProof.web3EventData(),
+            stateProof.web3StateProof()
+        ).send()
+        buildEvmBlocks(2)
+    }
+
     @Test
-    @Disabled // TODO: withdrawals should fail after mass exit
     @Order(10)
     fun `complete withdrawal requested before mass exit`() {
         logger.info { "complete withdrawal on evm requested before mass exit" }
 
-        val eventHash = getWithdrawalEventHashByTxRid(wdTxHashRequestedBeforeMassExit)
-        bridge.withdraw(Bytes32(eventHash), aliceCredentials.evmAddress).send()
-        buildEvmBlocks()
+        completeWithdrawalBySnapshot(wdTxHashRequestedBeforeMassExit)
+
         aliceBalance = testToken.balanceOf(aliceCredentials.evmAddress).send()
         assertEquals(initialMint - depositAmount + withdrawAmount * 3.toBigInteger() + multiWithdrawAmount * 2.toBigInteger(), aliceBalance.value)
     }
@@ -714,7 +737,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
                     eventProof.web3ExtraProofData()
             ).send()
         }
-        assertTrue(exception.message!!.contains("TokenBridge: cannot withdraw request after the mass exit block height"))
+        assertTrue(exception.message!!.contains("TokenBridge: action is not allowed during mass exit"))
 
         /*
         aliceBalance = testToken.balanceOf(aliceCredentials.evmAddress).send()

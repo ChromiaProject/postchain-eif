@@ -58,7 +58,7 @@ class EifBlockBuilderExtension(
      * Compute event (as a simple Merkle tree) and state hashes (using updateSnapshot)
      */
     override fun finalize(): Map<String, Gtv> {
-        val stateRootHash = snapshot.updateSnapshot(bctx.height, states)
+        val stateRootHash = snapshot.updateSnapshot(bctx.height, states, config.version)
         if (states.size > 0 && config.snapshotsToKeep > 0) {
             snapshot.pruneSnapshot(bctx.height)
         }

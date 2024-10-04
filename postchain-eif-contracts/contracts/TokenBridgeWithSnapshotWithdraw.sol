@@ -109,8 +109,9 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
             wd.amount = 0;
             wd.status = Status.Withdrawn;
         }
-        transferWithdraw(wd.token, beneficiary, amount);
-        emit Withdrawal(beneficiary, wd.token, amount);
+
+        transferWithdraw(token, beneficiary, amount);
+        emit Withdrawal(beneficiary, token, amount);
         emit WithdrawalHash(eventHash);
     }
 
