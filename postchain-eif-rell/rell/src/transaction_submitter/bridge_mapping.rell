@@ -1,4 +1,4 @@
-val bridge_mapping_topic = "L_bridge_mapping";
+val bridge_mapping_topic = "L__bridge_mapping";
 
 struct bridge_mapping_message {
     blockchain_rid: byte_array;

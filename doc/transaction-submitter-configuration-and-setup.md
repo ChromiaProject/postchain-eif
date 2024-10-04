@@ -36,7 +36,7 @@ The transaction submitter chain anchoring module has the following module args:
 In addition you also need to set up ICMF configuration so that it listens to:
 
 - `L_signer_list_update` from directory chain.
-- `L_bridge_mapping` from economy chain.
+- `L__bridge_mapping` from economy chain.
 - `G_evm_submit_transaction` (not really needed currently since we will only do anchoring and signer updates).
 
 Example:
@@ -103,7 +103,7 @@ Example:
               - L_signer_list_update
           local:
             - bc-rid: x"" # Replace with economy chain brid
-              topic: "L_bridge_mapping"
+              topic: "L__bridge_mapping"
           global:
             topics:
               - G_evm_submit_transaction
