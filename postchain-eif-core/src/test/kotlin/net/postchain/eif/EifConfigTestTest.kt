@@ -32,6 +32,7 @@ class EifConfigTestTest {
     fun restoreStreams() {
         System.setOut(originalOut)
         System.setErr(originalErr)
+        evmContainer.stop()
     }
 
     private val evmContainer: DockerComposeContainer<*> = GethContainer().withExposedService(
@@ -137,7 +138,6 @@ class EifConfigTestTest {
         )
     }
 
-    @Disabled
     @Test
     fun `Success EVM chains and node URLs are configured correctly`() {
         evmContainer.start()
