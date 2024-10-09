@@ -1,0 +1,19 @@
+import hbridge.*;
+
+function test_get_registered_erc20_assets() {
+    // Empty list
+    assert_true(get_registered_erc20_assets(network_id1).empty());
+
+    // Register FT4 and ERC20 assets
+    val chr_asset = register_foreign_asset(CHR, network_id1);
+    // bind ERC20 asset FOO on network_id2 to the FT4 CHR asset on Chromia
+    register_erc20_asset(chr_asset, FOO, network_id2);
+
+    val bar_asset = register_foreign_asset(BAR, network_id2);
+
+    // Asserts
+    val assets1 = get_registered_erc20_assets(network_id1);
+    assert_equals(assets1 @* {} .token_address, [CHR.token_address]);
+    val assets2 = get_registered_erc20_assets(network_id2);
+    assert_equals(assets2 @* {} .token_address, [FOO.token_address, BAR.token_address]);
+}
