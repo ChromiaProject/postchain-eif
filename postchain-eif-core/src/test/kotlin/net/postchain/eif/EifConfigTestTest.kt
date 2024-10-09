@@ -37,7 +37,7 @@ class EifConfigTestTest {
 
     private val evmContainer: DockerComposeContainer<*> = GethContainer().withExposedService(
         "geth", 8545,
-        Wait.forLogMessage(".*HTTP server started.*\\s", 1).withStartupTimeout(Duration.ofSeconds(3))
+        Wait.forLogMessage(".*Chain head was updated                   number=2.*\\s", 1).withStartupTimeout(Duration.ofSeconds(10))
     )
 
 
