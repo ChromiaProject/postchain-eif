@@ -163,6 +163,12 @@ query get_erc20_withdrawal_history(withdrawal_id: rowid): list<erc20_withdrawal_
     return history;
 }
 
+/**
+ * Returns the list of registered ERC20 assets by EVM network ID.
+ *
+ * @param network_id The ID of the EVM network.
+ * @return A list of `erc20_info` objects.
+ */
 query get_registered_erc20_assets(network_id: integer) {
     return erc20_asset @* { network_id } (erc20_info(
         .network_id,
