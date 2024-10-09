@@ -16,6 +16,14 @@ struct erc20_info {
     virtual_blockchain_rid: byte_array; // virtual blockchain RID derived from network_id and address
 }
 
+struct erc20_asset_info {
+    network_id: integer;
+    token_address: byte_array; // contract address
+    bridge_mode;
+    ft_asset_id: byte_array;
+    virtual_blockchain_rid: byte_array; // virtual blockchain RID derived from network_id and address
+}
+
 function register_erc20_asset(
     network_id: integer,
     token_address: byte_array,

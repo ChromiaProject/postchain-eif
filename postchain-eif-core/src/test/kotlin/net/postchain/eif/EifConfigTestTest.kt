@@ -32,6 +32,7 @@ class EifConfigTestTest {
     fun restoreStreams() {
         System.setOut(originalOut)
         System.setErr(originalErr)
+        evmContainer.stop()
     }
 
     private val evmContainer: DockerComposeContainer<*> = GethContainer().withExposedService(
