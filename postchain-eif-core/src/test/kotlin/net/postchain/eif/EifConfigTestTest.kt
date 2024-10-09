@@ -163,6 +163,7 @@ class EifConfigTestTest {
         )
     }
 
+    //Enable for manual testing, useful for development
     @Disabled
     @Test
     fun `BSC public chain with pruned state`() {
@@ -184,6 +185,7 @@ class EifConfigTestTest {
         )
     }
 
+    //Enable for manual testing, useful for development, use your one infuria key
     @Disabled
     @Test
     fun `Success Ethereum public chain`() {
