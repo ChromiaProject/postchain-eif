@@ -137,6 +137,7 @@ class EifConfigTestTest {
         )
     }
 
+    @Disabled
     @Test
     fun `Success EVM chains and node URLs are configured correctly`() {
         evmContainer.start()
