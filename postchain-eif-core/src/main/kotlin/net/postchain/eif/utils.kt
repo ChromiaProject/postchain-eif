@@ -85,3 +85,10 @@ fun String.upperCaseHex(): String {
     }
     return this.uppercase()
 }
+
+fun String.normalizeContractAddress(): String {
+    if (this.startsWith("0x", ignoreCase = true)) {
+        return this.substring(2).uppercase()
+    }
+    return this.uppercase()
+}

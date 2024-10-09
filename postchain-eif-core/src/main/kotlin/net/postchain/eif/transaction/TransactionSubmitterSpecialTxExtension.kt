@@ -107,13 +107,20 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                     return false
                 }
 
-                if (newTxStatus == RellTransactionStatus.TAKEN && currentTxStatus != RellTransactionStatus.QUEUED) {
-                    logger.warn { "Validation failed. Transaction $requestId can not be set to status ${RellTransactionStatus.TAKEN} from current status $currentTxStatus" }
-                    return false
+                if (validateSpecialOps()) {
+                    if (newTxStatus == RellTransactionStatus.TAKEN && currentTxStatus != RellTransactionStatus.QUEUED) {
+                        logger.warn { "Validation failed. Transaction $requestId can not be set to status ${RellTransactionStatus.TAKEN} from current status $currentTxStatus" }
+                        return false
+                    }
+                    if (newTxStatus == RellTransactionStatus.QUEUED && currentTxStatus != RellTransactionStatus.TAKEN) {
+                        logger.warn { "Validation failed. Only rell or the node submitting a transaction can set status to ${RellTransactionStatus.QUEUED}" }
+                        return false
+                    }
                 }
 
                 if (newTxStatus == RellTransactionStatus.PENDING) {
-                    if (currentTxStatus != RellTransactionStatus.QUEUED && currentTxStatus != RellTransactionStatus.TAKEN) {
+
+                    if (validateSpecialOps() && currentTxStatus != RellTransactionStatus.QUEUED && currentTxStatus != RellTransactionStatus.TAKEN) {
                         logger.warn { "Validation failed. Transaction $requestId can not be set to status ${RellTransactionStatus.PENDING} from current status $currentTxStatus" }
                         return false
                     }
@@ -131,11 +138,6 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                             it.addPendingTransaction(EvmPendingTx.fromEvmSubmitTxRellRequest(txPending, txHash))
                         }
                     }
-                }
-
-                if (newTxStatus == RellTransactionStatus.QUEUED && currentTxStatus != RellTransactionStatus.TAKEN) {
-                    logger.warn { "Validation failed. Only rell or the node submitting a transaction can set status to ${RellTransactionStatus.QUEUED}" }
-                    return false
                 }
 
                 if (newTxStatus == RellTransactionStatus.FAILURE || newTxStatus == RellTransactionStatus.SUCCESS) {
