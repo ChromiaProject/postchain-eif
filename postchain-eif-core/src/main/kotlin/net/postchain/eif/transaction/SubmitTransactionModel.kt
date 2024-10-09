@@ -1,5 +1,6 @@
 package net.postchain.eif.transaction
 
+import net.postchain.eif.normalizeContractAddress
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_BC_PERSISTED
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_CONTRACT
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_CREATED
@@ -63,7 +64,7 @@ open class EvmSubmitTxRellRequest(
         @Name("processed_by")
         val processedBy: ByteArray?,
 ) {
-    val contractAddress: String = contractAddress.upperCaseHex()
+    val contractAddress: String = contractAddress.normalizeContractAddress()
     var txHash: String? = txHash
         set(value) { field = value?.upperCaseHex() }
 }
@@ -126,7 +127,7 @@ class EvmPendingTx(
         var effectiveGasPrice: BigInteger? = null,
         var gasUsed: BigInteger? = null,
 ) {
-    val contractAddress: String = contractAddress.upperCaseHex()
+    val contractAddress: String = contractAddress.normalizeContractAddress()
     val txHash: String = txHash.upperCaseHex()
     var status: PendingTxStatus = PendingTxStatus.VERIFYING
         set(value) {
