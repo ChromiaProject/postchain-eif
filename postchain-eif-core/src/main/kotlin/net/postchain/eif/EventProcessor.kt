@@ -141,17 +141,23 @@ class EvmEventProcessor(
     private val eventSignatures = eventMap.keys.toTypedArray()
 
     @Volatile
-    var lastReadLogBlockHeight = getLastCommittedEvmBlockHeight(networkId) ?: getSkipToHeight(skipToHeight)
+    var lastReadLogBlockHeight: BigInteger = BigInteger.ZERO
         private set
 
     init {
-        if (lastEvmBlockHeight > lastReadLogBlockHeight) {
-            lastReadLogBlockHeight = lastEvmBlockHeight
-        }
-
         job = CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-event-processor") + MDCContext()) {
+            var hasInitiatedHeights = false
             while (isActive) {
                 try {
+                    if (!hasInitiatedHeights) {
+                        lastReadLogBlockHeight = getLastCommittedEvmBlockHeight(networkId)
+                                ?: getSkipToHeight(skipToHeight)
+                        if (lastEvmBlockHeight > lastReadLogBlockHeight) {
+                            lastReadLogBlockHeight = lastEvmBlockHeight
+                        }
+                        hasInitiatedHeights = true
+                    }
+
                     fetchEvents()
                 } catch (e: CancellationException) {
                     break
