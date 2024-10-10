@@ -37,7 +37,7 @@ class EifConfigTestTest {
 
     private val evmContainer: DockerComposeContainer<*> = GethContainer().withExposedService(
         "geth", 8545,
-        Wait.forLogMessage(".*HTTP server started.*\\s", 1).withStartupTimeout(Duration.ofSeconds(3))
+        Wait.forLogMessage(".*Chain head was updated                   number=2.*\\s", 1).withStartupTimeout(Duration.ofSeconds(10))
     )
 
 
@@ -163,6 +163,7 @@ class EifConfigTestTest {
         )
     }
 
+    //Enable for manual testing, useful for development
     @Disabled
     @Test
     fun `BSC public chain with pruned state`() {
@@ -184,6 +185,7 @@ class EifConfigTestTest {
         )
     }
 
+    //Enable for manual testing, useful for development, use your own infura key
     @Disabled
     @Test
     fun `Success Ethereum public chain`() {
