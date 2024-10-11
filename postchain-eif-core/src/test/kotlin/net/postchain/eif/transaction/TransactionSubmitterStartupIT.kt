@@ -112,7 +112,7 @@ class TransactionSubmitterStartupIT : EifBaseIntegrationTest() {
             buildBlock(1L)
 
             // It will fail since the transaction is not actually submitted
-            testLogAppender.assertWarn("Transaction 0 blockchain status is set to completed. This node will stop processing this transaction.")
+            testLogAppender.assertWarn("Transaction 0 blockchain status is set to SUCCESS. This node will stop processing this transaction.")
         }
     }
 }
