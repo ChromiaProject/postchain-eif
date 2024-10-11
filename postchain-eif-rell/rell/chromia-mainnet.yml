@@ -89,7 +89,7 @@ blockchains:
         contract_tx_rate_limit: 60000
         tx_node_submit_timeout: 1800000 # 30m
         tx_verification_timeout: 5400000 # 90 min - from the time a TX was TAKEN
-        tx_timeout: 3600000 # 24h
+        tx_timeout: 240000 # 4h
         node_retry_strategy: SUPERMAJORITY
         network_configs:
           - id: 56
@@ -120,7 +120,7 @@ blockchains:
             tx_verification_time: 20000
           ethereum:
             network_id: 1
-            max_gas_price: 15000000000000000 # Total gas cost per transaction, 2024-07-17: 0.015 ETH / 51.9 USD
+            max_gas_price: 20000000000000000 # Total gas cost per transaction, 2024-10-11: 0.02 ETH / 53 USD
             min_wallet_balance: 10000000000000000
             gas_limit: 10000000 # 300 000 was too low
             gas_limit_margin: "0.2" # 20%
