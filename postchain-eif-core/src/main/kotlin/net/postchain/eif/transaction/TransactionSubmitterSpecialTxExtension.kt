@@ -133,9 +133,11 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                     val txPending = getBcTransaction(bctx, requestId)
 
                     if (pollEvmReceipts) {
-                        withTxSubmitter(txPending.networkId) {
-                            it.removeSubmitTx(bctx, requestId)
-                            it.addPendingTransaction(EvmPendingTx.fromEvmSubmitTxRellRequest(txPending, txHash))
+                        bctx.addAfterCommitHook {
+                            withTxSubmitter(txPending.networkId) {
+                                it.removeSubmitTx(bctx, requestId)
+                                it.addPendingTransaction(EvmPendingTx.fromEvmSubmitTxRellRequest(txPending, txHash))
+                            }
                         }
                     }
                 }
@@ -244,7 +246,9 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
                 // We have processed this TX - cleanup
                 if (result.status != RellTransactionStatus.TAKEN) {
-                    txSubmitter.setSubmitBCPersisted(bctx, result.requestId)
+                    bctx.addAfterCommitHook {
+                        txSubmitter.setSubmitBCPersisted(bctx, result.requestId)
+                    }
                 }
             }
 
@@ -273,11 +277,8 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     private fun removeTxIfAlreadyCompleted(module: GTXModule, bctx: BlockEContext, requestId: Long) {
 
         if (isTxCompletedOnBlockchain(module, bctx, requestId)) {
-            withTxPending(requestId) { txSubmitter, _ ->
-                txSubmitter.removePendingTx(requestId)
-            }
             transactionSubmitters.values.forEach { txSubmitter ->
-                txSubmitter.removeSubmitTx(bctx, requestId)
+                txSubmitter.removeTransactionCompletely(bctx, requestId)
             }
         }
     }
@@ -290,8 +291,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                 gtv(txPending.blockHash ?: ""),
                 gtv(txPending.effectiveGasPrice ?: BigInteger.ZERO),
                 gtv(txPending.gasUsed ?: BigInteger.ZERO)
-        )
-        )
+        ))
     }
 
     fun buildTxUpdateOp(rowId: Long, rellStatus: RellTransactionStatus, txHash: String? = null): OpData {
@@ -441,7 +441,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
         val txStatus = getBcTransactionStatus(module, eContext, requestId)
 
         if (txStatus == null || txStatus.isCompleted()) {
-            logger.warn { "Transaction $requestId blockchain status is set to completed. This node will stop processing this transaction." }
+            logger.warn { "Transaction $requestId blockchain status is set to $txStatus. This node will stop processing this transaction." }
             return true
         }
 
@@ -469,6 +469,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
         transactionSubmitters.values.forEach { txSubmitter ->
 
+            // Check if bc process_by no longer match our cached value
             val removeTxs = txSubmitter.getPendingTxs().values.filter {
                 val tx = getBcTransaction(bctx, it.rowId)
                 tx.processedBy == null || !tx.processedBy.contentEquals(it.processedBy)
@@ -479,6 +480,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
                 logger.info { "Transaction ${tx.rowId} is retried by another node" }
 
                 if (tx.processedBy.contentEquals(pubKey)) {
+                    // This tx was submitted by us but given to someone else - send a cancel replacement tx
                     txSubmitter.cancelPendingTx(tx)
                 }
                 txSubmitter.removePendingTx(tx.rowId)

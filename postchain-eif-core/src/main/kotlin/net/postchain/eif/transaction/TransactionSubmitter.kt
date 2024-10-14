@@ -446,6 +446,16 @@ open class TransactionSubmitter(
         this.submitTxUpdates.removeAll(updatesToRemove)
     }
 
+    /**
+     * Remove transaction from all queues and completely forget about it.
+     */
+    fun removeTransactionCompletely(bctx: BlockEContext, requestId: Long) {
+        removePendingTx(requestId)
+        removeSubmitTx(bctx, requestId)
+        submitTxUpdates.removeIf { it.requestId == requestId }
+        cancelQueue.removeIf { it.rowId == requestId }
+    }
+
     override fun shutdown() {
         txSubmitJob.cancel()
         txStatusPollJob.cancel()
