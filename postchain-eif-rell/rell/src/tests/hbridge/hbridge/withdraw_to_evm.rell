@@ -140,7 +140,7 @@ function _register_ft_account_and_link_evm_address(link_evm_account: boolean = t
     val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
 
     if (link_evm_account) {
-        link_account(
+        link_eoa_account(
             rell.test.keypairs.eve,
             rell.test.keypairs.alice,
             account_id,

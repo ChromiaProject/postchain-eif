@@ -190,13 +190,14 @@ yarn import:bridge --network sepolia --address PROXY_ADDRESS
 
 - Allows token.
 
-`triggerMassExit(uint height, bytes32 blockRid)`
+`triggerMassExit(...)`
 
-- Triggers mass exit.
+- Triggers mass exit. Requires proof of a correctly signed block.
+- See SecurityModel.md for a detailed explanation of the mass exit mechanism.
 
 `postponeMassExit()`
 
-- Postpone mass exit.
+- Postpone (cancel) mass exit.
 - Requirements: Mass exit state.
 
 `pendingWithdraw(bytes32 _hash)`

@@ -56,15 +56,17 @@ abstract contract TokenMinterBase is TwoWeekDelay, Ownable2Step {
 
     // Function to modify the day limit
     function setDayLimit(uint _newDayLimit) external onlyOwner {
+        // if we already have a pending change, reset it
+        if (pendingDayLimit != 0) resetDelayForFunction(this.setDayLimit.selector);
+
         if (_newDayLimit > dayLimit) {
-            // if we already have a pending change, reset it
-            if (pendingDayLimit != 0) resetDelayForFunction(this.setDayLimit.selector);
             // Set pending day limit and start the two-week delay
             pendingDayLimit = _newDayLimit;
             startDelayedAction(this.setDayLimit.selector);
         } else {
             // If the new limit is lower, apply immediately
             dayLimit = _newDayLimit;
+            delete pendingDayLimit;
             emit DayLimitChanged(_newDayLimit);
         }
     }
@@ -77,7 +79,7 @@ abstract contract TokenMinterBase is TwoWeekDelay, Ownable2Step {
     }
 
     function transferMintRole(address newMinter) external onlyOwner {
-        if (pendingNewMinter != address(0)) resetDelayForFunction(this.transferMintRole.selector);
+        resetDelayForFunction(this.transferMintRole.selector);
         startDelayedAction(this.transferMintRole.selector);
         pendingNewMinter = newMinter;
     }
@@ -90,7 +92,7 @@ abstract contract TokenMinterBase is TwoWeekDelay, Ownable2Step {
     }
 
     function transferOwnership(address newOwner) public override onlyOwner {
-        if (pendingOwner() != address(0)) resetDelayForFunction(this.transferOwnership.selector);
+        resetDelayForFunction(this.transferOwnership.selector);
         startDelayedAction(this.transferOwnership.selector);
         super.transferOwnership(newOwner);
     }

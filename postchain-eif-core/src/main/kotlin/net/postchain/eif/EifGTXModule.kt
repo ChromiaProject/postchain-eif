@@ -37,7 +37,8 @@ const val EIF: String = "eif"
 
 class Config(
         var levelsPerPage: Int = 2,
-        var snapshotsToKeep: Int = 0
+        var snapshotsToKeep: Int = 0,
+        var version: Int = 1,
 )
 
 class EifGTXModule : SimpleGTXModule<Config>(
@@ -59,6 +60,7 @@ class EifGTXModule : SimpleGTXModule<Config>(
         if (snapshotConfig != null) {
             conf.levelsPerPage = snapshotConfig.levelsPerPage.toInt()
             conf.snapshotsToKeep = snapshotConfig.snapshotsToKeep.toInt()
+            conf.version = snapshotConfig.version.toInt()
         }
     }
 
@@ -73,9 +75,9 @@ class EifGTXModule : SimpleGTXModule<Config>(
     }
 
     override fun makeBlockBuilderExtensions(): List<BaseBlockBuilderExtension> {
-        return listOf(EifBlockBuilderExtension(SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)),
-                conf.levelsPerPage, conf.snapshotsToKeep
-        ))
+        return listOf(EifBlockBuilderExtension(
+                SimpleDigestSystem(MessageDigest.getInstance(KECCAK256)), conf)
+        )
     }
 
     override fun getSpecialTxExtensions(): List<GTXSpecialTxExtension> {

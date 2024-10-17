@@ -231,6 +231,8 @@ function emit_withdrawal_event(network_id: integer, token_address: byte_array, b
 
     update_withdrawal_status(event_hash, withdrawal_status.created);
 
+    add_erc20_withdrawal_to_snapshot(withdrawal);
+
     val withdraw_info = [
         next_serial.to_gtv(),
         network_id.to_gtv(),

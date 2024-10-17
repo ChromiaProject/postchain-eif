@@ -1,7 +1,7 @@
 import { ethers, upgrades, network } from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
-import { TestToken__factory, TokenBridge__factory, TokenBridgeDelegator__factory, Validator__factory } from "../src/types";
+import { TestToken__factory, TokenBridgeWithSnapshotWithdraw__factory, TokenBridgeDelegator__factory, Validator__factory } from "../src/types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BytesLike, hexZeroPad, keccak256 } from "ethers/lib/utils";
 import { ContractReceipt, ContractTransaction } from "ethers";
@@ -44,7 +44,7 @@ describe("Token Bridge Test", () => {
         const validatorContract = await validatorFactory.deploy([validator1.address, validator2.address])
         validatorAddress = validatorContract.address
 
-        const bridgeFactory = new TokenBridge__factory(admin)
+        const bridgeFactory = new TokenBridgeWithSnapshotWithdraw__factory(admin)
         const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_OFFSET])
         bridgeAddress = bridge.address
 
@@ -54,6 +54,47 @@ describe("Token Bridge Test", () => {
 
         await expect(bridge.allowToken(constants.AddressZero)).to.be.revertedWith("TokenBridge: token address is invalid");
         await expect(bridge.allowToken(tokenAddress)).to.emit(bridge, "AllowToken").withArgs(tokenAddress)
+    });
+
+    describe("Blockchain RID", async () => {
+        it("Blockchain RID can not be finalized unless it is initialized", async () => {
+            const [deployer] = await ethers.getSigners()
+            const bridgeOwner = new TokenBridgeWithSnapshotWithdraw__factory(deployer).attach(bridgeAddress)
+            await expect(bridgeOwner.finalizeBlockchainRid())
+                .to.be.revertedWith("TokenBridge: blockchain rid is not set")
+        });
+
+        it("Blockchain RID can be set multiple times and finalized", async () => {
+            const [deployer] = await ethers.getSigners()
+            const bridgeOwner = new TokenBridgeWithSnapshotWithdraw__factory(deployer).attach(bridgeAddress)
+            let blockchainRid0 = "0x977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795"
+            let blockchainRid1 = "0x977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c796"
+            await expect(bridgeOwner.setBlockchainRid(blockchainRid0))
+                .to.emit(bridgeOwner, "SetBlockchainRid").withArgs(blockchainRid0)
+            await expect(bridgeOwner.setBlockchainRid(blockchainRid1))
+                .to.emit(bridgeOwner, "SetBlockchainRid").withArgs(blockchainRid1)
+            await expect(bridgeOwner.finalizeBlockchainRid())
+                .to.emit(bridgeOwner, "BlockchainRidFinalized").withArgs(blockchainRid1)
+        });
+
+        it("Blockchain RID can be set to zeros", async () => {
+            const [deployer] = await ethers.getSigners()
+            const bridgeOwner = new TokenBridgeWithSnapshotWithdraw__factory(deployer).attach(bridgeAddress)
+            await expect(bridgeOwner.setBlockchainRid('0x' + '0'.repeat(64)))
+                .to.be.revertedWith("TokenBridge: blockchain rid is invalid")
+        });
+
+        it("Blockchain RID can finalized only once", async () => {
+            const [deployer] = await ethers.getSigners()
+            const bridgeOwner = new TokenBridgeWithSnapshotWithdraw__factory(deployer).attach(bridgeAddress)
+            let blockchainRid0 = "0x977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795"
+            await expect(bridgeOwner.setBlockchainRid(blockchainRid0))
+                .to.emit(bridgeOwner, "SetBlockchainRid").withArgs(blockchainRid0)
+            await expect(bridgeOwner.finalizeBlockchainRid())
+                .to.emit(bridgeOwner, "BlockchainRidFinalized").withArgs(blockchainRid0)
+            await expect(bridgeOwner.finalizeBlockchainRid())
+                .to.be.revertedWith("TokenBridge: blockchain rid has been already finalized")
+        });
     });
 
     describe("Validators", async () => {
@@ -96,7 +137,7 @@ describe("Token Bridge Test", () => {
             expect(await tokenInstance.totalSupply()).to.eq(toMint)
             expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint)
 
-            const bridge = new TokenBridge__factory(user).attach(bridgeAddress)
+            const bridge = new TokenBridgeWithSnapshotWithdraw__factory(user).attach(bridgeAddress)
             const toDeposit = ethers.utils.parseEther("100")
             const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
             const accountID = "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -115,55 +156,6 @@ describe("Token Bridge Test", () => {
         })
     })
 
-    describe("Emergency Withdraw", async () => {
-        it("Emergency Withdraw", async () => {
-            const [deployer, user, beneficiary] = await ethers.getSigners()
-            const tokenInstance = new TestToken__factory(deployer).attach(tokenAddress)
-            const toMint = ethers.utils.parseEther("10000")
-
-            await tokenInstance.mint(user.address, toMint)
-            expect(await tokenInstance.totalSupply()).to.eq(toMint)
-            expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint)
-
-            const bridge = new TokenBridge__factory(user).attach(bridgeAddress)
-            const toDeposit = ethers.utils.parseEther("100")
-            const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
-            await tokenApproveInstance.approve(bridgeAddress, toDeposit)
-            await bridge.deposit(tokenAddress, toDeposit)
-
-            // normal user cannot call emergencyWithdraw
-            await expect(bridge.emergencyWithdraw(tokenAddress, beneficiary.address))
-                .to.be.revertedWith('OwnableUnauthorizedAccount')
-
-            const adminBridge = new TokenBridge__factory(deployer).attach(bridgeAddress)
-            // admin or owner cannot call emergencyWithdraw before mass exit
-            await expect(adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address))
-                .to.be.revertedWith("TokenBridge: mass exit was not triggered yet")
-
-            await adminBridge.triggerMassExit(1, new Uint8Array(32))
-
-            // admin or owner cannot call emergencyWithdraw before emergency timestamp has passed
-            await expect(adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address))
-                .to.be.revertedWith("TokenBridge: cannot do emergency withdrawal until 90 days after mass exit")
-
-            // admin can call emergencyWithdraw after setting time
-            expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(0)
-            expect(await tokenInstance.balanceOf(adminBridge.address)).to.eq(toDeposit)
-            const ninetyDays = 90 * 24 * 60 * 60
-            const blockNum= await ethers.provider.getBlockNumber()
-            const block = await ethers.provider.getBlock(blockNum)
-            const timestamp = block.timestamp + ninetyDays
-            await ethers.provider.send('evm_setNextBlockTimestamp', [timestamp])
-            await expect(adminBridge.emergencyWithdraw(constants.AddressZero, beneficiary.address))
-            .to.be.revertedWith("TokenBridge: token address is invalid")
-            await expect(adminBridge.emergencyWithdraw(tokenAddress, constants.AddressZero))
-            .to.be.revertedWith("TokenBridge: beneficiary address is invalid")
-            await adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address)
-            expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(toDeposit)
-            expect(await tokenInstance.balanceOf(adminBridge.address)).to.eq(0)
-        })
-    })
-
     describe("Withdraw by normal user", async () => {
         it("User can request withdraw by providing properly proof data", async () => {
             const [deployer, user] = await ethers.getSigners()
@@ -173,8 +165,8 @@ describe("Token Bridge Test", () => {
             await tokenInstance.mint(user.address, toMint);
             expect(await tokenInstance.totalSupply()).to.eq(toMint)
 
-            const bridgeOwner = new TokenBridge__factory(deployer).attach(bridgeAddress)
-            const bridge = new TokenBridge__factory(user).attach(bridgeAddress)
+            const bridgeOwner = new TokenBridgeWithSnapshotWithdraw__factory(deployer).attach(bridgeAddress)
+            const bridge = new TokenBridgeWithSnapshotWithdraw__factory(user).attach(bridgeAddress)
             const validatorAdmin = new Validator__factory(admin).attach(validatorAddress)
             const toDeposit = ethers.utils.parseEther("100")
             const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
@@ -286,6 +278,9 @@ describe("Token Bridge Test", () => {
                                     dependenciesHashedLeaf.substring(2, dependenciesHashedLeaf.length),
                                     wrongNetworkIdExtraDataMerkleRoot
                 )
+                
+
+
 
                 // update to new validator list
                 await validatorAdmin.updateValidators([validator1.address, validator2.address, validator3.address])
@@ -522,18 +517,19 @@ describe("Token Bridge Test", () => {
             const tokenInstance = new TestToken__factory(deployer).attach(tokenAddress)
             const toMint = ethers.utils.parseEther("10000")
 
-            await tokenInstance.mint(bridgeDelegatorAddress, toMint);
+            await tokenInstance.mint(user.address, toMint);
             expect(await tokenInstance.totalSupply()).to.eq(toMint)
 
-            const bridge = new TokenBridge__factory(user).attach(bridgeAddress)
+            const bridge = new TokenBridgeWithSnapshotWithdraw__factory(user).attach(bridgeAddress)
             const validatorAdmin = new Validator__factory(admin).attach(validatorAddress)
-            const bridgeOwner = new TokenBridge__factory(admin).attach(bridgeAddress)
-            const bridgeDelegator = new TokenBridgeDelegator__factory(user).attach(bridgeDelegatorAddress)            
+            const bridgeOwner = new TokenBridgeWithSnapshotWithdraw__factory(admin).attach(bridgeAddress)
+            const bridgeDelegator = new TokenBridgeDelegator__factory(user).attach(bridgeDelegatorAddress)
             const toDeposit = ethers.utils.parseEther("100")
-            await bridgeDelegator.approve(tokenAddress, bridgeAddress, toDeposit)
+            const tokenApproveInstance = new TestToken__factory(user).attach(tokenAddress)
+            await tokenApproveInstance.approve(bridgeAddress, toDeposit)
 
             await expect(bridge.deposit(bridgeAddress, toDeposit)).to.be.revertedWith('TokenBridge: not allow token')
-            let tx: ContractTransaction = await bridgeDelegator.deposit(tokenAddress, toDeposit)
+            let tx: ContractTransaction = await bridge.deposit(tokenAddress, toDeposit)
             let receipt: ContractReceipt = await tx.wait()
             let logs = receipt.logs
             if (logs !== undefined) {
@@ -767,7 +763,7 @@ describe("Token Bridge Test", () => {
                 await expect(bridgeOwner.unpendingWithdraw(hashEvent))
                 .to.emit(bridge, "UnpendingWithdraw")
 
-                expect(await tokenInstance.balanceOf(bridgeDelegatorAddress)).to.eq(toMint.sub(toDeposit))
+                expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint.sub(toDeposit))
                 expect(await tokenInstance.balanceOf(bridge.address)).to.eq(toDeposit)
                 await expect(bridgeDelegator.withdraw(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
@@ -780,46 +776,163 @@ describe("Token Bridge Test", () => {
                 .to.emit(bridge, "Withdrawal")
                 .withArgs(bridgeDelegatorAddress, tokenAddress, toDeposit)
                 expect(await tokenInstance.balanceOf(bridge.address)).to.eq(0)
-                expect(await tokenInstance.balanceOf(bridgeDelegatorAddress)).to.eq(toMint)
+                expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint.sub(toDeposit))
                 await expect(bridgeDelegator.withdraw(
                     DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)),
                     bridgeDelegatorAddress)).to.be.revertedWith('TokenBridge: fund is pending or was already claimed')
             }
-        })        
+        })
     })
 
     describe("Mass Exit", async () => {
-        it("only admin can manage mass exit",async () => {
-            const [admin, other] = await ethers.getSigners()
-            let otherTokenBridge = new TokenBridge__factory(other).attach(bridgeAddress)
-            let adminTokenBridge = new TokenBridge__factory(admin).attach(bridgeAddress)
-            expect(await adminTokenBridge.isMassExit()).to.be.false
-            let node1 = hashGtvBytes32Leaf(DecodeHexStringToByteArray("977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795"))
-            let node2 = hashGtvBytes32Leaf(DecodeHexStringToByteArray("49e46bf022de1515cbb2bf0f69c62c071825a9b940e8f3892acb5d2021832ba0"))
-            let blockRid = postchainMerkleNodeHash([0x7, node1, node2])
+        let blockchainRid: string;
+        let previousBlockRid: string;
+        let merkleRootHash: string;
+        let dependencies: string;
+        let extraDataMerkleRoot: string;
+        let blockHeader: BytesLike;
+        let blockRid: string;
+        let sigs: BytesLike[];
+        let validators: string[];
+        let extraProof: any;
+
+        beforeEach(async () => {
+            blockchainRid = "977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795";
+            previousBlockRid = "49e46bf022de1515cbb2bf0f69c62c071825a9b940e8f3892acb5d2021832ba0";
+            merkleRootHash = "96defe74f43fcf2d12a1844bcd7a3a7bcb0d4fa191776953dae3f1efb508d866";
+            dependencies = "56bfbee83edd2c9a79ff421c95fc8ec0fa0d67258dca697e47aae56f6fbc8af3";
+            extraDataMerkleRoot = "672D33B35488E3C965E6A393B922CDCF79C51976DA97A6B7B3079DE1DF6DB89E";
+
+
+            const merkleRootHashHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(merkleRootHash));
+            const dependenciesHashedLeaf = hashGtvBytes32Leaf(DecodeHexStringToByteArray(dependencies));
+
+            const node1 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(blockchainRid));
+            const node2 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(previousBlockRid));
+            const node12 = postchainMerkleNodeHash([0x00, node1, node2]);
+            const node3 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(merkleRootHash));
+            const timestamp = Math.floor(Date.now());
+            const height = 100;
+            const node4 = hashGtvIntegerLeaf(timestamp);
+            const node34 = postchainMerkleNodeHash([0x00, node3, node4]);
+            const node5 = hashGtvIntegerLeaf(height);
+            const node6 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(dependencies));
+            const node56 = postchainMerkleNodeHash([0x00, node5, node6]);
+            const node1234 = postchainMerkleNodeHash([0x00, node12, node34]);
+            const node5678 = postchainMerkleNodeHash([0x00, node56, DecodeHexStringToByteArray(extraDataMerkleRoot)]);
+
+            blockRid = postchainMerkleNodeHash([0x7, node1234, node5678]);
+            blockHeader = '';
+            const ts = hexZeroPad(intToHex(timestamp), 32);
+            const h = hexZeroPad(intToHex(height), 32);
+            blockHeader = blockHeader.concat(blockchainRid, blockRid.substring(2, blockRid.length), previousBlockRid,
+                                merkleRootHashHashedLeaf.substring(2, merkleRootHashHashedLeaf.length),
+                                ts.substring(2, ts.length), h.substring(2, h.length),
+                                dependenciesHashedLeaf.substring(2, dependenciesHashedLeaf.length),
+                                extraDataMerkleRoot
+            );
+
+            const sig1 = await validator1.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)));
+            const sig2 = await validator2.signMessage(DecodeHexStringToByteArray(blockRid.substring(2, blockRid.length)));
+          
+            sigs = [
+                DecodeHexStringToByteArray(sig1.substring(2, sig1.length)),
+                DecodeHexStringToByteArray(sig2.substring(2, sig2.length))
+            ];
+
+            validators = [validator1.address, validator2.address, validator3.address];
+
+            let hashRootEvent = "0x728d07430504bb9ab20503de4226a073dd8407e10b6034419c8e74bfabe42ab7"
+            let hashRootState = "0x670fff953275de8667fe07d088f1e1dad999bd1d73f44f3b19b94b5c1b28fd69"
+            let eifLeaf = hashRootEvent.substring(2, hashRootEvent.length).concat(hashRootState.substring(2, hashRootState.length))
+
+            const hashedLeaf = hashGtvBytes64Leaf(DecodeHexStringToByteArray(eifLeaf));
+            extraProof = {
+                leaf: DecodeHexStringToByteArray(eifLeaf),
+                hashedLeaf: DecodeHexStringToByteArray(hashedLeaf.substring(2, hashedLeaf.length)),
+                position: 1,
+                extraRoot: DecodeHexStringToByteArray(extraDataMerkleRoot),
+                extraMerkleProofs: [DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797")],
+            }
+        });
+        
+
+        it("Emergency withdrawal can be performed after mass exit", async () => {
+            const [admin, user, beneficiary] = await ethers.getSigners();
+            const tokenInstance = new TestToken__factory(admin).attach(tokenAddress);
+            const adminBridge = new TokenBridgeWithSnapshotWithdraw__factory(admin).attach(bridgeAddress);
+            const userBridge = new TokenBridgeWithSnapshotWithdraw__factory(user).attach(bridgeAddress);
+            
+            const toMint = ethers.utils.parseEther("10000");
+            const toDeposit = ethers.utils.parseEther("100");
+
+            await tokenInstance.mint(user.address, toMint);
+            await tokenInstance.connect(user).approve(bridgeAddress, toDeposit);
+            await userBridge.deposit(tokenAddress, toDeposit);
+
+            // Trigger mass exit
+            await adminBridge.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid));
+            await adminBridge.triggerMassExit(DecodeHexStringToByteArray(blockHeader), sigs, validators, extraProof, {gasLimit: 10000000});
+
+            // Attempt emergency withdrawal before time has passed
+            await expect(adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address))
+                .to.be.revertedWith("TokenBridge: cannot do emergency withdrawal until 90 days after mass exit");
+
+            // Fast forward time
+            const ninetyDays = 90 * 24 * 60 * 60;
+            await ethers.provider.send('evm_increaseTime', [ninetyDays]);
+            await ethers.provider.send('evm_mine', []);
+
+            // Verify initial balances
+            expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(0);
+            expect(await tokenInstance.balanceOf(bridgeAddress)).to.eq(toDeposit);
+
+            // Attempt emergency withdrawal with invalid parameters
+            await expect(adminBridge.emergencyWithdraw(ethers.constants.AddressZero, beneficiary.address))
+                .to.be.revertedWith("TokenBridge: token address is invalid");
+            await expect(adminBridge.emergencyWithdraw(tokenAddress, ethers.constants.AddressZero))
+                .to.be.revertedWith("TokenBridge: beneficiary address is invalid");
+
+            // Perform valid emergency withdrawal
+            await expect(adminBridge.emergencyWithdraw(tokenAddress, beneficiary.address))
+                .to.not.be.reverted;
+
+            // Verify final balances
+            expect(await tokenInstance.balanceOf(beneficiary.address)).to.eq(toDeposit);
+            expect(await tokenInstance.balanceOf(bridgeAddress)).to.eq(0);
+        });
+        it("only admin can manage mass exit", async () => {
+            const [admin, other] = await ethers.getSigners();
+            let otherTokenBridge = new TokenBridgeWithSnapshotWithdraw__factory(other).attach(bridgeAddress);
+            let adminTokenBridge = new TokenBridgeWithSnapshotWithdraw__factory(admin).attach(bridgeAddress);
+            expect(await adminTokenBridge.isMassExit()).to.be.false;
+            
+            await expect(adminTokenBridge.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid)))
+                .to.emit(adminTokenBridge, "SetBlockchainRid");
 
             // non admin cannot trigger mass exit
-            await expect(otherTokenBridge.triggerMassExit(100, blockRid)).to.be.revertedWith('OwnableUnauthorizedAccount')
+            await expect(otherTokenBridge.triggerMassExit(DecodeHexStringToByteArray(blockHeader), sigs, validators, extraProof, {gasLimit: 10000000})).to.be.revertedWith('OwnableUnauthorizedAccount')
 
             // admin can trigger mass exit
-            await expect(adminTokenBridge.triggerMassExit(100, blockRid))
+            await expect(adminTokenBridge.triggerMassExit(DecodeHexStringToByteArray(blockHeader), sigs, validators, extraProof, {gasLimit: 10000000}))
             .to.emit(adminTokenBridge, "TriggerMassExit")
             expect(await adminTokenBridge.isMassExit()).to.be.true
             expect((await adminTokenBridge.massExitBlock()).blockRid).to.be.equal(blockRid)
             expect((await adminTokenBridge.massExitBlock()).height).to.be.equal(100)
 
-            // postpone mass exit
-            await expect(otherTokenBridge.postponeMassExit()).to.be.revertedWith('OwnableUnauthorizedAccount')
-            await expect(adminTokenBridge.postponeMassExit())
-            .to.emit(adminTokenBridge, "PostponeMassExit")
-            expect(await adminTokenBridge.isMassExit()).to.be.false
+            // admin can re-trigger mass exit
+            await expect(adminTokenBridge.triggerMassExit(DecodeHexStringToByteArray(blockHeader), sigs, validators, extraProof, {gasLimit: 10000000}))
+                .to.emit(adminTokenBridge, "TriggerMassExit")
+            expect(await adminTokenBridge.isMassExit()).to.be.true
+            expect((await adminTokenBridge.massExitBlock()).blockRid).to.be.equal(blockRid)
+            expect((await adminTokenBridge.massExitBlock()).height).to.be.equal(100)
         })
     })
 
     describe("Ownership", async () => {
         it("renounce ownership is not allowed", async () => {
             const [admin, other] = await ethers.getSigners()
-            let adminTokenBridge = new TokenBridge__factory(admin).attach(bridgeAddress)
+            let adminTokenBridge = new TokenBridgeWithSnapshotWithdraw__factory(admin).attach(bridgeAddress)
             await expect(adminTokenBridge.renounceOwnership()).to.be.revertedWith('TokenBridge: renounce ownership is not allowed')
         })
     })

@@ -24,7 +24,9 @@ object SimpleGtvEncoder {
                 is GtvArray -> {
                     val b = it.asArray()
                     b.forEach { ba ->
-                        if (ba.asByteArray().size != 32) throw IllegalArgumentException("invalid byte array length")
+                        if (ba.asByteArray().size != 32) {
+                            throw IllegalArgumentException("invalid byte array length")
+                        }
                         out = out.plus(ba.asByteArray())
                     }
                     out

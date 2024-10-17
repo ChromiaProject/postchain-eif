@@ -40,8 +40,7 @@ abstract class EifBaseIntegrationTest(private val prependUrls: List<String> = li
             "geth", 8545,
             Wait.forLogMessage(".*HTTP server started.*\\s", 1)
     )
-    val credentials = Credentials
-            .create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
+    val evmCredentials: Credentials = Credentials.create("0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
     val registerAccounts = mutableListOf<AccountRegister>()
     val snapshotHeights = mutableListOf<Long>()
     val tokenBridgeBinary = getBinaryFromArtifactResource("/net/postchain/eif/contracts/TokenBridge.bin")
@@ -71,7 +70,7 @@ abstract class EifBaseIntegrationTest(private val prependUrls: List<String> = li
 
         transactionManager = FastRawTransactionManager(
                 web3j,
-                credentials,
+                evmCredentials,
                 PollingTransactionReceiptProcessor(
                         web3j,
                         1000,
