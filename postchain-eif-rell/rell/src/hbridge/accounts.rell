@@ -25,6 +25,16 @@ function find_ft4_account_for_address(address: byte_array, network_id: integer):
     }
 }
 
+function find_address_for_ft4_account(account: ft4.accounts.account, network_id: integer): byte_array? {
+    // if multiple EOA addresses are linked to the same FT4 account, we return the one first one
+    val candidate = evm_eoa_account_link @? { account } (@sort @omit .rowid, .address) limit 1;
+    if (not empty(candidate)) {
+        return candidate;
+    } else {
+        return evm_sc_account_link @? { account, network_id } (@sort @omit .rowid, .address) limit 1;
+    }
+}
+
 @extendable
 function after_evm_account_linked(address: byte_array, account: ft4.accounts.account, network_id: integer, is_contract: boolean) {}
 

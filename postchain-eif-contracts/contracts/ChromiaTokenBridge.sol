@@ -44,4 +44,8 @@ contract ChromiaTokenBridge is TokenBridge {
     function transferWithdraw(IERC20 token, address beneficiary, uint value) internal override {
         tokenMinter.mint(beneficiary, value);
     }
+
+    function fund(IERC20 token, uint256 amount) public override returns (bool) {
+        revert("ChromiaTokenBridge: direct funding is not supported");
+    }
 }

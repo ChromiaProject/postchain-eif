@@ -92,7 +92,7 @@ function test_get_erc20_deposits() {
     assert_equals(dep3, expected_deposit2);
 
     // Linking Alice's EVM and FT4 accounts
-    link_account(alice_evm_keypair, rell.test.keypairs.alice, alice_account.id, alice_auth_descriptor.hash());
+    link_eoa_account(alice_evm_keypair, rell.test.keypairs.alice, alice_account.id, alice_auth_descriptor.hash());
 
     // Asserting that there are no deposits in `pending` or `recalled` states
     assert_equals(
@@ -186,7 +186,7 @@ function test_get_erc20_deposits() {
     );
 
     // Linking bob's EVM and FT4 accounts
-    link_account(bob_evm_keypair, rell.test.keypairs.bob, bob_account.id, bob_auth_descriptor.hash());
+    link_eoa_account(bob_evm_keypair, rell.test.keypairs.bob, bob_account.id, bob_auth_descriptor.hash());
 
     // Alice is making 20 more deposits
     for (dep in range(20)) {

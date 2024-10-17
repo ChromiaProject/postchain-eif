@@ -26,6 +26,7 @@ import ^.helpers;
 val admin_privkey = x"3132333435363738393031323334353637383930313233343536373839303131";
 
 namespace evm_events {
+    val link_account_id_name = "LinkAccountID";
     val deposited_erc20_name = "DepositedERC20";
     val pending_withdraw_event = "PendingWithdraw";
     val unpending_withdraw_event = "UnpendingWithdraw";
@@ -72,7 +73,7 @@ val BAR = asset_info(
 
 function register_foreign_asset(asset: asset_info = CHR, network_id: integer = network_id1): assets.asset {
     val ft4_asset = register_ft4_asset(asset, network_id);
-    register_erc20_asset(ft4_asset, asset, network_id);
+    register_erc20_asset(ft4_asset, asset, network_id, true); // snapshots enabled
     return ft4_asset;
 }
 
@@ -86,9 +87,9 @@ function register_ft4_asset(asset_info: asset_info, network_id: integer): assets
     return assets.Asset(asset_id);
 }
 
-function register_erc20_asset(ft4_asset: assets.asset, asset_info: asset_info, network_id: integer) {
+function register_erc20_asset(ft4_asset: assets.asset, asset_info: asset_info, network_id: integer, enable_snapshots: boolean = false) {
     rell.test.tx().op(
-        helpers.register_erc20_asset_op(network_id, asset_info.token_address, ft4_asset, hbridge.bridge_mode.foreign)
+        helpers.register_erc20_asset_op(network_id, asset_info.token_address, ft4_asset, hbridge.bridge_mode.foreign, enable_snapshots)
     ).run();
 
     assert_equals(
@@ -102,7 +103,7 @@ function register_erc20_asset(ft4_asset: assets.asset, asset_info: asset_info, n
     );
 }
 
-function link_account(
+function link_eoa_account(
         evm_keypair: rell.test.keypair,
         ft_keypair: rell.test.keypair,
         account_id: byte_array,
@@ -110,7 +111,9 @@ function link_account(
 ) {
     val evm_address = crypto.eth_pubkey_to_address(evm_keypair.pub);
     val op = hbridge.link_evm_eoa_account(evm_address);
-    val message = test_utils.create_evm_auth_message(op);
+    val message = test_utils.create_evm_auth_message(op)
+        .replace(auth.ACCOUNT_ID_PLACEHOLDER, account_id.to_hex().upper_case())
+        .replace(auth.AUTH_DESCRIPTOR_ID_PLACEHOLDER, auth_descriptor_id.to_hex().upper_case());
     val signature = test_utils.evm_sign(message, evm_keypair.priv);
     rell.test.tx()
         .op(auth.evm_signatures([evm_address], [signature]))
@@ -122,6 +125,53 @@ function link_account(
 
     assert_equals(hbridge.get_account_for_eoa_address(evm_address), account_id);
     assert_equals(hbridge.get_eoa_addresses_for_account(account_id), [evm_address]);
+}
+
+function link_sc_account_id_event(
+    evm_address: byte_array,
+    account_id: byte_array,
+    block_height: integer = 1,
+    network_id: integer = network_id1
+) {
+    val events = [
+        event_data(
+            tnx_hash = ("TX", block_height).hash(),
+            log_index = 1,
+            signature = ("SIG", block_height).hash(),
+            contract_address = contract_address,
+            name = evm_events.link_account_id_name,
+            indexed_values = [evm_address.to_gtv()],
+            non_indexed_values = [account_id.to_gtv(), true.to_gtv()]
+        )
+    ];
+    val block_hash = ("BLOCK", block_height).hash();
+    rell.test.tx().nop().op(
+        evm_block_op(network_id, block_height, block_hash, events)
+    ).run();
+}
+
+function link_sc_account(
+        evm_keypair: rell.test.keypair,
+        ft_keypair: rell.test.keypair,
+        account_id: byte_array,
+        auth_descriptor_id: byte_array,
+        network_id: integer = network_id1
+) {
+    val evm_address = crypto.eth_pubkey_to_address(evm_keypair.pub);
+    val op = hbridge.link_evm_sc_account(evm_address, network_id);
+    val message = test_utils.create_evm_auth_message(op)
+        .replace(auth.ACCOUNT_ID_PLACEHOLDER, account_id.to_hex().upper_case())
+        .replace(auth.AUTH_DESCRIPTOR_ID_PLACEHOLDER, auth_descriptor_id.to_hex().upper_case());
+    val signature = test_utils.evm_sign(message, evm_keypair.priv);
+    rell.test.tx()
+        .op(auth.external.ft_auth(account_id, auth_descriptor_id))
+        .op(op)
+        .nop()
+        .sign(ft_keypair).run();
+    assert_not_null(hbridge.evm_sc_account_link @? { .address == evm_address });
+
+    assert_equals(hbridge.get_account_for_sc_address(evm_address, network_id), account_id);
+    assert_equals(hbridge.get_sc_addresses_for_account(account_id), [(address = evm_address, network_id = network_id)]);
 }
 
 function deposit_from_evm(
@@ -187,7 +237,15 @@ function assert_withdraw(serial: integer, evm_address: byte_array, amount: big_i
         eif_utils.evm_address_to_32_byte_array(evm_address).to_gtv(),
         amount.to_gtv()
     ];
-    assert_equals(rell.test.get_events()[0], ("eif_event", withdraw_info.to_gtv_pretty()));
+
+    val events = rell.test.get_events();
+
+    val event_data = if (events.size() > 1)
+        events @* { $[0] == "eif_event" } [0]
+    else
+        events[0];
+
+    assert_equals(event_data, ("eif_event", withdraw_info.to_gtv_pretty()));
 
     val wdrs = hbridge.get_erc20_withdrawal(network_id1, asset.token_address, evm_address);
     assert_equals(wdrs.size(), expected_nr_withdrawals);

@@ -51,6 +51,7 @@ blockchains:
         snapshot:
           levels_per_page: 2
           snapshots_to_keep: 2
+          version: 2
       icmf:
         receiver:
           local:
