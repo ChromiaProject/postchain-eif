@@ -9,6 +9,9 @@ import {IManagedValidator} from "./IManagedValidator.sol";
 import "./ValidatorUpdateUtils.sol";
 
 abstract contract BaseManagedValidator is IManagedValidator {
+    // Merkle hash of GTV String "signer_list_update"
+    bytes32 constant SIGNER_UPDATE_KEY_MERKLE_HASH = 0x36A27B007B358F4B3973E424BDE7545CF784C91912B99D0FCF3348A4EAE9A30A;
+
     using EC for bytes32;
 
     mapping(address => bool) private validatorMap;
@@ -42,7 +45,7 @@ abstract contract BaseManagedValidator is IManagedValidator {
 
         bytes32 validatorUpdateRoot = bytes32(extraProof.leaf);
         require(Hash.hashGtvBytes32Leaf(validatorUpdateRoot) == extraProof.hashedLeaf, "Postchain: invalid signer update extra data");
-        (uint height, bytes32 blockRid) = Postchain.verifyBlockHeader(_directoryBlockchainRid(), blockHeader, extraProof);
+        (uint height, bytes32 blockRid) = Postchain.verifyBlockHeader(_directoryBlockchainRid(), blockHeader, extraProof, SIGNER_UPDATE_KEY_MERKLE_HASH);
         if (previousUpdateHeight > 0 && height < previousUpdateHeight) revert("Update validators: height is lower than previous update height");
         if (validatorUpdate.serial <= previousUpdateSerial) revert("Update validators: proof is older or same as previous update");
 

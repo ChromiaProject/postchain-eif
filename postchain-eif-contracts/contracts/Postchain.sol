@@ -43,14 +43,17 @@ library Postchain {
     function verifyBlockHeader(
         bytes32 blockchainRid,
         bytes memory blockHeader,
-        Data.ExtraProofData memory proof
+        Data.ExtraProofData memory proof,
+        bytes32 extraDataKey
     ) internal pure returns (uint, bytes32) {
         BlockHeaderData memory header = decodeBlockHeader(blockHeader);
         if (blockchainRid != header.blockchainRid) revert("Postchain: invalid blockchain rid");
         require(proof.extraRoot == header.extraDataHashedLeaf, "Postchain: invalid extra data root");
-        // TODO: check that the key in extra data pair is correct
         if (!proof.extraMerkleProofs.verifySHA256(proof.hashedLeaf, proof.position, proof.extraRoot)) {
             revert("Postchain: invalid extra merkle proof");
+        }
+        if (proof.extraMerkleProofs[0] != extraDataKey) {
+            revert("Postchain: proof does not originate from EIF");
         }
         return (header.height, header.blockRid);
     }

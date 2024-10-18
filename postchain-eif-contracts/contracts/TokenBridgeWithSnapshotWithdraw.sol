@@ -169,10 +169,12 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
 
 
         // Check extraProof against the mass exit block and for internal consistency
-        // TODO: check that the key in extra data pair is correct
         require(Hash.hashGtvBytes64Leaf(extraProof.leaf) == extraProof.hashedLeaf, "Postchain: invalid EIF extra data");
         if (!MerkleProof.verifySHA256(extraProof.extraMerkleProofs, extraProof.hashedLeaf, extraProof.position, extraProof.extraRoot)) {
             revert("Postchain: invalid extra merkle proof");
+        }
+        if (extraProof.extraMerkleProofs[0] != EIF_KEY_MERKLE_HASH) {
+            revert("Postchain: proof does not originate from EIF");
         }
 
         massExitStateRoot = _bytesToBytes32(extraProof.leaf, 32);

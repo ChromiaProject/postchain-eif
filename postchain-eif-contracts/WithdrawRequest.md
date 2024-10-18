@@ -130,8 +130,6 @@ function verifyBlockHeader(
         // check that extra data proof is connected to block header
         require(proof.extraRoot == header.extraDataHashedLeaf, "Postchain: invalid extra data root");
     
-        // TODO: check that the key in extra data pair is correct
-    
         // verify extra data proof using G
         if (!proof.extraMerkleProofs.verifySHA256(proof.hashedLeaf, proof.position, proof.extraRoot)) {
             revert("Postchain: invalid extra merkle proof");

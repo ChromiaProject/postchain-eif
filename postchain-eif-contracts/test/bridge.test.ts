@@ -8,16 +8,18 @@ import { ContractReceipt, ContractTransaction } from "ethers";
 import { intToHex } from "ethjs-util";
 import { constants } from "ethers";
 import {
-  DecodeHexStringToByteArray,
-  hashGtvBytes32Leaf,
-  hashGtvBytes64Leaf,
-  hashGtvIntegerLeaf,
-  postchainMerkleNodeHash,
+    DecodeHexStringToByteArray,
+    hashGtvBytes32Leaf,
+    hashGtvBytes64Leaf,
+    hashGtvIntegerLeaf,
+    hashGtvStringLeaf,
+    postchainMerkleNodeHash,
 } from "./utils";
 
 chai.use(solidity);
 const { expect } = chai;
 const WITHDRAW_OFFSET = "0x20";
+const EIF_HEADER_KEY_HASH = hashGtvStringLeaf("eif").substring(2)
 describe("Token Bridge Test", () => {
     let tokenAddress: string;
     let bridgeAddress: string;
@@ -234,6 +236,7 @@ describe("Token Bridge Test", () => {
                 // This merkle root is calculated in the postchain code
                 let extraDataMerkleRoot = "672D33B35488E3C965E6A393B922CDCF79C51976DA97A6B7B3079DE1DF6DB89E"
                 let wrongNetworkIdExtraDataMerkleRoot = "512B99A96BC206862ED76AFC1B555037D3A14D5A62DC4778A548D38A5FCDA9C1"
+                let wrongExtraDataKeyMerkleRoot = "18FE5D1F22C3A31458AADFDA6C0970029D489F4C188E2C61AE98D1461CFE99A5"
 
                 let node1 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(blockchainRid))
                 let node2 = hashGtvBytes32Leaf(DecodeHexStringToByteArray(previousBlockRid))
@@ -249,13 +252,16 @@ describe("Token Bridge Test", () => {
                 let node1234 = postchainMerkleNodeHash([0x00, node12, node34])
                 let node5678 = postchainMerkleNodeHash([0x00, node56, DecodeHexStringToByteArray(extraDataMerkleRoot)])
                 let wrongNetworkIdNode5678 = postchainMerkleNodeHash([0x00, node56, DecodeHexStringToByteArray(wrongNetworkIdExtraDataMerkleRoot)])
+                let wrongExtraDataKeyNode5678 = postchainMerkleNodeHash([0x00, node56, DecodeHexStringToByteArray(wrongExtraDataKeyMerkleRoot)])
 
                 let blockRid = postchainMerkleNodeHash([0x7, node1234, node5678])
                 let maliciousBlockRid = postchainMerkleNodeHash([0x7, node1234, node1234])
                 let wrongNetworkIdBlockRid = postchainMerkleNodeHash([0x7, node1234, wrongNetworkIdNode5678])
+                let wrongExtraDataKeyBlockRid = postchainMerkleNodeHash([0x7, node1234, wrongExtraDataKeyNode5678])
                 let blockHeader: BytesLike = ''
                 let maliciousBlockHeader: BytesLike = ''
                 let wrongNetworkIdBlockHeader: BytesLike = ''
+                let wrongExtraDataKeyBlockHeader: BytesLike = ''
                 let ts = hexZeroPad(intToHex(timestamp), 32)
                 let h = hexZeroPad(intToHex(height), 32)
                 blockHeader = blockHeader.concat(blockchainRid, blockRid.substring(2, blockRid.length), previousBlockRid,
@@ -272,15 +278,20 @@ describe("Token Bridge Test", () => {
                                     extraDataMerkleRoot
                 )
 
-                wrongNetworkIdBlockHeader = wrongNetworkIdBlockHeader.concat(blockchainRid, wrongNetworkIdBlockRid.substring(2, wrongNetworkIdBlockRid.length), previousBlockRid, 
+                wrongNetworkIdBlockHeader = wrongNetworkIdBlockHeader.concat(blockchainRid, wrongNetworkIdBlockRid.substring(2, wrongNetworkIdBlockRid.length), previousBlockRid,
                                     merkleRootHashHashedLeaf.substring(2, merkleRootHashHashedLeaf.length),
                                     ts.substring(2, ts.length), h.substring(2, h.length),
                                     dependenciesHashedLeaf.substring(2, dependenciesHashedLeaf.length),
                                     wrongNetworkIdExtraDataMerkleRoot
                 )
-                
 
 
+                wrongExtraDataKeyBlockHeader = wrongExtraDataKeyBlockHeader.concat(blockchainRid, wrongExtraDataKeyBlockRid.substring(2, wrongExtraDataKeyBlockRid.length), previousBlockRid,
+                    merkleRootHashHashedLeaf.substring(2, merkleRootHashHashedLeaf.length),
+                    ts.substring(2, ts.length), h.substring(2, h.length),
+                    dependenciesHashedLeaf.substring(2, dependenciesHashedLeaf.length),
+                    wrongExtraDataKeyMerkleRoot
+                )
 
                 // update to new validator list
                 await validatorAdmin.updateValidators([validator1.address, validator2.address, validator3.address])
@@ -292,6 +303,10 @@ describe("Token Bridge Test", () => {
                 let wrongNetworkIdSig1 = await validator1.signMessage(DecodeHexStringToByteArray(wrongNetworkIdBlockRid.substring(2, wrongNetworkIdBlockRid.length)))
                 let wrongNetworkIdSig2 = await validator2.signMessage(DecodeHexStringToByteArray(wrongNetworkIdBlockRid.substring(2, wrongNetworkIdBlockRid.length)))
                 let wrongNetworkIdSig3 = await validator3.signMessage(DecodeHexStringToByteArray(wrongNetworkIdBlockRid.substring(2, wrongNetworkIdBlockRid.length)))
+
+                let wrongExtraDataKeySig1 = await validator1.signMessage(DecodeHexStringToByteArray(wrongExtraDataKeyBlockRid.substring(2, wrongExtraDataKeyBlockRid.length)))
+                let wrongExtraDataKeySig2 = await validator2.signMessage(DecodeHexStringToByteArray(wrongExtraDataKeyBlockRid.substring(2, wrongExtraDataKeyBlockRid.length)))
+                let wrongExtraDataKeySig3 = await validator3.signMessage(DecodeHexStringToByteArray(wrongExtraDataKeyBlockRid.substring(2, wrongExtraDataKeyBlockRid.length)))
 
                 let merkleProof = [
                                     DecodeHexStringToByteArray("0000000000000000000000000000000000000000000000000000000000000000"), 
@@ -320,28 +335,35 @@ describe("Token Bridge Test", () => {
                     hashedLeaf: DecodeHexStringToByteArray(hashedLeaf.substring(2, hashedLeaf.length)),
                     position: 1,
                     extraRoot: DecodeHexStringToByteArray(extraDataMerkleRoot),
-                    extraMerkleProofs: [DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797")],
+                    extraMerkleProofs: [DecodeHexStringToByteArray(EIF_HEADER_KEY_HASH)],
                 }
                 let wrongNetworkIdExtraProof = {
                     leaf: DecodeHexStringToByteArray(eifWrongNetworkIdLeaf),
                     hashedLeaf: DecodeHexStringToByteArray(wrongNetworkIdHashedLeaf.substring(2, wrongNetworkIdHashedLeaf.length)),
                     position: 1,
                     extraRoot: DecodeHexStringToByteArray(wrongNetworkIdExtraDataMerkleRoot),
-                    extraMerkleProofs: [DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797")],
+                    extraMerkleProofs: [DecodeHexStringToByteArray(EIF_HEADER_KEY_HASH)],
                 }
                 let invalidExtraLeaf = {
                     leaf: DecodeHexStringToByteArray(eifLeaf),
                     hashedLeaf: DecodeHexStringToByteArray(maliciousHashEventLeaf.substring(2, maliciousHashEventLeaf.length)),
                     position: 1,
                     extraRoot: DecodeHexStringToByteArray(extraDataMerkleRoot),
-                    extraMerkleProofs: [DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797")],
+                    extraMerkleProofs: [DecodeHexStringToByteArray(EIF_HEADER_KEY_HASH)],
                 }
                 let invalidExtraDataRoot = {
                     leaf: DecodeHexStringToByteArray(eifLeaf),
                     hashedLeaf: DecodeHexStringToByteArray(hashedLeaf.substring(2, hashedLeaf.length)),
                     position: 1,
                     extraRoot: DecodeHexStringToByteArray("04D17CC3DD96E88DF05A943EC79DD436F220E84BA9E5F35CACF627CA225424A2"),
-                    extraMerkleProofs: [DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797")],
+                    extraMerkleProofs: [DecodeHexStringToByteArray(EIF_HEADER_KEY_HASH)],
+                }
+                let wrongExtraDataKeyExtraProof = {
+                    leaf: DecodeHexStringToByteArray(eifLeaf),
+                    hashedLeaf: DecodeHexStringToByteArray(hashedLeaf.substring(2, hashedLeaf.length)),
+                    position: 1,
+                    extraRoot: DecodeHexStringToByteArray(wrongExtraDataKeyMerkleRoot),
+                    extraMerkleProofs: [DecodeHexStringToByteArray(hashGtvStringLeaf("fake").substring(2))],
                 }
                 let maliciousEl2Proof = {
                     leaf: DecodeHexStringToByteArray(eifLeaf),
@@ -363,17 +385,26 @@ describe("Token Bridge Test", () => {
                     DecodeHexStringToByteArray(wrongNetworkIdSig2.substring(2, wrongNetworkIdSig2.length)),
                     DecodeHexStringToByteArray(wrongNetworkIdSig3.substring(2, wrongNetworkIdSig3.length))
                 ]
+                let wrongExtraDataKeySigs = [
+                    DecodeHexStringToByteArray(wrongExtraDataKeySig1.substring(2, wrongExtraDataKeySig1.length)),
+                    DecodeHexStringToByteArray(wrongExtraDataKeySig2.substring(2, wrongExtraDataKeySig2.length)),
+                    DecodeHexStringToByteArray(wrongExtraDataKeySig3.substring(2, wrongExtraDataKeySig3.length))
+                ]
                 let validators = [validator1.address, validator2.address, validator3.address];
                 await expect(bridge.withdrawRequest(wrongNetworkIdData, wrongNetworkIdEventProof,
-                    DecodeHexStringToByteArray(wrongNetworkIdBlockHeader), wrongNetworkIdSigs, validators, 
+                    DecodeHexStringToByteArray(wrongNetworkIdBlockHeader), wrongNetworkIdSigs, validators,
                     wrongNetworkIdExtraProof)
                 ).to.be.revertedWith('TokenBridge: blockchain rid is not set')
                 await expect(bridgeOwner.setBlockchainRid(DecodeHexStringToByteArray(blockchainRid)))
                 .to.emit(bridgeOwner, "SetBlockchainRid")
                 await expect(bridge.withdrawRequest(wrongNetworkIdData, wrongNetworkIdEventProof,
-                    DecodeHexStringToByteArray(wrongNetworkIdBlockHeader), wrongNetworkIdSigs, validators, 
+                    DecodeHexStringToByteArray(wrongNetworkIdBlockHeader), wrongNetworkIdSigs, validators,
                     wrongNetworkIdExtraProof)
                 ).to.be.revertedWith('TokenBridge: incorrect network id')
+                await expect(bridge.withdrawRequest(data, eventProof,
+                    DecodeHexStringToByteArray(wrongExtraDataKeyBlockHeader), wrongExtraDataKeySigs, validators,
+                    wrongExtraDataKeyExtraProof)
+                ).to.be.revertedWith('Postchain: proof does not originate from EIF')
                 await expect(bridge.withdrawRequest(maliciousData, eventProof,
                     DecodeHexStringToByteArray(blockHeader), sigs, validators, 
                     extraProof)
@@ -635,21 +666,21 @@ describe("Token Bridge Test", () => {
                     hashedLeaf: DecodeHexStringToByteArray(hashedLeaf.substring(2, hashedLeaf.length)),
                     position: 1,
                     extraRoot: DecodeHexStringToByteArray(extraDataMerkleRoot),
-                    extraMerkleProofs: [DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797")],
+                    extraMerkleProofs: [DecodeHexStringToByteArray(EIF_HEADER_KEY_HASH)],
                 }
                 let invalidExtraLeaf = {
                     leaf: DecodeHexStringToByteArray(eifLeaf),
                     hashedLeaf: DecodeHexStringToByteArray(maliciousHashEventLeaf.substring(2, maliciousHashEventLeaf.length)),
                     position: 1,
                     extraRoot: DecodeHexStringToByteArray(extraDataMerkleRoot),
-                    extraMerkleProofs: [DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797")],
+                    extraMerkleProofs: [DecodeHexStringToByteArray(EIF_HEADER_KEY_HASH)],
                 }
                 let invalidExtraDataRoot = {
                     leaf: DecodeHexStringToByteArray(eifLeaf),
                     hashedLeaf: DecodeHexStringToByteArray(hashedLeaf.substring(2, hashedLeaf.length)),
                     position: 1,
                     extraRoot: DecodeHexStringToByteArray("04D17CC3DD96E88DF05A943EC79DD436F220E84BA9E5F35CACF627CA225424A2"),
-                    extraMerkleProofs: [DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797")],
+                    extraMerkleProofs: [DecodeHexStringToByteArray(EIF_HEADER_KEY_HASH)],
                 }
                 let maliciousEl2Proof = {
                     leaf: DecodeHexStringToByteArray(eifLeaf),
@@ -852,7 +883,7 @@ describe("Token Bridge Test", () => {
                 hashedLeaf: DecodeHexStringToByteArray(hashedLeaf.substring(2, hashedLeaf.length)),
                 position: 1,
                 extraRoot: DecodeHexStringToByteArray(extraDataMerkleRoot),
-                extraMerkleProofs: [DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797")],
+                extraMerkleProofs: [DecodeHexStringToByteArray(EIF_HEADER_KEY_HASH)],
             }
         });
         
