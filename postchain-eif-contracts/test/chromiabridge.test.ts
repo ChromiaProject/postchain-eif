@@ -20,6 +20,7 @@ import {
   hashGtvBytes32Leaf,
   hashGtvBytes64Leaf,
   hashGtvIntegerLeaf,
+  hashGtvStringLeaf,
   postchainMerkleNodeHash,
 } from "./utils";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
@@ -28,6 +29,7 @@ chai.use(solidity);
 const { expect } = chai;
 const WITHDRAW_OFFSET = "0x20";
 const DAILY_LIMIT = BigInt(1000000000000000000000000);
+const EIF_HEADER_KEY_HASH = hashGtvStringLeaf("eif").substring(2)
 describe("ChromiaToken Bridge Test", () => {
   let tokenAddress: string;
   let bridgeAddress: string;
@@ -326,7 +328,7 @@ describe("ChromiaToken Bridge Test", () => {
           position: 1,
           extraRoot: DecodeHexStringToByteArray(extraDataMerkleRoot),
           extraMerkleProofs: [
-            DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797"),
+            DecodeHexStringToByteArray(EIF_HEADER_KEY_HASH),
           ],
         };
         let wrongNetworkIdExtraProof = {
@@ -337,7 +339,7 @@ describe("ChromiaToken Bridge Test", () => {
           position: 1,
           extraRoot: DecodeHexStringToByteArray(wrongNetworkIdExtraDataMerkleRoot),
           extraMerkleProofs: [
-            DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797"),
+            DecodeHexStringToByteArray(EIF_HEADER_KEY_HASH),
           ],
         };
         let invalidExtraLeaf = {
@@ -346,7 +348,7 @@ describe("ChromiaToken Bridge Test", () => {
           position: 1,
           extraRoot: DecodeHexStringToByteArray(extraDataMerkleRoot),
           extraMerkleProofs: [
-            DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797"),
+            DecodeHexStringToByteArray(EIF_HEADER_KEY_HASH),
           ],
         };
         let invalidExtraDataRoot = {
@@ -355,7 +357,7 @@ describe("ChromiaToken Bridge Test", () => {
           position: 1,
           extraRoot: DecodeHexStringToByteArray("04D17CC3DD96E88DF05A943EC79DD436F220E84BA9E5F35CACF627CA225424A2"),
           extraMerkleProofs: [
-            DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797"),
+            DecodeHexStringToByteArray(EIF_HEADER_KEY_HASH),
           ],
         };
         let maliciousEl2Proof = {
@@ -770,7 +772,7 @@ describe("ChromiaToken Bridge Test", () => {
           position: 1,
           extraRoot: DecodeHexStringToByteArray(extraDataMerkleRoot),
           extraMerkleProofs: [
-            DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797"),
+            DecodeHexStringToByteArray(EIF_HEADER_KEY_HASH),
           ],
         };
         let invalidExtraLeaf = {
@@ -779,7 +781,7 @@ describe("ChromiaToken Bridge Test", () => {
           position: 1,
           extraRoot: DecodeHexStringToByteArray(extraDataMerkleRoot),
           extraMerkleProofs: [
-            DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797"),
+            DecodeHexStringToByteArray(EIF_HEADER_KEY_HASH),
           ],
         };
         let invalidExtraDataRoot = {
@@ -788,7 +790,7 @@ describe("ChromiaToken Bridge Test", () => {
           position: 1,
           extraRoot: DecodeHexStringToByteArray("04D17CC3DD96E88DF05A943EC79DD436F220E84BA9E5F35CACF627CA225424A2"),
           extraMerkleProofs: [
-            DecodeHexStringToByteArray("1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797"),
+            DecodeHexStringToByteArray(EIF_HEADER_KEY_HASH),
           ],
         };
         let maliciousEl2Proof = {

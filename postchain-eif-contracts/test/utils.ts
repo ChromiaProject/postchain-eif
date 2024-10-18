@@ -49,3 +49,7 @@ export var hashGtvIntegerLeaf = function (num: number): string {
     }
     return ethers.utils.soliditySha256(['uint8', 'uint8', 'uint8', 'uint8', 'uint8', 'bytes'], [0x1, 0xA3, nbytes+2, 0x2, nbytes, b])
 }
+
+export function hashGtvStringLeaf(text: string): string {
+    return ethers.utils.soliditySha256(['uint8', 'uint8', 'uint8', 'uint8', 'uint8', 'string'], [0x1, 0xA2, text.length + 2, 0xC, text.length, text])
+}
