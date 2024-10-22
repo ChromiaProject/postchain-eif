@@ -1,3 +1,8 @@
+definitions:
+  - &chain_version
+    release_version: ${RELEASE_VERSION:-dev}
+    release_commit: ${RELEASE_COMMIT:-dev}
+
 blockchains:
   eif_event_receiver_devnet1:
     module: eif_event_receiver
@@ -18,6 +23,8 @@ blockchains:
             evm_read_offset: 10
             skip_to_height: 5801241
             events: !include configs/events.yml
+    moduleArgs:
+      chain_version: *chain_version
 
   transaction_submitter_devnet1:
     module: transaction_submitter
@@ -48,6 +55,8 @@ blockchains:
             currency_symbol: "BNB"
         system_max_priority_fee_per_gas: 25000000000
         system_max_fee_per_gas: 180000000000
+        tx_verification_timeout: 1500000 # 25 min - a bit less than tx_node_submit_timeout
+      chain_version: *chain_version
     config:
       gtx:
         modules:
@@ -66,7 +75,6 @@ blockchains:
             gas_limit_margin: "0.2" # 20%
             base_fee_per_gas_margin: "1.5" # +150% (base_fee + base_fee * 1.5)
             priority_fee_per_gas_margin: "0.000001" # 0.00001% # Small margin to pass the default priority fees
-        node_tx_verification_timeout: 1500000 # 25 min - a bit less than tx_node_submit_timeout
       sync_ext:
         - "net.postchain.eif.transaction.TransactionSubmitterSynchronizationInfrastructureExtension"
         - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"

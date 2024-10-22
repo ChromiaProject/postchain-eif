@@ -22,6 +22,9 @@ definitions:
       admin_pubkey: 02897FAC9964FBDF97E6B83ECCBDE4A8D28729E0FB27059487D1B6B29F70B48767
     lib.originals.marketplace:
       oracle_pubkey: 02897FAC9964FBDF97E6B83ECCBDE4A8D28729E0FB27059487D1B6B29F70B48767
+  - &chain_version
+    release_version: ${RELEASE_VERSION:-dev}
+    release_commit: ${RELEASE_COMMIT:-dev}
 
 test:
   modules:
@@ -42,6 +45,7 @@ blockchains:
     moduleArgs:
       <<: *common_args
       <<: *rell_test_args
+      chain_version: *chain_version
 
 compile:
   source: src

@@ -1,3 +1,8 @@
+definitions:
+  - &chain_version
+    release_version: ${RELEASE_VERSION:-dev}
+    release_commit: ${RELEASE_COMMIT:-dev}
+
 blockchains:
   eif_event_receiver_mainnet:
     module: eif_event_receiver
@@ -26,6 +31,8 @@ blockchains:
               - '0xC7b0F970c1EFBB181194Fc15ccD5C4a2c2Ab863B' # staking
             skip_to_height: 11223368
             events: !include configs/events.yml
+    moduleArgs:
+      chain_version: *chain_version
 
   eif_event_receiver_price_oracle_mainnet:
     module: eif_event_receiver
@@ -100,6 +107,7 @@ blockchains:
         system_max_fee_per_gas: 180000000000
       transaction_submitter.anchoring:
         anchoring_interval: 3600000 # every 1 hour
+      chain_version: *chain_version
     config:
       gtx:
         modules:
