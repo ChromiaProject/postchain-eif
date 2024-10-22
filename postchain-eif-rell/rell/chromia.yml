@@ -22,6 +22,9 @@ definitions:
       admin_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
     lib.access.admin:
       admin_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
+  - &chain_version
+    release_version: ${RELEASE_VERSION:-dev}
+    release_commit: ${RELEASE_COMMIT:-dev}
 
 test:
   failOnError: false
@@ -119,6 +122,8 @@ blockchains:
             evm_read_offset: 10
             skip_to_height: 5801241
             events: !include configs/events.yml
+    moduleArgs:
+      chain_version: *chain_version
 
   eif_event_receiver_mainnet:
     module: eif_event_receiver
@@ -143,6 +148,8 @@ blockchains:
             contracts: # TODO
             skip_to_height: 20043373  # TODO
             events: !include configs/events.yml
+    moduleArgs:
+      chain_version: *chain_version
 
   eif_event_receiver_price_oracle_mainnet:
     module: eif_event_receiver
@@ -171,6 +178,8 @@ blockchains:
               - '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
             skip_to_height: 20276695 # TODO set to most recent block
             events: !include configs/events_price_oracle.yml
+    moduleArgs:
+      chain_version: *chain_version
 
   hbridge:
     module: hbridge
@@ -193,6 +202,7 @@ blockchains:
       <<: *rell_test_args
       lib.ft4.core.accounts.strategies.transfer:
         rules: [] # TODO specify transfer strategy rules
+      chain_version: *chain_version
 
   transaction_submitter:
     module: transaction_submitter
@@ -231,6 +241,7 @@ blockchains:
         system_max_fee_per_gas: 4000000000
       transaction_submitter.anchoring:
         anchoring_interval: 3600000 # 1 per hour
+      chain_version: *chain_version
     config:
       gtx:
         modules:

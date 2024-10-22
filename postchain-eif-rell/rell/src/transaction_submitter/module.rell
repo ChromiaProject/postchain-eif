@@ -1,6 +1,6 @@
 import .anchoring.*;
 import .signer_update.*;
-
+import chain_version;
 import .messaging.*;
 import .utils.*;
 
