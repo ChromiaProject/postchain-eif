@@ -5,6 +5,7 @@ import messaging: ^.eif.messaging;
 import common: ^.eif.common;
 import utils: ^.eif.utils;
 import version: ^.eif.version;
+import access_list_control: ^.access_list_control;
 
 namespace ft4 {
     import lib.ft4.accounts;
@@ -26,3 +27,8 @@ val need_consent_on_deposit = true;
 
 val zero_beneficiary = x"0000000000000000000000000000000000000000000000000000000000000000";
 
+@extendable
+function deposit_check_access_list(account_id: byte_array): boolean;
+
+@extendable
+function withdraw_check_access_list(account_id: byte_array): boolean;

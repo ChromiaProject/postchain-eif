@@ -66,6 +66,8 @@ operation bridge_ft4_token_to_evm(network_id: integer, asset_id: byte_array, amo
         "Can only withdraw to your own account"
     );
 
+    require(withdraw_check_access_list(from_account.id), "Account id %s not on access list.".format(from_account.id));
+
     bridge_deduct_balance(from_account, erc20.asset, amount);
     emit_withdrawal_event(erc20.network_id, erc20.token_address, beneficiary, amount);
 }
