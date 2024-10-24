@@ -281,7 +281,7 @@ function evm_block_fn(network_id: integer, evm_block_height: integer, evm_block_
                         account_link.state_n,
                         account = state
                     );
-                    op_context.emit_event("eif_state", state_data.to_gtv());
+                    //op_context.emit_event("eif_state", state_data.to_gtv());
                 } else {
                     // mint postchain token for ft3 account
                     val ft3_account = evm_account.account;
@@ -295,7 +295,7 @@ function evm_block_fn(network_id: integer, evm_block_height: integer, evm_block_
                         account_link.state_n,
                         account = state
                     );
-                    op_context.emit_event("eif_state", state_data.to_gtv());
+                    //op_context.emit_event("eif_state", state_data.to_gtv());
                 }
             }
             "DepositedERC721" -> {
@@ -331,7 +331,7 @@ function evm_block_fn(network_id: integer, evm_block_height: integer, evm_block_
                         account_link.state_n,
                         account = state
                     );
-                    op_context.emit_event("eif_state", state_data.to_gtv());
+                    //op_context.emit_event("eif_state", state_data.to_gtv());
                 } else {
                     val ft3_account = evm_account.account;
                     log("mint postchain original for ft3 account: " + ft3_account.id);
@@ -880,7 +880,7 @@ function emit_withdraw(network_id: integer, beneficiary: byte_array, account: ac
         account = state
     );
 
-    op_context.emit_event("eif_state", state_data.to_gtv());
+    //op_context.emit_event("eif_state", state_data.to_gtv());
     op_context.emit_event("eif_event", eth_event_data.to_gtv());
 }
 
@@ -918,5 +918,5 @@ function update_account_state(account_id: byte_array, asset_id: byte_array) {
         account_link.state_n,
         account = state
     );
-    op_context.emit_event("eif_state", state_data.to_gtv());
+    //op_context.emit_event("eif_state", state_data.to_gtv());
 }
