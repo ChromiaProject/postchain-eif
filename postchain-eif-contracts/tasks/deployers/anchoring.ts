@@ -7,8 +7,8 @@ import {
 } from "../../src/types";
 
 task("deploy:anchoring", "Deploy anchoring contract")
-    .addParam("blockchainRid", "Blockchain RID of directory chain")
-    .addParam("directoryValidator", "Blockchain RID of directory chain")
+    .addParam("blockchainRid", "Blockchain RID of system anchoring chain")
+    .addParam("directoryValidator", "Contract address of directory chain validator")
     .addFlag('verify', 'Verify contracts at Etherscan')
     .setAction(async ({blockchainRid, directoryValidator, verify}, hre) => {
       const validatorFactory: ManagedValidator__factory = await hre.ethers.getContractFactory("ManagedValidator");
