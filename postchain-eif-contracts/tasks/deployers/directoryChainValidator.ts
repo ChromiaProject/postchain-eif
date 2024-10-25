@@ -2,7 +2,7 @@ import {task} from "hardhat/config";
 import {DirectoryChainValidator, DirectoryChainValidator__factory} from "../../src/types";
 
 task("deploy:directoryValidator", "Deploy directory chain validator contract")
-    .addParam("blockchainRid", "Blockchain RID of system anchoring chain")
+    .addParam("blockchainRid", "Blockchain RID of directory chain")
     .addFlag('verify', 'Verify contracts at Etherscan')
     .setAction(async ({blockchainRid, verify}, hre) => {
       const validatorFactory: DirectoryChainValidator__factory = await hre.ethers.getContractFactory("DirectoryChainValidator");
