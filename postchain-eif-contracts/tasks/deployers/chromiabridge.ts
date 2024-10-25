@@ -53,6 +53,7 @@ task("deploy:chromiabridge")
       const validatorFactory: ManagedValidator__factory = await hre.ethers.getContractFactory("ManagedValidator");
       validator = <IValidator>await validatorFactory.deploy(directoryValidator);
     }
+    await validator.deployed();
     console.log("Validator deployed to: ", validator.address);
     const withdrawOffset = offset === undefined ? 0 : parseInt(offset);
 

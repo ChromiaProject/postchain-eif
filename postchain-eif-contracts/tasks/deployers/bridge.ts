@@ -26,6 +26,7 @@ task("deploy:bridge")
       const validatorFactory: ManagedValidator__factory = await hre.ethers.getContractFactory("ManagedValidator");
       validator = <IValidator>await validatorFactory.deploy(directoryValidator);
     }
+    await validator.deployed();
     console.log("Validator deployed to: ", validator.address);
 
     // deploy token bridge smart contracts
