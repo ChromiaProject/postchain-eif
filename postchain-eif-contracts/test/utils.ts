@@ -1,8 +1,16 @@
 import { ethers } from "hardhat";
-import { BytesLike } from "ethers/lib/utils";
+import { BytesLike } from "ethers";
+
+export function strip0x(hexString: string): string {
+    return hexString.startsWith("0x") ? hexString.slice(2) : hexString;
+}
+
+export function toHex(str: string): string {
+    return str.startsWith("0x") ? str : "0x" + str;
+}
 
 export function DecodeHexStringToByteArray(hexString: string) {
-    var result = [];
+    const result: number[] = [];
     while (hexString.length >= 2) { 
         result.push(parseInt(hexString.substring(0, 2), 16))
         hexString = hexString.substring(2, hexString.length)
@@ -11,18 +19,18 @@ export function DecodeHexStringToByteArray(hexString: string) {
 }
 
 export function postchainMerkleNodeHash(values: any[]): string {
-    return ethers.utils.soliditySha256(['uint8', 'bytes32', 'bytes32'], values)
+    return ethers.solidityPackedSha256(['uint8', 'bytes32', 'bytes32'], values)
 }
 
 export function hashGtvBytes32Leaf (data: BytesLike): string {
     var result: string = ''
-    result = ethers.utils.soliditySha256(['uint8', 'uint8', 'uint8', 'uint8', 'uint8', 'bytes32'], [0x1, 0xA1, 32+2, 0x4, 32, data])
+    result = ethers.solidityPackedSha256(['uint8', 'uint8', 'uint8', 'uint8', 'uint8', 'bytes32'], [0x1, 0xA1, 32+2, 0x4, 32, data])
     return result
 }
 
 export function hashGtvBytes64Leaf (data: BytesLike): string {
     var result: string = ''
-    result = ethers.utils.soliditySha256(['uint8', 'uint8', 'uint8', 'uint8', 'uint8', 'bytes'], [0x1, 0xA1, 64+2, 0x4, 64, data])
+    result = ethers.solidityPackedSha256(['uint8', 'uint8', 'uint8', 'uint8', 'uint8', 'bytes'], [0x1, 0xA1, 64+2, 0x4, 64, data])
     return result
 }
 
@@ -45,11 +53,11 @@ export var hashGtvIntegerLeaf = function (num: number): string {
         nbytes += 1
         let a = new Uint8Array(1)
         a[0] = 0
-        return ethers.utils.soliditySha256(['uint8', 'uint8', 'uint8', 'uint8', 'uint8', 'bytes'], [0x1, 0xA3, nbytes+2, 0x2, nbytes, new Uint8Array([...a, ...b])])
+        return ethers.solidityPackedSha256(['uint8', 'uint8', 'uint8', 'uint8', 'uint8', 'bytes'], [0x1, 0xA3, nbytes+2, 0x2, nbytes, new Uint8Array([...a, ...b])])
     }
-    return ethers.utils.soliditySha256(['uint8', 'uint8', 'uint8', 'uint8', 'uint8', 'bytes'], [0x1, 0xA3, nbytes+2, 0x2, nbytes, b])
+    return ethers.solidityPackedSha256(['uint8', 'uint8', 'uint8', 'uint8', 'uint8', 'bytes'], [0x1, 0xA3, nbytes+2, 0x2, nbytes, b])
 }
 
 export function hashGtvStringLeaf(text: string): string {
-    return ethers.utils.soliditySha256(['uint8', 'uint8', 'uint8', 'uint8', 'uint8', 'string'], [0x1, 0xA2, text.length + 2, 0xC, text.length, text])
+    return ethers.solidityPackedSha256(['uint8', 'uint8', 'uint8', 'uint8', 'uint8', 'string'], [0x1, 0xA2, text.length + 2, 0xC, text.length, text])
 }

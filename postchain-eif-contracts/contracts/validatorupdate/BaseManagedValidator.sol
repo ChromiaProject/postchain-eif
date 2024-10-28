@@ -9,6 +9,7 @@ import {IManagedValidator} from "./IManagedValidator.sol";
 import "./ValidatorUpdateUtils.sol";
 
 abstract contract BaseManagedValidator is IManagedValidator {
+
     // Merkle hash of GTV String "signer_list_update"
     bytes32 constant SIGNER_UPDATE_KEY_MERKLE_HASH = 0x36A27B007B358F4B3973E424BDE7545CF784C91912B99D0FCF3348A4EAE9A30A;
 

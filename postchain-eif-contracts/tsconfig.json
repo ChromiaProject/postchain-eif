@@ -1,36 +1,41 @@
 {
   "compilerOptions": {
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "lib": [
-      "es6"
-    ],
+    // Target and Language Support
+    "target": "es2020",
+    "lib": ["es2020"],
+
+    // Module System and Resolution
     "module": "commonjs",
     "moduleResolution": "node",
-    "noImplicitAny": true,
-    "outDir": "dist",
-    "resolveJsonModule": true,
-    "sourceMap": true,
-    "strict": true,
-    "target": "es6",
-    "allowJs": true,
-    "skipLibCheck": true,
+
+    // Interoperability and Import/Export
+    "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+
+    // Code Quality and Strictness
+    "strict": true,
+    "noImplicitAny": true,
+    "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
+
+    // Project Structure and Output
+    "outDir": "dist",
+    "sourceMap": true,
+    "allowJs": true,
     "isolatedModules": true,
-    "noEmit": true,
-    "jsx": "react-jsx"
+
+    // Compiler Performance
+    "skipLibCheck": true
   },
-  "exclude": [
-    "node_modules"
-  ],
   "files": [
     "./hardhat.config.ts"
   ],
   "include": [
     "tasks/**/*.ts",
     "test/**/*.ts",
-    "src/types/**/*.d.ts",
-    "src/types/**/*.ts"
-  ]
+    "typechain-types/**/*.d.ts",
+    "typechain-types/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
 }

@@ -167,7 +167,6 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
 
         require(extraProof.extraRoot == header.extraDataHashedLeaf, "Postchain: invalid extra data root");
 
-
         // Check extraProof against the mass exit block and for internal consistency
         require(Hash.hashGtvBytes64Leaf(extraProof.leaf) == extraProof.hashedLeaf, "Postchain: invalid EIF extra data");
         if (!MerkleProof.verifySHA256(extraProof.extraMerkleProofs, extraProof.hashedLeaf, extraProof.position, extraProof.extraRoot)) {

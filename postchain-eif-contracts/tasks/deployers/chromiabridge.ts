@@ -1,155 +1,157 @@
 import { task } from "hardhat/config";
-import {
-  ChromiaTokenBridge,
-  ChromiaTokenBridge__factory,
-  IValidator,
-  Validator__factory,
-  ManagedValidator__factory,
-  TokenMinterBase,
-  TokenMinterETH__factory,
-  Chromia,
-  Chromia__factory,
-} from "../../src/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
+import {
+    Chromia,
+    Chromia__factory,
+    ChromiaTokenBridge,
+    ChromiaTokenBridge__factory,
+    IValidator,
+    ManagedValidator__factory,
+    TokenMinterBase,
+    TokenMinterETH__factory,
+    Validator__factory,
+} from "../../typechain-types";
 
 interface KnownArtifacts {
-  multiSigOwner: string;
-  chromiaTokenAddress: string;
+    multiSigOwner: string;
+    chromiaTokenAddress: string;
 }
 
 
 const known_artifacts_by_network: { [key: string]: KnownArtifacts } = {
-  "ethereum": {
-    "multiSigOwner": "0x734eEdaD58606EfF1AAf6fF3699fa4ae4f36E8C1", // system.ops.wallets
-    "chromiaTokenAddress": "0x8A2279d4A90B6fe1C4B30fa660cC9f926797bAA2", // chr.tokens
-  },
-  "bsc": {
-    "multiSigOwner": "0xe33D5C1DFDEde024f612c33C90B1D4a3d3504da0", // system.ops.wallets
-    "chromiaTokenAddress": "0xf9CeC8d50f6c8ad3Fb6dcCEC577e05aA32B224FE", // chr.tokens
-  },
-  "hardhat": {
-    "multiSigOwner": "0x6e8187435d5140214552ef3989ddb1457f4a663a", // nonsense
-    "chromiaTokenAddress": "0x8A22279d4A90B6fe1C4B30fa660cC9f926797bAA2", // nonsense
-  }
+    "ethereum": {
+        "multiSigOwner": "0x734eEdaD58606EfF1AAf6fF3699fa4ae4f36E8C1", // system.ops.wallets
+        "chromiaTokenAddress": "0x8A2279d4A90B6fe1C4B30fa660cC9f926797bAA2", // chr.tokens
+    },
+    "bsc": {
+        "multiSigOwner": "0xe33D5C1DFDEde024f612c33C90B1D4a3d3504da0", // system.ops.wallets
+        "chromiaTokenAddress": "0xf9CeC8d50f6c8ad3Fb6dcCEC577e05aA32B224FE", // chr.tokens
+    },
+    "hardhat": {
+        "multiSigOwner": "0x6e8187435d5140214552ef3989ddb1457f4a663a", // nonsense
+        "chromiaTokenAddress": "0x8A22279d4A90B6fe1C4B30fa660cC9f926797bAA2", // nonsense
+    },
+    "bsc_testnet": {
+        "multiSigOwner": "0x6e8187435d5140214552ef3989ddb1457f4a663a", // nonsense
+        "chromiaTokenAddress": "0x8A22279d4A90B6fe1C4B30fa660cC9f926797bAA2", // nonsense
+    }
 }
 
 task("deploy:chromiabridge")
-  .addOptionalParam("app", "app node, not needed when using managed validator")
-  .addOptionalParam("offset", "withdraw offset")
-  .addOptionalParam("directoryValidator", "Contract address of directory chain validator, supply this to use managed validator contract")
-  .addFlag("verify", "Verify contracts at Etherscan")
-  .setAction(async ({verify, app, offset, directoryValidator}, hre) => {
+    .addOptionalParam("app", "app node, not needed when using managed validator")
+    .addOptionalParam("offset", "withdraw offset")
+    .addOptionalParam("directoryValidator", "Contract address of directory chain validator, supply this to use managed validator contract")
+    .addFlag("verify", "Verify contracts at Etherscan")
+    .setAction(async ({ verify, app, offset, directoryValidator }, hre) => {
 
-    let multiSigOwner = known_artifacts_by_network[hre.network.name].multiSigOwner;
+        let multiSigOwner = known_artifacts_by_network[hre.network.name].multiSigOwner;
 
-    // deploy validator smart contract
-    let validator;
-    let validators;
-    if (directoryValidator === undefined) {
-      const validatorFactory: Validator__factory = await hre.ethers.getContractFactory("Validator");
-      validators = app === undefined ? [] : getNodes(app);
-      validator = <IValidator>await validatorFactory.deploy(validators);
-    } else {
-      const validatorFactory: ManagedValidator__factory = await hre.ethers.getContractFactory("ManagedValidator");
-      validator = <IValidator>await validatorFactory.deploy(directoryValidator);
-    }
-    await validator.deployed();
-    console.log("Validator deployed to: ", validator.address);
-    const withdrawOffset = offset === undefined ? 0 : parseInt(offset);
-
-    // deploy token bridge smart contracts
-    const factory: ChromiaTokenBridge__factory = await hre.ethers.getContractFactory("ChromiaTokenBridge");
-    const bridge: ChromiaTokenBridge = <ChromiaTokenBridge>(
-      await hre.upgrades.deployProxy(factory, [validator.address, withdrawOffset])
-    );
-    await bridge.deployed();
-
-    console.log("Token bridge deployed to: ", bridge.address);
-    const proxyAdmin = await hre.upgrades.erc1967.getAdminAddress(bridge.address);
-    console.log("Proxy admin address is: ", proxyAdmin);
-    await hre.upgrades.admin.transferProxyAdminOwnership(
-      multiSigOwner
-    );
-
-    const DAILY_LIMIT = 1000000 * 1000000; // agreed on weekly meeting 2024-06-19
-
-    let signers = await hre.ethers.getSigners();
-    let signerAddress = await signers[0].getAddress();
-
-    // Import the Chromia token contract
-    const tokenFactory: Chromia__factory = await hre.ethers.getContractFactory("Chromia");
-    const token: Chromia = tokenFactory.attach(
-      known_artifacts_by_network[hre.network.name].chromiaTokenAddress
-    );
-
-    const tokenMinterFactory: TokenMinterETH__factory = await hre.ethers.getContractFactory("TokenMinterETH"); // transferFromNative ETH mainnet
-    const tokenMinter: TokenMinterBase = await tokenMinterFactory.deploy(DAILY_LIMIT, token.address, bridge.address, multiSigOwner);
-    await tokenMinter.deployed();
-    console.log("Token Minter deployed to: ", tokenMinter.address);
-
-    console.log('bridge.setTokenMinter');
-    console.log(await bridge.setTokenMinter(tokenMinter.address));
-
-    console.log('bridge.allowToken');
-    console.log(await bridge.allowToken(token.address));
-
-    console.log('bridge.transferOwnership');
-    console.log(await bridge.transferOwnership(multiSigOwner));
-    // note: it needs to be accepted by the multisig
-
-    if (verify) {
-      // When redeploy new smart contracts, etherscan can automatically verify the smart contract
-      // with the similar code, then calling verify will return error.
-      // We add try/catch to handle the error and continue to verify the main bridge smart contract.
-      try {
+        // deploy validator smart contract
+        let validator;
+        let validators;
         if (directoryValidator === undefined) {
-          await hre.run("verify:verify", {
-            address: validator.address,
-            constructorArguments: [validators],
-          });
+            const validatorFactory = await hre.ethers.getContractFactory("Validator") as Validator__factory;
+            validators = app === undefined ? [] : getNodes(app);
+            validator = await validatorFactory.deploy(validators) as IValidator;
         } else {
-          await hre.run("verify:verify", {
-            address: validator.address,
-            constructorArguments: [directoryValidator],
-          });
+            const validatorFactory = await hre.ethers.getContractFactory("ManagedValidator") as ManagedValidator__factory;
+            validator = await validatorFactory.deploy(directoryValidator) as IValidator;
         }
-        await hre.run("verify:verify", {
-          address: token.address,
-          constructorArguments: [signerAddress, 0],
-        });
-        await hre.run("verify:verify", {
-          address: tokenMinter.address,
-          constructorArguments: [DAILY_LIMIT, token.address, bridge.address, multiSigOwner],
-        });
-      } catch (e) {
-        console.log(e);
-      }
+        await validator.waitForDeployment();
+        const validatorAddress = await validator.getAddress();
+        console.log("Validator deployed to: ", validatorAddress);
+        const withdrawOffset = offset === undefined ? 0 : parseInt(offset);
 
-      try {
-        await verifyProxyContract(hre, bridge.address);
-      } catch (e) {
-        console.log(e);
-      }
-    }
-  });
+        // deploy token bridge smart contracts
+        const factory = await hre.ethers.getContractFactory("ChromiaTokenBridge") as ChromiaTokenBridge__factory;
+        const bridge = await hre.upgrades.deployProxy(factory, [validatorAddress, withdrawOffset]) as ChromiaTokenBridge;
+        await bridge.waitForDeployment();
+        const bridgeAddress = await bridge.getAddress();
+
+        console.log("Token bridge deployed to: ", bridgeAddress);
+        const proxyAdmin = await hre.upgrades.erc1967.getAdminAddress(bridgeAddress);
+        console.log("Proxy admin address is: ", proxyAdmin);
+        await hre.upgrades.admin.transferProxyAdminOwnership(multiSigOwner);
+
+        const DAILY_LIMIT = 1000000 * 1000000; // agreed on weekly meeting 2024-06-19
+
+        let signers = await hre.ethers.getSigners();
+        let signerAddress = await signers[0].getAddress();
+
+        // Import the Chromia token contract
+        const tokenFactory  = await hre.ethers.getContractFactory("Chromia") as Chromia__factory;
+        const token = tokenFactory.attach(known_artifacts_by_network[hre.network.name].chromiaTokenAddress) as Chromia;
+        const tokenAddress = await token.getAddress();
+
+        const tokenMinterFactory = await hre.ethers.getContractFactory("TokenMinterETH") as TokenMinterETH__factory; // transferFromNative ETH mainnet
+        const tokenMinter = await tokenMinterFactory.deploy(DAILY_LIMIT, tokenAddress, bridgeAddress, multiSigOwner) as TokenMinterBase;
+        await tokenMinter.waitForDeployment();
+        const tokenMinterAddress = tokenMinter.getAddress();
+        console.log("Token Minter deployed to: ", tokenMinterAddress);
+
+        console.log('bridge.setTokenMinter');
+        console.log(await bridge.setTokenMinter(tokenMinterAddress));
+
+        console.log('bridge.allowToken');
+        console.log(await bridge.allowToken(tokenAddress));
+
+        console.log('bridge.transferOwnership');
+        console.log(await bridge.transferOwnership(multiSigOwner));
+        // note: it needs to be accepted by the multisig
+
+        if (verify) {
+            // When redeploy new smart contracts, etherscan can automatically verify the smart contract
+            // with the similar code, then calling verify will return error.
+            // We add try/catch to handle the error and continue to verify the main bridge smart contract.
+            try {
+                if (directoryValidator === undefined) {
+                    await hre.run("verify:verify", {
+                        address: validatorAddress,
+                        constructorArguments: [validators],
+                    });
+                } else {
+                    await hre.run("verify:verify", {
+                        address: validatorAddress,
+                        constructorArguments: [directoryValidator],
+                    });
+                }
+                await hre.run("verify:verify", {
+                    address: tokenAddress,
+                    constructorArguments: [signerAddress, 0],
+                });
+                await hre.run("verify:verify", {
+                    address: tokenMinterAddress,
+                    constructorArguments: [DAILY_LIMIT, tokenAddress, bridgeAddress, multiSigOwner],
+                });
+            } catch (e) {
+                console.log(e);
+            }
+
+            try {
+                await verifyProxyContract(hre, bridgeAddress);
+            } catch (e) {
+                console.log(e);
+            }
+        }
+    });
 
 async function verifyProxyContract(hre: HardhatRuntimeEnvironment, proxyAddress: string) {
-  // We need to wait a little bit to verify the contract after deployment
-  const implementationAddress = await hre.upgrades.erc1967.getImplementationAddress(proxyAddress);
-  console.log("Verifying logic contract deployed at: " + implementationAddress + ". This may take some time.");
-  await delay(60000);
+    // We need to wait a little bit to verify the contract after deployment
+    const implementationAddress = await hre.upgrades.erc1967.getImplementationAddress(proxyAddress);
+    console.log("Verifying logic contract deployed at: " + implementationAddress + ". This may take some time.");
+    await delay(60000);
 
-  await hre.run("verify:verify", {
-    address: implementationAddress,
-  });
+    await hre.run("verify:verify", {
+        address: implementationAddress,
+    });
 }
 
 function delay(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function getNodes(nodes: string) {
-  return nodes.split(",");
+    return nodes.split(",");
 }
 
 /*
@@ -192,14 +194,14 @@ OLD ETH mainnet:
 
 
 // If the above deployments of ChromiaTokenBridge and DailyLimit work, the contracts instances can be obtained like this:
-    /*
-    const factory: ChromiaTokenBridge__factory = await hre.ethers.getContractFactory("ChromiaTokenBridge");
-    const bridge: ChromiaTokenBridge = factory.attach(
-      "0x6e8187435d5140214552ef3989ddb1457f4a663a",
-    );
+/*
+const factory: ChromiaTokenBridge__factory = await hre.ethers.getContractFactory("ChromiaTokenBridge");
+const bridge: ChromiaTokenBridge = factory.attach(
+  "0x6e8187435d5140214552ef3989ddb1457f4a663a",
+);
 
-    const dailyLimitFactory: DailyLimit__factory = await hre.ethers.getContractFactory("DailyLimit");
-    const dailyLimit: DailyLimit = dailyLimitFactory.attach(
-      "0x0444d0F8799272AE52644264873de86aa28D222A",
-    );
-    */
+const dailyLimitFactory: DailyLimit__factory = await hre.ethers.getContractFactory("DailyLimit");
+const dailyLimit: DailyLimit = dailyLimitFactory.attach(
+  "0x0444d0F8799272AE52644264873de86aa28D222A",
+);
+*/

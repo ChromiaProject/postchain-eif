@@ -16,7 +16,7 @@
             <outputDirectory>artifacts</outputDirectory>
         </fileSet>
         <fileSet>
-            <directory>${project.basedir}/src/types</directory>
+            <directory>${project.basedir}/typechain-types</directory>
             <outputDirectory>types</outputDirectory>
         </fileSet>
     </fileSets>

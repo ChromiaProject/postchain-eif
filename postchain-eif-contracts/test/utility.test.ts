@@ -1,28 +1,26 @@
 import { ethers } from "hardhat";
 import chai from "chai";
-import { solidity } from "ethereum-waffle";
-import { TestDelegator__factory, TestDelegator } from "../src/types";
+import { TestDelegator__factory, TestDelegator } from "../typechain-types";
 
-chai.use(solidity);
 const { expect } = chai;
 
 describe("Utility Test", () => {
-    let testDelegatorAddress: string;
+    let testDelegator: TestDelegator;
 
     beforeEach(async () => {
-        const [deployer] = await ethers.getSigners()
-
-        const testDelegatorFactory = new TestDelegator__factory(deployer)
-        const testDelegator = await testDelegatorFactory.deploy()
-        testDelegatorAddress = testDelegator.address
+        const [deployer] = await ethers.getSigners();
+        const testDelegatorFactory = await ethers.getContractFactory("TestDelegator", deployer) as TestDelegator__factory;
+        testDelegator = await testDelegatorFactory.deploy();
+        await testDelegator.waitForDeployment();
     });
 
     describe("Utility", async () => {
         describe("hash", async () => {
-            var testDelegatorInstance: TestDelegator
+            var testDelegatorInstance: TestDelegator;
+            
             beforeEach(async () => {
-                const [everyone] = await ethers.getSigners()
-                testDelegatorInstance = new TestDelegator__factory(everyone).attach(testDelegatorAddress)
+                const [everyone] = await ethers.getSigners();
+                testDelegatorInstance = testDelegator.connect(everyone);
             })
 
             it("Non-empty node sha3 hash function", async () => {
@@ -100,8 +98,8 @@ describe("Utility Test", () => {
 
         describe("Merkle Proof", async () => {
             it("Verify valid merkle proof properly", async () => {
-                const [everyone] = await ethers.getSigners()
-                const testDelegatorInstance = new TestDelegator__factory(everyone).attach(testDelegatorAddress)
+                const [everyone] = await ethers.getSigners();
+                const testDelegatorInstance = testDelegator.connect(everyone);
 
                 expect(await testDelegatorInstance.verify(["0x57abe736cc8dcd7497b22ba39c7c2009088136d479e23cb7d1526751995832d6",
                     "0xd103842c6a7267b533021131520f29734b4cd2256ea3851aa963339c9d763904"],
@@ -111,8 +109,8 @@ describe("Utility Test", () => {
             })
 
             it("Invalid merkle proof", async () => {
-                const [everyone] = await ethers.getSigners()
-                const testDelegatorInstance = new TestDelegator__factory(everyone).attach(testDelegatorAddress)
+                const [everyone] = await ethers.getSigners();
+                const testDelegatorInstance = testDelegator.connect(everyone);
 
                 expect(await testDelegatorInstance.verify(["0x57abe736cc8dcd7497b22ba39c7c2009088136d479e23cb7d1526751995832d6",
                     "0xd103842c6a7267b533021131520f29734b4cd2256ea3851aa963339c9d763904"],
@@ -124,8 +122,8 @@ describe("Utility Test", () => {
 
         describe("SHA256 Merkle Proof", async () => {
             it("Verify valid SHA256 merkle proof properly", async () => {
-                const [everyone] = await ethers.getSigners()
-                const testDelegatorInstance = new TestDelegator__factory(everyone).attach(testDelegatorAddress)
+                const [everyone] = await ethers.getSigners();
+                const testDelegatorInstance = testDelegator.connect(everyone);
 
                 expect(await testDelegatorInstance.verifySHA256(["0xC7CBFEFDF46A4F2F925389E660604B7E68246802F25581C1493F2673EA2F71F1"],
                     "0x480DE19560D2D0DE62AD9306F1156B08CD543626AC1F28134E32C6A2FECB357A",
@@ -144,8 +142,8 @@ describe("Utility Test", () => {
             })
 
             it("Invalid SHA256 merkle proof due to incorrect merkle root", async () => {
-                const [everyone] = await ethers.getSigners()
-                const testDelegatorInstance = new TestDelegator__factory(everyone).attach(testDelegatorAddress)
+                const [everyone] = await ethers.getSigners();
+                const testDelegatorInstance = testDelegator.connect(everyone);
 
                 expect(await testDelegatorInstance.verifySHA256(["0xC7CBFEFDF46A4F2F925389E660604B7E68246802F25581C1493F2673EA2F71F1"],
                     "0x480DE19560D2D0DE62AD9306F1156B08CD543626AC1F28134E32C6A2FECB357A",
