@@ -1,147 +1,150 @@
-import { ethers, upgrades, network } from "hardhat";
-import chai from "chai";
-import { solidity } from "ethereum-waffle";
-import {
-  Chromia__factory,
-  ChromiaTokenBridge__factory,
-  TokenBridgeDelegator__factory,
-  Validator__factory,
-  TokenMinterETH__factory,
-} from "../src/types";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { constants } from "ethers";
+import "@nomicfoundation/hardhat-chai-matchers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
+import "@openzeppelin/hardhat-upgrades";
+import chai from "chai";
+import { ethers, network, upgrades } from "hardhat";
+import {
+    Chromia,
+    Chromia__factory,
+    ChromiaTokenBridge,
+    ChromiaTokenBridge__factory,
+    TokenBridgeDelegator,
+    TokenBridgeDelegator__factory,
+    TokenMinterETH,
+    TokenMinterETH__factory,
+    Validator,
+    Validator__factory,
+} from "../typechain-types";
 
-chai.use(solidity);
 const { expect } = chai;
 const WITHDRAW_OFFSET = "0x20";
 const DAILY_LIMIT = BigInt(50000000000000000000000);
+
 describe("TokenMinter test", () => {
-  let tokenAddress: string;
-  let bridgeAddress: string;
-  let validatorAddress: string;
-  let tokenMinterAddress: string;
-  let bridgeDelegatorAddress: string;
-  let migrationAddress: string;
-  let admin: SignerWithAddress;
-  let validator1: SignerWithAddress;
-  let validator2: SignerWithAddress;
-  let validator3: SignerWithAddress;
 
-  beforeEach(async () => {
-    await network.provider.request({
-      method: "hardhat_reset",
-      params: [],
-    });
-    const [deployer] = await ethers.getSigners();
-    [admin, validator1, validator2, validator3] = await ethers.getSigners();
-    const tokenFactory = new Chromia__factory(deployer);
-    const tokenContract = await tokenFactory.deploy(admin.address, 0);
-    tokenAddress = tokenContract.address;
-    expect(await tokenContract.totalSupply()).to.eq(0);
+    let tokenContract: Chromia;
+    let validatorContract: Validator;
+    let bridgeContract: ChromiaTokenBridge;
+    let bridgeDelegatorContract: TokenBridgeDelegator;
+    let tokenMinterContract: TokenMinterETH;
 
-    const validatorFactory = new Validator__factory(admin);
-    const validatorContract = await validatorFactory.deploy([validator1.address, validator2.address]);
-    validatorAddress = validatorContract.address;
+    beforeEach(async () => {
+        await network.provider.request({
+            method: "hardhat_reset",
+            params: [],
+        });
+        const [deployer] = await ethers.getSigners();
+        const [admin, validator1, validator2, validator3] = await ethers.getSigners();
+        const tokenFactory = await ethers.getContractFactory("Chromia", deployer) as Chromia__factory;
+        tokenContract = await tokenFactory.deploy(admin.address, 0);
+        await tokenContract.waitForDeployment();
+        var tokenAddress = await tokenContract.getAddress();
+        expect(await tokenContract.totalSupply()).to.eq(0);
 
-    const bridgeFactory = new ChromiaTokenBridge__factory(admin);
-    const bridge = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_OFFSET]);
-    bridgeAddress = bridge.address;
+        const validatorFactory = await ethers.getContractFactory("Validator", admin) as Validator__factory;
+        validatorContract = await validatorFactory.deploy([validator1.address, validator2.address]);
+        await validatorContract.waitForDeployment();
+        var validatorAddress = await validatorContract.getAddress();
 
-    const bridgeDelegatorFactory = new TokenBridgeDelegator__factory(deployer);
-    const bridgeDelegator = await bridgeDelegatorFactory.deploy(bridgeAddress);
-    bridgeDelegatorAddress = bridgeDelegator.address;
+        const bridgeFactory = await ethers.getContractFactory("ChromiaTokenBridge", admin) as ChromiaTokenBridge__factory;
+        bridgeContract = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_OFFSET]) as ChromiaTokenBridge;
+        await bridgeContract.waitForDeployment();
+        var bridgeAddress = await bridgeContract.getAddress();
 
-    const tokenMinterFactory = new TokenMinterETH__factory(admin);
-    const tokenMinterContract = await tokenMinterFactory.deploy(DAILY_LIMIT, tokenAddress, deployer.address, deployer.address);
-    tokenMinterAddress = tokenMinterContract.address;
-    bridge.setTokenMinter(tokenMinterAddress);
-    tokenContract.changeMinter(tokenMinterAddress);
+        const bridgeDelegatorFactory = await ethers.getContractFactory("TokenBridgeDelegator", deployer) as TokenBridgeDelegator__factory;
+        bridgeDelegatorContract = await bridgeDelegatorFactory.deploy(bridgeAddress);
+        await bridgeDelegatorContract.waitForDeployment();
 
-    await expect(bridge.allowToken(constants.AddressZero)).to.be.revertedWith("TokenBridge: token address is invalid");
-    await expect(bridge.allowToken(tokenAddress)).to.emit(bridge, "AllowToken").withArgs(tokenAddress);
-  });
+        const tokenMinterFactory = await ethers.getContractFactory("TokenMinterETH", admin) as TokenMinterETH__factory;
+        tokenMinterContract = await tokenMinterFactory.deploy(DAILY_LIMIT, tokenAddress, deployer.address, deployer.address);
+        var tokenMinterAddress = await tokenMinterContract.getAddress();
+        await bridgeContract.setTokenMinter(tokenMinterAddress);
+        await tokenContract.changeMinter(tokenMinterAddress);
 
-  describe("ChromiaToken", async () => {
-    it("Admin can change minter", async () => {
-      const [deployer, user] = await ethers.getSigners();
-      const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
-      const tokenMinter = new TokenMinterETH__factory(deployer).attach(tokenMinterAddress);
-
-      const tokenMinterUser = new TokenMinterETH__factory(user).attach(tokenMinterAddress);
-
-      await expect(tokenMinterUser.transferMintRole(deployer.address)).to.be.revertedWith("OwnableUnauthorizedAccount");
-
-      await expect(tokenMinter.transferMintRole(deployer.address)).to.emit(tokenMinter, "DelayedActionRequested");
-      await time.increase(86400 * 13);
-      await expect(tokenMinter.finishTransferMintRole()).to.be.revertedWith("Two weeks delay has not passed.");
-      await time.increase(86400 * 1 + 1);
-      await expect(tokenMinter.finishTransferMintRole()).to.emit(tokenInstance, "MinterSet");
-
-      await expect(tokenMinter.transferMintRole(deployer.address)).to.emit(tokenMinter, "DelayedActionRequested");
-      await time.increase(86400 * 14 + 1);
-      await expect(tokenMinter.finishTransferMintRole()).to.be.revertedWith("caller is not a minter");
-    });
-    it("Admin can change owner", async () => {
-      const [deployer, user] = await ethers.getSigners();
-      const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
-      const tokenMinter = new TokenMinterETH__factory(deployer).attach(tokenMinterAddress);
-      const tokenMinterUser = new TokenMinterETH__factory(user).attach(tokenMinterAddress);
-
-      await expect(tokenMinterUser.transferOwnership(deployer.address)).to.be.revertedWith(
-        "OwnableUnauthorizedAccount",
-      );
-
-      await expect(tokenMinter.transferOwnership(user.address)).to.emit(tokenMinter, "DelayedActionRequested");
-      await time.increase(86400 * 13);
-      await expect(tokenMinterUser.acceptOwnership()).to.be.revertedWith("Two weeks delay has not passed.");
-      await time.increase(86400 * 1 + 1);
-      await expect(tokenMinter.acceptOwnership()).to.be.revertedWith("OwnableUnauthorizedAccount");
-      await expect(tokenMinterUser.acceptOwnership()).to.emit(tokenMinter, "OwnershipTransferred");
-
-      await expect(tokenMinter.transferOwnership(deployer.address)).to.be.revertedWith("OwnableUnauthorizedAccount");
-      await expect(tokenMinterUser.transferOwnership(deployer.address)).to.emit(tokenMinter, "DelayedActionRequested");
-      await time.increase(86400 * 14 + 1);
-      await expect(tokenMinter.acceptOwnership()).to.emit(tokenMinter, "OwnershipTransferred");
+        await expect(bridgeContract.allowToken(ethers.ZeroAddress)).to.rejectedWith("TokenBridge: token address is invalid");
+        await expect(bridgeContract.allowToken(tokenAddress)).to.be.emit(bridgeContract, "AllowToken").withArgs(tokenAddress);
     });
 
-    it("Admin can set daily limit", async () => {
-      const [deployer, user] = await ethers.getSigners();
-      const tokenMinter = new TokenMinterETH__factory(deployer).attach(tokenMinterAddress);
-    
-      await tokenMinter.setDayLimit(0);
-      await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.be.revertedWith("DailyLimit: limit reached");
-      await time.increase(86400 * 1 + 1);
-      await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.be.revertedWith("DailyLimit: limit reached");
+    describe("ChromiaToken", async () => {
+        it("Admin can change minter", async () => {
+            const [deployer, user] = await ethers.getSigners();
+            const tokenInstance = tokenContract.connect(deployer);
+            const tokenMinter = tokenMinterContract.connect(deployer);
+            const tokenMinterUser = tokenMinterContract.connect(user);
 
-      await expect(tokenMinter.setDayLimit(DAILY_LIMIT)).to.emit(tokenMinter, "DelayedActionRequested");
-      await time.increase(86400 * 13);
-      await expect(tokenMinter.finishSetDayLimit()).to.be.revertedWith("Two weeks delay has not passed.");
-      await time.increase(86400 * 1 + 1);
-      await expect(tokenMinter.finishSetDayLimit()).to.emit(tokenMinter, "DayLimitChanged");
+            await expect(tokenMinterUser.transferMintRole(deployer.address)).to.rejectedWith("OwnableUnauthorizedAccount");
 
-      await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.not.be.reverted;
-      await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.be.revertedWith("DailyLimit: limit reached");
-      await tokenMinter.setDayLimit(0);
-      await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.be.revertedWith("DailyLimit: limit reached");
+            await expect(tokenMinter.transferMintRole(deployer.address)).to.emit(tokenMinter, "DelayedActionRequested");
+            await time.increase(86400 * 13);
+            await expect(tokenMinter.finishTransferMintRole()).to.be.revertedWith("Two weeks delay has not passed.");
+            await time.increase(86400 * 1 + 1);
+            await expect(tokenMinter.finishTransferMintRole()).to.emit(tokenInstance, "MinterSet");
+
+            await expect(tokenMinter.transferMintRole(deployer.address)).to.emit(tokenMinter, "DelayedActionRequested");
+            await time.increase(86400 * 14 + 1);
+            await expect(tokenMinter.finishTransferMintRole()).to.be.revertedWith("caller is not a minter");
+        });
+
+        it("Admin can change owner", async () => {
+            const [deployer, user] = await ethers.getSigners();
+            const tokenMinter = tokenMinterContract.connect(deployer);
+            const tokenMinterUser = tokenMinterContract.connect(user);
+
+            await expect(tokenMinterUser.transferOwnership(deployer.address)).to.rejectedWith(
+                "OwnableUnauthorizedAccount",
+            );
+
+            await expect(tokenMinter.transferOwnership(user.address)).to.emit(tokenMinter, "DelayedActionRequested");
+            await time.increase(86400 * 13);
+            await expect(tokenMinterUser.acceptOwnership()).to.rejectedWith("Two weeks delay has not passed.");
+            await time.increase(86400 * 1 + 1);
+            await expect(tokenMinter.acceptOwnership()).to.rejectedWith("OwnableUnauthorizedAccount");
+            await expect(tokenMinterUser.acceptOwnership()).to.emit(tokenMinter, "OwnershipTransferred");
+
+            await expect(tokenMinter.transferOwnership(deployer.address)).to.rejectedWith("OwnableUnauthorizedAccount");
+            await expect(tokenMinterUser.transferOwnership(deployer.address)).to.emit(tokenMinter, "DelayedActionRequested");
+            await time.increase(86400 * 14 + 1);
+            await expect(tokenMinter.acceptOwnership()).to.emit(tokenMinter, "OwnershipTransferred");
+        });
+
+        it("Admin can set daily limit", async () => {
+            const [deployer] = await ethers.getSigners();
+            const tokenMinter = tokenMinterContract.connect(deployer);
+
+            await tokenMinter.setDayLimit(0);
+            await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.rejectedWith("DailyLimit: limit reached");
+            await time.increase(86400 * 1 + 1);
+            await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.rejectedWith("DailyLimit: limit reached");
+
+            await expect(tokenMinter.setDayLimit(DAILY_LIMIT)).to.emit(tokenMinter, "DelayedActionRequested");
+            await time.increase(86400 * 13);
+            await expect(tokenMinter.finishSetDayLimit()).to.rejectedWith("Two weeks delay has not passed.");
+            await time.increase(86400 * 1 + 1);
+            await expect(tokenMinter.finishSetDayLimit()).to.emit(tokenMinter, "DayLimitChanged");
+
+            await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.not.be.reverted;
+            await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.rejectedWith("DailyLimit: limit reached");
+            await tokenMinter.setDayLimit(0);
+            await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.rejectedWith("DailyLimit: limit reached");
+        });
+
+        it("Cant mint more than daily limit", async () => {
+            const [deployer] = await ethers.getSigners();
+            const tokenInstance = tokenContract.connect(deployer);
+            const tokenMinter = tokenMinterContract.connect(deployer);
+
+            await tokenMinter.mint(deployer.address, DAILY_LIMIT);
+            await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.rejectedWith("DailyLimit: limit reached");
+            await time.increase(86400 * 1 + 1);
+
+            await tokenMinter.mint(deployer.address, DAILY_LIMIT);
+            expect(await tokenInstance.balanceOf(deployer.address)).to.eq(DAILY_LIMIT * BigInt(2));
+            await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.rejectedWith("DailyLimit: limit reached");
+            await time.increase(86400 * 1 + 1);
+
+            await tokenMinter.mint(deployer.address, DAILY_LIMIT);
+            expect(await tokenInstance.balanceOf(deployer.address)).to.eq(DAILY_LIMIT * BigInt(3));
+            await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.rejectedWith("DailyLimit: limit reached");
+        });
     });
-    it("Cant mint more than daily limit", async () => {
-      const [deployer, user] = await ethers.getSigners();
-      const tokenMinter = new TokenMinterETH__factory(deployer).attach(tokenMinterAddress);
-      const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
-
-      await tokenMinter.mint(deployer.address, DAILY_LIMIT);
-      await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.be.revertedWith("DailyLimit: limit reached");
-      await time.increase(86400 * 1 + 1);
-
-      await tokenMinter.mint(deployer.address, DAILY_LIMIT);
-      expect(await tokenInstance.balanceOf(deployer.address)).to.eq(DAILY_LIMIT * BigInt(2));
-      await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.be.revertedWith("DailyLimit: limit reached");
-      await time.increase(86400 * 1 + 1);
-
-      await tokenMinter.mint(deployer.address, DAILY_LIMIT);
-      expect(await tokenInstance.balanceOf(deployer.address)).to.eq(DAILY_LIMIT * BigInt(3));
-      await expect(tokenMinter.mint(deployer.address, DAILY_LIMIT)).to.be.revertedWith("DailyLimit: limit reached");
-    });
-  });
 });

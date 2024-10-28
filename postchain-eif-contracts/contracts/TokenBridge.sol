@@ -17,9 +17,10 @@ import "./IValidator.sol";
 // Some instructions are also not allowed. Read more at: https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable
 // Note: To enhance the security & decentralization, we should call transferOwnership() to external multi-sig owner after deploy the smart contract
 contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeable, ReentrancyGuardUpgradeable {
+
     // Merkle hash of GTV String "eif"
     bytes32 constant EIF_KEY_MERKLE_HASH = 0x1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797;
-    
+
     using Postchain for bytes32;
     using MerkleProof for bytes32[];
     using SafeERC20 for IERC20;
