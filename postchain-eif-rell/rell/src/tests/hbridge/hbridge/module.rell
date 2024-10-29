@@ -72,12 +72,12 @@ val BAR = asset_info(
 );
 
 function register_foreign_asset(asset: asset_info = CHR, network_id: integer = network_id1): assets.asset {
-    val ft4_asset = register_ft4_asset(asset, network_id);
+    val ft4_asset = register_ft4_asset(asset);
     register_erc20_asset(ft4_asset, asset, network_id, true); // snapshots enabled
     return ft4_asset;
 }
 
-function register_ft4_asset(asset_info: asset_info, network_id: integer): assets.asset {
+function register_ft4_asset(asset_info: asset_info): assets.asset {
     val asset_id = (asset_info.token_name, chain_context.blockchain_rid).hash();
 
     rell.test.tx().op(
