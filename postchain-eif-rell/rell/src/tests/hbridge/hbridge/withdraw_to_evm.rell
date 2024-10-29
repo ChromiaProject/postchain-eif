@@ -16,7 +16,7 @@ function test_withdraw_to_ethereum_with_already_linked_account() {
 }
 
 function test_withdraw_to_ethereum_using_most_recent_erc20_token_address_by_default() {
-    val ft_asset = register_ft4_asset(CHR, network_id1);
+    val ft_asset = register_ft4_asset(CHR);
     register_erc20_asset(ft_asset, CHR, network_id1);
     register_erc20_asset(ft_asset, FOO, network_id1);
 
@@ -41,7 +41,7 @@ function test_withdraw_to_ethereum_using_most_recent_erc20_token_address_by_defa
 }
 
 function test_withdraw_to_ethereum_using_specific_erc20_token_address() {
-    val ft_asset = register_ft4_asset(CHR, network_id1);
+    val ft_asset = register_ft4_asset(CHR);
     register_erc20_asset(ft_asset, CHR, network_id1);
     register_erc20_asset(ft_asset, FOO, network_id1);
 
