@@ -25,13 +25,13 @@
     <properties>
         <revision>dev</revision>
         <postchain.version>3.16.2</postchain.version>
-        <rell.version>0.13.12</rell.version>
+        <rell.version>0.13.15</rell.version>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <kotlin.compiler.jvmTarget>17</kotlin.compiler.jvmTarget>
         <testcontainers.version>1.16.2</testcontainers.version>
         <junit.pioneer.version>2.2.0</junit.pioneer.version>
-        <rell.maven.plugin.version>0.11.16</rell.maven.plugin.version>
+        <rell.maven.plugin.version>0.12.2</rell.maven.plugin.version>
         <web3j.version>4.12.0</web3j.version>
     </properties>
 
@@ -209,7 +209,7 @@
                 <enabled>false</enabled>
             </snapshots>
         </repository>
-        <!-- Needed for web3j -->
+<!--         Needed for web3j -->
         <repository>
             <id>consensys</id>
             <name>Consensys repository</name>

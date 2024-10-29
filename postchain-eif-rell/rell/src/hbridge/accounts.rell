@@ -38,8 +38,10 @@ function (ft4.accounts.account) {
                 after_evm_account_linked(deposit.sender_address, account, deposit.network_id, true);
             }
         } else {
-            create evm_eoa_account_link(deposit.sender_address, account);
-            after_evm_account_linked(deposit.sender_address, account, -1, false);
+            if (empty(evm_eoa_account_link @? { deposit.sender_address })) {
+                create evm_eoa_account_link(deposit.sender_address, account);
+                after_evm_account_linked(deposit.sender_address, account, -1, false);
+            }
         }
 
         // note: we don't need to call collect_pooled_assets here, because it's already done in the transfer strategy implementation

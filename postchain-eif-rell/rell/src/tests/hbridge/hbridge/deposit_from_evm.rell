@@ -38,7 +38,7 @@ function test_deposit_foreign_token_from_evm_when_both_account_and_erc20_token_a
     assert_withdraw(1, evm_address, amount);
 }
 
-function test_deposit_foreign_token_from_evm_with_already_created_and_linked_account() {
+function test_deposit_foreign_token_from_evm_eoa_with_already_created_and_linked_account() {
     val ft_asset = register_foreign_asset();
 
     // Account
@@ -162,26 +162,53 @@ function test_deposit_foreign_token_from_evm_before_account_creation() {
     );
 }
 
-function test_deposit_foreign_token_from_evm_will_get_pending_assets_when_registering_account_with_evm_address() {
-    val ft_asset = register_foreign_asset();
+function test_deposit_foreign_token_from_evm_will_collect_pending_deposits_when_registering_account_with_evm_address() {
+    // FT4 CHR <-> CHR on network_id1
+    val chr_asset = register_foreign_asset(CHR);
+
+    // FT4 FOO <-> FOO on network_id1 & BAR on network_id2
+    val foo_asset = register_ft4_asset(FOO);
+    register_erc20_asset(foo_asset, FOO, network_id1);
+    register_erc20_asset(foo_asset, BAR, network_id2);
 
     // Account
     val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
     val recipient_id = evm_address.hash();
     val auth_descriptor = test_utils.create_auth_descriptor(evm_address, ["A", "T"]);
 
-    val amount = 10000000L;
-    val amount2 = 50000000L;
+    val amount1 = 10000000L;
+    val amount2 = 20000000L;
+    val amount3 = 30000000L;
+    val amount4 = 40000000L;
 
-    // THe first deposit will be created as pending
-    deposit_from_evm(evm_address, amount, block_height = 1);
-    assert_true("open" in create_on_transfer.get_pending_transfer_strategies(recipient_id));
+    // The first CHR deposit will be created as pending
+    deposit_from_evm(evm_address, amount1, block_height = 1, asset = CHR);
+    assert_equals(create_on_transfer.get_pending_transfer_strategies(recipient_id), set(["open"]));
 
-    // The 2nd deposit will be bounced
-    deposit_from_evm(evm_address, amount2, block_height = 2);
+    // The 2nd CHR deposit will be bounced
+    deposit_from_evm(evm_address, amount2, block_height = 2, asset = CHR);
     assert_withdraw(1, evm_address, amount2);
 
-    // Register account
+    // The first FOO deposit from the network_id1 will be created as pending
+    deposit_from_evm(evm_address, amount3, block_height = 3, asset = FOO, network_id = network_id1);
+    assert_equals(create_on_transfer.get_pending_transfer_strategies(recipient_id), set(["open"]));
+
+    // The first BAR deposit from the network_id2 will be created as pending
+    deposit_from_evm(evm_address, amount4, block_height = 4, asset = BAR, network_id = network_id2);
+    assert_equals(create_on_transfer.get_pending_transfer_strategies(recipient_id), set(["open"]));
+
+    // Verify pending deposits
+    val pending_depostis = get_erc20_deposits(deposit_filter(recipient_id = recipient_id), null, null);
+    assert_equals(
+        pending_depostis.data @* {} (erc20_deposit_info.from_gtv_pretty($)) @* {} (_ = .asset_id, _ = .amount, _ = .state),
+        [
+            (chr_asset.id, amount1, deposit_state.pending), // CHR
+            (foo_asset.id, amount3, deposit_state.pending), // FOO
+            (foo_asset.id, amount4, deposit_state.pending)  // BAR
+        ],
+    );
+
+    // Register account using strategies
     val op1 = open.ras_transfer_open(auth_descriptor);
     val op2 = strategies.external.register_account();
     val message = strategies.external.get_register_account_message(
@@ -199,13 +226,16 @@ function test_deposit_foreign_token_from_evm_will_get_pending_assets_when_regist
     assert_true(empty(create_on_transfer.get_pending_transfer_strategies(recipient_id)));
 
     val ft_account = accounts.Account(recipient_id);
-
-    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
+    // CHR token deposit has been credited to the FT4 CHR token balance.
+    assert_equals(assets.get_asset_balance(ft_account, chr_asset), amount1);
+    // Both FOO and BAR token deposits have been credited to the FT4 FOO token balance.
+    assert_equals(assets.get_asset_balance(ft_account, foo_asset), amount3 + amount4);
 
     // Making sure ft4 and evm accounts are linked
     assert_equals(hbridge.get_account_for_eoa_address(evm_address), ft_account.id);
     assert_equals(hbridge.get_eoa_addresses_for_account(ft_account.id), [evm_address]);
 
+    // Explicit account linking will fail
     val op = hbridge.link_evm_eoa_account(evm_address);
     val message2 = test_utils.create_evm_auth_message(op);
     val signature2 = test_utils.evm_sign(message2, rell.test.privkeys.eve);
