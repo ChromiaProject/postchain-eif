@@ -304,7 +304,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         emit WithdrawalToPostchain(_hash);
     }
 
-
     function _bytesToBytes32(bytes memory b, uint offset) internal pure returns (bytes32) {
         bytes32 out;
 
