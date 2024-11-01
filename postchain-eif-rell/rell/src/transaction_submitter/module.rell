@@ -206,7 +206,7 @@ query get_transaction(row_id: integer): evm_submit_transaction_data {
 /**
  * Get list of nodes that have `taken` a transaction and tried to submit it.
  *
- * @returns A list of node pubkeys - please note this is not the provider key even if the entity says it is.
+ * @return A list of node pubkeys - please note this is not the provider key even if the entity says it is.
  */
 query get_transaction_taken_by(row_id: integer): list<pubkey> {
 
@@ -224,7 +224,7 @@ query get_transaction_taken_by(row_id: integer): list<pubkey> {
  * @param from_row_id Return transactions from this row id, inclusive.
  * @param count Max number of transactions returned. Default value is 20 and maximum 50.
  *
- * @returns List of `evm_submit_transaction_data`.
+ * @return List of `evm_submit_transaction_data`.
  */
 query get_transactions(
     contract_address: text? = null,
@@ -264,7 +264,7 @@ query get_transactions(
 /**
  * Get all transactions with status PENDING.
  *
- * @returns List of `evm_submit_transaction_data`.
+ * @return List of `evm_submit_transaction_data`.
  */
 query get_pending_transactions(): list<evm_submit_transaction_data> {
 
@@ -288,7 +288,7 @@ query get_pending_transactions(): list<evm_submit_transaction_data> {
  * Returns status of a transaction.
  *
  * @param row_id The transaction row id.
- * @returns A `transaction_status` or null if no transaction exists by that id.
+ * @return A `transaction_status` or null if no transaction exists by that id.
  */
 query get_evm_transaction_status(row_id: integer): transaction_status? {
     return evm_submit_transaction @? { rowid(row_id) }.status;
