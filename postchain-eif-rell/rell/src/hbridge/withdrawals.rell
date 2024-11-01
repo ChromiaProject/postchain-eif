@@ -36,6 +36,7 @@ struct erc20_withdrawal_history_entry {
     +-----------------------------------+---------------------------------+
     |             Chromia               |               EVM               |
     +-----------------------------------+---------------------------------+
+    |                                   |  Uninitialized                  |
     | created                           |                                 |
     | requested                         |  Withdrawable                   |
     | pending <-> requested             |  Pending <-> Withdrawable       |

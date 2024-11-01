@@ -10,7 +10,6 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
     uint constant EMERGENCY_DURATION = 90 days;
     uint256 public emergencyTimestamp;
 
-
     using SafeERC20 for IERC20;
 
     uint8 constant ERC20_BALANCE_RECORD_BYTE_SIZE = 64;
@@ -21,7 +20,6 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
     bytes32 constant ERC20_WITHDRAWAL_TAG_V1 = 0x686272696467653a65726332305f77697468647261773a763101010101010101;
 
     bytes32 public massExitStateRoot;
-
 
     struct ERC20StateHeader {
         bytes32 tag;
@@ -47,16 +45,16 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
         uint256 contractSpecificDiscriminator = networkDiscriminator + uint160(address(this));
 
         bool isValidDiscriminator = (header.discriminator == networkDiscriminator) ||
-                                    (header.discriminator == contractSpecificDiscriminator);
+            (header.discriminator == contractSpecificDiscriminator);
 
         require(isValidDiscriminator, "TokenBridge: invalid bridge contract");
     }
 
     /**
      * @dev completeWithdrawalBySnapshot is used in mass exit scenario instead of the normal withdraw process.
-     *      In the mass exit scenario, we are not able to verify block headers as validators are considered non-trustworhy,
+     *      In the mass exit scenario, we are not able to verify block headers as validators are considered non-trustworthy,
      *      thus we need to use the snapshot data to verify the withdrawal request.
-     *      Snpashot data includes withdrawal even hashes.
+     *      Snapshot data includes withdrawal even hashes.
      * @param _stateRecord contains header and a list of event hashes
      * @param n index of the event hash we want to use
      * @param _event withdrawal event data
@@ -80,9 +78,11 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
 
         address beneficiary = header.beneficiary;
 
-        // extrat withdraw event hash from the list
-        bytes32 eventHash = bytes32(_stateRecord[ERC20_STATE_HEADER_BYTE_SIZE + n * 32:
-                                        ERC20_STATE_HEADER_BYTE_SIZE +  (n + 1) * 32]);
+        // extract withdraw event hash from the list
+        bytes32 eventHash = bytes32(_stateRecord[
+            ERC20_STATE_HEADER_BYTE_SIZE + n * 32 :
+            ERC20_STATE_HEADER_BYTE_SIZE + (n + 1) * 32]
+        );
 
         Withdraw storage wd = _withdraw[eventHash];
         bool withdrawalRequestProcessed = _events[eventHash];
@@ -115,7 +115,6 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
         emit WithdrawalHash(eventHash);
     }
 
-
     /**
      * @dev withdraw all account assets in the postchain snapshot when mass exit was triggered
      * Note: the mass exit block should be the block at which snapshot was updated
@@ -137,7 +136,7 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
         address beneficiary = header.beneficiary;
         uint offset = ERC20_STATE_HEADER_BYTE_SIZE;
         uint endOffset = snapshot.length;
-        
+
         _snapshots[stateProof.leaf] = true;
 
         for (uint i = offset; i < endOffset; i += ERC20_BALANCE_RECORD_BYTE_SIZE) {
@@ -186,7 +185,6 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
         emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
         emit TriggerMassExit(header.height, header.blockRid);
     }
-
 
     /**
      * @notice this function will be use only in emergency case
