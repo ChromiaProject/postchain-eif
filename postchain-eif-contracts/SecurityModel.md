@@ -38,6 +38,12 @@ When owner triggers mass exit, they must provide "last known good" block (mass e
 which is not older than 3 days.
 Owner must provide a signature of the block by the supermajority of validators.
 
+In case the validator contract for the bridge is managed and has also been updated with bogus validators by malicious
+actors on Chromia side it is also possible to supply a list of historical validators
+(these must have been the actual validators until less than 3 days ago). It's important that validators are supplied in
+the exact same order that they were registered. Simplest way to do this is to use the validator list in the
+`UpdateValidators` event that was emitted by the last correct validator update transaction.
+
 Once mass exit is triggered, all withdrawals at blocks above the mass exit block are blocked.
 (I.e. blocks above the height of mass exit block are considered invalid.)
 Deposits are also blocked.

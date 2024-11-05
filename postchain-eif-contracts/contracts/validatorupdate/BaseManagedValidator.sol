@@ -21,6 +21,10 @@ abstract contract BaseManagedValidator is IManagedValidator {
     uint public previousUpdateHeight;
     uint public previousUpdateSerial;
 
+    // validator hash => valid until
+    mapping(bytes32 => uint) private historicalUpdates;
+    bytes32 private currentUpdateHash;
+
     event UpdateValidators(uint confirmedAtHeight, address[] validators);
 
     function isValidator(address _addr) public view returns (bool) {
@@ -69,6 +73,12 @@ abstract contract BaseManagedValidator is IManagedValidator {
 
     // update validator list
     function _updateValidators(address[] memory _validators) internal {
+        bytes32 validatorHash = keccak256(abi.encodePacked(_validators));
+        if (currentUpdateHash != bytes32(0)) {
+            historicalUpdates[currentUpdateHash] = block.timestamp;
+        }
+        currentUpdateHash = validatorHash;
+
         for (uint i = 0; i < validators.length; i++) {
             validatorMap[validators[i]] = false;
         }
@@ -102,6 +112,39 @@ abstract contract BaseManagedValidator is IManagedValidator {
             }
         }
         return (_actualSignature >= _requiredSignature);
+    }
+
+    function isValidSignaturesWithHistoricalValidators(bytes32 hash, bytes[] memory signatures, address[] memory signers, address[] memory historicalValidators, uint validUntil) external view returns (bool) {
+        require(_isValidHistoricalValidatorSet(historicalValidators, validUntil), "Validator: Invalid historical validators");
+
+        // Severe code duplication here but not that easy to re-use with solidity
+        require(signatures.length == signers.length, "Validator: mismatch between the number of signers and signatures");
+        uint _actualSignature = 0;
+        uint _requiredSignature = _calculateBFTRequiredNum(historicalValidators.length);
+        if (_requiredSignature == 0) return false;
+        address _lastSigner = address(0);
+        for (uint i = 0; i < signatures.length; i++) {
+            // We do an awkward array check here, but it's a one time cost when triggering mass-exit
+            bool foundSigner = false;
+            for (uint j = 0; j < historicalValidators.length; j++) {
+                if (signers[i] == historicalValidators[j]) {
+                    foundSigner = true;
+                    break;
+                }
+            }
+            require(foundSigner, "Validator: signer is not validator");
+            if (_isValidSignature(hash, signatures[i], signers[i])) {
+                _actualSignature++;
+                require(signers[i] > _lastSigner, "Validator: duplicate signature or signers is out of order");
+                _lastSigner = signers[i];
+            }
+        }
+        return (_actualSignature >= _requiredSignature);
+    }
+
+    function _isValidHistoricalValidatorSet(address[] memory historicalValidators, uint validUntil) internal view returns (bool) {
+        bytes32 historicalValidatorHash = keccak256(abi.encodePacked(historicalValidators));
+        return historicalValidatorHash == currentUpdateHash || historicalUpdates[historicalValidatorHash] > validUntil;
     }
 
     function _calculateBFTRequiredNum(uint total) internal pure returns (uint) {
