@@ -2,6 +2,7 @@
 pragma solidity 0.8.20;
 
 import "./TokenBridge.sol";
+import {IManagedValidator} from "./validatorupdate/IManagedValidator.sol";
 
 contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
 
@@ -152,17 +153,35 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
         emit WithdrawalBySnapshot(beneficiary);
     }
 
+    function triggerMassExitWithHistoricalValidators(
+        bytes memory blockHeader,
+        bytes[] memory sigs,
+        address[] memory signers,
+        Data.ExtraProofData memory extraProof,
+        address[] memory historicalValidators
+    ) public onlyOwner {
+        Postchain.BlockHeaderData memory header = Postchain.decodeBlockHeader(blockHeader);
+        // Unsafe cast but this function is pointless for manually updated validator contracts
+        IManagedValidator managedValidator = IManagedValidator(address(validator));
+        require(managedValidator.isValidSignaturesWithHistoricalValidators(header.blockRid, sigs, signers, historicalValidators, block.timestamp - 3 days), "TokenBridge: block signature is invalid");
+        validateMassExit(header, extraProof);
+    }
+
     function triggerMassExit(
         bytes memory blockHeader,
         bytes[] memory sigs,
         address[] memory signers,
         Data.ExtraProofData memory extraProof
     ) public onlyOwner {
-        require(blockchainRid != bytes32(0), "TokenBridge: blockchain rid is not set");
         Postchain.BlockHeaderData memory header = Postchain.decodeBlockHeader(blockHeader);
+        require(validator.isValidSignatures(header.blockRid, sigs, signers), "TokenBridge: block signature is invalid");
+        validateMassExit(header, extraProof);
+    }
+
+    function validateMassExit(Postchain.BlockHeaderData memory header, Data.ExtraProofData memory extraProof) internal {
+        require(blockchainRid != bytes32(0), "TokenBridge: blockchain rid is not set");
         require(header.timestamp >= (block.timestamp - 3 days) * 1000, "TokenBridge: mass exit block is too old");
         require(blockchainRid == header.blockchainRid, "TokenBridge: invalid blockchain rid");
-        require(validator.isValidSignatures(header.blockRid, sigs, signers), "TokenBridge: block signature is invalid");
 
         require(extraProof.extraRoot == header.extraDataHashedLeaf, "Postchain: invalid extra data root");
 

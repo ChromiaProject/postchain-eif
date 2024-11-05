@@ -195,6 +195,12 @@ yarn import:bridge --network sepolia --address PROXY_ADDRESS
 - Triggers mass exit. Requires proof of a correctly signed block.
 - See SecurityModel.md for a detailed explanation of the mass exit mechanism.
 
+- `triggerMassExitWithHistoricalValidators(...)`
+
+- Triggers mass exit. Requires proof of a correctly signed block. Block signature is checked with the provided
+  validators.
+- See SecurityModel.md for a detailed explanation of the mass exit mechanism.
+
 `postponeMassExit()`
 
 - Postpone (cancel) mass exit.
