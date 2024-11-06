@@ -3,9 +3,7 @@
  */
 import { BytesLike, keccak256, toBeHex, zeroPadValue } from "ethers";
 import { ethers } from "hardhat";
-import { hashGtvBytes32Leaf, hashGtvIntegerLeaf, postchainMerkleNodeHash } from "./utils";
-
-const ZERO_32_BYTES_HEX = "0x" + "0".repeat(64);
+import { hashGtvBytes32Leaf, hashGtvIntegerLeaf, postchainMerkleNodeHash, strip0x } from "./utils";
 
 interface EVMEncodedBlockData {
     encodedData: BytesLike,
@@ -13,13 +11,13 @@ interface EVMEncodedBlockData {
 }
 
 export function encodeBlockHeaderDataForEVM(
-    blockchainRid: BytesLike = ZERO_32_BYTES_HEX,
+    blockchainRid: BytesLike = ethers.ZeroHash,
     height: number = 0,
     timestamp: number = 0,
-    extraDataHashedLeaf: BytesLike = ZERO_32_BYTES_HEX,
-    merkleRootHashHashedLeaf: BytesLike = hashGtvBytes32Leaf(ZERO_32_BYTES_HEX),
-    previousBlockRid: BytesLike = ZERO_32_BYTES_HEX,
-    dependenciesHashedLeaf: BytesLike = hashGtvBytes32Leaf(ZERO_32_BYTES_HEX),
+    extraDataHashedLeaf: BytesLike = ethers.ZeroHash,
+    merkleRootHashHashedLeaf: BytesLike = hashGtvBytes32Leaf(ethers.ZeroHash),
+    previousBlockRid: BytesLike = ethers.ZeroHash,
+    dependenciesHashedLeaf: BytesLike = hashGtvBytes32Leaf(ethers.ZeroHash),
 ): EVMEncodedBlockData {
     // Infer block RID
     const node1 = hashGtvBytes32Leaf(blockchainRid);
@@ -75,3 +73,21 @@ export function encodeProofData(encodedUpdateEvent: BytesLike, extraHeaderKeyHas
         extraDataMerkleRoot
     }
 }
+
+export function merkleRootHashOfEmptyBlock(): string {
+    return postchainMerkleNodeHash([0x07, ethers.ZeroHash, ethers.ZeroHash]);
+}
+
+export function calcExtraDataMerkleRoot(extraHeaderKeyHash: BytesLike, updateEventLeafHash: BytesLike): string {
+    return postchainMerkleNodeHash([0x08, extraHeaderKeyHash, updateEventLeafHash]);
+}
+
+export function buildWithdrawEvent(serialNumber: string, networkId: string, contractAddress: string, toAddress: string, amountHex: string): string {
+    return ''
+        .concat(strip0x(serialNumber))
+        .concat(strip0x(networkId))
+        .concat(strip0x(contractAddress))
+        .concat(strip0x(toAddress))
+        .concat(strip0x(amountHex));
+}
+
