@@ -9,33 +9,23 @@ export function toHex(str: string): string {
     return str.startsWith("0x") ? str : "0x" + str;
 }
 
-export function DecodeHexStringToByteArray(hexString: string) {
-    const result: number[] = [];
-    while (hexString.length >= 2) { 
-        result.push(parseInt(hexString.substring(0, 2), 16))
-        hexString = hexString.substring(2, hexString.length)
-    }
-    return result;
-}
-
 export function postchainMerkleNodeHash(values: any[]): string {
     return ethers.solidityPackedSha256(['uint8', 'bytes32', 'bytes32'], values)
 }
 
+export function hashGtvNullLeaf(): string {
+    return ethers.solidityPackedSha256(['uint8', 'uint8', 'uint8', 'uint8', 'uint8'], [0x1, 0xa0, 0x02, 0x05, 0x00])
+}
+
 export function hashGtvBytes32Leaf (data: BytesLike): string {
-    var result: string = ''
-    result = ethers.solidityPackedSha256(['uint8', 'uint8', 'uint8', 'uint8', 'uint8', 'bytes32'], [0x1, 0xA1, 32+2, 0x4, 32, data])
-    return result
+    return ethers.solidityPackedSha256(['uint8', 'uint8', 'uint8', 'uint8', 'uint8', 'bytes32'], [0x1, 0xA1, 32+2, 0x4, 32, data])
 }
 
 export function hashGtvBytes64Leaf (data: BytesLike): string {
-    var result: string = ''
-    result = ethers.solidityPackedSha256(['uint8', 'uint8', 'uint8', 'uint8', 'uint8', 'bytes'], [0x1, 0xA1, 64+2, 0x4, 64, data])
-    return result
+    return ethers.solidityPackedSha256(['uint8', 'uint8', 'uint8', 'uint8', 'uint8', 'bytes'], [0x1, 0xA1, 64+2, 0x4, 64, data])
 }
 
 export var hashGtvIntegerLeaf = function (num: number): string {
-    var result: string = ''
     let nbytes = 1
     let remainingValue = Math.trunc(num / 256)
     while (remainingValue > 0) {

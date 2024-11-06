@@ -12,12 +12,15 @@ import {
     Validator,
     Validator__factory
 } from "../typechain-types";
+import { buildWithdrawEvent, calcExtraDataMerkleRoot } from "./block.utils";
+import { getBlockHeaderBuilder } from "./blockbuilder.utils";
+import { blockchainRid, dependenciesHashedLeaf, merkleRootHashHashedLeaf, previousBlockRid } from "./blockheader.const.utils";
 import {
     hashGtvBytes32Leaf,
     hashGtvBytes64Leaf,
     hashGtvIntegerLeaf,
-    postchainMerkleNodeHash,
     hashGtvStringLeaf,
+    postchainMerkleNodeHash,
     strip0x, toHex
 } from "./utils";
 
@@ -88,8 +91,8 @@ describe("Token Bridge Test", () => {
         it("Blockchain RID can be set multiple times and finalized", async () => {
             const [deployer] = await ethers.getSigners();
             const bridgeOwner = bridgeContract.connect(deployer);
-            let blockchainRid0 = "0x977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795";
-            let blockchainRid1 = "0x977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c796";
+            let blockchainRid0 = toHex("1".repeat(64));
+            let blockchainRid1 = toHex("2".repeat(64));
             await expect(bridgeOwner.setBlockchainRid(blockchainRid0)).to.emit(bridgeOwner, "SetBlockchainRid").withArgs(blockchainRid0);
             await expect(bridgeOwner.setBlockchainRid(blockchainRid1)).to.emit(bridgeOwner, "SetBlockchainRid").withArgs(blockchainRid1);
             await expect(bridgeOwner.finalizeBlockchainRid()).to.emit(bridgeOwner, "BlockchainRidFinalized").withArgs(blockchainRid1);
@@ -98,15 +101,14 @@ describe("Token Bridge Test", () => {
         it("Blockchain RID can be set to zeros", async () => {
             const [deployer] = await ethers.getSigners();
             const bridgeOwner = bridgeContract.connect(deployer);
-            await expect(bridgeOwner.setBlockchainRid('0x' + '0'.repeat(64))).to.rejectedWith("TokenBridge: blockchain rid is invalid");
+            await expect(bridgeOwner.setBlockchainRid(toHex("0".repeat(64)))).to.rejectedWith("TokenBridge: blockchain rid is invalid");
         });
 
         it("Blockchain RID can finalized only once", async () => {
             const [deployer] = await ethers.getSigners();
             const bridgeOwner = bridgeContract.connect(deployer);
-            let blockchainRid0 = "0x977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795";
-            await expect(bridgeOwner.setBlockchainRid(blockchainRid0)).to.emit(bridgeOwner, "SetBlockchainRid").withArgs(blockchainRid0);
-            await expect(bridgeOwner.finalizeBlockchainRid()).to.emit(bridgeOwner, "BlockchainRidFinalized").withArgs(blockchainRid0);
+            await expect(bridgeOwner.setBlockchainRid(toHex(blockchainRid))).to.emit(bridgeOwner, "SetBlockchainRid").withArgs(toHex(blockchainRid));
+            await expect(bridgeOwner.finalizeBlockchainRid()).to.emit(bridgeOwner, "BlockchainRidFinalized").withArgs(toHex(blockchainRid));
             await expect(bridgeOwner.finalizeBlockchainRid()).to.rejectedWith("TokenBridge: blockchain rid has been already finalized");
         });
     });
@@ -151,7 +153,7 @@ describe("Token Bridge Test", () => {
             const bridge = bridgeContract.connect(user);
             const toDeposit = ethers.parseEther("100");
             const tokenApproveInstance = tokenInstance.connect(user);
-            const accountID = "0x0000000000000000000000000000000000000000000000000000000000000000"
+            const accountID = ethers.ZeroHash;
             await tokenApproveInstance.approve(bridgeAddress, toDeposit)
             await expect(bridge.deposit(tokenAddress, toDeposit)).to.emit(bridge, "DepositedERC20").withArgs(
                 user.address,
@@ -165,8 +167,9 @@ describe("Token Bridge Test", () => {
         })
     });
 
-    describe("Withdraw by normal user", async () => {
-        it("User can request withdraw by providing properly proof data", async () => {
+    describe("Withdraw tests", async () => {
+        
+        it("Withdraw by user", async () => {
             const [deployer, user] = await ethers.getSigners();
             const tokenInstance = tokenContract.connect(deployer);
             const toMint = ethers.parseEther("10000");
@@ -196,111 +199,82 @@ describe("Token Bridge Test", () => {
             const toAddress = zeroPadValue(user.address, 32);
             const amountHex = zeroPadValue(toBeHex(toDeposit), 32);
 
-            let event: string = '';
-            event = event.concat(strip0x(serialNumber));
-            event = event.concat(strip0x(networkId));
-            event = event.concat(strip0x(contractAddress));
-            event = event.concat(strip0x(toAddress));
-            event = event.concat(strip0x(amountHex));
-
-            // swap toAddress and contractAddress position to make maliciousEvent
-            let maliciousEvent: string = '';
-            maliciousEvent = maliciousEvent.concat(strip0x(serialNumber));
-            maliciousEvent = maliciousEvent.concat(strip0x(networkId));
-            maliciousEvent = maliciousEvent.concat(strip0x(toAddress));
-            maliciousEvent = maliciousEvent.concat(strip0x(contractAddress));
-            maliciousEvent = maliciousEvent.concat(strip0x(amountHex));
-
-            let wrongNetworkIdEvent: string = '';
-            wrongNetworkIdEvent = wrongNetworkIdEvent.concat(strip0x(serialNumber));
-            wrongNetworkIdEvent = wrongNetworkIdEvent.concat(strip0x(zeroNetworkId));
-            wrongNetworkIdEvent = wrongNetworkIdEvent.concat(strip0x(contractAddress));
-            wrongNetworkIdEvent = wrongNetworkIdEvent.concat(strip0x(toAddress));
-            wrongNetworkIdEvent = wrongNetworkIdEvent.concat(strip0x(amountHex));
-
+            // normal event
+            let event: string = buildWithdrawEvent(serialNumber, networkId, contractAddress, toAddress, amountHex);
             let data = toHex(event);
-            let maliciousData = toHex(maliciousEvent);
-            let wrongNetworkIdData = toHex(wrongNetworkIdEvent);
             let hashEventLeaf = keccak256(data);
-            let maliciousHashEventLeaf = keccak256(keccak256(data));
-            let wrongNetworkIdHashEventLeaf = keccak256(wrongNetworkIdData);
             let hashRootEvent = keccak256(keccak256(hashEventLeaf));
-            let wrongNetworkIdHashRoot = keccak256(keccak256(wrongNetworkIdHashEventLeaf));
             let state = strip0x(blockNumber).concat(event);
             let hashRootState = keccak256(toHex(state));
             let eifLeaf = strip0x(hashRootEvent) + strip0x(hashRootState);
-            let eifWrongNetworkIdLeaf = strip0x(wrongNetworkIdHashRoot) + strip0x(hashRootState);
+            let hashedLeaf = hashGtvBytes64Leaf(toHex(eifLeaf));
+            let extraDataMerkleRoot = calcExtraDataMerkleRoot(EIF_HEADER_KEY_HASH, hashedLeaf);
 
-            let blockchainRid = "977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795";
+            // malicious event, toAddress and contractAddress swapped
+            let maliciousEvent: string = buildWithdrawEvent(serialNumber, networkId, toAddress, contractAddress, amountHex);
+            let maliciousData = toHex(maliciousEvent);
+            let maliciousHashEventLeaf = keccak256(keccak256(maliciousData));
             let maliciousBlockchainRid = "efe4a2423cc6d39eb91bc9baac4ec325825ff7c12093d45a554dab732129eefc";
-            let previousBlockRid = "49e46bf022de1515cbb2bf0f69c62c071825a9b940e8f3892acb5d2021832ba0";
-            let merkleRootHash = "96defe74f43fcf2d12a1844bcd7a3a7bcb0d4fa191776953dae3f1efb508d866";
-            let merkleRootHashHashedLeaf = hashGtvBytes32Leaf(toHex(merkleRootHash));
-            let dependencies = "56bfbee83edd2c9a79ff421c95fc8ec0fa0d67258dca697e47aae56f6fbc8af3";
-            let dependenciesHashedLeaf = hashGtvBytes32Leaf(toHex(dependencies));
 
-            // This merkle root is calculated in the postchain code
-            let extraDataMerkleRoot = "672D33B35488E3C965E6A393B922CDCF79C51976DA97A6B7B3079DE1DF6DB89E";
-            let wrongNetworkIdExtraDataMerkleRoot = "512B99A96BC206862ED76AFC1B555037D3A14D5A62DC4778A548D38A5FCDA9C1";
+            // wrong networkId event
+            let wrongNetworkIdEvent: string = buildWithdrawEvent(serialNumber, zeroNetworkId, contractAddress, toAddress, amountHex);
+            let wrongNetworkIdData = toHex(wrongNetworkIdEvent);
+            let wrongNetworkIdHashEventLeaf = keccak256(wrongNetworkIdData);
+            let wrongNetworkIdHashRoot = keccak256(keccak256(wrongNetworkIdHashEventLeaf));
+            let wrongNetworkIdEifLeaf = strip0x(wrongNetworkIdHashRoot) + strip0x(hashRootState);
+            let wrongNetworkIdHashedLeaf = hashGtvBytes64Leaf(toHex(wrongNetworkIdEifLeaf));
+            let wrongNetworkIdExtraDataMerkleRoot = calcExtraDataMerkleRoot(EIF_HEADER_KEY_HASH, wrongNetworkIdHashedLeaf);
             let wrongExtraDataKeyMerkleRoot = "18FE5D1F22C3A31458AADFDA6C0970029D489F4C188E2C61AE98D1461CFE99A5";
 
+            // blockRid calculation
             let node1 = hashGtvBytes32Leaf(toHex(blockchainRid));
             let node2 = hashGtvBytes32Leaf(toHex(previousBlockRid));
             let node12 = postchainMerkleNodeHash([0x00, node1, node2]);
-            let node3 = hashGtvBytes32Leaf(toHex(merkleRootHash));
+            let node3 = merkleRootHashHashedLeaf;
             let timestamp = 1629878444220;
             let height = 46;
             let node4 = hashGtvIntegerLeaf(timestamp);
             let node34 = postchainMerkleNodeHash([0x00, node3, node4]);
             let node5 = hashGtvIntegerLeaf(height);
-            let node6 = hashGtvBytes32Leaf(toHex(dependencies));
+            let node6 = dependenciesHashedLeaf;
             let node56 = postchainMerkleNodeHash([0x00, node5, node6]);
             let node1234 = postchainMerkleNodeHash([0x00, node12, node34]);
-            let node5678 = postchainMerkleNodeHash([0x00, node56, toHex(extraDataMerkleRoot)]);
-            let wrongNetworkIdNode5678 = postchainMerkleNodeHash([0x00, node56, toHex(wrongNetworkIdExtraDataMerkleRoot)]);
-            let wrongExtraDataKeyNode5678 = postchainMerkleNodeHash([0x00, node56, toHex(wrongExtraDataKeyMerkleRoot)]);
-
+            let node5678 = postchainMerkleNodeHash([0x00, node56, extraDataMerkleRoot]);
             let blockRid = postchainMerkleNodeHash([0x7, node1234, node5678]);
-            let maliciousBlockRid = postchainMerkleNodeHash([0x7, node1234, node1234]);
+            
+            let wrongNetworkIdNode5678 = postchainMerkleNodeHash([0x00, node56, toHex(wrongNetworkIdExtraDataMerkleRoot)]);
             let wrongNetworkIdBlockRid = postchainMerkleNodeHash([0x7, node1234, wrongNetworkIdNode5678]);
+
+            let wrongExtraDataKeyNode5678 = postchainMerkleNodeHash([0x00, node56, toHex(wrongExtraDataKeyMerkleRoot)]);
             let wrongExtraDataKeyBlockRid = postchainMerkleNodeHash([0x7, node1234, wrongExtraDataKeyNode5678]);
+
+            let maliciousBlockRid = postchainMerkleNodeHash([0x7, node1234, node1234]);
 
             let ts = zeroPadValue(toBeHex(timestamp), 32);
             let h = zeroPadValue(toBeHex(height), 32);
 
-            let blockHeader: BytesLike = "0x".concat(
-                blockchainRid, strip0x(blockRid), previousBlockRid,
-                strip0x(merkleRootHashHashedLeaf),
-                strip0x(ts), strip0x(h),
-                strip0x(dependenciesHashedLeaf),
-                extraDataMerkleRoot
+            let blockHeaderBuilder = getBlockHeaderBuilder(
+                blockchainRid, blockRid, previousBlockRid, merkleRootHashHashedLeaf, ts, h, 
+                dependenciesHashedLeaf, extraDataMerkleRoot
             );
 
-            let maliciousBlockHeader: BytesLike = '0x'.concat(
-                blockchainRid, strip0x(maliciousBlockRid), previousBlockRid,
-                strip0x(merkleRootHashHashedLeaf),
-                strip0x(ts), strip0x(h),
-                strip0x(dependenciesHashedLeaf),
-                extraDataMerkleRoot
-            );
+            let blockHeader = blockHeaderBuilder.build();
+            
+            let maliciousBlockHeader = blockHeaderBuilder.update({ 
+                blockRid: maliciousBlockRid,
+            }).build();
 
-            let wrongNetworkIdBlockHeader: BytesLike = '0x'.concat(
-                blockchainRid, strip0x(wrongNetworkIdBlockRid), previousBlockRid,
-                strip0x(merkleRootHashHashedLeaf),
-                strip0x(ts), strip0x(h),
-                strip0x(dependenciesHashedLeaf),
-                wrongNetworkIdExtraDataMerkleRoot
-            );
+            let wrongNetworkIdBlockHeader = blockHeaderBuilder.update({ 
+                blockRid: wrongNetworkIdBlockRid,
+                extraDataMerkleRoot: wrongNetworkIdExtraDataMerkleRoot,
+            }).build();
+            
+            let wrongExtraDataKeyBlockHeader = blockHeaderBuilder.update({ 
+                blockRid: wrongExtraDataKeyBlockRid,
+                extraDataMerkleRoot: wrongExtraDataKeyMerkleRoot,
+            }).build();
 
-            let wrongExtraDataKeyBlockHeader: BytesLike = '0x'.concat(
-                blockchainRid, strip0x(wrongExtraDataKeyBlockRid), previousBlockRid,
-                strip0x(merkleRootHashHashedLeaf),
-                strip0x(ts), strip0x(h),
-                strip0x(dependenciesHashedLeaf),
-                wrongExtraDataKeyMerkleRoot
-            );
-
-            // update to new validator list
+            // update to add new validator list
             await validatorAdmin.updateValidators([validator1.address, validator2.address, validator3.address]);
 
             let sig1 = await validator1.signMessage(ethers.getBytes(blockRid));
@@ -335,17 +309,15 @@ describe("Token Bridge Test", () => {
                 position: 0,
                 merkleProofs: merkleProof,
             };
-            let hashedLeaf = hashGtvBytes64Leaf(toHex(eifLeaf));
-            let wrongNetworkIdHashedLeaf = hashGtvBytes64Leaf(toHex(eifWrongNetworkIdLeaf));
             let extraProof = {
                 leaf: toHex(eifLeaf),
                 hashedLeaf: hashedLeaf,
                 position: 1,
-                extraRoot: toHex(extraDataMerkleRoot),
+                extraRoot: extraDataMerkleRoot,
                 extraMerkleProofs: [EIF_HEADER_KEY_HASH],
             };
             let wrongNetworkIdExtraProof = {
-                leaf: toHex(eifWrongNetworkIdLeaf),
+                leaf: toHex(wrongNetworkIdEifLeaf),
                 hashedLeaf: wrongNetworkIdHashedLeaf,
                 position: 1,
                 extraRoot: toHex(wrongNetworkIdExtraDataMerkleRoot),
@@ -355,7 +327,7 @@ describe("Token Bridge Test", () => {
                 leaf: toHex(eifLeaf),
                 hashedLeaf: maliciousHashEventLeaf,
                 position: 1,
-                extraRoot: toHex(extraDataMerkleRoot),
+                extraRoot: extraDataMerkleRoot,
                 extraMerkleProofs: [EIF_HEADER_KEY_HASH],
             };
             let invalidExtraDataRoot = {
@@ -376,7 +348,7 @@ describe("Token Bridge Test", () => {
                 leaf: toHex(eifLeaf),
                 hashedLeaf: hashedLeaf,
                 position: 0,
-                extraRoot: toHex(extraDataMerkleRoot),
+                extraRoot: extraDataMerkleRoot,
                 extraMerkleProofs: [
                     "0x0000000000000000000000000000000000000000000000000000000000000000",
                     "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -509,16 +481,14 @@ describe("Token Bridge Test", () => {
                 eventHash, user.address
             )).to.rejectedWith('TokenBridge: fund is pending or was already claimed');
         })
-    })
 
-    describe("Withdraw via smart contract", async () => {
-        it("Integrate with smart contract", async () => {
+        it("Withdraw via smart contract", async () => {
             const [deployer, user] = await ethers.getSigners();
-            const tokenInstance = await tokenContract.connect(deployer) as TestToken;
+            const tokenInstance = tokenContract.connect(deployer);
             const toMint = ethers.parseEther("10000");
 
             await tokenInstance.mint(user.address, toMint);
-            expect(await tokenInstance.totalSupply()).to.eq(toMint)
+            expect(await tokenInstance.totalSupply()).to.eq(toMint);
 
             const bridge = bridgeContract.connect(user);
             const validatorAdmin = validatorContract.connect(admin);
@@ -538,50 +508,32 @@ describe("Token Bridge Test", () => {
             const toAddress = zeroPadValue(bridgeDelegatorAddress, 32);
             const amountHex = zeroPadValue(toBeHex(toDeposit), 32);
 
-            let event: string = ''
-            event = event.concat(strip0x(serialNumber));
-            event = event.concat(strip0x(networkId));
-            event = event.concat(strip0x(contractAddress));
-            event = event.concat(strip0x(toAddress));
-            event = event.concat(strip0x(amountHex));
-
-            // swap toAddress and contractAddress position to make maliciousEvent
-            let maliciousEvent: string = ''
-            maliciousEvent = maliciousEvent.concat(strip0x(serialNumber));
-            maliciousEvent = maliciousEvent.concat(strip0x(networkId));
-            maliciousEvent = maliciousEvent.concat(strip0x(toAddress));
-            maliciousEvent = maliciousEvent.concat(strip0x(contractAddress));
-            maliciousEvent = maliciousEvent.concat(strip0x(amountHex));
-
+            // normal event
+            let event: string = buildWithdrawEvent(serialNumber, networkId, contractAddress, toAddress, amountHex);
             let data = toHex(event);
-            let maliciousData = toHex(maliciousEvent);
             let hashEventLeaf = keccak256(data);
-            let maliciousHashEventLeaf = keccak256(keccak256(data));
             let hashRootEvent = keccak256(keccak256(hashEventLeaf));
             let state = strip0x(blockNumber).concat(event);
             let hashRootState = keccak256(toHex(state));
             let eifLeaf = strip0x(hashRootEvent) + strip0x(hashRootState);
+            let hashedLeaf = hashGtvBytes64Leaf(toHex(eifLeaf));
+            let extraDataMerkleRoot = calcExtraDataMerkleRoot(EIF_HEADER_KEY_HASH, hashedLeaf);
 
-            let blockchainRid = "977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795";
-            let previousBlockRid = "49e46bf022de1515cbb2bf0f69c62c071825a9b940e8f3892acb5d2021832ba0";
-            let merkleRootHash = "96defe74f43fcf2d12a1844bcd7a3a7bcb0d4fa191776953dae3f1efb508d866";
-            let merkleRootHashHashedLeaf = hashGtvBytes32Leaf(toHex(merkleRootHash));
-            let dependencies = "56bfbee83edd2c9a79ff421c95fc8ec0fa0d67258dca697e47aae56f6fbc8af3";
-            let dependenciesHashedLeaf = hashGtvBytes32Leaf(toHex(dependencies));
-
-            // This merkle root is calculated in the postchain code
-            let extraDataMerkleRoot = "A1C05DC4AFAE5375A20F89785FA362C6BCF74310C5209F1C023C6334C31DE3C4"
+            // malicious event, toAddress and contractAddress swapped
+            let maliciousEvent: string = buildWithdrawEvent(serialNumber, networkId, toAddress, contractAddress, amountHex);
+            let maliciousData = toHex(maliciousEvent);
+            let maliciousHashEventLeaf = keccak256(keccak256(data));
 
             let node1 = hashGtvBytes32Leaf(toHex(blockchainRid));
             let node2 = hashGtvBytes32Leaf(toHex(previousBlockRid));
             let node12 = postchainMerkleNodeHash([0x00, node1, node2]);
-            let node3 = hashGtvBytes32Leaf(toHex(merkleRootHash));
+            let node3 = merkleRootHashHashedLeaf;
             let timestamp = 1629878444220;
             let height = 46;
             let node4 = hashGtvIntegerLeaf(timestamp);
             let node34 = postchainMerkleNodeHash([0x00, node3, node4]);
             let node5 = hashGtvIntegerLeaf(height);
-            let node6 = hashGtvBytes32Leaf(toHex(dependencies));
+            let node6 = dependenciesHashedLeaf;
             let node56 = postchainMerkleNodeHash([0x00, node5, node6]);
             let node1234 = postchainMerkleNodeHash([0x00, node12, node34]);
             let node5678 = postchainMerkleNodeHash([0x00, node56, toHex(extraDataMerkleRoot)]);
@@ -592,21 +544,15 @@ describe("Token Bridge Test", () => {
             let ts = zeroPadValue(toBeHex(timestamp), 32);
             let h = zeroPadValue(toBeHex(height), 32);
 
-            let blockHeader: BytesLike = "0x".concat(
-                blockchainRid, strip0x(blockRid), previousBlockRid,
-                strip0x(merkleRootHashHashedLeaf),
-                strip0x(ts), strip0x(h),
-                strip0x(dependenciesHashedLeaf),
-                extraDataMerkleRoot
+            const blockHeaderBuilder = getBlockHeaderBuilder(
+                blockchainRid, blockRid, previousBlockRid, merkleRootHashHashedLeaf, ts, h, 
+                dependenciesHashedLeaf, extraDataMerkleRoot
             );
 
-            let maliciousBlockHeader: BytesLike = "0x".concat(
-                blockchainRid, strip0x(maliciousBlockRid), previousBlockRid,
-                strip0x(merkleRootHashHashedLeaf),
-                strip0x(ts), strip0x(h),
-                strip0x(dependenciesHashedLeaf),
-                extraDataMerkleRoot
-            );
+            let blockHeader = blockHeaderBuilder.build();
+            let maliciousBlockHeader = blockHeaderBuilder.update({
+                blockRid: maliciousBlockRid,
+            }).build();
 
             // update to add new validator list
             await validatorAdmin.updateValidators([validator1.address, validator2.address, validator3.address]);
@@ -630,7 +576,6 @@ describe("Token Bridge Test", () => {
                 position: 0,
                 merkleProofs: merkleProof,
             };
-            let hashedLeaf = hashGtvBytes64Leaf(toHex(eifLeaf));
             let extraProof = {
                 leaf: toHex(eifLeaf),
                 hashedLeaf: hashedLeaf,
@@ -760,11 +705,6 @@ describe("Token Bridge Test", () => {
 
     describe("Mass Exit", async () => {
 
-        let blockchainRid: string;
-        let previousBlockRid: string;
-        let merkleRootHash: string;
-        let dependencies: string;
-        let extraDataMerkleRoot: string;
         let blockHeader: BytesLike;
         let blockRid: string;
         let sigs: BytesLike[];
@@ -772,53 +712,41 @@ describe("Token Bridge Test", () => {
         let extraProof: any;
 
         beforeEach(async () => {
-            blockchainRid = "977dd435e17d637c2c71ebb4dec4ff007a4523976dc689c7bcb9e6c514e4c795";
-            previousBlockRid = "49e46bf022de1515cbb2bf0f69c62c071825a9b940e8f3892acb5d2021832ba0";
-            merkleRootHash = "96defe74f43fcf2d12a1844bcd7a3a7bcb0d4fa191776953dae3f1efb508d866";
-            dependencies = "56bfbee83edd2c9a79ff421c95fc8ec0fa0d67258dca697e47aae56f6fbc8af3";
-            extraDataMerkleRoot = "672D33B35488E3C965E6A393B922CDCF79C51976DA97A6B7B3079DE1DF6DB89E";
-
-            const merkleRootHashHashedLeaf = hashGtvBytes32Leaf(toHex(merkleRootHash));
-            const dependenciesHashedLeaf = hashGtvBytes32Leaf(toHex(dependencies));
+            let hashRootEvent = "0x728d07430504bb9ab20503de4226a073dd8407e10b6034419c8e74bfabe42ab7";
+            let hashRootState = "0x670fff953275de8667fe07d088f1e1dad999bd1d73f44f3b19b94b5c1b28fd69";
+            let eifLeaf = strip0x(hashRootEvent) + strip0x(hashRootState);
+            let hashedLeaf = hashGtvBytes64Leaf(toHex(eifLeaf));
+            let extraDataMerkleRoot = calcExtraDataMerkleRoot(EIF_HEADER_KEY_HASH, hashedLeaf);
 
             const node1 = hashGtvBytes32Leaf(toHex(blockchainRid));
             const node2 = hashGtvBytes32Leaf(toHex(previousBlockRid));
             const node12 = postchainMerkleNodeHash([0x00, node1, node2]);
-            const node3 = hashGtvBytes32Leaf(toHex(merkleRootHash));
+            const node3 = merkleRootHashHashedLeaf;
             const timestamp = Math.floor(Date.now());
             const height = 100;
             const node4 = hashGtvIntegerLeaf(timestamp);
             const node34 = postchainMerkleNodeHash([0x00, node3, node4]);
             const node5 = hashGtvIntegerLeaf(height);
-            const node6 = hashGtvBytes32Leaf(toHex(dependencies));
+            const node6 = dependenciesHashedLeaf;
             const node56 = postchainMerkleNodeHash([0x00, node5, node6]);
             const node1234 = postchainMerkleNodeHash([0x00, node12, node34]);
             const node5678 = postchainMerkleNodeHash([0x00, node56, toHex(extraDataMerkleRoot)]);
-
             blockRid = postchainMerkleNodeHash([0x7, node1234, node5678]);
 
             const ts = zeroPadValue(toBeHex(timestamp), 32);
             const h = zeroPadValue(toBeHex(height), 32);
 
-            blockHeader = "0x".concat(
-                blockchainRid, strip0x(blockRid), previousBlockRid,
-                strip0x(merkleRootHashHashedLeaf),
-                strip0x(ts), strip0x(h),
-                strip0x(dependenciesHashedLeaf),
-                extraDataMerkleRoot
-            );
+            blockHeader = getBlockHeaderBuilder(
+                blockchainRid, blockRid, previousBlockRid, merkleRootHashHashedLeaf, ts, h, 
+                dependenciesHashedLeaf, extraDataMerkleRoot
+            ).build();
 
             const sig1 = await validator1.signMessage(ethers.getBytes(blockRid));
             const sig2 = await validator2.signMessage(ethers.getBytes(blockRid));
 
             sigs = [sig1, sig2];
-            validators = [validator1.address, validator2.address, validator3.address];
+            validators = [validator1.address, validator2.address, validator3.address];           
 
-            let hashRootEvent = "0x728d07430504bb9ab20503de4226a073dd8407e10b6034419c8e74bfabe42ab7";
-            let hashRootState = "0x670fff953275de8667fe07d088f1e1dad999bd1d73f44f3b19b94b5c1b28fd69";
-            let eifLeaf = strip0x(hashRootEvent) + strip0x(hashRootState);
-
-            const hashedLeaf = hashGtvBytes64Leaf(toHex(eifLeaf));
             extraProof = {
                 leaf: toHex(eifLeaf),
                 hashedLeaf: hashedLeaf,
@@ -913,3 +841,4 @@ describe("Token Bridge Test", () => {
         });
     })
 });
+
