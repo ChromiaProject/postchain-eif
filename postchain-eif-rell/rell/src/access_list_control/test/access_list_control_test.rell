@@ -1,6 +1,7 @@
 @test module;
 
-import ^^.*;
+import ^^^.hbridge.*;
+import ^^^.access_list_control.*;
 
 function test_blacklist_is_default_mode() {
     assert_true(state.access_mode == access_mode.blacklist);
@@ -82,4 +83,42 @@ function test_is_account_allowed_to_withdraw() {
     )
         .run();
     assert_false(is_account_allowed_to_withdraw(x""));
+}
+
+function test_blacklist_history() {
+    rell.test.tx().op(
+        set_access_mode(access_mode.blacklist),
+        add_blacklist_account_id(x""),
+        remove_blacklist_account_id(x"")
+    ).run();
+
+    val result = check_access_list(x"");
+    assert_true(result);
+    val history = blacklist_history @* {};
+    assert_true(history.size() == 2 );
+    assert_equals(history[0].account_id, x"" );
+    assert_equals(history[0].action, action.add );
+    assert_equals(history[0].block_height, 0 );
+    assert_equals(history[1].account_id, x"" );
+    assert_equals(history[1].action, action.remove );
+    assert_equals(history[1].block_height, 0 );
+}
+
+function test_whitelist_history() {
+    rell.test.tx().op(
+        set_access_mode(access_mode.whitelist),
+        add_whitelist_account_id(x""),
+        remove_whitelist_account_id(x"")
+    ).run();
+
+    val result = check_access_list(x"");
+    assert_false(result);
+    val history = whitelist_history @* {};
+    assert_true(history.size() == 2 );
+    assert_equals(history[0].account_id, x"" );
+    assert_equals(history[0].action, action.add );
+    assert_equals(history[0].block_height, 0 );
+    assert_equals(history[1].account_id, x"" );
+    assert_equals(history[1].action, action.remove );
+    assert_equals(history[1].block_height, 0 );
 }

@@ -1,0 +1,83 @@
+@test module;
+
+import ^^.*;
+import ^.helper_operations.*;
+
+struct module_args {
+    admin_privkey: byte_array;
+    bridge_admin_account_signers: gtv;
+}
+
+val bridge_admin_account_privkey = x"84C63F4F29B69D59D8F3424B9F1591F91C456B7C86E84F9B6CC9B1BE0678C08C";
+
+function test_seize_funds() {
+    //register bridge admin account
+    rell.test.tx().op(register_bridge_admin_account()).run();
+
+    //register test accounts and asset
+    rell.test.tx().op(
+            register_test_account(rell.test.pubkeys.alice),
+            register_test_account(rell.test.pubkeys.bob),
+            register_asset()
+        ).sign(chain_context.args.admin_privkey).run();
+
+    //mint alice account
+    val alice_account = ft4.accounts.account_by_id(rell.test.pubkeys.alice.hash());
+    rell.test.tx()
+        .op(mint_to(alice_account, 1000)).run();
+
+    val bridge_account_signer = list<byte_array>.from_gtv(chain_context.args.bridge_admin_account_signers)[0];
+
+    //Only frozen accounts can be seized
+    rell.test.tx()
+        .op(
+        ft_auth_operation_for(bridge_account_signer),
+        seize_funds(alice_account.id, 1000, get_asset().id)
+    )
+        .sign(bridge_admin_account_privkey)
+        .run_must_fail("Only frozen accounts can be seized.");
+
+    //blacklist alice account
+    rell.test.tx()
+        .op(
+            ft_auth_operation_for(bridge_account_signer),
+            access_list_control.set_access_mode(access_list_control.access_mode.blacklist),
+            ft_auth_operation_for(bridge_account_signer),
+            access_list_control.add_blacklist_account_id(alice_account.id)
+        ).sign(bridge_admin_account_privkey).run();
+    assert_false(access_list_control.check_access_list(alice_account.id));
+
+    //ft4 transfer not allowed for blacklisted account
+    val bob_account = ft4.accounts.account_by_id(rell.test.pubkeys.bob.hash());
+    rell.test.tx()
+        .op(
+            ft_auth_operation_for(rell.test.pubkeys.alice),
+            ft4.assets.external.transfer(bob_account.id, get_asset().id, 100)
+        )
+        .sign(rell.test.privkeys.alice).run_must_fail("Transfers from account 0x7b1dda0d03d062460c745b459779e1dee9845a5eec6341a81f91c081c5cc89c5 are blocked.");
+
+    //bridge_account can seize funds
+    rell.test.tx()
+        .op(
+            ft_auth_operation_for(bridge_account_signer),
+            seize_funds(alice_account.id, 1000, get_asset().id)
+        )
+        .sign(bridge_admin_account_privkey)
+        .run();
+    assert_equals(ft4.assets.get_asset_balance(alice_account, get_asset()), 0L);
+
+    val seize_history = seize_history @* { };
+    assert_equals(seize_history.size(), 1);
+    assert_equals(seize_history[0].account_id, alice_account.id);
+    assert_equals(seize_history[0].amount, 1000);
+    assert_equals(seize_history[0].asset_id, get_asset().id);
+}
+
+function ft_auth_operation_for(signer: byte_array) {
+    val descriptor = require(
+        ft4.accounts.auth_descriptor_signer @? { signer }.account_auth_descriptor limit 1,
+        "No auth descriptor found for signer %s".format(signer)
+    );
+
+    return ft4.auth.external.ft_auth(descriptor.account.id, descriptor.id);
+}

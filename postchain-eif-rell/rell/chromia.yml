@@ -35,6 +35,7 @@ test:
     - transaction_submitter.anchoring.test
     - transaction_submitter.signer_update.test
     - access_list_control.test
+    - bridge_admin.test
   moduleArgs:
     <<: *common_args
     <<: *rell_test_args
@@ -94,6 +95,11 @@ test:
       anchoring_interval: 3600000
     eif_event_receiver:
       enable_icmf: false
+    bridge_admin:
+      bridge_admin_account_signers: [ x"02AB507A89AF2B8C1DCDF177E8C16BE36D8B8216B2F6FDAD9E7EB7CD8CCE661B2B" ]
+    bridge_admin.test.bridge_admin_test:
+      admin_privkey: x"D223C1BEF057A86FCB4603BF8CCBF7FFBFAF1F1928ADBD52A8FCCD08E3C487C3"  # Only for tests
+      bridge_admin_account_signers: [ x"02AB507A89AF2B8C1DCDF177E8C16BE36D8B8216B2F6FDAD9E7EB7CD8CCE661B2B" ]  # Only for tests
 
 blockchains:
   eif_event_receiver_test:
@@ -203,6 +209,8 @@ blockchains:
       lib.ft4.core.accounts.strategies.transfer:
         rules: [] # TODO specify transfer strategy rules
       chain_version: *chain_version
+      bridge_admin:
+        bridge_admin_account_signers: [ ] # TODO replace with real signers
 
   transaction_submitter:
     module: transaction_submitter
