@@ -42,7 +42,7 @@ function test_seize_funds() {
             ft_auth_operation_for(bridge_admin_account_signer),
             eif_access_list_control.set_access_mode(eif_access_list_control.access_mode.blacklist),
             ft_auth_operation_for(bridge_admin_account_signer),
-            eif_access_list_control.add_blacklist_account_id(alice_account.id)
+            eif_access_list_control.add_account_id_to_blacklist(alice_account.id)
         ).sign(bridge_admin_account_privkey).run();
     assert_false(eif_access_list_control.check_access_list(alice_account.id));
 
@@ -80,11 +80,9 @@ function test_seize_funds() {
         .run();
     assert_equals(ft4.assets.get_asset_balance(alice_account, get_asset()), 0L);
 
-    val seize_history = seize_history @* { };
+    val seize_history = get_seize_history(alice_account.id);
     assert_equals(seize_history.size(), 1);
-    assert_equals(seize_history[0].account_id, alice_account.id);
-    assert_equals(seize_history[0].amount, 1000);
-    assert_equals(seize_history[0].asset_id, get_asset().id);
+    assert_equals(seize_history[0], seize_history_entry(account_id=alice_account.id, amount=1000, asset_id= get_asset().id, timestamp=1577836840000));
 }
 
 function ft_auth_operation_for(signer: byte_array) {

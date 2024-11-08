@@ -2,6 +2,13 @@ module;
 
 import hbridge: ^.hbridge;
 
+namespace ft4 {
+    import lib.ft4.assets;
+    import lib.ft4.accounts;
+    import lib.ft4.auth;
+    import lib.ft4.utils;
+}
+
 @extend(hbridge.deposit_check_access_list)
 function deposit_check_access_list(account_id: byte_array): boolean {
     return check_access_list(account_id);
@@ -27,6 +34,11 @@ enum access_mode {
     whitelist
 }
 
+enum action {
+    add,
+    remove
+}
+
 entity blacklist {
     key account_id: byte_array;
 }
@@ -35,32 +47,64 @@ entity whitelist {
     key account_id: byte_array;
 }
 
+@log
+entity blacklist_history {
+    op_index: integer = op_context.op_index;
+    index transaction, op_index;
+    index account_id: byte_array;
+    action;
+}
+
+@log
+entity whitelist_history {
+    op_index: integer = op_context.op_index;
+    index transaction, op_index;
+    index account_id: byte_array;
+    action;
+}
+
 object state {
     mutable access_mode: access_mode = access_mode.blacklist;
 }
 
-operation add_blacklist_account_id(account_id: byte_array) {
+@extend(ft4.assets.before_transfer)
+function block_transfers(from: ft4.accounts.account, to: ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
+    if (block_transfers_exception(from, to, asset, amount)) {
+        require(check_access_list(from.id), "Transfers from account %s are blocked.".format(from.id));
+        require(check_access_list(to.id), "Transfers to account %s are blocked.".format(to.id));
+    } else {
+        require(not check_access_list(from.id), "Only frozen accounts can be seized.");
+    }
+}
+
+@extendable
+function block_transfers_exception(from: ft4.accounts.account, to: ft4.accounts.account, ft4.assets.asset, amount: big_integer): boolean = false;
+
+@extendable
+function require_auth();
+
+operation add_account_id_to_blacklist(account_id: byte_array) {
     require_auth();
     require(blacklist @? { account_id } == null, "The account id %s is already blacklisted.".format(account_id));
     create blacklist ( account_id );
     create blacklist_history ( account_id, action.add, op_context.block_height );
 }
 
-operation remove_blacklist_account_id(account_id: byte_array) {
+operation remove_account_id_from_blacklist(account_id: byte_array) {
     require_auth();
     require(blacklist @? { account_id } != null, "The account id %s is not blacklisted.".format(account_id));
     delete blacklist @? { account_id };
     create blacklist_history ( account_id, action.remove, op_context.block_height );
 }
 
-operation add_whitelist_account_id(account_id: byte_array) {
+operation add_account_id_to_whitelist(account_id: byte_array) {
     require_auth();
     require(whitelist @? { account_id } == null, "The account id %s is already whitelisted.".format(account_id));
     create whitelist ( account_id );
     create whitelist_history ( account_id, action.add, op_context.block_height );
 }
 
-operation remove_whitelist_account_id(account_id: byte_array) {
+operation remove_account_id_from_whitelist(account_id: byte_array) {
     require_auth();
     require(whitelist @? { account_id } != null, "The account id %s is not whitelisted.".format(account_id));
     delete whitelist @? { account_id };
@@ -72,32 +116,40 @@ operation set_access_mode(access_mode: access_mode) {
     state.access_mode = access_mode;
 }
 
-query is_account_allowed_to_deposit(account_id: byte_array): boolean {
-    return deposit_check_access_list(account_id);
+query is_account_on_access_list(account_id: byte_array): boolean {
+    return check_access_list(account_id);
 }
 
-query is_account_allowed_to_withdraw(account_id: byte_array): boolean {
-    return withdraw_check_access_list(account_id);
+query get_blacklist_history(account_id: byte_array): list<blacklist_history_entry> {
+    return blacklist_history @* { account_id } (
+        @sort @omit .rowid,
+        blacklist_history_entry (
+            account_id = account_id,
+            action = .action,
+            timestamp = .transaction.block.timestamp
+        )
+    );
 }
 
-@extendable
-function require_auth();
-
-@log entity blacklist_history {
-    op_index: integer = op_context.op_index;
-    index transaction, op_index;
-
-    index account_id: byte_array;
-    action;
-}
-
-entity whitelist_history {
+struct blacklist_history_entry {
     account_id: byte_array;
-    action;
-    block_height: integer;
+    action: action;
+    timestamp;
 }
 
-enum action {
-    add,
-    remove
+query get_whitelist_history(account_id: byte_array): list<whitelist_history_entry> {
+    return whitelist_history @* { account_id } (
+        @sort @omit .rowid,
+        whitelist_history_entry (
+            account_id = account_id,
+            action = .action,
+            timestamp = .transaction.block.timestamp
+        )
+    );
+}
+
+struct whitelist_history_entry {
+    account_id: byte_array;
+    action: action;
+    timestamp;
 }

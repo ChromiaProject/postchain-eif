@@ -20,7 +20,7 @@ function test_check_access_list_blacklist_pass() {
 function test_check_access_list_blacklist_block() {
     rell.test.tx().op(
             set_access_mode(access_mode.blacklist),
-            add_blacklist_account_id(x"")
+            add_account_id_to_blacklist(x"")
         ).run();
 
     val result = check_access_list(x"");
@@ -31,7 +31,7 @@ function test_check_access_list_blacklist_block() {
 function test_check_access_list_whitelist_pass() {
     rell.test.tx().op(
             set_access_mode(access_mode.whitelist),
-            add_whitelist_account_id(x"")
+            add_account_id_to_whitelist(x"")
         ).run();
 
     val result = check_access_list(x"");
@@ -52,69 +52,58 @@ function test_check_access_list_whitelist_block() {
 function test_check_access_list_blacklist_same_account_id() {
     rell.test.tx().op(
             set_access_mode(access_mode.blacklist),
-            add_blacklist_account_id(x""),
-            add_blacklist_account_id(x"")
+            add_account_id_to_blacklist(x""),
+            add_account_id_to_blacklist(x"")
         ).run_must_fail("The account id 0x is already blacklisted.");
 }
 
 function test_check_access_list_whitelist_same_account_id() {
     rell.test.tx().op(
             set_access_mode(access_mode.whitelist),
-            add_whitelist_account_id(x""),
-            add_whitelist_account_id(x"")
+            add_account_id_to_whitelist(x""),
+            add_account_id_to_whitelist(x"")
         ).run_must_fail("The account id 0x is already whitelisted.");
 }
 
-function test_is_account_allowed_to_deposit() {
-    assert_true(is_account_allowed_to_deposit(x""));
+function test_is_account_on_access_list() {
+    assert_true(is_account_on_access_list(x""));
     rell.test.tx().op(
             set_access_mode(access_mode.blacklist),
-            add_blacklist_account_id(x"")
+            add_account_id_to_blacklist(x"")
         )
         .run();
-    assert_false(is_account_allowed_to_deposit(x""));
+    assert_false(is_account_on_access_list(x""));
 }
 
-function test_is_account_allowed_to_withdraw() {
-    assert_true(is_account_allowed_to_withdraw(x""));
-    rell.test.tx().op(
-        set_access_mode(access_mode.blacklist),
-        add_blacklist_account_id(x"")
-    )
-        .run();
-    assert_false(is_account_allowed_to_withdraw(x""));
-}
 
 function test_blacklist_history() {
     rell.test.tx().op(
-        set_access_mode(access_mode.blacklist),
-        add_blacklist_account_id(x""),
-        remove_blacklist_account_id(x"")
-    ).run();
+            set_access_mode(access_mode.blacklist),
+            add_account_id_to_blacklist(x""),
+            remove_account_id_from_blacklist(x"")
+        ).run();
 
     val result = check_access_list(x"");
     assert_true(result);
-    val history = blacklist_history @* {};
-    assert_true(history.size() == 2 );
-    assert_equals(history[0].account_id, x"" );
-    assert_equals(history[0].action, action.add );
-    assert_equals(history[1].account_id, x"" );
-    assert_equals(history[1].action, action.remove );
+
+    val history = get_blacklist_history(x"");
+    assert_true(history.size() == 2);
+    assert_equals(history[0], blacklist_history_entry(x"", action.add, 1577836800000));
+    assert_equals(history[1], blacklist_history_entry(x"", action.remove, 1577836800000));
 }
 
 function test_whitelist_history() {
     rell.test.tx().op(
-        set_access_mode(access_mode.whitelist),
-        add_whitelist_account_id(x""),
-        remove_whitelist_account_id(x"")
-    ).run();
+            set_access_mode(access_mode.whitelist),
+            add_account_id_to_whitelist(x""),
+            remove_account_id_from_whitelist(x"")
+        ).run();
 
     val result = check_access_list(x"");
     assert_false(result);
-    val history = whitelist_history @* {};
-    assert_true(history.size() == 2 );
-    assert_equals(history[0].account_id, x"" );
-    assert_equals(history[0].action, action.add );
-    assert_equals(history[1].account_id, x"" );
-    assert_equals(history[1].action, action.remove );
+
+    val history = get_whitelist_history(x"");
+    assert_true(history.size() == 2);
+    assert_equals(history[0], whitelist_history_entry(x"", action.add, 1577836800000));
+    assert_equals(history[1], whitelist_history_entry(x"", action.remove, 1577836800000));
 }

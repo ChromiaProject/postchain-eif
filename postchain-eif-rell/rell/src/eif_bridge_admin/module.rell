@@ -32,15 +32,8 @@ function require_auth_bridge_admin_account() {
     require(bridge_admin_account_id == account.id, "Authorization failed: The account %s is not authorized. Bridge admin account authorization is required.".format(account.id));
 }
 
-@extend(ft4.assets.before_transfer)
-function block_transfers(from: ft4.accounts.account, to: ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
-    if (to.id != get_bridge_admin_account_id()) {
-        require(eif_access_list_control.check_access_list(from.id), "Transfers from account %s are blocked.".format(from.id));
-        require(eif_access_list_control.check_access_list(to.id), "Transfers to account %s are blocked.".format(to.id));
-    } else {
-        require(not eif_access_list_control.check_access_list(from.id), "Only frozen accounts can be seized.");
-    }
-}
+@extend(eif_access_list_control.block_transfers_exception)
+function bridge_admin_account_exception(from: ft4.accounts.account, to: ft4.accounts.account, ft4.assets.asset, amount: big_integer): boolean = to.id != get_bridge_admin_account_id();
 
 operation seize_funds(account_id: byte_array, amount: big_integer, asset_id: byte_array) {
     eif_access_list_control.require_auth();
@@ -63,6 +56,25 @@ function get_bridge_admin_account_id() {
     asset_id: byte_array;
 }
 
+struct seize_history_entry {
+    account_id: byte_array;
+    amount: big_integer;
+    asset_id: byte_array;
+    timestamp;
+}
+
+query get_seize_history(account_id: byte_array): list<seize_history_entry> {
+    return seize_history @* { account_id } (
+        @sort @omit .rowid,
+            seize_history_entry (
+            account_id = .account_id,
+            amount = .amount,
+            asset_id = .asset_id,
+            timestamp = .transaction.block.timestamp
+        )
+    );
+}
+
 @extend(ft4.auth.auth_handler)
 function () = ft4.auth.add_auth_handler(
     scope = rell.meta(eif_access_list_control.set_access_mode).mount_name,
@@ -71,7 +83,25 @@ function () = ft4.auth.add_auth_handler(
 
 @extend(ft4.auth.auth_handler)
 function () = ft4.auth.add_auth_handler(
-    scope = rell.meta(eif_access_list_control.add_blacklist_account_id).mount_name,
+    scope = rell.meta(eif_access_list_control.add_account_id_to_blacklist).mount_name,
+    flags = ["A"]
+);
+
+@extend(ft4.auth.auth_handler)
+function () = ft4.auth.add_auth_handler(
+    scope = rell.meta(eif_access_list_control.remove_account_id_from_blacklist).mount_name,
+    flags = ["A"]
+);
+
+@extend(ft4.auth.auth_handler)
+function () = ft4.auth.add_auth_handler(
+    scope = rell.meta(eif_access_list_control.add_account_id_to_whitelist).mount_name,
+    flags = ["A"]
+);
+
+@extend(ft4.auth.auth_handler)
+function () = ft4.auth.add_auth_handler(
+    scope = rell.meta(eif_access_list_control.remove_account_id_from_whitelist).mount_name,
     flags = ["A"]
 );
 
