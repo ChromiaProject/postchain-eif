@@ -83,10 +83,12 @@ query is_account_allowed_to_withdraw(account_id: byte_array): boolean {
 @extendable
 function require_auth();
 
-entity blacklist_history {
-    account_id: byte_array;
+@log entity blacklist_history {
+    op_index: integer = op_context.op_index;
+    index transaction, op_index;
+
+    index account_id: byte_array;
     action;
-    block_height: integer;
 }
 
 entity whitelist_history {

@@ -96,10 +96,7 @@ test:
     eif_event_receiver:
       enable_icmf: false
     bridge_admin:
-      bridge_admin_account_signers: [ x"02AB507A89AF2B8C1DCDF177E8C16BE36D8B8216B2F6FDAD9E7EB7CD8CCE661B2B" ]
-    bridge_admin.test.bridge_admin_test:
-      admin_privkey: x"D223C1BEF057A86FCB4603BF8CCBF7FFBFAF1F1928ADBD52A8FCCD08E3C487C3"  # Only for tests
-      bridge_admin_account_signers: [ x"02AB507A89AF2B8C1DCDF177E8C16BE36D8B8216B2F6FDAD9E7EB7CD8CCE661B2B" ]  # Only for tests
+      bridge_admin_account_signers: [ x"032c0b7cf95324a07d05398b240174dc0c2be444d96b159aa6c7f7b1e668680991" ]
 
 blockchains:
   eif_event_receiver_test:

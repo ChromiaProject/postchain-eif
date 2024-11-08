@@ -98,10 +98,8 @@ function test_blacklist_history() {
     assert_true(history.size() == 2 );
     assert_equals(history[0].account_id, x"" );
     assert_equals(history[0].action, action.add );
-    assert_equals(history[0].block_height, 0 );
     assert_equals(history[1].account_id, x"" );
     assert_equals(history[1].action, action.remove );
-    assert_equals(history[1].block_height, 0 );
 }
 
 function test_whitelist_history() {
@@ -117,8 +115,6 @@ function test_whitelist_history() {
     assert_true(history.size() == 2 );
     assert_equals(history[0].account_id, x"" );
     assert_equals(history[0].action, action.add );
-    assert_equals(history[0].block_height, 0 );
     assert_equals(history[1].account_id, x"" );
     assert_equals(history[1].action, action.remove );
-    assert_equals(history[1].block_height, 0 );
 }
