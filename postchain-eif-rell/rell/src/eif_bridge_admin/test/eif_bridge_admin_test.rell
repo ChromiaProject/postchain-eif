@@ -40,11 +40,11 @@ function test_seize_funds() {
     rell.test.tx()
         .op(
             ft_auth_operation_for(bridge_admin_account_signer),
-            access_list_control.set_access_mode(access_list_control.access_mode.blacklist),
+            eif_access_list_control.set_access_mode(eif_access_list_control.access_mode.blacklist),
             ft_auth_operation_for(bridge_admin_account_signer),
-            access_list_control.add_blacklist_account_id(alice_account.id)
+            eif_access_list_control.add_blacklist_account_id(alice_account.id)
         ).sign(bridge_admin_account_privkey).run();
-    assert_false(access_list_control.check_access_list(alice_account.id));
+    assert_false(eif_access_list_control.check_access_list(alice_account.id));
 
     //ft4 transfer not allowed for blacklisted account
     val bob_account = ft4.accounts.account_by_id(rell.test.pubkeys.bob.hash());

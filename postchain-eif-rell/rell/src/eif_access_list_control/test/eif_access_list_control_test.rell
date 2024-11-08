@@ -1,7 +1,7 @@
 @test module;
 
 import ^^^.hbridge.*;
-import ^^^.access_list_control.*;
+import ^^^.eif_access_list_control.*;
 
 function test_blacklist_is_default_mode() {
     assert_true(state.access_mode == access_mode.blacklist);

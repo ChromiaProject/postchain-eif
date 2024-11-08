@@ -1,6 +1,6 @@
 module;
 
-import access_list_control: ^.access_list_control;
+import eif_access_list_control: ^.eif_access_list_control;
 
 namespace ft4 {
     import lib.ft4.assets;
@@ -25,7 +25,7 @@ operation register_bridge_admin_account() {
     }
 }
 
-@extend(access_list_control.require_auth)
+@extend(eif_access_list_control.require_auth)
 function require_auth_bridge_admin_account() {
     val account = ft4.auth.authenticate();
     val bridge_admin_account_id = get_bridge_admin_account_id();
@@ -35,15 +35,15 @@ function require_auth_bridge_admin_account() {
 @extend(ft4.assets.before_transfer)
 function block_transfers(from: ft4.accounts.account, to: ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
     if (to.id != get_bridge_admin_account_id()) {
-        require(access_list_control.check_access_list(from.id), "Transfers from account %s are blocked.".format(from.id));
-        require(access_list_control.check_access_list(to.id), "Transfers to account %s are blocked.".format(to.id));
+        require(eif_access_list_control.check_access_list(from.id), "Transfers from account %s are blocked.".format(from.id));
+        require(eif_access_list_control.check_access_list(to.id), "Transfers to account %s are blocked.".format(to.id));
     } else {
-        require(not access_list_control.check_access_list(from.id), "Only frozen accounts can be seized.");
+        require(not eif_access_list_control.check_access_list(from.id), "Only frozen accounts can be seized.");
     }
 }
 
 operation seize_funds(account_id: byte_array, amount: big_integer, asset_id: byte_array) {
-    access_list_control.require_auth();
+    eif_access_list_control.require_auth();
     val account = ft4.accounts.Account(account_id);
     val bridge_admin_account = ft4.accounts.Account(get_bridge_admin_account_id());
     ft4.assets.Unsafe.transfer(account, bridge_admin_account, ft4.assets.Asset(asset_id), amount);
@@ -65,13 +65,13 @@ function get_bridge_admin_account_id() {
 
 @extend(ft4.auth.auth_handler)
 function () = ft4.auth.add_auth_handler(
-    scope = rell.meta(access_list_control.set_access_mode).mount_name,
+    scope = rell.meta(eif_access_list_control.set_access_mode).mount_name,
     flags = ["A"]
 );
 
 @extend(ft4.auth.auth_handler)
 function () = ft4.auth.add_auth_handler(
-    scope = rell.meta(access_list_control.add_blacklist_account_id).mount_name,
+    scope = rell.meta(eif_access_list_control.add_blacklist_account_id).mount_name,
     flags = ["A"]
 );
 

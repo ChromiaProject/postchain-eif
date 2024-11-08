@@ -34,8 +34,8 @@ test:
     - transaction_submitter.test
     - transaction_submitter.anchoring.test
     - transaction_submitter.signer_update.test
-    - access_list_control.test
-    - bridge_admin.test
+    - eif_access_list_control.test
+    - eif_bridge_admin.test
   moduleArgs:
     <<: *common_args
     <<: *rell_test_args
@@ -95,7 +95,7 @@ test:
       anchoring_interval: 3600000
     eif_event_receiver:
       enable_icmf: false
-    bridge_admin:
+    eif_bridge_admin:
       bridge_admin_account_signers: [ x"032c0b7cf95324a07d05398b240174dc0c2be444d96b159aa6c7f7b1e668680991" ]
 
 blockchains:
