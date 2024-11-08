@@ -24,6 +24,12 @@ struct erc20_asset_info {
     virtual_blockchain_rid: byte_array; // virtual blockchain RID derived from network_id and address
 }
 
+struct bridge_contract_info {
+    contract_address: text;
+    evm_read_offset: integer;
+    erc20_assets: list<erc20_asset_info>;
+}
+
 function register_erc20_asset(
     network_id: integer,
     token_address: byte_array,
@@ -49,3 +55,10 @@ function register_erc20_asset(
 function compute_virtual_blockchain_rid(network_id: integer, token_address: byte_array): byte_array =
         ("EVM", network_id, token_address).hash();
 
+function map_erc20_asset_to_erc20_asset_info(erc20_asset) = erc20_asset_info(
+    network_id = erc20_asset.network_id,
+    token_address = erc20_asset.token_address,
+    bridge_mode = erc20_asset.bridge_mode,
+    ft_asset_id = erc20_asset.asset.id,
+    virtual_blockchain_rid = erc20_asset.virtual_blockchain_rid
+);

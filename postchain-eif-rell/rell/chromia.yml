@@ -37,6 +37,20 @@ test:
     - access_list_control.test
   moduleArgs:
     <<: *common_args
+    hbridge:
+      supported_bridge_contracts:
+        bsc:
+          network_id: 97
+          contracts:
+            - "0x2Cf48D2891CC286d18596Df1261D011d1B78E03E"
+            - "0x2Cf48D2891CC286d18596Df1261D011d1B78E03F"
+          evm_read_offset: 10
+        sepolia:
+          network_id: 11155111
+          contracts:
+            - "0x2Cf48D2891CC286d18596Df1261D011d1B78E04E"
+            - "0x2Cf48D2891CC286d18596Df1261D011d1B78E04F"
+          evm_read_offset: 20
     <<: *rell_test_args
     lib.ft4.core.accounts.strategies.transfer:
       rules:
@@ -199,9 +213,11 @@ blockchains:
               bc-rid: x"0000000000000000000000000000000000000000000000000000000000000000"
     moduleArgs:
       <<: *common_args
+      hbridge:
+        supported_bridge_contracts: { } # See test moduleArgs
       <<: *rell_test_args
       lib.ft4.core.accounts.strategies.transfer:
-        rules: [] # TODO specify transfer strategy rules
+        rules: [ ] # TODO specify transfer strategy rules
       chain_version: *chain_version
 
   transaction_submitter:

@@ -71,6 +71,14 @@ val BAR = asset_info(
     token_icon_url = "https://bar.com/bar",
 );
 
+val ABC = asset_info(
+    token_address = x"39615b16b74589919c9ce1ea73f1fc5d53141a71",
+    token_name = "ABC Token",
+    token_symbol = "ABC",
+    token_decimal = 6,
+    token_icon_url = "https://abc.com/abc",
+);
+
 function register_foreign_asset(asset: asset_info = CHR, network_id: integer = network_id1): assets.asset {
     val ft4_asset = register_ft4_asset(asset);
     register_erc20_asset(ft4_asset, asset, network_id, true); // snapshots enabled

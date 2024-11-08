@@ -16,6 +16,16 @@ namespace ft4 {
     import transfer_strategy: lib.ft4.accounts.strategies.transfer;
 }
 
+struct chain_bridge_contracts {
+    network_id: integer;
+    contracts: list<text>;
+    evm_read_offset: integer;
+}
+
+struct module_args {
+    supported_bridge_contracts: gtv = map<text, chain_bridge_contracts>().to_gtv();
+}
+
 enum bridge_mode {
     native,
     foreign,
