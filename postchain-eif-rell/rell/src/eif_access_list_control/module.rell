@@ -70,10 +70,10 @@ object state {
 @extend(ft4.assets.before_transfer)
 function block_transfers(from: ft4.accounts.account, to: ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
     if (block_transfers_exception(from, to, asset, amount)) {
+        require(not check_access_list(from.id), "Block transfer exceptions can only be applied to blocked accounts.");
+    } else {
         require(check_access_list(from.id), "Transfers from account %s are blocked.".format(from.id));
         require(check_access_list(to.id), "Transfers to account %s are blocked.".format(to.id));
-    } else {
-        require(not check_access_list(from.id), "Only blocked accounts can be seized.");
     }
 }
 
