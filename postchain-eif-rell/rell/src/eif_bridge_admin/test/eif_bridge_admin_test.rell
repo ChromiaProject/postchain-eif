@@ -34,7 +34,7 @@ function test_seize_funds() {
             seize_funds(alice_account.id, 1000, get_asset().id)
         )
         .sign(bridge_admin_account_privkey)
-        .run_must_fail("Only frozen accounts can be seized.");
+        .run_must_fail("Only blocked accounts can be seized.");
 
     //blacklist alice account
     rell.test.tx()

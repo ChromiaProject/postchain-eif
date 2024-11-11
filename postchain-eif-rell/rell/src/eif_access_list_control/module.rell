@@ -73,12 +73,17 @@ function block_transfers(from: ft4.accounts.account, to: ft4.accounts.account, f
         require(check_access_list(from.id), "Transfers from account %s are blocked.".format(from.id));
         require(check_access_list(to.id), "Transfers to account %s are blocked.".format(to.id));
     } else {
-        require(not check_access_list(from.id), "Only frozen accounts can be seized.");
+        require(not check_access_list(from.id), "Only blocked accounts can be seized.");
     }
 }
 
 @extendable
-function block_transfers_exception(from: ft4.accounts.account, to: ft4.accounts.account, ft4.assets.asset, amount: big_integer): boolean = false;
+function block_transfers_exception(
+    from: ft4.accounts.account,
+    to: ft4.accounts.account,
+    ft4.assets.asset,
+    amount: big_integer
+): boolean = false;
 
 @extendable
 function require_auth();
@@ -87,28 +92,28 @@ operation add_account_id_to_blacklist(account_id: byte_array) {
     require_auth();
     require(blacklist @? { account_id } == null, "The account id %s is already blacklisted.".format(account_id));
     create blacklist ( account_id );
-    create blacklist_history ( account_id, action.add, op_context.block_height );
+    create blacklist_history ( account_id, action.add );
 }
 
 operation remove_account_id_from_blacklist(account_id: byte_array) {
     require_auth();
     require(blacklist @? { account_id } != null, "The account id %s is not blacklisted.".format(account_id));
     delete blacklist @? { account_id };
-    create blacklist_history ( account_id, action.remove, op_context.block_height );
+    create blacklist_history ( account_id, action.remove );
 }
 
 operation add_account_id_to_whitelist(account_id: byte_array) {
     require_auth();
     require(whitelist @? { account_id } == null, "The account id %s is already whitelisted.".format(account_id));
     create whitelist ( account_id );
-    create whitelist_history ( account_id, action.add, op_context.block_height );
+    create whitelist_history ( account_id, action.add );
 }
 
 operation remove_account_id_from_whitelist(account_id: byte_array) {
     require_auth();
     require(whitelist @? { account_id } != null, "The account id %s is not whitelisted.".format(account_id));
     delete whitelist @? { account_id };
-    create whitelist_history ( account_id, action.remove, op_context.block_height );
+    create whitelist_history ( account_id, action.remove );
 }
 
 operation set_access_mode(access_mode: access_mode) {

@@ -14,6 +14,10 @@ struct module_args {
 }
 
 operation register_bridge_admin_account() {
+    create_bridge_admin_account();
+}
+
+function create_bridge_admin_account() {
     require(ft4.accounts.account @? { get_bridge_admin_account_id() } == null, "Bridge admin account already created.");
     val signers = list<byte_array>.from_gtv(chain_context.args.bridge_admin_account_signers);
     if (signers.size() == 1) {
