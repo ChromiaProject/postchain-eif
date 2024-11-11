@@ -1,16 +1,21 @@
 @test module;
 
-import ^^^.hbridge.*;
 import ^^^.eif_access_list_control.*;
+import ^^^.eif_bridge_admin.*;
+
+val bridge_admin_account_signer = rell.test.pubkeys.charlie;
+val bridge_admin_account_privkey = rell.test.privkeys.charlie;
 
 function test_blacklist_is_default_mode() {
     assert_true(state.access_mode == access_mode.blacklist);
 }
 
 function test_check_access_list_blacklist_pass() {
+    rell.test.tx().op(register_bridge_admin_account()).run();
     rell.test.tx().op(
+            ft_auth_operation_for(bridge_admin_account_signer),
             set_access_mode(access_mode.blacklist),
-        ).run();
+        ).sign(bridge_admin_account_privkey).run();
 
     val result = check_access_list(x"");
 
@@ -18,10 +23,13 @@ function test_check_access_list_blacklist_pass() {
 }
 
 function test_check_access_list_blacklist_block() {
+    rell.test.tx().op(register_bridge_admin_account()).run();
     rell.test.tx().op(
+            ft_auth_operation_for(bridge_admin_account_signer),
             set_access_mode(access_mode.blacklist),
+            ft_auth_operation_for(bridge_admin_account_signer),
             add_account_id_to_blacklist(x"")
-        ).run();
+        ).sign(bridge_admin_account_privkey).run();
 
     val result = check_access_list(x"");
 
@@ -29,10 +37,13 @@ function test_check_access_list_blacklist_block() {
 }
 
 function test_check_access_list_whitelist_pass() {
+    rell.test.tx().op(register_bridge_admin_account()).run();
     rell.test.tx().op(
+            ft_auth_operation_for(bridge_admin_account_signer),
             set_access_mode(access_mode.whitelist),
+            ft_auth_operation_for(bridge_admin_account_signer),
             add_account_id_to_whitelist(x"")
-        ).run();
+        ).sign(bridge_admin_account_privkey).run();
 
     val result = check_access_list(x"");
 
@@ -40,9 +51,11 @@ function test_check_access_list_whitelist_pass() {
 }
 
 function test_check_access_list_whitelist_block() {
+    rell.test.tx().op(register_bridge_admin_account()).run();
     rell.test.tx().op(
+            ft_auth_operation_for(bridge_admin_account_signer),
             set_access_mode(access_mode.whitelist),
-        ).run();
+        ).sign(bridge_admin_account_privkey).run();
 
     val result = check_access_list(x"");
 
@@ -50,60 +63,86 @@ function test_check_access_list_whitelist_block() {
 }
 
 function test_check_access_list_blacklist_same_account_id() {
+    rell.test.tx().op(register_bridge_admin_account()).run();
     rell.test.tx().op(
+            ft_auth_operation_for(bridge_admin_account_signer),
             set_access_mode(access_mode.blacklist),
+            ft_auth_operation_for(bridge_admin_account_signer),
             add_account_id_to_blacklist(x""),
+            ft_auth_operation_for(bridge_admin_account_signer),
             add_account_id_to_blacklist(x"")
-        ).run_must_fail("The account id 0x is already blacklisted.");
+        ).sign(bridge_admin_account_privkey).run_must_fail("The account id 0x is already blacklisted.");
 }
 
 function test_check_access_list_whitelist_same_account_id() {
+    rell.test.tx().op(register_bridge_admin_account()).run();
     rell.test.tx().op(
+            ft_auth_operation_for(bridge_admin_account_signer),
             set_access_mode(access_mode.whitelist),
+            ft_auth_operation_for(bridge_admin_account_signer),
             add_account_id_to_whitelist(x""),
+            ft_auth_operation_for(bridge_admin_account_signer),
             add_account_id_to_whitelist(x"")
-        ).run_must_fail("The account id 0x is already whitelisted.");
+        ).sign(bridge_admin_account_privkey).run_must_fail("The account id 0x is already whitelisted.");
 }
 
 function test_is_account_on_access_list() {
     assert_true(is_account_on_access_list(x""));
+    rell.test.tx().op(register_bridge_admin_account()).run();
     rell.test.tx().op(
+            ft_auth_operation_for(bridge_admin_account_signer),
             set_access_mode(access_mode.blacklist),
+            ft_auth_operation_for(bridge_admin_account_signer),
             add_account_id_to_blacklist(x"")
-        )
-        .run();
+        ).sign(bridge_admin_account_privkey).run();
     assert_false(is_account_on_access_list(x""));
 }
 
-
 function test_blacklist_history() {
+    rell.test.tx().op(register_bridge_admin_account()).run();
     rell.test.tx().op(
+            ft_auth_operation_for(bridge_admin_account_signer),
             set_access_mode(access_mode.blacklist),
+            ft_auth_operation_for(bridge_admin_account_signer),
             add_account_id_to_blacklist(x""),
+            ft_auth_operation_for(bridge_admin_account_signer),
             remove_account_id_from_blacklist(x"")
-        ).run();
+        ).sign(bridge_admin_account_privkey).run();
 
     val result = check_access_list(x"");
     assert_true(result);
 
     val history = get_blacklist_history(x"");
     assert_true(history.size() == 2);
-    assert_equals(history[0], blacklist_history_entry(x"", action.add, 1577836800000));
-    assert_equals(history[1], blacklist_history_entry(x"", action.remove, 1577836800000));
+    assert_equals(history[0], blacklist_history_entry(x"", action.add, 1577836810000));
+    assert_equals(history[1], blacklist_history_entry(x"", action.remove, 1577836810000));
 }
 
 function test_whitelist_history() {
+    rell.test.tx().op(register_bridge_admin_account()).run();
     rell.test.tx().op(
+            ft_auth_operation_for(bridge_admin_account_signer),
             set_access_mode(access_mode.whitelist),
+            ft_auth_operation_for(bridge_admin_account_signer),
             add_account_id_to_whitelist(x""),
+            ft_auth_operation_for(bridge_admin_account_signer),
             remove_account_id_from_whitelist(x"")
-        ).run();
+        ).sign(bridge_admin_account_privkey).run();
 
     val result = check_access_list(x"");
     assert_false(result);
 
     val history = get_whitelist_history(x"");
     assert_true(history.size() == 2);
-    assert_equals(history[0], whitelist_history_entry(x"", action.add, 1577836800000));
-    assert_equals(history[1], whitelist_history_entry(x"", action.remove, 1577836800000));
+    assert_equals(history[0], whitelist_history_entry(x"", action.add, 1577836810000));
+    assert_equals(history[1], whitelist_history_entry(x"", action.remove, 1577836810000));
+}
+
+function ft_auth_operation_for(signer: byte_array) {
+    val descriptor = require(
+        eif_access_list_control.ft4.accounts.auth_descriptor_signer @? { signer }.account_auth_descriptor limit 1,
+        "No auth descriptor found for signer %s".format(signer)
+    );
+
+    return eif_access_list_control.ft4.auth.external.ft_auth(descriptor.account.id, descriptor.id);
 }
