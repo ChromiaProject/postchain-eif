@@ -81,12 +81,6 @@ query get_seize_history(account_id: byte_array): list<seize_history_entry> {
 
 @extend(ft4.auth.auth_handler)
 function () = ft4.auth.add_auth_handler(
-    scope = rell.meta(eif_access_list_control.set_access_mode).mount_name,
-    flags = ["A"]
-);
-
-@extend(ft4.auth.auth_handler)
-function () = ft4.auth.add_auth_handler(
     scope = rell.meta(eif_access_list_control.add_account_id_to_blacklist).mount_name,
     flags = ["A"]
 );

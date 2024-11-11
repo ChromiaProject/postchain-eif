@@ -40,8 +40,6 @@ function test_seize_funds() {
     rell.test.tx()
         .op(
             ft_auth_operation_for(bridge_admin_account_signer),
-            eif_access_list_control.set_access_mode(eif_access_list_control.access_mode.blacklist),
-            ft_auth_operation_for(bridge_admin_account_signer),
             eif_access_list_control.add_account_id_to_blacklist(alice_account.id)
         ).sign(bridge_admin_account_privkey).run();
     assert_false(eif_access_list_control.check_access_list(alice_account.id));

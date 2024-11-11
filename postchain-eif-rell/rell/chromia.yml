@@ -17,6 +17,22 @@ definitions:
     lib.ft4.core.auth:
       evm_signatures_authorized_operations:
         - eif.hbridge.link_evm_eoa_account
+    lib.ft4.core.accounts.strategies.transfer:
+      rules: [ ]
+  - &common_hbridge_config
+    gtx:
+      modules:
+        - "net.postchain.eif.EifGTXModule"
+        - "net.postchain.d1.icmf.IcmfReceiverGTXModule"
+    sync_ext:
+      - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"
+    eif:
+      <<: *eif_test
+    icmf:
+      receiver:
+        local:
+          - topic: L_evm_block_events
+            bc-rid: x"0000000000000000000000000000000000000000000000000000000000000000"
   - &rell_test_args
     lib.ft4.core.admin:
       admin_pubkey: 0350fe40766bc0ce8d08b3f5b810e49a8352fdd458606bd5fafe5acdcdc8ff3f57
@@ -34,7 +50,6 @@ test:
     - transaction_submitter.test
     - transaction_submitter.anchoring.test
     - transaction_submitter.signer_update.test
-    - eif_access_list_control.test
     - eif_bridge_admin.test
   moduleArgs:
     <<: *common_args
@@ -95,6 +110,8 @@ test:
       anchoring_interval: 3600000
     eif_event_receiver:
       enable_icmf: false
+    eif_access_list_control:
+      access_mode: blacklist
     eif_bridge_admin:
       bridge_admin_account_signers: [ x"032c0b7cf95324a07d05398b240174dc0c2be444d96b159aa6c7f7b1e668680991" ]
 
@@ -187,27 +204,46 @@ blockchains:
   hbridge:
     module: hbridge
     config:
-      gtx:
-        modules:
-          - "net.postchain.eif.EifGTXModule"
-          - "net.postchain.d1.icmf.IcmfReceiverGTXModule"
-      sync_ext:
-        - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"
-      eif:
-        <<: *eif_test
-      icmf:
-        receiver:
-          local:
-            - topic: L_evm_block_events
-              bc-rid: x"0000000000000000000000000000000000000000000000000000000000000000"
+      <<: *common_hbridge_config
     moduleArgs:
       <<: *common_args
       <<: *rell_test_args
-      lib.ft4.core.accounts.strategies.transfer:
-        rules: [] # TODO specify transfer strategy rules
       chain_version: *chain_version
-      bridge_admin:
+      eif_bridge_admin:
         bridge_admin_account_signers: [ ] # TODO replace with real signers
+  hbridge_whitelist_test:
+    module: hbridge_whitelist_test
+    config:
+      <<: *common_hbridge_config
+    moduleArgs:
+      <<: *common_args
+      <<: *rell_test_args
+      chain_version: *chain_version
+      eif_bridge_admin:
+        bridge_admin_account_signers: [ x"032c0b7cf95324a07d05398b240174dc0c2be444d96b159aa6c7f7b1e668680991" ]
+    test:
+      modules:
+        - hbridge_whitelist_test.test
+      moduleArgs:
+        eif_access_list_control:
+          access_mode: whitelist
+
+  hbridge_blacklist_test:
+    module: hbridge_blacklist_test
+    config:
+      <<: *common_hbridge_config
+    moduleArgs:
+      <<: *common_args
+      <<: *rell_test_args
+      chain_version: *chain_version
+      eif_bridge_admin:
+        bridge_admin_account_signers: [ x"032c0b7cf95324a07d05398b240174dc0c2be444d96b159aa6c7f7b1e668680991" ]
+    test:
+      modules:
+        - hbridge_blacklist_test.test
+      moduleArgs:
+        eif_access_list_control:
+          access_mode: blacklist
 
   transaction_submitter:
     module: transaction_submitter

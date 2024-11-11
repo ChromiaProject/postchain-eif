@@ -14,6 +14,16 @@ module;
 import eif_access_list_control.*;
 ```
 
+## Configuration
+
+Configure access mode using module args.
+
+```yaml
+moduleArgs:
+  eif_access_list_control:
+    access_mode: blacklist
+```
+
 ## Features
 
 - Access Modes: 
