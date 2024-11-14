@@ -3,32 +3,34 @@
 import ^.helpers.*;
 import ^^^.eif.messaging.*;
 
-val contract_address = x"c5B2d0F1F659A72c3c94E6E654C859771161eFD3";
-
-function event(name: text, height: integer, log_index: integer, nonce: integer) = event_data(
-    tnx_hash = ("TX", nonce).hash(),
-    log_index = log_index,
-    signature = ("SIG", nonce).hash(),
-    contract_address = contract_address,
-    name = name,
-    indexed_values = [nonce.to_gtv()],
-    non_indexed_values = [nonce.to_gtv()]
-);
-
 function setup_test_data() {
+    log("A few of the following `Withdrawal event with hash <hash> not found` messages are not relevant to Event Receiver");
+
     // network: 56
     var block_height = 10;
     var block_hash = ("BLOCK", block_height).hash();
     rell.test.tx().nop().op(
-        evm_block_op(56, block_height, block_hash, [event("LinkAccountID", block_height, 0, nonce = 0)])
+        evm_block_op(56, block_height, block_hash, [event(
+            "LinkAccountID", block_height, 0, nonce = 0,
+            indexed_values = [evm_address.to_gtv()],
+            non_indexed_values = [account_id.to_gtv(), true.to_gtv()]
+        )])
     ).run();
 
     block_height = 20;
     block_hash = ("BLOCK", block_height).hash();
     rell.test.tx().nop().op(
         evm_block_op(56, block_height, block_hash, [
-            event("DepositedERC20", block_height, 0, nonce = 1),
-            event("PendingWithdraw", block_height, 1, nonce = 2)
+            event(
+                "DepositedERC20", block_height, 0, nonce = 1,
+                indexed_values = [sender_address.to_gtv(), token_address.to_gtv()],
+                non_indexed_values = [(10L).to_gtv(), account_id.to_gtv()]
+            ),
+            event(
+                "PendingWithdraw", block_height, 1, nonce = 2,
+                indexed_values = [event_hash.to_gtv()],
+                non_indexed_values = list<gtv>()
+            )
         ])
     ).run();
 
@@ -41,7 +43,11 @@ function setup_test_data() {
     block_height = 40;
     block_hash = ("BLOCK", block_height).hash();
     rell.test.tx().nop().op(
-        evm_block_op(56, block_height, block_hash, [event("UnpendingWithdraw", block_height, 0, nonce = 3)])
+        evm_block_op(56, block_height, block_hash, [event(
+            "UnpendingWithdraw", block_height, 0, nonce = 3,
+            indexed_values = [event_hash.to_gtv()],
+            non_indexed_values = list<gtv>()
+        )])
     ).run();
 
     // network: 1
@@ -49,16 +55,32 @@ function setup_test_data() {
     block_hash = ("BLOCK", block_height).hash();
     rell.test.tx().nop().op(
         evm_block_op(1, block_height, block_hash, [
-            event("WithdrawRequestHash", block_height, 0, nonce = 4),
-            event("WithdrawalHash", block_height, 1, nonce = 5),
-            event("WithdrawalHash", block_height, 3, nonce = 6),
+            event(
+                "WithdrawRequestHash", block_height, 0, nonce = 4,
+                indexed_values = [event_hash.to_gtv()],
+                non_indexed_values = list<gtv>()
+            ),
+            event(
+                "WithdrawalHash", block_height, 1, nonce = 5,
+                indexed_values = [event_hash.to_gtv()],
+                non_indexed_values = list<gtv>()
+            ),
+            event(
+                "WithdrawalHash", block_height, 3, nonce = 6,
+                indexed_values = [event_hash.to_gtv()],
+                non_indexed_values = list<gtv>()
+            ),
         ])
     ).run();
 
     block_height = 600;
     block_hash = ("BLOCK", block_height).hash();
     rell.test.tx().nop().op(
-        evm_block_op(1, block_height, block_hash, [event("WithdrawalToPostchain", block_height, 0, nonce = 7)])
+        evm_block_op(1, block_height, block_hash, [event(
+            "WithdrawalToPostchain", block_height, 0, nonce = 7,
+            indexed_values = [event_hash.to_gtv()],
+            non_indexed_values = list<gtv>()
+        )])
     ).run();
 }
 
@@ -110,7 +132,7 @@ function test_get_last_evm_block_data_with_events() {
     );
     assert_equals(
         last56[1] @* {} (_ = .name, _ = .log_index, _ = .indexed_values),
-        [("UnpendingWithdraw", 0, [(3).to_gtv()])]
+        [("UnpendingWithdraw", 0, [event_hash.to_gtv()])]
     );
 
     // network_id = 1
@@ -122,7 +144,7 @@ function test_get_last_evm_block_data_with_events() {
     );
     assert_equals(
         last1[1] @* {} (_ = .name, _ = .log_index, _ = .indexed_values),
-        [("WithdrawalToPostchain", 0, [(7).to_gtv()])]
+        [("WithdrawalToPostchain", 0, [event_hash.to_gtv()])]
     );
 }
 
@@ -170,7 +192,7 @@ function test_get_evm_block_data_with_events() {
     );
     assert_equals(
         last56_10[1] @* {} (_ = .name, _ = .log_index, _ = .indexed_values),
-        [("LinkAccountID", 0, [(0).to_gtv()])]
+        [("LinkAccountID", 0, [evm_address.to_gtv()])]
     );
     // block without events
     val last56_30 = get_evm_block_data_with_events(network_id = 56, height = 30);
@@ -194,9 +216,9 @@ function test_get_evm_block_data_with_events() {
     assert_equals(
         last1_500[1] @* {} (_ = .name, _ = .log_index, _ = .indexed_values),
         [
-            ("WithdrawRequestHash", 0, [(4).to_gtv()]),
-            ("WithdrawalHash", 1, [(5).to_gtv()]),
-            ("WithdrawalHash", 3, [(6).to_gtv()]),
+            ("WithdrawRequestHash", 0, [event_hash.to_gtv()]),
+            ("WithdrawalHash", 1, [event_hash.to_gtv()]),
+            ("WithdrawalHash", 3, [event_hash.to_gtv()]),
         ]
     );
 }
