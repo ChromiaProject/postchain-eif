@@ -1,7 +1,7 @@
 module;
 
 import ^^.*;
-import ^^^.eif.messaging;
+import ^^^.eif.messaging.*;
 import ^^.model.*;
 
 operation evm_block_op(
@@ -18,3 +18,19 @@ function expected_block(height: integer) =
 
 function block_hash(height: integer) = ("BLOCK", height).hash();
 
+val contract_address = x"c5B2d0F1F659A72c3c94E6E654C859771161eFD3";
+val token_address = x"000000F1F659A72c3c94E6E654C859771161eFD3";
+val evm_address = x"111111F1F659A72c3c94E6E654C859771161eFD3";
+val sender_address = x"222222F1F659A72c3c94E6E654C859771161eFD3";
+val account_id = "account_id".hash();
+val event_hash = "event_hash".hash();
+
+function event(name: text, height: integer, log_index: integer, nonce: integer, indexed_values: list<gtv>, non_indexed_values: list<gtv>) = event_data(
+    tnx_hash = ("TX", nonce).hash(),
+    log_index = log_index,
+    signature = ("SIG", nonce).hash(),
+    contract_address = contract_address,
+    name = name,
+    indexed_values = indexed_values,
+    non_indexed_values = non_indexed_values
+);
