@@ -1,0 +1,58 @@
+
+function test_get_bridge_contracts_for_unknown_network() {
+    assert_equals(
+        get_bridge_contracts(network_id = -1),
+        list<bridge_contract_info>()
+    );
+}
+
+function test_get_bridge_contracts_when_no_registered_erc20_assets() {
+    assert_equals(
+        get_bridge_contracts(network_id = 97), // bsc_testnet
+        [
+            bridge_contract_info(
+                contract_address = "0x2Cf48D2891CC286d18596Df1261D011d1B78E03E",
+                evm_read_offset = 10,
+                erc20_assets = []
+            ),
+            bridge_contract_info(
+                contract_address = "0x2Cf48D2891CC286d18596Df1261D011d1B78E03F",
+                evm_read_offset = 10,
+                erc20_assets = []
+            ),
+        ]
+    );
+}
+
+function test_get_bridge_contracts_when_registered_erc20_assets_exist() {
+    val network_id = 11155111; // sepolia
+
+    // Register FT4 CHR and ERC20 CHR assets
+    val chr_asset = register_foreign_asset(CHR, network_id);
+    // bind ERC20 asset FOO on `network_id` to the FT4 CHR asset on Chromia
+    register_erc20_asset(chr_asset, FOO, network_id);
+    // Register FT4 BAR and ERC20 BAR assets
+    register_foreign_asset(BAR, network_id);
+    // Register FT4 ABC and ERC20 ABC on bsc_testnet:97 assets
+    register_foreign_asset(ABC, 97);
+
+    val erc20_chr = erc20_asset @ { .token_address == CHR.token_address } (map_erc20_asset_to_erc20_asset_info($));
+    val erc20_foo = erc20_asset @ { .token_address == FOO.token_address } (map_erc20_asset_to_erc20_asset_info($));
+    val erc20_bar = erc20_asset @ { .token_address == BAR.token_address } (map_erc20_asset_to_erc20_asset_info($));
+
+    assert_equals(
+        get_bridge_contracts(network_id = 11155111), // sepolia
+        [
+            bridge_contract_info(
+                contract_address = "0x2Cf48D2891CC286d18596Df1261D011d1B78E04E",
+                evm_read_offset = 20,
+                erc20_assets = [erc20_chr, erc20_foo, erc20_bar]
+            ),
+            bridge_contract_info(
+                contract_address = "0x2Cf48D2891CC286d18596Df1261D011d1B78E04F",
+                evm_read_offset = 20,
+                erc20_assets = [erc20_chr, erc20_foo, erc20_bar]
+            ),
+        ]
+    );
+}
