@@ -1,4 +1,0 @@
-module;
-
-import eif_access_list_control: ^.eif_access_list_control;
-
