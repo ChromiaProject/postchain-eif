@@ -1,7 +1,6 @@
 @test module;
 
-import ^^^.eif_access_list_control.*;
-import ^^^.hbridge_whitelist_test.*;
+import ^^.*;
 import eif_bridge_admin: ^^^.eif_bridge_admin.*;
 
 val bridge_admin_account_signer = rell.test.pubkeys.charlie;
@@ -50,9 +49,9 @@ function test_blacklist_history() {
 
 function ft_auth_operation_for(signer: byte_array) {
     val descriptor = require(
-        eif_access_list_control.ft4.accounts.auth_descriptor_signer @? { signer }.account_auth_descriptor limit 1,
+    eif_bridge_admin.ft4.accounts.auth_descriptor_signer @? { signer }.account_auth_descriptor limit 1,
         "No auth descriptor found for signer %s".format(signer)
     );
 
-    return eif_access_list_control.ft4.auth.external.ft_auth(descriptor.account.id, descriptor.id);
+    return ft4.auth.external.ft_auth(descriptor.account.id, descriptor.id);
 }
