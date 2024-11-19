@@ -27,9 +27,9 @@ class EifBlockBuilderExtension(
 ) : BaseBlockBuilderExtension, TxEventSink {
 
     private lateinit var bctx: BlockEContext
-    lateinit var store: LeafStore
-    lateinit var snapshot: SnapshotPageStore
-    lateinit var event: EventPageStore
+    private lateinit var leafStore: LeafStore
+    private lateinit var eventPageStore: EventPageStore
+    private lateinit var snapshotPageStore: SnapshotPageStore
 
     private val events = mutableListOf<Hash>()
     private val states = TreeMap<Long, Hash>()
@@ -49,20 +49,20 @@ class EifBlockBuilderExtension(
         baseBB.installEventProcessor(EIF_EVENT, this)
         baseBB.installEventProcessor(EIF_STATE, this)
         bctx = blockEContext
-        store = LeafStore()
-        snapshot = SnapshotPageStore(blockEContext, config.levelsPerPage, config.snapshotsToKeep, ds, PREFIX)
-        event = EventPageStore(blockEContext, config.levelsPerPage, ds, PREFIX)
+        leafStore = LeafStore()
+        eventPageStore = EventPageStore(blockEContext, config.levelsPerPage, ds, PREFIX)
+        snapshotPageStore = SnapshotPageStore(blockEContext, config.levelsPerPage, config.snapshotsToKeep, ds, PREFIX)
     }
 
     /**
      * Compute event (as a simple Merkle tree) and state hashes (using updateSnapshot)
      */
     override fun finalize(): Map<String, Gtv> {
-        val stateRootHash = snapshot.updateSnapshot(bctx.height, states, config.version)
+        val eventRootHash = eventPageStore.writeEventTree(bctx.height, events)
+        val stateRootHash = snapshotPageStore.updateSnapshot(bctx.height, states, config.version)
         if (states.size > 0 && config.snapshotsToKeep > 0) {
-            snapshot.pruneSnapshot(bctx.height)
+            snapshotPageStore.pruneSnapshot(bctx.height)
         }
-        val eventRootHash = event.writeEventTree(bctx.height, events)
         return mapOf(EIF to GtvByteArray(eventRootHash + stateRootHash))
     }
 
@@ -75,10 +75,10 @@ class EifBlockBuilderExtension(
             currentTxCtx = ctxt
             currentTxNrOfEvents = 0
         }
-        // Note: the event hash is also calculated on the Rell side and can be obtained through the `evt` argument
+        // Note: the event hash is also calculated on the Rell side and can be retrieved from `evt` argument
         val data = SimpleGtvEncoder.encodeGtv(evt)
         val hash = ds.digest(data)
-        store.writeEvent(ctxt, PREFIX, events.size.toLong() + currentTxNrOfEvents, hash, data)
+        leafStore.writeEvent(ctxt, PREFIX, events.size.toLong() + currentTxNrOfEvents, hash, data)
         currentTxNrOfEvents++
         ctxt.addAfterAppendHook {
             events.add(hash)
@@ -93,7 +93,7 @@ class EifBlockBuilderExtension(
     private fun emitEifState(ctxt: TxEContext, stateN: Long, state: GtvArray) {
         val data = SimpleGtvEncoder.encodeGtv(state)
         val hash = ds.digest(data)
-        store.writeState(bctx, PREFIX, stateN, data)
+        leafStore.writeState(bctx, PREFIX, stateN, data)
         ctxt.addAfterAppendHook {
             states[stateN] = hash
         }

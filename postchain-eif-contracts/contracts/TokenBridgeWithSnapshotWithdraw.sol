@@ -55,7 +55,7 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
      * @dev completeWithdrawalBySnapshot is used in mass exit scenario instead of the normal withdraw process.
      *      In the mass exit scenario, we are not able to verify block headers as validators are considered non-trustworthy,
      *      thus we need to use the snapshot data to verify the withdrawal request.
-     *      Snapshot data includes withdrawal even hashes.
+     *      Snapshot data includes withdrawal event hashes.
      * @param _stateRecord contains header and a list of event hashes
      * @param n index of the event hash we want to use
      * @param _event withdrawal event data
