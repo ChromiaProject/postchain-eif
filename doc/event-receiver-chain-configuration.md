@@ -1,6 +1,6 @@
 ## EVM Event Receiver Configuration
 
-### EVM Event Receiver Chain Configuration
+### EVM Event Receiver Blockchain Configuration
 
 EVM Event Receiver blockchain configuration contains a list of EVM chain configurations. The last has the following configuration properties:
 
@@ -118,7 +118,7 @@ EVM Event Receiver node configuration has the following properties.
 | `evm.maxTryErrors`         | The maximum number of errors allowed per iteration before switching to an alternate EVM node URL. Used when multiple URLs are provided. | int  | 10      | `POSTCHAIN_EIF_EVM_MAX_TRY_ERRORS`           |
 
 
-#### Chain-specific properties:
+#### EVM chain-specific properties:
 | Name                          | Description                                                                                                                                                                                                                                                                                                                 | Type         | Default | Environment Variable                           |
 |-------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|---------|------------------------------------------------|
 | `${chain}.urls`               | CSV list of URLs for connecting to EVM nodes (HTTP URLs or IPC socket paths)                                                                                                                                                                                                                                                | list<string> | [ ]     | `POSTCHAIN_EIF_${CHAIN}_URLS`                  |
