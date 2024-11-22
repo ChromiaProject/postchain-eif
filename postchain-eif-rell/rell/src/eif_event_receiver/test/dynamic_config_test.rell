@@ -1,0 +1,28 @@
+@test module;
+
+import ^.helpers.*;
+import ^^.dynamic_config.*;
+
+function test_contracts_config() {
+    rell.test.tx()
+        .op(add_contract_config(1, "0x753218363422002DF74F3D0D8d67f6CB38bE32D0"))
+        .op(add_contract_config(1, "0x2Cf48D2891CC286d18596Df1261D011d1B78E03E"))
+        .op(add_contract_config(2, "0x0000000000000000000000000000000000000000"))
+    .run();
+
+    assert_equals(get_contracts(1),
+        ["0x753218363422002DF74F3D0D8d67f6CB38bE32D0", "0x2Cf48D2891CC286d18596Df1261D011d1B78E03E"]);
+}
+
+function test_events_config() {
+    val event1 = event_def(name = "foo", inputs = [event_input(type = "address", indexed = true), event_input(type = "uint256", indexed = false)]);
+    val event2 = event_def(name = "bar", inputs = [event_input(type = "bytes32", indexed = false)]);
+
+    rell.test.tx()
+        .op(add_event_config(1, event1.name, encode_inputs(event1.inputs)))
+        .op(add_event_config(1, event2.name, encode_inputs(event2.inputs)))
+        .op(add_event_config(2, "baz", encode_inputs([])))
+    .run();
+
+    assert_equals(get_events(1), [event1, event2]);
+}

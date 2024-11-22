@@ -15,7 +15,7 @@ import java.time.Clock
 import java.time.Duration
 
 
-class EifConfigTestTest {
+class EifConfigTestIT {
 
     private val outContent = ByteArrayOutputStream()
     private val errContent = ByteArrayOutputStream()

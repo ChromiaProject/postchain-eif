@@ -2,6 +2,7 @@ package net.postchain.eif
 
 import assertk.assertThat
 import assertk.assertions.containsExactly
+import assertk.assertions.isEqualTo
 import net.postchain.common.toHex
 import net.postchain.core.BlockchainEngine
 import net.postchain.core.block.BlockQueries
@@ -13,7 +14,6 @@ import net.postchain.gtv.GtvNull
 import net.postchain.gtx.data.OpData
 import org.awaitility.Awaitility
 import org.awaitility.Duration
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -71,10 +71,10 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
                 .send().result.blockNumber
         val eventsToRead = listOf(TokenBridge.DEPOSITEDERC20_EVENT)
         val evmEventProcessor =
-                EvmEventProcessor(1L, listOf(bridge.contractAddress), eventsToRead,
-                        BigInteger.ZERO, BigInteger.ONE, 200L, 100L,
-                        contractDeployBlockNumber, BigInteger.ZERO, engineMock, Web3jRequestHandler(500, 60_000, 2, mutableListOf(url), web3jServices), 500).apply {
-                }
+                EvmEventProcessor(1L, listOf(bridge.contractAddress), hasDynamicContacts = false, eventsToRead,
+                        hasDynamicEvents = false, BigInteger.ZERO, BigInteger.ONE, 200L,
+                        100L, contractDeployBlockNumber, BigInteger.ZERO, engineMock,
+                        Web3jRequestHandler(500, 60_000, 2, mutableListOf(url), web3jServices), 500)
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contract
         val testToken = deployRemoteCall(TestToken::class.java, web3jServices[0], transactionManager, gasProvider, testTokenBinary, "").send().apply {
@@ -85,7 +85,7 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
         // Allow token
         bridge.allowToken(Address(testToken.contractAddress)).send()
         // Deposit to postchain
-        for (i in 1..5) {
+        (1..5).forEach { i ->
             bridge.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN)).send()
         }
 
@@ -94,7 +94,7 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
                 .untilAsserted {
                     val eventBlocks = evmEventProcessor.getEventData()
                     val events = eventBlocks.flatMap { it[EncodedBlock.EVENTS.index].asArray().asList() }
-                    assertEquals(events.size, 5)
+                    assertThat(events.size).isEqualTo(5)
                 }
 
         // validate events
@@ -142,7 +142,7 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
                 .untilAsserted {
                     val eventBlocks = evmEventProcessor.getEventData()
                     val events = eventBlocks.flatMap { it[EncodedBlock.EVENTS.index].asArray().asList() }
-                    assertEquals(events.size, 1)
+                    assertThat(events.size).isEqualTo(1)
                 }
 
         val lastEventBlock = evmEventProcessor.getEventData().first()
@@ -151,15 +151,16 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
         val nonIndexedValues = lastEvent[EncodedEvent.NON_INDEXED_VALUES.index].asArray()
 
         // Check that data in the event matches what we sent
-        assertEquals("0x${indexedValues[0].asByteArray().toHex().lowercase()}", transactionManager.fromAddress) // owner
-        assertEquals("0x${indexedValues[1].asByteArray().toHex().lowercase()}", testToken.contractAddress) // token
-        assertEquals(nonIndexedValues[0].asBigInteger(), max) // value
+        assertThat(transactionManager.fromAddress).isEqualTo("0x${indexedValues[0].asByteArray().toHex().lowercase()}") // owner
+        assertThat(testToken.contractAddress).isEqualTo("0x${indexedValues[1].asByteArray().toHex().lowercase()}") // token
+        assertThat(nonIndexedValues[0].asBigInteger()).isEqualTo(max) // value
 
         evmEventProcessor.shutdown()
     }
 
     @Test
-    fun `Events can be received from multiple contracts`() {
+    fun `Multiple events can be received from multiple contracts which are statically and dynamically configured`() {
+        val networkId = 1L
         val initialMint = 20L
         // Deploy two token bridge contracts
         val bridgeFirst = deployRemoteCall(TokenBridge::class.java, web3jServices[0], transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
@@ -169,9 +170,22 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
             initialize(validatorContract, Uint256(2)).send()
         }
 
-        // Mock query for last evm block in this test
+        // Mock queries in this test
         val blockQueriesMock: BlockQueries = mock {
             on { query(eq("get_last_evm_block"), any()) } doReturn CompletableFuture.completedFuture(GtvNull)
+
+            on { query(eq(EIF_CONFIG_CONTRACTS_QUERY), eq(gtv(mapOf("network_id" to gtv(networkId))))) } doReturn
+                    CompletableFuture.completedFuture(gtv(listOf(gtv(bridgeSecond.contractAddress))))
+
+            on { query(eq(EIF_CONFIG_EVENTS_QUERY), eq(gtv(mapOf("network_id" to gtv(networkId))))) } doReturn
+                    CompletableFuture.completedFuture(gtv(listOf(gtv(mapOf(
+                            "name" to gtv("DepositedERC20"),
+                            "inputs" to gtv(listOf(
+                                    gtv(mapOf("type" to gtv("address"), "indexed" to gtv(true))),
+                                    gtv(mapOf("type" to gtv("address"), "indexed" to gtv(true))),
+                                    gtv(mapOf("type" to gtv("uint256"), "indexed" to gtv(false))),
+                                    gtv(mapOf("type" to gtv("bytes32"), "indexed" to gtv(false))),
+                            )))))))
         }
         val engineMock: BlockchainEngine = mock {
             on { getBlockQueries() } doReturn blockQueriesMock
@@ -180,13 +194,13 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
         val contractDeployTransactionHash = bridgeFirst.transactionReceipt.get().transactionHash
         val contractDeployBlockNumber = web3jServices[0].ethGetTransactionByHash(contractDeployTransactionHash)
                 .send().result.blockNumber
-        val contractAddresses = listOf(bridgeFirst.contractAddress, bridgeSecond.contractAddress)
-        val eventsToRead = listOf(TokenBridge.DEPOSITEDERC20_EVENT)
         val evmEventProcessor =
-                EvmEventProcessor(1L, contractAddresses, eventsToRead,
-                        BigInteger.ZERO, BigInteger.ONE, 200L, 100L,
-                        contractDeployBlockNumber, BigInteger.ZERO, engineMock, Web3jRequestHandler(500, 60_000, 2, mutableListOf(url), web3jServices), 500).apply {
-                }
+                EvmEventProcessor(networkId,
+                        listOf(bridgeFirst.contractAddress), hasDynamicContacts = true,
+                        listOf(TokenBridge.ALLOWTOKEN_EVENT), hasDynamicEvents = true,
+                        BigInteger.ZERO, BigInteger.ONE, 200L,
+                        100L, contractDeployBlockNumber, BigInteger.ZERO, engineMock,
+                        Web3jRequestHandler(500, 60_000, 2, mutableListOf(url), web3jServices), 500)
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contracts
         val testToken = deployRemoteCall(TestToken::class.java, web3jServices[0], transactionManager, gasProvider, testTokenBinary, "").send().apply {
@@ -209,9 +223,16 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
                 .untilAsserted {
                     val eventBlocks = evmEventProcessor.getEventData()
                     val events = eventBlocks.flatMap { it[EncodedBlock.EVENTS.index].asArray().asList() }
-                    assertEquals(events.size, 2)
-                    val eventContractAddresses = events.map { "0x${it[EncodedEvent.CONTRACT.index].asByteArray().toHex()}".lowercase() }
-                    assertThat(eventContractAddresses).containsExactly(*contractAddresses.map(String::lowercase).toTypedArray())
+                    assertThat(events.size).isEqualTo(4)
+                    val eventContractAddresses = events.map {
+                        "0x${it[EncodedEvent.CONTRACT.index].asByteArray().toHex()}".lowercase() to it[EncodedEvent.NAME.index].asString()
+                    }
+                    assertThat(eventContractAddresses).containsExactly(
+                            bridgeFirst.contractAddress.lowercase() to TokenBridge.ALLOWTOKEN_EVENT.name,
+                            bridgeSecond.contractAddress.lowercase() to TokenBridge.ALLOWTOKEN_EVENT.name,
+                            bridgeFirst.contractAddress.lowercase() to TokenBridge.DEPOSITEDERC20_EVENT.name,
+                            bridgeSecond.contractAddress.lowercase() to TokenBridge.DEPOSITEDERC20_EVENT.name,
+                    )
                 }
 
         evmEventProcessor.shutdown()

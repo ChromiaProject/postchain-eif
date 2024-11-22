@@ -36,6 +36,7 @@ import java.math.BigInteger
 import java.util.LinkedList
 import java.util.Queue
 import java.util.stream.Collectors
+import kotlin.collections.map
 
 enum class EncodedBlock(val index: Int) {
     NETWORK_ID(0),
@@ -117,8 +118,10 @@ class NoOpEventProcessor : EventProcessor {
  */
 class EvmEventProcessor(
         private val networkId: Long,
-        private val contractAddresses: List<String>,
-        events: List<Event>,
+        private val staticContracts: List<String>,
+        private val hasDynamicContacts: Boolean,
+        private val staticEvents: List<Event>,
+        private val hasDynamicEvents: Boolean,
         private val evmReadOffset: BigInteger,
         private val readOffset: BigInteger,
         private val maxReadAhead: Long,
@@ -137,8 +140,6 @@ class EvmEventProcessor(
     data class EvmBlock(val number: BigInteger, val hash: String)
 
     private val eventBlocks: Queue<Array<Gtv>> = LinkedList()
-    private val eventMap = events.associateBy(EventEncoder::encode)
-    private val eventSignatures = eventMap.keys.toTypedArray()
 
     @Volatile
     var lastReadLogBlockHeight: BigInteger = BigInteger.ZERO
@@ -159,7 +160,7 @@ class EvmEventProcessor(
                     }
 
                     fetchEvents()
-                } catch (e: CancellationException) {
+                } catch (_: CancellationException) {
                     break
                 } catch (e: Exception) {
                     logger.error("Parsing of EVM logs unexpectedly failed: $e", e)
@@ -187,13 +188,50 @@ class EvmEventProcessor(
             return
         }
 
+        val contracts = if (hasDynamicContacts) {
+            try {
+                val dynamicContracts = blockchainEngine.getBlockQueries().query(
+                        EIF_CONFIG_CONTRACTS_QUERY, gtv(mapOf("network_id" to gtv(networkId)))).get().asArray().map { it.asString() }
+                staticContracts.union(dynamicContracts)
+            } catch (e: Exception) {
+                logger.warn(e) { "Unable to fetch dynamic contracts: $e" }
+                staticContracts
+            }
+        } else {
+            staticContracts
+        }
+        logger.debug { "Contracts: $contracts" }
+        if (contracts.isEmpty()) {
+            logger.warn { "No contracts configured, trying again later" }
+            delay(delayWhenNoNewBlocks)
+            return
+        }
+
+        val eventMap = if (hasDynamicEvents) {
+            try {
+                val dynamicEvents = blockchainEngine.getBlockQueries().query(
+                        EIF_CONFIG_EVENTS_QUERY, gtv(mapOf("network_id" to gtv(networkId)))).get().asArray().map(GtvToEventMapper::map)
+                staticEvents.associateBy(EventEncoder::encode).toMutableMap().apply { putAll(dynamicEvents.associateBy(EventEncoder::encode)) }
+            } catch (e: Exception) {
+                logger.warn(e) { "Unable to fetch dynamic events: $e" }
+                staticEvents.associateBy(EventEncoder::encode)
+            }
+        } else {
+            staticEvents.associateBy(EventEncoder::encode)
+        }
+        logger.debug { "Events: ${eventMap.values}" }
+        if (eventMap.isEmpty()) {
+            logger.warn { "No events configured, trying again later" }
+            delay(delayWhenNoNewBlocks)
+            return
+        }
+
         val filter = EthFilter(
                 DefaultBlockParameter.valueOf(from),
                 DefaultBlockParameter.valueOf(to),
-                contractAddresses
+                contracts.toList()
         )
-        filter.addOptionalTopics(*eventSignatures)
-
+        filter.addOptionalTopics(*eventMap.keys.toTypedArray())
 
         val logResponse = web3jRequestHandler.sendWeb3jRequestWithRetry { it.ethGetLogs(filter) }
 
@@ -204,7 +242,7 @@ class EvmEventProcessor(
                 .mapValues { it.value.sortedWith(compareBy({ event -> event.transactionIndex }, { event -> event.logIndex })) }
                 .toList()
                 .sortedBy { it.first.number }
-                .map(::eventBlockToGtv)
+                .map { eventBlockToGtv(eventMap, it) }
         processLogEventsAndUpdateOffsets(sortedEncodedLogs, to)
 
         // If we just saw one new block we can probably sleep
@@ -283,7 +321,7 @@ class EvmEventProcessor(
                 .collect(Collectors.toList())
     }
 
-    private fun eventBlockToGtv(eventBlock: Pair<EvmBlock, List<Log>>): Array<Gtv> {
+    private fun eventBlockToGtv(eventMap: Map<String, Event>, eventBlock: Pair<EvmBlock, List<Log>>): Array<Gtv> {
         val events = eventBlock.second.map { event ->
             val matchingEvent = eventMap[event.topics[0]] ?: throw ProgrammerMistake("No matching event")
             val parameters = Contract.staticExtractEventParameters(matchingEvent, event)

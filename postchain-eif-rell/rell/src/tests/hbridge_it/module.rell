@@ -1,7 +1,7 @@
 @mount("eif.hbridge")
 module;
 
-import eif_event_receiver.*;
+import eif_event_receiver_with_dynamic_config.*;
 import hbridge;
 
 import lib.ft4.admin;
@@ -24,4 +24,10 @@ operation register_erc20_asset(
         hbridge.bridge_mode.foreign,
         enable_snapshots
     );
+}
+
+operation add_contract_config(network_id: integer, contract: text) {
+    admin.require_admin();
+
+    create contract_config(network_id, contract);
 }

@@ -1,0 +1,4 @@
+module;
+
+import eif_event_receiver.*;
+import eif_event_receiver.dynamic_config.*;
