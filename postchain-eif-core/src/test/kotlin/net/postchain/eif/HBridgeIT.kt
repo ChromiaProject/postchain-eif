@@ -213,6 +213,8 @@ class HBridgeIT : EifBaseIntegrationTest() {
         val apiVersion = node.getBlockchainInstance().blockchainEngine.getBlockQueries()
                 .query("eif.api_version", gtv(emptyMap())).get().asInteger()
         logger.info { "EIF API version: $apiVersion" }
+
+        enqueueTx(configureContract("0x39615b16b74589919c9ce1ea73f1fc5d53141a78", bcRid, adminKeyPair))
     }
 
     @Test
@@ -850,6 +852,21 @@ class HBridgeIT : EifBaseIntegrationTest() {
                     gtv(tokenAddress),
                     gtv(assetId),
                     gtv(true) // enable snapshots
+            )
+            .finish()
+            .sign(cryptoSystem.buildSigMaker(keyPair))
+            .buildGtx()
+            .encode()
+
+    private fun configureContract(
+            contractAddress: String,
+            bcRid: BlockchainRid,
+            keyPair: KeyPair
+    ): ByteArray = GtxBuilder(bcRid, listOf(keyPair.pubKey.data), myCS)
+            .addOperation(
+                    "eif.hbridge.add_contract_config",
+                    gtv(networkId),
+                    gtv(contractAddress),
             )
             .finish()
             .sign(cryptoSystem.buildSigMaker(keyPair))

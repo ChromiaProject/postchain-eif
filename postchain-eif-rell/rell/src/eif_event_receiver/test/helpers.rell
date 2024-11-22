@@ -2,6 +2,7 @@ module;
 
 import ^^.*;
 import ^^^.eif.messaging.*;
+import ^^.dynamic_config.*;
 import ^^.model.*;
 
 operation evm_block_op(
@@ -34,3 +35,11 @@ function event(name: text, height: integer, log_index: integer, nonce: integer, 
     indexed_values = indexed_values,
     non_indexed_values = non_indexed_values
 );
+
+operation add_contract_config(network_id: integer, contract: text) {
+    create contract_config(network_id, contract);
+}
+
+operation add_event_config(network_id: integer, name: text, inputs: text) {
+    create event_config(network_id, name, inputs);
+}

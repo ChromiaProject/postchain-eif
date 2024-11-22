@@ -41,8 +41,6 @@ blockchains:
         chains:
           ethereum:
             network_id: 1337
-            contracts:
-              - '0x39615b16b74589919c9ce1ea73f1fc5d53141a78'
             skip_to_height: 0
             evm_read_offset: 0
             read_offset: 0

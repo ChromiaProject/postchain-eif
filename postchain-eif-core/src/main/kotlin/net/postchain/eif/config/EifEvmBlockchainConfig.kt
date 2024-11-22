@@ -11,7 +11,7 @@ data class EifEvmBlockchainConfig(
         @Name("network_id")
         val networkId: Long,
         @Name("contracts")
-        val contracts: List<String>,
+        val contracts: List<String>?,
         @Name("events")
         val events: Gtv,
         @Name("skip_to_height")

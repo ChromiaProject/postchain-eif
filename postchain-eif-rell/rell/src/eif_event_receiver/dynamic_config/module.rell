@@ -1,0 +1,49 @@
+@mount('eif')
+module;
+
+entity contract_config {
+    key network_id: integer, address: text;
+}
+
+entity event_config {
+    key network_id: integer, name: text, inputs: text;
+}
+
+struct event_def {
+    name: text;
+    inputs: list<event_input>;
+}
+
+struct event_input {
+    type: text;
+    indexed: boolean;
+}
+
+/**
+ * This is called by EIF to fetch smart contracts whose events Event Receiver will listen to.
+ * The return value of this query will be merged with any contracts specified in blockchain configuration.
+ *
+ * @param networkId  EVM network ID
+ * @returns  EVM addresses of the smart contracts
+ */
+query get_contracts(network_id: integer): list<text> =
+    contract_config @* { network_id } (.address);
+
+/**
+ * This is called by EIF to fetch the smart contract events Event Receiver will listen to.
+ * The return value of this query will be merged with any events specified in blockchain configuration.
+ *
+ * @param networkId  EVM network ID
+ * @returns  smart contract events
+ */
+query get_events(network_id: integer): list<event_def> =
+    event_config @* { network_id } (event_def(name = .name, inputs = decode_inputs(.inputs)));
+
+function decode_inputs(text): list<event_input> =
+    text.split(",") @* {} (event_input(type = $.sub(1), indexed = $[0] == "1"));
+
+function encode_inputs(inputs: list<event_input>): text =
+    inputs.join_to_text(",", "", "", null, "", encode_input(*));
+
+function encode_input(input: event_input): text =
+    (if (input.indexed) "1" else "0") + input.type;
