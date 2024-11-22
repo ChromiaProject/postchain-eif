@@ -24,14 +24,14 @@
 
     <properties>
         <revision>dev</revision>
-        <postchain.version>3.20.1</postchain.version>
-        <rell.version>0.13.15</rell.version>
+        <postchain.version>3.24.2</postchain.version>
+        <rell.version>0.14.2</rell.version>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <kotlin.compiler.jvmTarget>21</kotlin.compiler.jvmTarget>
-        <testcontainers.version>1.16.2</testcontainers.version>
+        <testcontainers.version>1.20.3</testcontainers.version>
         <junit.pioneer.version>2.2.0</junit.pioneer.version>
-        <rell.maven.plugin.version>0.12.2</rell.maven.plugin.version>
+        <rell.maven.plugin.version>0.12.5</rell.maven.plugin.version>
         <web3j.version>4.12.0</web3j.version>
     </properties>
 
@@ -71,6 +71,13 @@
                 <groupId>org.testcontainers</groupId>
                 <artifactId>junit-jupiter</artifactId>
                 <version>${testcontainers.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <!-- Needed for testcontainers -->
+            <dependency>
+                <groupId>commons-codec</groupId>
+                <artifactId>commons-codec</artifactId>
+                <version>1.17.1</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
