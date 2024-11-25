@@ -17,16 +17,21 @@ function register_bridge_and_token(
     bridge_contract_address: byte_array
 ) {
     val erc20_asset = register_erc20_asset(network_id, token_address, asset, mode, use_snapshots);
-    val bridge_contract = create bridge_contract(network_id, bridge_contract_address);
+    val bridge_contract = get_or_create_bridge(network_id, bridge_contract_address);
     create bridge_erc20_asset(bridge_contract, erc20_asset);
 }
 
 function register_bridge_with_assets(network_id: integer, bridge_contract_address: byte_array, erc20_assets: list<erc20_asset>) {
-    val bridge_contract = create bridge_contract(network_id, bridge_contract_address);
+    val bridge_contract = get_or_create_bridge(network_id, bridge_contract_address);
 
     for (erc20_asset in erc20_assets) {
         add_asset_to_bridge(bridge_contract, erc20_asset);
     }
+}
+
+function get_or_create_bridge(network_id: integer, bridge_contract_address: byte_array) {
+    return bridge_contract @? { network_id, bridge_contract_address }
+        ?: create bridge_contract(network_id, bridge_contract_address);
 }
 
 function add_asset_to_bridge(bridge_contract, erc20_asset) {
