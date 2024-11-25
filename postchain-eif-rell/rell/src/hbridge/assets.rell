@@ -25,7 +25,7 @@ struct erc20_asset_info {
 }
 
 struct bridge_contract_info {
-    contract_address: text;
+    contract_address: byte_array;
     evm_read_offset: integer;
     erc20_assets: list<erc20_asset_info>;
 }
