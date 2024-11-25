@@ -25,10 +25,10 @@ function withdraw_check_access_list(account_id: byte_array): boolean {
 
 function check_access_list(account_id: byte_array): boolean {
     if (chain_context.args.access_mode == access_mode.blacklist) {
-        return blacklist @ { account_id } ( @sum 1 ) == 0;
+        return empty(blacklist @? { account_id });
     }
     if (chain_context.args.access_mode == access_mode.whitelist) {
-        return whitelist @ { account_id } ( @sum 1 ) > 0;
+        return exists(whitelist @? { account_id });
     }
     return true;
 }
