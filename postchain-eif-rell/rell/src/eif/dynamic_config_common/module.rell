@@ -1,0 +1,18 @@
+module;
+
+val eif_event_receiver_dynamic_config_topic = "L_eif_event_receiver_dynamic_config";
+
+struct event_def {
+    name: text;
+    inputs: list<event_input>;
+}
+
+struct event_input {
+    type: text;
+    indexed: boolean;
+}
+
+struct eif_event_receiver_dynamic_config_message {
+    contracts: list<text>;
+    events: list<event_def>;
+}

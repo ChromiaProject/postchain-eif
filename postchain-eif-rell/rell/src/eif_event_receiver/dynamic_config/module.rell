@@ -1,22 +1,14 @@
 @mount('eif')
 module;
 
+import ^^.eif.dynamic_config_common;
+
 entity contract_config {
     key network_id: integer, address: text;
 }
 
 entity event_config {
     key network_id: integer, name: text, inputs: text;
-}
-
-struct event_def {
-    name: text;
-    inputs: list<event_input>;
-}
-
-struct event_input {
-    type: text;
-    indexed: boolean;
 }
 
 /**
@@ -36,14 +28,14 @@ query get_contracts(network_id: integer): list<text> =
  * @param networkId  EVM network ID
  * @returns  smart contract events
  */
-query get_events(network_id: integer): list<event_def> =
-    event_config @* { network_id } (event_def(name = .name, inputs = decode_inputs(.inputs)));
+query get_events(network_id: integer): list<dynamic_config_common.event_def> =
+        event_config @* { network_id } (dynamic_config_common.event_def(name = .name, inputs = decode_inputs(.inputs)));
 
-function decode_inputs(text): list<event_input> =
-    text.split(",") @* {} (event_input(type = $.sub(1), indexed = $[0] == "1"));
+function decode_inputs(text): list<dynamic_config_common.event_input> =
+        text.split(",") @* {} (dynamic_config_common.event_input(type = $.sub(1), indexed = $[0] == "1"));
 
-function encode_inputs(inputs: list<event_input>): text =
+function encode_inputs(inputs: list<dynamic_config_common.event_input>): text =
     inputs.join_to_text(",", "", "", null, "", encode_input(*));
 
-function encode_input(input: event_input): text =
+function encode_input(input: dynamic_config_common.event_input): text =
     (if (input.indexed) "1" else "0") + input.type;

@@ -1,21 +1,16 @@
 module;
 
+import ^.eif.dynamic_config_common.*;
 import eif_event_receiver.*;
 import eif_event_receiver.dynamic_config.*;
 import lib.icmf.constants.*;
 import lib.icmf.receiver.*;
 
-val eif_event_receiver_dynamic_config_topic = ICMF_TOPIC_LOCAL_PREFIX  + "eif_event_receiver_dynamic_config";
 val blockchain_rid_topic = ICMF_TOPIC_LOCAL_PREFIX + "blockchain_rid_topic";
 
 struct blockchain_rid_message {
     rid: byte_array;
     name: text;
-}
-
-struct eif_event_receiver_dynamic_config_message {
-    contracts: list<text>;
-    events: list<event_def>;
 }
 
 struct module_args {
