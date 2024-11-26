@@ -7,16 +7,22 @@ function test_get_bridge_contracts_for_unknown_network() {
 }
 
 function test_get_bridge_contracts_when_no_registered_erc20_assets() {
+
+    rell.test.tx().op(
+        helpers.get_or_create_bridge_op(97, x"2Cf48D2891CC286d18596Df1261D011d1B78E03E"),
+        helpers.get_or_create_bridge_op(97, x"2Cf48D2891CC286d18596Df1261D011d1B78E03F"),
+    ).run();
+
     assert_equals(
         get_bridge_contracts(network_id = 97), // bsc_testnet
         [
             bridge_contract_info(
-                contract_address = "0x2Cf48D2891CC286d18596Df1261D011d1B78E03E",
+                contract_address = x"2Cf48D2891CC286d18596Df1261D011d1B78E03E",
                 evm_read_offset = 10,
                 erc20_assets = []
             ),
             bridge_contract_info(
-                contract_address = "0x2Cf48D2891CC286d18596Df1261D011d1B78E03F",
+                contract_address = x"2Cf48D2891CC286d18596Df1261D011d1B78E03F",
                 evm_read_offset = 10,
                 erc20_assets = []
             ),
@@ -36,22 +42,36 @@ function test_get_bridge_contracts_when_registered_erc20_assets_exist() {
     // Register FT4 ABC and ERC20 ABC on bsc_testnet:97 assets
     register_foreign_asset(ABC, 97);
 
-    val erc20_chr = erc20_asset @ { .token_address == CHR.token_address } (map_erc20_asset_to_erc20_asset_info($));
-    val erc20_foo = erc20_asset @ { .token_address == FOO.token_address } (map_erc20_asset_to_erc20_asset_info($));
-    val erc20_bar = erc20_asset @ { .token_address == BAR.token_address } (map_erc20_asset_to_erc20_asset_info($));
+    val erc20_chr = erc20_asset @ { .token_address == CHR.token_address };
+    val erc20_foo = erc20_asset @ { .token_address == FOO.token_address };
+    val erc20_bar = erc20_asset @ { .token_address == BAR.token_address };
+    val erc20_chr_info = map_erc20_asset_to_erc20_asset_info(erc20_chr);
+    val erc20_foo_info = map_erc20_asset_to_erc20_asset_info(erc20_foo);
+    val erc20_bar_info = map_erc20_asset_to_erc20_asset_info(erc20_bar);
+
+    rell.test.tx().op(
+        helpers.register_bridge_with_assets_op(
+            11155111,
+            x"2Cf48D2891CC286d18596Df1261D011d1B78E04E",
+            [erc20_chr, erc20_foo]),
+        helpers.register_bridge_with_assets_op(
+            11155111,
+            x"2Cf48D2891CC286d18596Df1261D011d1B78E04F",
+            [erc20_foo, erc20_bar]),
+    ).run();
 
     assert_equals(
         get_bridge_contracts(network_id = 11155111), // sepolia
         [
             bridge_contract_info(
-                contract_address = "0x2Cf48D2891CC286d18596Df1261D011d1B78E04E",
+                contract_address = x"2Cf48D2891CC286d18596Df1261D011d1B78E04E",
                 evm_read_offset = 20,
-                erc20_assets = [erc20_chr, erc20_foo, erc20_bar]
+                erc20_assets = [erc20_chr_info, erc20_foo_info]
             ),
             bridge_contract_info(
-                contract_address = "0x2Cf48D2891CC286d18596Df1261D011d1B78E04F",
+                contract_address = x"2Cf48D2891CC286d18596Df1261D011d1B78E04F",
                 evm_read_offset = 20,
-                erc20_assets = [erc20_chr, erc20_foo, erc20_bar]
+                erc20_assets = [erc20_foo_info, erc20_bar_info]
             ),
         ]
     );
