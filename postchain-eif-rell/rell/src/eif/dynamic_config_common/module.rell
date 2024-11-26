@@ -13,6 +13,6 @@ struct event_input {
 }
 
 struct eif_event_receiver_dynamic_config_message {
-    contracts: list<text>;
+    contracts: list<byte_array>;
     events: list<event_def>;
 }

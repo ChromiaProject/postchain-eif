@@ -31,8 +31,8 @@ function handle_dynamic_config_message(body: gtv) {
 
     for ((network_id, config) in configs) {
         for (contract in config.contracts) {
-            if (empty(contract_config @? { network_id, contract })) {
-                create contract_config(network_id, contract);
+            if (empty(contract_config @? { network_id, contract.to_hex() })) {
+                create contract_config(network_id, contract.to_hex());
             }
         }
 
