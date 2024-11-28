@@ -51,6 +51,6 @@ function handle_blockchain_rid_message(body: gtv) {
 
     if (message.name == chain_context.args.configuration_chain) {
         receiver_icmf_update_topics(
-            [icmf_receiver_topic(topic = chain_context.args.configuration_chain, bc_rid = message.rid)], false);
+            [icmf_receiver_topic(topic = eif_event_receiver_dynamic_config_topic, bc_rid = message.rid)], false);
     }
 }

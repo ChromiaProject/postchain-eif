@@ -1,7 +1,7 @@
 @test module;
 
 import ^.helpers.*;
-import ^^.dynamic_config.*;
+import eif.dynamic_config_common.*;
 
 function test_contracts_config() {
     rell.test.tx()
