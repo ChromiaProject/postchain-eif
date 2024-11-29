@@ -50,7 +50,13 @@ blockchains:
           bsc:
             network_id: 56
             evm_read_offset: 10
-            skip_to_height: 5801241
+            skip_to_height: 7743093
+            events: !include configs/events.yml
+          ethereum:
+            network_id: 1
+            evm_read_offset: 50
+            skip_to_height: 11223368
+            events: !include configs/events.yml
       icmf:
         receiver:
           local:

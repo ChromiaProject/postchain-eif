@@ -95,7 +95,6 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
         return;
     }
 
-    // TODO: add test
     if (not validate_bridge_contract(event.bridge_address, erc20)) {
         log("Deposit event bounced: ERC20 token %s is not registered to bridge %s".format(event.token_address, event.bridge_address));
         // TODO: Users can still abuse by claiming this withdraw on actual bridge, must be solved in POS-1583
