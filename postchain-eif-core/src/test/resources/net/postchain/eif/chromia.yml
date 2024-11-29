@@ -70,7 +70,7 @@ blockchains:
 compile:
   source: src
   target: target
-  rellVersion: 0.13.12
+  rellVersion: 0.13.13
 
 libs:
   ft4:
