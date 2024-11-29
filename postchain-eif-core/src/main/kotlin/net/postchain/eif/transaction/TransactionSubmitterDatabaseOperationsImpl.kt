@@ -10,7 +10,7 @@ import org.jooq.SQLDialect
 import org.jooq.impl.DSL.field
 import org.jooq.impl.DSL.table
 import org.jooq.impl.DSL.using
-import org.jooq.util.postgres.PostgresDataType
+import org.jooq.impl.SQLDataType
 import java.math.BigInteger
 
 enum class PendingTxStatus {
@@ -33,20 +33,20 @@ open class TransactionSubmitterDatabaseOperationsImpl : TransactionSubmitterData
         private const val PREFIX: String = "sys.x.evm_tx" // This name should not clash with Rell
         const val EVM_TX_SUBMIT_TABLE_NAME: String = "${PREFIX}.submit"
 
-        val EVM_TX_SUBMIT_COLUMN_REQUEST_ID: Field<Long> = field("request_id", PostgresDataType.BIGINT.nullable(false))
-        val EVM_TX_SUBMIT_COLUMN_CONTRACT: Field<String> = field("contract", PostgresDataType.TEXT.nullable(false))
-        val EVM_TX_SUBMIT_COLUMN_FUNCTION: Field<String> = field("function", PostgresDataType.TEXT.nullable(false))
-        val EVM_TX_SUBMIT_COLUMN_PARAMETER_TYPES: Field<String> = field("parameter_types", PostgresDataType.TEXT.nullable(false))
-        val EVM_TX_SUBMIT_COLUMN_PARAMETER_VALUES: Field<ByteArray> = field("parameter_values", PostgresDataType.BYTEA.nullable(false))
-        val EVM_TX_SUBMIT_COLUMN_MAX_GAS_PRICE: Field<Long> = field("max_gas_price", PostgresDataType.BIGINT.nullable(true))
-        val EVM_TX_SUBMIT_COLUMN_MAX_PRIORITY_FEE_PER_GAS: Field<Long> = field("max_priority_fee_per_gas", PostgresDataType.BIGINT.nullable(false))
-        val EVM_TX_SUBMIT_COLUMN_MAX_FEE_PER_GAS: Field<Long> = field("max_fee_per_gas", PostgresDataType.BIGINT.nullable(false))
-        val EVM_TX_SUBMIT_COLUMN_GAS_LIMIT: Field<Long> = field("gas_limit", PostgresDataType.BIGINT.nullable(true))
-        val EVM_TX_SUBMIT_COLUMN_CREATED: Field<Long> = field("created", PostgresDataType.BIGINT.nullable(false))
-        val EVM_TX_SUBMIT_COLUMN_NETWORK_ID: Field<Long> = field("network_id", PostgresDataType.BIGINT.nullable(false))
-        val EVM_TX_SUBMIT_COLUMN_SENDER: Field<ByteArray> = field("sender", PostgresDataType.BYTEA.nullable(false))
-        val EVM_TX_SUBMIT_COLUMN_HASH: Field<String> = field("hash", PostgresDataType.TEXT.nullable(true))
-        val EVM_TX_SUBMIT_COLUMN_BC_PERSISTED: Field<Boolean> = field("bc_persisted", PostgresDataType.BOOLEAN.nullable(false).defaultValue(false))
+        val EVM_TX_SUBMIT_COLUMN_REQUEST_ID: Field<Long> = field("request_id", SQLDataType.BIGINT.nullable(false))
+        val EVM_TX_SUBMIT_COLUMN_CONTRACT: Field<String> = field("contract", SQLDataType.CLOB.nullable(false))
+        val EVM_TX_SUBMIT_COLUMN_FUNCTION: Field<String> = field("function", SQLDataType.CLOB.nullable(false))
+        val EVM_TX_SUBMIT_COLUMN_PARAMETER_TYPES: Field<String> = field("parameter_types", SQLDataType.CLOB.nullable(false))
+        val EVM_TX_SUBMIT_COLUMN_PARAMETER_VALUES: Field<ByteArray> = field("parameter_values", SQLDataType.BLOB.nullable(false))
+        val EVM_TX_SUBMIT_COLUMN_MAX_GAS_PRICE: Field<Long> = field("max_gas_price", SQLDataType.BIGINT.nullable(true))
+        val EVM_TX_SUBMIT_COLUMN_MAX_PRIORITY_FEE_PER_GAS: Field<Long> = field("max_priority_fee_per_gas", SQLDataType.BIGINT.nullable(false))
+        val EVM_TX_SUBMIT_COLUMN_MAX_FEE_PER_GAS: Field<Long> = field("max_fee_per_gas", SQLDataType.BIGINT.nullable(false))
+        val EVM_TX_SUBMIT_COLUMN_GAS_LIMIT: Field<Long> = field("gas_limit", SQLDataType.BIGINT.nullable(true))
+        val EVM_TX_SUBMIT_COLUMN_CREATED: Field<Long> = field("created", SQLDataType.BIGINT.nullable(false))
+        val EVM_TX_SUBMIT_COLUMN_NETWORK_ID: Field<Long> = field("network_id", SQLDataType.BIGINT.nullable(false))
+        val EVM_TX_SUBMIT_COLUMN_SENDER: Field<ByteArray> = field("sender", SQLDataType.BLOB.nullable(false))
+        val EVM_TX_SUBMIT_COLUMN_HASH: Field<String> = field("hash", SQLDataType.CLOB.nullable(true))
+        val EVM_TX_SUBMIT_COLUMN_BC_PERSISTED: Field<Boolean> = field("bc_persisted", SQLDataType.BOOLEAN.nullable(false).defaultValue(false))
     }
 
     override fun initialize(ctx: EContext) {
