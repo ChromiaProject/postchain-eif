@@ -31,8 +31,9 @@ function handle_dynamic_config_message(body: gtv) {
 
     for ((network_id, config) in configs) {
         for (contract in config.contracts) {
-            if (empty(contract_config @? { network_id, contract.to_hex() })) {
-                create contract_config(network_id, contract.to_hex());
+            val contract_hex_with_0x = contract_hex_with_0x(contract);
+            if (empty(contract_config @? { network_id, contract_hex_with_0x })) {
+                create contract_config(network_id, contract_hex_with_0x);
             }
         }
 
@@ -54,3 +55,6 @@ function handle_blockchain_rid_message(body: gtv) {
             [icmf_receiver_topic(topic = eif_event_receiver_dynamic_config_topic, bc_rid = message.rid)], false);
     }
 }
+
+function contract_hex_with_0x(contract: byte_array) =
+    "0x%s".format(contract.to_hex());
