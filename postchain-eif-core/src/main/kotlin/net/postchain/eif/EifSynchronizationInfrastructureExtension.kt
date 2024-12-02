@@ -54,7 +54,7 @@ class EifSynchronizationInfrastructureExtension(
                         throw UserMistake("Node does not have any URLs configured for EVM network: $evmBlockchainName")
                     }
 
-                    val hasDynamicContacts = (cfg.module as? CompositeGTXModule)?.let { compositeModule ->
+                    val hasDynamicContracts = (cfg.module as? CompositeGTXModule)?.let { compositeModule ->
                         (EIF_CONFIG_CONTRACTS_QUERY in compositeModule.getQueries())
                     } == true
 
@@ -62,7 +62,7 @@ class EifSynchronizationInfrastructureExtension(
                         (EIF_CONFIG_EVENTS_QUERY in compositeModule.getQueries())
                     } == true
 
-                    val eventProcessor = initializeEventProcessor(cfg, evmBlockchainConfig, engine, evmConfig, hasDynamicContacts, hasDynamicEvents)
+                    val eventProcessor = initializeEventProcessor(cfg, evmBlockchainConfig, engine, evmConfig, hasDynamicContracts, hasDynamicEvents)
                     ext.addEventProcessor(evmBlockchainConfig.networkId, eventProcessor)
                     eventProcessors[cfg.blockchainRid]?.set(evmBlockchainConfig.networkId, eventProcessor)
                     eifMetricsRegistry.registerMetrics(cfg.chainID, cfg.blockchainRid, evmBlockchainConfig.networkId, eventProcessor)

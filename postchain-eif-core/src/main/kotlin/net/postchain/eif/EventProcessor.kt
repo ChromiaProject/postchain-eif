@@ -12,6 +12,7 @@ import kotlinx.coroutines.slf4j.MDCContext
 import mu.KLogging
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.hexStringToByteArray
+import net.postchain.common.toHex
 import net.postchain.concurrent.util.get
 import net.postchain.core.BlockchainEngine
 import net.postchain.core.Shutdownable
@@ -191,7 +192,8 @@ class EvmEventProcessor(
         val contracts = if (hasDynamicContacts) {
             try {
                 val dynamicContracts = blockchainEngine.getBlockQueries().query(
-                        EIF_CONFIG_CONTRACTS_QUERY, gtv(mapOf("network_id" to gtv(networkId)))).get().asArray().map { it.asString() }
+                        EIF_CONFIG_CONTRACTS_QUERY, gtv(mapOf("network_id" to gtv(networkId)))).get().asArray()
+                        .map { "0x${it.asByteArray().toHex()}" }
                 staticContracts.union(dynamicContracts)
             } catch (e: Exception) {
                 logger.warn(e) { "Unable to fetch dynamic contracts: $e" }

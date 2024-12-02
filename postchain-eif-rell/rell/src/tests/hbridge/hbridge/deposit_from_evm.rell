@@ -43,7 +43,7 @@ function test_deposit_foreign_token_from_evm_when_bridge_is_missing() {
     val ft_asset = register_ft4_asset(CHR);
 
     rell.test.tx().op(
-        helpers.register_bridge_and_token_op(
+        helpers.register_bridge_and_erc20_asset_op(
             network_id = network_id1,
             token_address = CHR.token_address,
             asset = ft_asset,

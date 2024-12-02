@@ -13,7 +13,7 @@ operation register_erc20_asset_op(
     hbridge.register_erc20_asset(network_id, token_address, asset, bridge_mode, enable_snapshots);
 }
 
-operation register_bridge_and_token_op(
+operation register_bridge_and_erc20_asset_op(
     network_id: integer,
     token_address: byte_array,
     assets.asset,
@@ -21,11 +21,11 @@ operation register_bridge_and_token_op(
     use_snapshots: boolean = false,
     bridge_contract_address: byte_array
 ) {
-    hbridge.register_bridge_and_token(network_id, token_address, asset, mode, use_snapshots, bridge_contract_address);
+    hbridge.register_bridge_and_erc20_asset(network_id, token_address, asset, mode, use_snapshots, bridge_contract_address);
 }
 
-operation register_bridge_with_assets_op(network_id: integer, bridge_contract_address: byte_array, erc20_assets: list<hbridge.erc20_asset>) {
-    hbridge.register_bridge_with_assets(network_id, bridge_contract_address, erc20_assets);
+operation register_bridge_with_erc20_assets_op(network_id: integer, bridge_contract_address: byte_array, erc20_assets: list<hbridge.erc20_asset>) {
+    hbridge.register_bridge_with_erc20_assets(network_id, bridge_contract_address, erc20_assets);
 }
 
 operation get_or_create_bridge_op(

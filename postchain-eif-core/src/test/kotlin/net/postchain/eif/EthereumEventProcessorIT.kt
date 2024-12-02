@@ -3,6 +3,7 @@ package net.postchain.eif
 import assertk.assertThat
 import assertk.assertions.containsExactly
 import assertk.assertions.isEqualTo
+import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
 import net.postchain.core.BlockchainEngine
 import net.postchain.core.block.BlockQueries
@@ -175,7 +176,7 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
             on { query(eq("get_last_evm_block"), any()) } doReturn CompletableFuture.completedFuture(GtvNull)
 
             on { query(eq(EIF_CONFIG_CONTRACTS_QUERY), eq(gtv(mapOf("network_id" to gtv(networkId))))) } doReturn
-                    CompletableFuture.completedFuture(gtv(listOf(gtv(bridgeSecond.contractAddress))))
+                    CompletableFuture.completedFuture(gtv(listOf(gtv(bridgeSecond.contractAddress.substring(2).hexStringToByteArray()))))
 
             on { query(eq(EIF_CONFIG_EVENTS_QUERY), eq(gtv(mapOf("network_id" to gtv(networkId))))) } doReturn
                     CompletableFuture.completedFuture(gtv(listOf(gtv(mapOf(
