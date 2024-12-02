@@ -11,6 +11,7 @@ function create_link_account_id_event(event: messaging.event_data) = link_accoun
 );
 
 struct deposited_erc20_event {
+    bridge_address: byte_array;
     sender: byte_array;
     token_address: byte_array;
     amount: big_integer;
@@ -19,6 +20,7 @@ struct deposited_erc20_event {
 }
 
 function create_deposited_erc20_event(event: messaging.event_data) = deposited_erc20_event(
+    bridge_address = event.contract_address,
     sender = byte_array.from_gtv(event.indexed_values[0]),
     token_address = byte_array.from_gtv(event.indexed_values[1]),
     amount = big_integer.from_gtv(event.non_indexed_values[0]),
@@ -27,10 +29,12 @@ function create_deposited_erc20_event(event: messaging.event_data) = deposited_e
 );
 
 function create_withdrawal_event(event: messaging.event_data) = withdrawal_event(
+    bridge_address = event.contract_address,
     hash = byte_array.from_gtv(event.indexed_values[0]),
 );
 
 struct withdrawal_event {
+    bridge_address: byte_array;
     hash: byte_array;
 }
 
@@ -88,6 +92,13 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
 
     if (event.amount <= 0) {
         log("Deposit event ignored: amount must be greater than 0: ERC20 token %s, sender %s".format(event.token_address, event.sender));
+        return;
+    }
+
+    if (not validate_bridge_contract(event.bridge_address, erc20)) {
+        log("Deposit event bounced: ERC20 token %s is not registered to bridge %s".format(event.token_address, event.bridge_address));
+        // TODO: Users can still abuse by claiming this withdraw on actual bridge, must be solved in POS-1583
+        bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
         return;
     }
 
@@ -263,4 +274,11 @@ function calculate_withdrawal_event_evm_hash(
         + utils.big_integer_to_32_byte_array(amount);
 
     return crypto.keccak256(data);
+}
+
+function validate_bridge_contract(bridge_address: byte_array, erc20_asset): boolean {
+    // In order to not ruin existing bridges we skip validation if no bridge has been defined
+    if (empty(bridge_contract @* {})) return true;
+
+    return exists(bridge_erc20_asset @? { erc20_asset, .bridge_contract.contract_address == bridge_address });
 }

@@ -26,7 +26,7 @@ operation register_erc20_asset(
     );
 }
 
-operation add_contract_config(network_id: integer, contract: text) {
+operation add_contract_config(network_id: integer, contract: byte_array) {
     admin.require_admin();
 
     create contract_config(network_id, contract);

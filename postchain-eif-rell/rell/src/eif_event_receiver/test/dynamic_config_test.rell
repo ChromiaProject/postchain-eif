@@ -1,17 +1,17 @@
 @test module;
 
 import ^.helpers.*;
-import ^^.dynamic_config.*;
+import eif.dynamic_config_common.*;
 
 function test_contracts_config() {
     rell.test.tx()
-        .op(add_contract_config(1, "0x753218363422002DF74F3D0D8d67f6CB38bE32D0"))
-        .op(add_contract_config(1, "0x2Cf48D2891CC286d18596Df1261D011d1B78E03E"))
-        .op(add_contract_config(2, "0x0000000000000000000000000000000000000000"))
+        .op(add_contract_config(1, x"753218363422002DF74F3D0D8d67f6CB38bE32D0"))
+        .op(add_contract_config(1, x"2Cf48D2891CC286d18596Df1261D011d1B78E03E"))
+        .op(add_contract_config(2, x"0000000000000000000000000000000000000000"))
     .run();
 
     assert_equals(get_contracts(1),
-        ["0x753218363422002DF74F3D0D8d67f6CB38bE32D0", "0x2Cf48D2891CC286d18596Df1261D011d1B78E03E"]);
+        [x"753218363422002DF74F3D0D8d67f6CB38bE32D0", x"2Cf48D2891CC286d18596Df1261D011d1B78E03E"]);
 }
 
 function test_events_config() {

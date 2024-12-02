@@ -38,6 +38,33 @@ function test_deposit_foreign_token_from_evm_when_both_account_and_erc20_token_a
     assert_withdraw(1, evm_address, amount);
 }
 
+function test_deposit_foreign_token_from_evm_when_bridge_is_missing() {
+
+    val ft_asset = register_ft4_asset(CHR);
+
+    rell.test.tx().op(
+        helpers.register_bridge_and_erc20_asset_op(
+            network_id = network_id1,
+            token_address = CHR.token_address,
+            asset = ft_asset,
+            mode = hbridge.bridge_mode.foreign,
+            use_snapshots = false,
+            bridge_contract_address = x"01"
+        )
+    ).run();
+
+    // Deposit ERC20 tokens
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+    val amount = 10000000L;
+    deposit_from_evm(evm_address, amount, contract_address = x"99");
+
+    // There is no deposit for evm_address
+    assert_true(empty(erc20_deposit @* {}));
+
+    // The deposit will be bounced
+    assert_withdraw(1, evm_address, amount);
+}
+
 function test_deposit_foreign_token_from_evm_eoa_with_already_created_and_linked_account() {
     val ft_asset = register_foreign_asset();
 

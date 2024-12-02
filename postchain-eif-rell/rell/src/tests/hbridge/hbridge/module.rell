@@ -188,7 +188,8 @@ function deposit_from_evm(
     block_height: integer = 1,
     account_id: byte_array = hbridge.zero_beneficiary,
     asset: asset_info = CHR,
-    network_id: integer = network_id1
+    network_id: integer = network_id1,
+    contract_address: byte_array = contract_address
 ) {
     val events = [
         event_data(

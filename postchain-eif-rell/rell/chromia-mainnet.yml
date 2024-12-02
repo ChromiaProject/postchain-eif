@@ -34,6 +34,37 @@ blockchains:
     moduleArgs:
       chain_version: *chain_version
 
+  eif_event_receiver_token_chain_mainnet:
+    module: eif_event_receiver_dynamic_icmf_config
+    config:
+      gtx:
+        modules:
+          - "net.postchain.eif.EifGTXModule"
+          - "net.postchain.d1.icmf.IcmfSenderGTXModule"
+          - "net.postchain.d1.icmf.IcmfReceiverGTXModule"
+      sync_ext:
+        - "net.postchain.eif.EifSynchronizationInfrastructureExtension"
+        - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"
+      eif:
+        chains:
+          bsc:
+            network_id: 56
+            evm_read_offset: 10
+            skip_to_height: 7743093
+            events: !include configs/events.yml
+          ethereum:
+            network_id: 1
+            evm_read_offset: 50
+            skip_to_height: 11223368
+            events: !include configs/events.yml
+      icmf:
+        receiver:
+          local:
+            - bc-rid: x"" # Replace with token chain
+              topic: "L_eif_event_receiver_dynamic_config"
+    moduleArgs:
+      chain_version: *chain_version
+
   eif_event_receiver_price_oracle_mainnet:
     module: eif_event_receiver
     config:
