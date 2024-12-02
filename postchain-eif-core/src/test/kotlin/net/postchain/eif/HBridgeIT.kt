@@ -214,7 +214,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
                 .query("eif.api_version", gtv(emptyMap())).get().asInteger()
         logger.info { "EIF API version: $apiVersion" }
 
-        enqueueTx(configureContract("0x39615b16b74589919c9ce1ea73f1fc5d53141a78", bcRid, adminKeyPair))
+        enqueueTx(configureContract("39615b16b74589919c9ce1ea73f1fc5d53141a78".hexStringToByteArray(), bcRid, adminKeyPair))
     }
 
     @Test
@@ -859,7 +859,7 @@ class HBridgeIT : EifBaseIntegrationTest() {
             .encode()
 
     private fun configureContract(
-            contractAddress: String,
+            contractAddress: ByteArray,
             bcRid: BlockchainRid,
             keyPair: KeyPair
     ): ByteArray = GtxBuilder(bcRid, listOf(keyPair.pubKey.data), myCS)
