@@ -47,14 +47,10 @@ When token is moved from FT4 to EVM we burn FT4 tokens.
 
 In native mode, we assume that FT4 is the origin of the token. It works similarly to FT4 crosschain.
 
-When token is moved from FT4 to EVM we lock FT4 tokens into
-a special blockchain account which represents tokens held on EVM.
+When token is moved from FT4 to EVM we lock FT4 tokens into a special blockchain account which represents tokens held on EVM.
 When token is moved from EVM to FT4 we move FT4 tokens from the blockchain account to user's account.
 
 This accounting will make sure that token supply cannot be increased by faulty EVM contract.
-
-TODO: Not implemented yet. But the implementation essentially boils down to
-bridge_deduct_balance / bridge_increase_balance working similarly to ft4.crosschain.update_balances_if_needed.
 
 ## Deposit and Withdrawal flow
 

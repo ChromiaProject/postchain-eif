@@ -37,7 +37,6 @@ function register_erc20_asset(
     mode: bridge_mode,
     use_snapshots: boolean = false
 ): erc20_asset {
-    require(mode == bridge_mode.foreign, "native mode not supported yet");
     require(empty(erc20_asset @? { network_id, token_address }), "token already exists");
     val erc20_asset = create erc20_asset (
         network_id,

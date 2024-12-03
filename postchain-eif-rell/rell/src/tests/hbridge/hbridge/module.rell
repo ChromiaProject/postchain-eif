@@ -81,8 +81,13 @@ val ABC = asset_info(
 
 function register_foreign_asset(asset: asset_info = CHR, network_id: integer = network_id1): assets.asset {
     val ft4_asset = register_ft4_asset(asset);
-    register_erc20_asset(ft4_asset, asset, network_id, true); // snapshots enabled
+    register_erc20_asset(ft4_asset, asset, network_id, enable_snapshots = true, bridge_mode = hbridge.bridge_mode.foreign);
     return ft4_asset;
+}
+
+function register_native_asset(asset: asset_info = CHR, network_id: integer = network_id1): erc20_asset {
+    val ft4_asset = register_ft4_asset(asset);
+    return register_erc20_asset(ft4_asset, asset, network_id, enable_snapshots = true, bridge_mode = hbridge.bridge_mode.native);
 }
 
 function register_ft4_asset(asset_info: asset_info): assets.asset {
@@ -95,9 +100,10 @@ function register_ft4_asset(asset_info: asset_info): assets.asset {
     return assets.Asset(asset_id);
 }
 
-function register_erc20_asset(ft4_asset: assets.asset, asset_info: asset_info, network_id: integer, enable_snapshots: boolean = false) {
+function register_erc20_asset(ft4_asset: assets.asset, asset_info: asset_info, network_id: integer,
+        enable_snapshots: boolean = false, hbridge.bridge_mode = hbridge.bridge_mode.foreign): erc20_asset {
     rell.test.tx().op(
-        helpers.register_erc20_asset_op(network_id, asset_info.token_address, ft4_asset, hbridge.bridge_mode.foreign, enable_snapshots)
+        helpers.register_erc20_asset_op(network_id, asset_info.token_address, ft4_asset, bridge_mode, enable_snapshots)
     ).run();
 
     assert_equals(
@@ -105,10 +111,12 @@ function register_erc20_asset(ft4_asset: assets.asset, asset_info: asset_info, n
         hbridge.erc20_info(
             network_id,
             token_address = asset_info.token_address,
-            bridge_mode = hbridge.bridge_mode.foreign,
+            bridge_mode = bridge_mode,
             virtual_blockchain_rid = hbridge.compute_virtual_blockchain_rid(network_id, asset_info.token_address)
         )
     );
+
+    return erc20_asset @ { network_id, .token_address == asset_info.token_address };
 }
 
 function link_eoa_account(
@@ -278,4 +286,14 @@ function create_ft4_account(pubkey: byte_array) {
     return (
         ft_account, auth_descriptor
     );
+}
+
+function _mint(accounts.account, assets.asset) {
+    val amount = 10000000000000000000L;
+
+    rell.test.tx().op(
+        admin.external.mint(account.id, asset.id, amount)
+    ).sign(admin_privkey).run();
+
+    return amount;
 }

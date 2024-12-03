@@ -11,6 +11,7 @@ operation register_erc20_asset(
     network_id: integer,
     token_address: byte_array,
     asset_id: byte_array,
+    hbridge.bridge_mode,
     enable_snapshots: boolean
 ) {
     admin.require_admin();
@@ -21,7 +22,7 @@ operation register_erc20_asset(
         network_id,
         token_address,
         asset,
-        hbridge.bridge_mode.foreign,
+        bridge_mode,
         enable_snapshots
     );
 }

@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 import "./utils/TwoWeekDelay.sol";
+import {ITokenMinter} from "./ChromiaTokenBridge.sol";
 
 interface ChromiaToken_Base {
     function changeMinter(address newMinter) external;
@@ -22,7 +23,7 @@ interface ChromiaToken_BSC {
 }
 
 
-abstract contract TokenMinterBase is TwoWeekDelay, Ownable2Step {
+abstract contract TokenMinterBase is TwoWeekDelay, Ownable2Step, ITokenMinter {
     uint private dayStart; // Timestamp at which the day started
     uint private dayAmount; // Amount of tokens withdrawn so far
     uint private dayLimit; // Maximum amount of tokens that can be withdrawn in a day
