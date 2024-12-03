@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import "./TokenBridge.sol";
 import {IManagedValidator} from "./validatorupdate/IManagedValidator.sol";

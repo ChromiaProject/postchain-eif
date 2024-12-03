@@ -212,15 +212,18 @@
             <plugin>
                 <groupId>org.web3j</groupId>
                 <artifactId>web3j-maven-plugin</artifactId>
-                <version>4.11.1</version>
+                <version>4.12.1</version>
                 <configuration>
                     <packageName>net.postchain.eif.contracts</packageName>
                     <nativeJavaType>false</nativeJavaType>
                     <contract>
                         <includes>
+                            <include>TokenMinterTest</include>
                             <include>TokenBridge</include>
                             <include>TokenBridgeWithSnapshotWithdraw</include>
+                            <include>ChromiaTokenBridge</include>
                             <include>TestToken</include>
+                            <include>ChromiaTestToken</include>
                             <include>Validator</include>
                             <include>Anchoring</include>
                             <include>DirectoryChainValidator</include>
@@ -233,9 +236,12 @@
                     <soliditySourceFiles>
                         <directory>${project.parent.basedir}/postchain-eif-contracts/contracts</directory>
                         <includes>
+                            <include>**/TokenMinterTest.sol</include>
                             <include>TokenBridge.sol</include>
                             <include>TokenBridgeWithSnapshotWithdraw.sol</include>
+                            <include>ChromiaTokenBridge.sol</include>
                             <include>**/TestToken.sol</include>
+                            <include>**/ChromiaTestToken.sol</include>
                             <include>**/Validator.sol</include>
                             <include>**/Anchoring.sol</include>
                             <include>**/DirectoryChainValidator.sol</include>

@@ -94,13 +94,54 @@ function _link_evm_sc_account(address: byte_array, network_id: integer, account:
 // function which deducts balance from the account in a smart way:
 //  * burn when bridge is in foreign mode
 //  * transfer to pool account when bridge is in native mode
-function bridge_deduct_balance(ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
-    ft4.assets.Unsafe.burn(account, asset, amount);
+function bridge_deduct_balance(ft4.accounts.account, erc20_asset, amount: big_integer) {
+    when (erc20_asset.bridge_mode) {
+        bridge_mode.foreign ->
+            ft4.assets.Unsafe.burn(account, erc20_asset.asset, amount);
+        bridge_mode.native -> {
+            val bridge_account = ensure_bridge_account(erc20_asset.virtual_blockchain_rid);
+            transfer(account, bridge_account, erc20_asset.asset, amount);
+        }
+    }
 }
 
 // function which increase balance of the account in a smart way:
 //  * mint when bridge is in foreign mode
 //  * transfer from pool account when bridge is in native mode
-function bridge_increase_balance(ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
-    ft4.assets.Unsafe.mint(account, asset, amount);
+function bridge_increase_balance(ft4.accounts.account, erc20_asset, amount: big_integer) {
+    when (erc20_asset.bridge_mode) {
+        bridge_mode.foreign ->
+            ft4.assets.Unsafe.mint(account, erc20_asset.asset, amount);
+        bridge_mode.native -> {
+            val bridge_account = ensure_bridge_account(erc20_asset.virtual_blockchain_rid);
+            transfer(bridge_account, account, erc20_asset.asset, amount);
+        }
+    }
+}
+
+val ACCOUNT_TYPE_BRIDGE = "EIF_BRIDGE";
+
+function ensure_bridge_account(blockchain_rid: byte_array) =
+   ft4.accounts.ensure_account_without_auth(blockchain_rid, ACCOUNT_TYPE_BRIDGE);
+
+function transfer(from: ft4.accounts.account, to: ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
+    ft4.assets.require_zero_exclusive_asset_amount_limits(amount, "Parameter amount");
+
+    ft4.assets.deduct_balance(from, asset, amount);
+    create ft4.assets.transfer_history_entry(
+        .account = from,
+        .asset = asset,
+        .delta = amount,
+        .op_index = op_context.op_index,
+        .is_input = true
+   );
+
+    ft4.assets.increase_balance(to, asset, amount);
+    create ft4.assets.transfer_history_entry(
+        .account = to,
+        .asset = asset,
+        .delta = amount,
+        .op_index = op_context.op_index,
+        .is_input = false
+    );
 }

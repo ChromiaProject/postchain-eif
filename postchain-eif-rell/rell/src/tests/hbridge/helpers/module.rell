@@ -33,3 +33,7 @@ operation get_or_create_bridge_op(
 ) {
     hbridge.get_or_create_bridge(network_id, bridge_contract_address);
 }
+
+operation create_bridge_account_op(blockchain_rid: byte_array) {
+    hbridge.ensure_bridge_account(blockchain_rid);
+}

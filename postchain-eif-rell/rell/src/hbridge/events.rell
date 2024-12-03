@@ -102,6 +102,16 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
         return;
     }
 
+    if (erc20.bridge_mode == bridge_mode.native) {
+        val bridge_account = ensure_bridge_account(erc20.virtual_blockchain_rid);
+        if (ft4.assets.get_asset_balance(bridge_account, erc20.asset) < event.amount) {
+            log("Deposit event bounced: insufficient balance of asset %s: ERC20 token %s, sender %s"
+                .format(erc20.asset.symbol, event.token_address, event.sender));
+            bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
+            return;
+        }
+    }
+
     var ft4_account: ft4.accounts.account? = null;
     if (deposit_from_smart_contract) {
         ft4_account = ft4.accounts.account @? { .id == beneficiary };
@@ -150,7 +160,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
         }
 
         bridge_increase_balance(
-            ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid), erc20.asset, event.amount);
+            ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid), erc20, event.amount);
 
         val deposit = create erc20_deposit(
             sender_address = event.sender,
@@ -189,7 +199,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
                 evm_tx_hash = event.evm_tx_hash,
             );
 
-            bridge_increase_balance(ft4_account, erc20.asset, event.amount);
+            bridge_increase_balance(ft4_account, erc20, event.amount);
         } else {
             log("Deposit event bounced: Account id %s not on access list.".format(ft4_account.id));
             bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);

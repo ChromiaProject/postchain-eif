@@ -5,6 +5,7 @@ import net.postchain.devtools.ManagedModeTest
 import net.postchain.eif.transaction.TransactionSubmitter
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvFactory.gtv
+import net.postchain.gtv.merkle.GtvMerkleHashCalculator
 import org.apache.logging.log4j.Level
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -34,6 +35,8 @@ enum class AuthType {
 
 abstract class EifBaseIntegrationTest(private val prependUrls: List<String> = listOf()) : ManagedModeTest() {
 
+    val hashCalculator = GtvMerkleHashCalculator(myCS)
+
     val networkId = 1337L
     val gasProvider = DefaultGasProvider()
     protected val evmContainer: DockerComposeContainer<*> = GethContainer().withExposedService(
@@ -46,7 +49,12 @@ abstract class EifBaseIntegrationTest(private val prependUrls: List<String> = li
     val tokenBridgeBinary = getBinaryFromArtifactResource("/net/postchain/eif/contracts/TokenBridge.bin")
     val tokenBridgeWithSnapshotWithdrawBinary =
             getBinaryFromArtifactResource("/net/postchain/eif/contracts/TokenBridgeWithSnapshotWithdraw.bin")
+    val chromiaTokenBridgeBinary =
+            getBinaryFromArtifactResource("/net/postchain/eif/contracts/ChromiaTokenBridge.bin")
+    val tokenMinterBinary =
+            getBinaryFromArtifactResource("/net/postchain/eif/contracts/TokenMinterTest.bin")
     val testTokenBinary = getBinaryFromArtifactResource("/net/postchain/eif/contracts/TestToken.bin")
+    val chromiaTestTokenBinary = getBinaryFromArtifactResource("/net/postchain/eif/contracts/ChromiaTestToken.bin")
     val validatorBinary = getBinaryFromArtifactResource("/net/postchain/eif/contracts/Validator.bin")
 
     lateinit var web3j: Web3j
@@ -125,4 +133,7 @@ abstract class EifBaseIntegrationTest(private val prependUrls: List<String> = li
                 BigInteger.ZERO
         )
     }
+
+    fun getRegisterMessage(evmAddress: String, disposableKey: String) =
+            "Create account for EVM wallet:\n${evmAddress}\n\nDisposable key:\n${disposableKey}"
 }

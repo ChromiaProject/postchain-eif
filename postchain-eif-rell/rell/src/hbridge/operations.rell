@@ -68,7 +68,7 @@ operation bridge_ft4_token_to_evm(network_id: integer, asset_id: byte_array, amo
 
     require(withdraw_check_access_list(from_account.id), "Account id %s not on access list.".format(from_account.id));
 
-    bridge_deduct_balance(from_account, erc20.asset, amount);
+    bridge_deduct_balance(from_account, erc20, amount);
     emit_withdrawal_event(erc20.network_id, erc20.token_address, beneficiary, amount);
 }
 
@@ -99,7 +99,7 @@ operation bridge_ft4_token_to_evm_contract(network_id: integer, asset_id: byte_a
         "Can only withdraw to your own account"
     );
 
-    bridge_deduct_balance(from_account, erc20.asset, amount);
+    bridge_deduct_balance(from_account, erc20, amount);
     emit_withdrawal_event(erc20.network_id, erc20.token_address, beneficiary, amount);
 }
 
@@ -114,7 +114,9 @@ operation recall_pending_deposit(sender_address: byte_array) {
             transfer.sender_blockchain_rid, transfer.sender_id, transfer.transaction.tx_rid, transfer.op_index
         );
 
-        bridge_deduct_balance(ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid), asset, amount);
+        require(asset == deposit.token.asset, "Expected asset %s but was %s".format(asset.symbol, deposit.token.asset.symbol));
+
+        bridge_deduct_balance(ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid), deposit.token, amount);
         emit_withdrawal_event(deposit.token.network_id, deposit.token.token_address, sender_address, amount);
 
         update_deposit_state(deposit, deposit_state.recalled);

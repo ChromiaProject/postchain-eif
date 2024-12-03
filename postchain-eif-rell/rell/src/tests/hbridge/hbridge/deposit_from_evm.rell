@@ -67,7 +67,24 @@ function test_deposit_foreign_token_from_evm_when_bridge_is_missing() {
 
 function test_deposit_foreign_token_from_evm_eoa_with_already_created_and_linked_account() {
     val ft_asset = register_foreign_asset();
+    _deposit_token_from_evm_eoa_with_already_created_and_linked_account(ft_asset);
+}
 
+function test_deposit_native_token_from_evm_eoa_with_already_created_and_linked_account_deducs_from_brige_account() {
+    val erc20 = register_native_asset();
+
+    rell.test.tx().op(
+        helpers.create_bridge_account_op(erc20.virtual_blockchain_rid)
+    ).run();
+    val bridge_account = ensure_bridge_account(erc20.virtual_blockchain_rid);
+    val bridge_amount = _mint(bridge_account, erc20.asset);
+
+    val deposited_amount = _deposit_token_from_evm_eoa_with_already_created_and_linked_account(erc20.asset);
+
+    assert_equals(assets.get_asset_balance(bridge_account, erc20.asset), bridge_amount - deposited_amount);
+}
+
+function _deposit_token_from_evm_eoa_with_already_created_and_linked_account(ft_asset: ft4.assets.asset): big_integer {
     // Account
     val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
     val account_id = rell.test.pubkeys.alice.hash();
@@ -92,18 +109,69 @@ function test_deposit_foreign_token_from_evm_eoa_with_already_created_and_linked
     deposit_from_evm(evm_address, 1, block_height = 1);
     deposit_from_evm(evm_address, 8000, block_height = 2);
     deposit_from_evm(evm_address, 10000000, block_height = 3);
-    assert_equals(assets.get_asset_balance(ft_account, ft_asset), 10008001L);
+    val deposited_amount = 10008001L;
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), deposited_amount);
 
     // Deposits with zero or negative amount are not allowed
     val nr_of_deposits = erc20_deposit @ {} (@sum 1);
     deposit_from_evm(evm_address, 0, block_height = 4);
     deposit_from_evm(evm_address, -1, block_height = 5);
     assert_equals(erc20_deposit @ {} (@sum 1), nr_of_deposits);
+
+    return deposited_amount;
+}
+
+function test_deposit_native_token_from_evm_eoa_is_not_allowed_when_there_is_insufficient_balance_in_bridge_account() {
+    val ft_asset = register_native_asset().asset;
+
+    // Account
+    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val account_id = rell.test.pubkeys.alice.hash();
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+
+    // Register account
+    rell.test.tx().op(
+        admin.external.register_account(auth_descriptor)
+    ).sign(admin_privkey).run();
+    val ft_account = accounts.Account(account_id);
+
+    // Link account
+    link_eoa_account(
+        rell.test.keypairs.eve,
+        rell.test.keypairs.alice,
+        account_id,
+        auth_descriptor.hash()
+    );
+
+    // Deposit from EVM is not allowed when there is no previous balance in bridge account
+    deposit_from_evm(evm_address, 1, block_height = 1);
+    deposit_from_evm(evm_address, 8000, block_height = 2);
+    deposit_from_evm(evm_address, 10000000, block_height = 3);
+
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), 0L);
+    assert_equals(erc20_deposit @ {} (@sum 1), 0);
 }
 
 function test_deposit_foreign_token_from_evm_sc_with_already_created_and_linked_account() {
     val ft_asset = register_foreign_asset();
+    _deposit_token_from_evm_sc_with_already_created_and_linked_account(ft_asset);
+}
 
+function test_deposit_native_token_from_evm_sc_with_already_created_and_linked_account_deducs_from_brige_account() {
+    val erc20 = register_native_asset();
+
+    rell.test.tx().op(
+        helpers.create_bridge_account_op(erc20.virtual_blockchain_rid)
+    ).run();
+    val bridge_account = ensure_bridge_account(erc20.virtual_blockchain_rid);
+    val bridge_amount = _mint(bridge_account, erc20.asset);
+
+    val deposited_amount = _deposit_token_from_evm_sc_with_already_created_and_linked_account(erc20.asset);
+
+    assert_equals(assets.get_asset_balance(bridge_account, erc20.asset), bridge_amount - deposited_amount);
+}
+
+function _deposit_token_from_evm_sc_with_already_created_and_linked_account(ft_asset: ft4.assets.asset): big_integer {
     // Account
     val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
     val account_id = rell.test.pubkeys.alice.hash();
@@ -124,13 +192,61 @@ function test_deposit_foreign_token_from_evm_sc_with_already_created_and_linked_
     );
 
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), 0L);
+    val deposited_amount = 10000000L;
+    deposit_from_evm(evm_address, deposited_amount, block_height = 2);
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), deposited_amount);
+
+    return deposited_amount;
+}
+
+function test_deposit_native_token_from_evm_sc_is_not_allowed_when_there_is_insufficient_balance_in_bridge_account() {
+    val ft_asset = register_native_asset().asset;
+
+    // Account
+    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val account_id = rell.test.pubkeys.alice.hash();
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+
+    // Register account
+    rell.test.tx().op(
+        admin.external.register_account(auth_descriptor)
+    ).sign(admin_privkey).run();
+    val ft_account = accounts.Account(account_id);
+
+    link_sc_account_id_event(evm_address, account_id);
+    link_sc_account(
+        rell.test.keypairs.eve,
+        rell.test.keypairs.alice,
+        account_id,
+        auth_descriptor.hash()
+    );
+
     deposit_from_evm(evm_address, 10000000, block_height = 2);
-    assert_equals(assets.get_asset_balance(ft_account, ft_asset), 10000000L);
+
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), 0L);
+    assert_equals(erc20_deposit @ {} (@sum 1), 0);
 }
 
 function test_deposit_foreign_token_from_evm_before_account_creation() {
     val ft_asset = register_foreign_asset();
+    _deposit_token_from_evm_before_account_creation(ft_asset);
+}
 
+function test_deposit_native_token_from_evm_before_account_creation_deducs_from_brige_account() {
+    val erc20 = register_native_asset();
+
+    rell.test.tx().op(
+        helpers.create_bridge_account_op(erc20.virtual_blockchain_rid)
+    ).run();
+    val bridge_account = ensure_bridge_account(erc20.virtual_blockchain_rid);
+    val bridge_amount = _mint(bridge_account, erc20.asset);
+
+    val deposited_amount = _deposit_token_from_evm_before_account_creation(erc20.asset);
+
+    assert_equals(assets.get_asset_balance(bridge_account, erc20.asset), bridge_amount - deposited_amount);
+}
+
+function _deposit_token_from_evm_before_account_creation(ft_asset: ft4.assets.asset): big_integer {
     // Account
     val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
     val account_id = rell.test.pubkeys.alice.hash();
@@ -186,7 +302,8 @@ function test_deposit_foreign_token_from_evm_before_account_creation() {
     // Once accounts are linked, the user can deposit any amount
     deposit_from_evm(evm_address, 9000, block_height = 8);
     deposit_from_evm(evm_address, 13000000, block_height = 9);
-    assert_equals(assets.get_asset_balance(ft_account, ft_asset), 10000000 + 9000 + 13000000);
+    val deposited_amount = 10000000 + 9000 + 13000000;
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), deposited_amount);
 
     // Trying to link accounts again
     assert_fails("EVM address %s is already linked to FT4 account".format(evm_address),
@@ -214,6 +331,20 @@ function test_deposit_foreign_token_from_evm_before_account_creation() {
             *
         )
     );
+
+    return deposited_amount;
+}
+
+function test_deposit_native_token_from_evm_before_account_creation_is_not_allowed_when_there_is_insufficient_balance_in_bridge_account() {
+    val ft_asset = register_native_asset().asset;
+
+    // Account
+    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val account_id = rell.test.pubkeys.alice.hash();
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+
+    deposit_from_evm(evm_address, 10000000, block_height = 2);
+    assert_true(empty(erc20_deposit @* {}));
 }
 
 function test_deposit_foreign_token_from_evm_will_collect_pending_deposits_when_registering_account_with_evm_address() {
