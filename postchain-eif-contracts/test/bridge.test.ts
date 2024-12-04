@@ -226,6 +226,17 @@ describe("Token Bridge Test", () => {
             let wrongNetworkIdExtraDataMerkleRoot = calcExtraDataMerkleRoot(EIF_HEADER_KEY_HASH, wrongNetworkIdHashedLeaf);
             let wrongExtraDataKeyMerkleRoot = "18FE5D1F22C3A31458AADFDA6C0970029D489F4C188E2C61AE98D1461CFE99A5";
 
+            // event with a non-registered token (toAddress)
+            let unknownTokenEvent: string = buildWithdrawEvent(serialNumber, networkId, toAddress, toAddress, amountHex);
+            let unknownTokenData = toHex(unknownTokenEvent);
+            let unknownTokenHashEventLeaf = keccak256(unknownTokenData);
+            let unknownTokenHashRootEvent = keccak256(keccak256(unknownTokenHashEventLeaf));
+            let unknownTokenState = strip0x(blockNumber).concat(unknownTokenEvent);
+            let unknownTokenHashRootState = keccak256(toHex(unknownTokenState));
+            let unknownTokenEifLeaf = strip0x(unknownTokenHashRootEvent) + strip0x(unknownTokenHashRootState);
+            let unknownTokenHashedLeaf = hashGtvBytes64Leaf(toHex(unknownTokenEifLeaf));
+            let unknownTokenExtraDataMerkleRoot = calcExtraDataMerkleRoot(EIF_HEADER_KEY_HASH, unknownTokenHashedLeaf);
+
             // blockRid calculation
             let node1 = hashGtvBytes32Leaf(toHex(blockchainRid));
             let node2 = hashGtvBytes32Leaf(toHex(previousBlockRid));
@@ -249,6 +260,9 @@ describe("Token Bridge Test", () => {
             let wrongExtraDataKeyBlockRid = postchainMerkleNodeHash([0x7, node1234, wrongExtraDataKeyNode5678]);
 
             let maliciousBlockRid = postchainMerkleNodeHash([0x7, node1234, node1234]);
+
+            let unknownTokenNode5678 = postchainMerkleNodeHash([0x00, node56, toHex(unknownTokenExtraDataMerkleRoot)]);
+            let unknownTokenBlockRid =  postchainMerkleNodeHash([0x7, node1234, unknownTokenNode5678]);
 
             let ts = zeroPadValue(toBeHex(timestamp), 32);
             let h = zeroPadValue(toBeHex(height), 32);
@@ -274,6 +288,11 @@ describe("Token Bridge Test", () => {
                 extraDataMerkleRoot: wrongExtraDataKeyMerkleRoot,
             }).build();
 
+            let unknownTokenBlockHeader = blockHeaderBuilder.update({ 
+                blockRid: unknownTokenBlockRid,
+                extraDataMerkleRoot: unknownTokenExtraDataMerkleRoot,
+            }).build();
+
             // update to add new validator list
             await validatorAdmin.updateValidators([validator1.address, validator2.address, validator3.address]);
 
@@ -289,11 +308,16 @@ describe("Token Bridge Test", () => {
             let wrongExtraDataKeySig2 = await validator2.signMessage(ethers.getBytes(wrongExtraDataKeyBlockRid));
             let wrongExtraDataKeySig3 = await validator3.signMessage(ethers.getBytes(wrongExtraDataKeyBlockRid));
 
+            let unknownTokenSig1 = await validator1.signMessage(ethers.getBytes(unknownTokenBlockRid));
+            let unknownTokenSig2 = await validator2.signMessage(ethers.getBytes(unknownTokenBlockRid));
+            let unknownTokenSig3 = await validator3.signMessage(ethers.getBytes(unknownTokenBlockRid));
+
             let merkleProof = [
                 "0x0000000000000000000000000000000000000000000000000000000000000000",
                 "0x0000000000000000000000000000000000000000000000000000000000000000"
             ];
 
+            // event proof
             let eventProof = {
                 leaf: hashEventLeaf,
                 position: 0,
@@ -309,6 +333,12 @@ describe("Token Bridge Test", () => {
                 position: 0,
                 merkleProofs: merkleProof,
             };
+            let unknownTokenEventProof = {
+                leaf: unknownTokenHashEventLeaf,
+                position: 0,
+                merkleProofs: merkleProof,
+            };
+            // extra proof
             let extraProof = {
                 leaf: toHex(eifLeaf),
                 hashedLeaf: hashedLeaf,
@@ -354,9 +384,17 @@ describe("Token Bridge Test", () => {
                     "0x0000000000000000000000000000000000000000000000000000000000000000"
                 ],
             };
+            let unknownTokenExtraProof = {
+                leaf: toHex(unknownTokenEifLeaf),
+                hashedLeaf: unknownTokenHashedLeaf,
+                position: 1,
+                extraRoot: unknownTokenExtraDataMerkleRoot,
+                extraMerkleProofs: [EIF_HEADER_KEY_HASH],
+            };
             let sigs = [sig1, sig2, sig3];
             let wrongNetworkIdSigs = [wrongNetworkIdSig1, wrongNetworkIdSig2, wrongNetworkIdSig3];
             let wrongExtraDataKeySigs = [wrongExtraDataKeySig1, wrongExtraDataKeySig2, wrongExtraDataKeySig3];
+            let unknownTokenSigs = [unknownTokenSig1, unknownTokenSig2, unknownTokenSig3];
             let validators = [validator1.address, validator2.address, validator3.address];
 
             await expect(bridge.withdrawRequest(
@@ -434,6 +472,10 @@ describe("Token Bridge Test", () => {
             await expect(bridge.withdrawRequest(
                 data, eventProof, blockHeader, sigs, validators, extraProof
             )).to.rejectedWith('TokenBridge: event hash was already used');
+
+            await expect(bridge.withdrawRequest(
+                unknownTokenData, unknownTokenEventProof, unknownTokenBlockHeader, unknownTokenSigs, validators, unknownTokenExtraProof
+            )).to.rejectedWith('TokenBridge: not allow token');
 
             await expect(bridge.withdraw(
                 hashEventLeaf, deployer.address
