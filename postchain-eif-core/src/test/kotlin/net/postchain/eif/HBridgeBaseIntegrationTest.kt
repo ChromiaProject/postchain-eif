@@ -188,6 +188,16 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
             .encode()
 
     fun configureContract(
+            contractAddress: String,
+            bcRid: BlockchainRid,
+            keyPair: KeyPair
+    ) = configureContract(
+            contractAddress.substringAfter("0x").hexStringToByteArray(),
+            bcRid,
+            keyPair
+    )
+
+    fun configureContract(
             contractAddress: ByteArray,
             bcRid: BlockchainRid,
             keyPair: KeyPair
