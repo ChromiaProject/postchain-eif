@@ -12,6 +12,7 @@ import net.postchain.gtx.GTXOperation
 import net.postchain.gtx.GTXSchemaManager
 import net.postchain.gtx.SimpleGTXModule
 import net.postchain.gtx.data.ExtOpData
+import net.postchain.gtx.data.OpData
 import org.apache.commons.dbutils.QueryRunner
 import org.apache.commons.dbutils.handlers.MapListHandler
 import java.math.BigInteger
@@ -86,10 +87,23 @@ class EifTransferOp(u: Unit, opdata: ExtOpData) : GTXOperation(opdata) {
     }
 }
 
+@Suppress("UNUSED_PARAMETER")
+class EifBlockOp(u: Unit, opdata: ExtOpData) : GTXOperation(opdata) {
+
+    override fun checkCorrectness() {
+        requireNotNull(EvmBlockOp.fromOpData(OpData(data.opName, data.args)))
+    }
+
+    override fun apply(ctx: TxEContext): Boolean {
+        return true
+    }
+}
+
 class EifTestModule : SimpleGTXModule<Unit>(Unit,
         mapOf(
                 "eif_event" to ::EifEventOp,
-                "eif_state" to ::EifStateOp
+                "eif_state" to ::EifStateOp,
+                EvmBlockOp.OP_NAME to ::EifBlockOp
         ),
         mapOf()
 ) {

@@ -1,22 +1,9 @@
 package net.postchain.eif
 
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.slf4j.MDCContext
 import mu.KLogging
 import net.postchain.common.exception.ProgrammerMistake
-import net.postchain.common.hexStringToByteArray
-import net.postchain.common.toHex
 import net.postchain.concurrent.util.get
 import net.postchain.core.BlockchainEngine
-import net.postchain.core.Shutdownable
-import net.postchain.eif.web3j.Web3jRequestHandler
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvBigInteger
@@ -25,26 +12,10 @@ import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvInteger
 import net.postchain.gtv.GtvNull
 import net.postchain.gtv.GtvString
-import net.postchain.gtx.data.OpData
-import org.web3j.abi.EventEncoder
-import org.web3j.abi.datatypes.Event
-import org.web3j.protocol.core.DefaultBlockParameter
-import org.web3j.protocol.core.methods.request.EthFilter
-import org.web3j.protocol.core.methods.response.EthLog
-import org.web3j.protocol.core.methods.response.Log
-import org.web3j.tx.Contract
 import java.math.BigInteger
 import java.util.LinkedList
 import java.util.Queue
 import java.util.stream.Collectors
-import kotlin.collections.map
-
-enum class EncodedBlock(val index: Int) {
-    NETWORK_ID(0),
-    NUMBER(1),
-    HASH(2),
-    EVENTS(3)
-}
 
 enum class EncodedEvent(val index: Int) {
     TX_HASH(0),
@@ -57,10 +28,10 @@ enum class EncodedEvent(val index: Int) {
 }
 
 interface EventProcessor {
-    fun shutdown()
-    fun getEventData(): List<Array<Gtv>>
-    fun isValidEventData(ops: List<OpData>): Boolean
-    fun markAsProcessed(ops: List<OpData>)
+    fun getEventData(): List<EvmBlockOp>
+    fun numberOfNewEvents(): Long
+    fun isValidEventData(ops: List<EvmBlockOp>): Boolean
+    fun markAsProcessed(ops: List<EvmBlockOp>)
 }
 
 /**
@@ -70,29 +41,21 @@ interface EventProcessor {
 class NoOpEventProcessor : EventProcessor {
     companion object : KLogging()
 
-    override fun shutdown() {}
+    override fun getEventData(): List<EvmBlockOp> = emptyList()
 
-    override fun getEventData(): List<Array<Gtv>> = emptyList()
+    override fun numberOfNewEvents(): Long = 0L
 
     /**
      * We can at least validate structure
      */
-    override fun isValidEventData(ops: List<OpData>): Boolean {
+    override fun isValidEventData(ops: List<EvmBlockOp>): Boolean {
         for (op in ops) {
-            if (op.opName == OP_EVM_BLOCK) {
-                if (!isValidEvmBlockFormat(op.args)) {
-                    logger.warn("Received malformed operation of type $OP_EVM_BLOCK")
-                    return false
-                }
-            } else {
-                logger.error("Unknown operation: ${op.opName}")
-                return false
-            }
+            return op.events.all { isValidEvmEventFormat(it.asArray()) }
         }
         return true
     }
 
-    override fun markAsProcessed(ops: List<OpData>) {}
+    override fun markAsProcessed(ops: List<EvmBlockOp>) {}
 
     private fun isValidEvmEventFormat(opArgs: Array<out Gtv>) = opArgs.size == 7 &&
             opArgs[EncodedEvent.TX_HASH.index] is GtvByteArray &&
@@ -102,169 +65,29 @@ class NoOpEventProcessor : EventProcessor {
             opArgs[EncodedEvent.NAME.index] is GtvString &&
             opArgs[EncodedEvent.INDEXED_VALUES.index] is GtvArray &&
             opArgs[EncodedEvent.NON_INDEXED_VALUES.index] is GtvArray
-
-    private fun isValidEvmBlockFormat(opArgs: Array<out Gtv>) = opArgs.size == 4 &&
-            opArgs[EncodedBlock.NETWORK_ID.index] is GtvInteger &&
-            opArgs[EncodedBlock.NUMBER.index] is GtvBigInteger &&
-            opArgs[EncodedBlock.HASH.index] is GtvByteArray &&
-            opArgs[EncodedBlock.EVENTS.index].asArray().all { isValidEvmEventFormat(it.asArray()) }
 }
 
 /**
- * Reads events from evm chain
- *
- * @param evmReadOffset We will read this amount of blocks from the block head on the evm chain, to avoid issues with chain reorg
  * @param readOffset Will return events from blocks with this specified offset from the last block we have seen from evm chain
  * (so that slower nodes may have a chance to validate the events)
  */
 class EvmEventProcessor(
-        private val networkId: Long,
-        private val staticContracts: List<String>,
-        private val hasDynamicContacts: Boolean,
-        private val staticEvents: List<Event>,
-        private val hasDynamicEvents: Boolean,
-        private val evmReadOffset: BigInteger,
         private val readOffset: BigInteger,
-        private val maxReadAhead: Long,
         private val maxQueueSize: Long,
-        skipToHeight: BigInteger,
-        lastEvmBlockHeight: BigInteger,
         private val blockchainEngine: BlockchainEngine,
-        private val web3jRequestHandler: Web3jRequestHandler,
-        private val delayWhenNoNewBlocks: Long
-) : EventProcessor, Shutdownable {
-
-    private val job: Job
+) : EventProcessor {
 
     companion object : KLogging()
 
     data class EvmBlock(val number: BigInteger, val hash: String)
 
-    private val eventBlocks: Queue<Array<Gtv>> = LinkedList()
+    private val eventBlocks: Queue<EvmBlockOp> = LinkedList()
 
     @Volatile
     var lastReadLogBlockHeight: BigInteger = BigInteger.ZERO
-        private set
-
-    init {
-        job = CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-event-processor") + MDCContext()) {
-            var hasInitiatedHeights = false
-            while (isActive) {
-                try {
-                    if (!hasInitiatedHeights) {
-                        lastReadLogBlockHeight = getLastCommittedEvmBlockHeight(networkId)
-                                ?: getSkipToHeight(skipToHeight)
-                        if (lastEvmBlockHeight > lastReadLogBlockHeight) {
-                            lastReadLogBlockHeight = lastEvmBlockHeight
-                        }
-                        hasInitiatedHeights = true
-                    }
-
-                    fetchEvents()
-                } catch (_: CancellationException) {
-                    break
-                } catch (e: Exception) {
-                    logger.error("Parsing of EVM logs unexpectedly failed: $e", e)
-                    delay(500) // Delay a bit and hope that we can recover
-                }
-            }
-        }
-    }
-
-    /**
-     * Producer thread will read events from ethereum ond add to queue in this action. Main thread will consume them.
-     */
-    private suspend fun fetchEvents() {
-        val from = lastReadLogBlockHeight + BigInteger.ONE
-
-        val blockNumberReply = web3jRequestHandler.sendWeb3jRequestWithRetry { it.ethBlockNumber() }
-        val currentBlockHeight = blockNumberReply.blockNumber - evmReadOffset
-        // Pacing the reading of logs
-        val to = minOf(currentBlockHeight, from + BigInteger.valueOf(maxReadAhead))
-
-        if (to < from) {
-            logger.debug { "No new blocks to read. We are at height: $to" }
-            // Sleep a bit until next attempt
-            delay(delayWhenNoNewBlocks)
-            return
-        }
-
-        val contracts = if (hasDynamicContacts) {
-            try {
-                val dynamicContracts = blockchainEngine.getBlockQueries().query(
-                        EIF_CONFIG_CONTRACTS_QUERY, gtv(mapOf("network_id" to gtv(networkId)))).get().asArray()
-                        .map { "0x${it.asByteArray().toHex()}" }
-                staticContracts.union(dynamicContracts)
-            } catch (e: Exception) {
-                logger.warn(e) { "Unable to fetch dynamic contracts: $e" }
-                staticContracts
-            }
-        } else {
-            staticContracts
-        }
-        logger.debug { "Contracts: $contracts" }
-        if (contracts.isEmpty()) {
-            logger.warn { "No contracts configured, trying again later" }
-            delay(delayWhenNoNewBlocks)
-            return
-        }
-
-        val eventMap = if (hasDynamicEvents) {
-            try {
-                val dynamicEvents = blockchainEngine.getBlockQueries().query(
-                        EIF_CONFIG_EVENTS_QUERY, gtv(mapOf("network_id" to gtv(networkId)))).get().asArray().map(GtvToEventMapper::map)
-                staticEvents.associateBy(EventEncoder::encode).toMutableMap().apply { putAll(dynamicEvents.associateBy(EventEncoder::encode)) }
-            } catch (e: Exception) {
-                logger.warn(e) { "Unable to fetch dynamic events: $e" }
-                staticEvents.associateBy(EventEncoder::encode)
-            }
-        } else {
-            staticEvents.associateBy(EventEncoder::encode)
-        }
-        logger.debug { "Events: ${eventMap.values}" }
-        if (eventMap.isEmpty()) {
-            logger.warn { "No events configured, trying again later" }
-            delay(delayWhenNoNewBlocks)
-            return
-        }
-
-        val filter = EthFilter(
-                DefaultBlockParameter.valueOf(from),
-                DefaultBlockParameter.valueOf(to),
-                contracts.toList()
-        )
-        filter.addOptionalTopics(*eventMap.keys.toTypedArray())
-
-        val logResponse = web3jRequestHandler.sendWeb3jRequestWithRetry { it.ethGetLogs(filter) }
-
-        // Ensure events are sorted on txIndex + logIndex, blocks sorted on block number
-        val sortedEncodedLogs = logResponse.logs
-                .map { (it as EthLog.LogObject).get() }
-                .groupBy { EvmBlock(it.blockNumber, it.blockHash) }
-                .mapValues { it.value.sortedWith(compareBy({ event -> event.transactionIndex }, { event -> event.logIndex })) }
-                .toList()
-                .sortedBy { it.first.number }
-                .map { eventBlockToGtv(eventMap, it) }
-        processLogEventsAndUpdateOffsets(sortedEncodedLogs, to)
-
-        // If we just saw one new block we can probably sleep
-        if (to == from) {
-            delay(delayWhenNoNewBlocks)
-        }
-
-        while (isQueueFull()) {
-            logger.debug("Wait for events to be consumed until we read more")
-            delay(500)
-        }
-    }
-
-    override fun shutdown() {
-        job.cancel()
-        web3jRequestHandler.close()
-    }
 
     @Synchronized
-    override fun isValidEventData(ops: List<OpData>): Boolean {
+    override fun isValidEventData(ops: List<EvmBlockOp>): Boolean {
         // We are strict here, if we have not seen something we will not try to go and fetch it.
         // We simply verify that the same blocks and events are coming in the same order that we have seen them
         // If there are too many rejections, readOffset should be increased
@@ -277,75 +100,42 @@ class EvmEventProcessor(
             if (index >= ops.size) break
 
             val op = ops[index]
-            if (op.opName == OP_EVM_BLOCK) {
-                if (op.args.size != 4) {
-                    logger.warn("Got $OP_EVM_BLOCK operation with wrong number of arguments: ${op.args.size}")
-                    return false
-                }
 
-                val opNetworkId = op.args[EncodedBlock.NETWORK_ID.index]
-                val eventNetworkId = eventBlock[EncodedBlock.NETWORK_ID.index]
-                val opBlockNumber = op.args[EncodedBlock.NUMBER.index]
-                val eventBlockNumber = eventBlock[EncodedBlock.NUMBER.index]
-                val opBlockHash = op.args[EncodedBlock.HASH.index]
-                val eventBlockHash = eventBlock[EncodedBlock.HASH.index]
+            if (op.networkId != eventBlock.networkId || op.evmBlockHeight != eventBlock.evmBlockHeight || op.evmBlockHash != eventBlock.evmBlockHash) {
+                logger.warn(
+                        "Received unexpected block ${op.evmBlockHeight} with hash ${op.evmBlockHash} in network ${op.networkId}." +
+                                " Expected block ${eventBlock.evmBlockHeight} with hash ${eventBlock.evmBlockHash} in network ${eventBlock.networkId}"
+                )
+                return false
+            }
 
-                if (opNetworkId != eventNetworkId || opBlockNumber != eventBlockNumber || opBlockHash != eventBlockHash) {
-                    logger.warn(
-                            "Received unexpected block $opBlockNumber with hash $opBlockHash in network $opNetworkId." +
-                                    " Expected block $eventBlockNumber with hash $eventBlockHash in network $eventNetworkId"
-                    )
-                    return false
-                }
-
-                if (op.args[EncodedBlock.EVENTS.index] != eventBlock[EncodedBlock.EVENTS.index]) {
-                    logger.warn("Events in received block $opBlockNumber do not match expected events")
-                    return false
-                }
-            } else {
-                logger.error("Unknown operation: ${op.opName}")
+            if (op.events != eventBlock.events) {
+                logger.warn("Events in received block ${op.evmBlockHeight} do not match expected events")
                 return false
             }
         }
         return true
     }
 
-    override fun markAsProcessed(ops: List<OpData>) {
+    override fun markAsProcessed(ops: List<EvmBlockOp>) {
         if (ops.isNotEmpty()) {
-            pruneEvents(ops.maxOf { it.args[EncodedBlock.NUMBER.index].asBigInteger() })
+            pruneEvents(ops.maxOf { it.evmBlockHeight })
         }
     }
+
+    fun isQueueFull() = numberOfNewEvents() > maxQueueSize
 
     @Synchronized
-    override fun getEventData(): List<Array<Gtv>> {
-        return eventBlocks.stream()
-                .takeWhile { it[EncodedBlock.NUMBER.index].asBigInteger() <= lastReadLogBlockHeight - readOffset }
-                .collect(Collectors.toList())
-    }
+    override fun numberOfNewEvents(): Long = eventBlocks.stream()
+            .takeWhile { it.evmBlockHeight <= lastReadLogBlockHeight - readOffset }
+            .count()
 
-    private fun eventBlockToGtv(eventMap: Map<String, Event>, eventBlock: Pair<EvmBlock, List<Log>>): Array<Gtv> {
-        val events = eventBlock.second.map { event ->
-            val matchingEvent = eventMap[event.topics[0]] ?: throw ProgrammerMistake("No matching event")
-            val parameters = Contract.staticExtractEventParameters(matchingEvent, event)
-            gtv(listOf(
-                    gtv(event.transactionHash.substring(2).hexStringToByteArray()),
-                    gtv(event.logIndex),
-                    gtv(event.topics[0].substring(2).hexStringToByteArray()),
-                    gtv(event.address.substring(2).hexStringToByteArray()),
-                    gtv(matchingEvent.name),
-                    gtv(parameters.indexedValues.map(TypeToGtvMapper::map)),
-                    gtv(parameters.nonIndexedValues.map(TypeToGtvMapper::map))
-            ))
-        }
-        return arrayOf(
-                gtv(networkId),
-                gtv(eventBlock.first.number),
-                gtv(eventBlock.first.hash.substring(2).hexStringToByteArray()),
-                gtv(events)
-        )
-    }
+    @Synchronized
+    override fun getEventData(): List<EvmBlockOp> = eventBlocks.stream()
+            .takeWhile { it.evmBlockHeight <= lastReadLogBlockHeight - readOffset }
+            .collect(Collectors.toList())
 
-    private fun getLastCommittedEvmBlockHeight(networkId: Long): BigInteger? {
+    fun getLastCommittedEvmBlockHeight(networkId: Long): BigInteger? {
         val block = blockchainEngine.getBlockQueries().query("get_last_evm_block", gtv("network_id" to gtv(networkId))).get()
         if (block == GtvNull) {
             return null
@@ -369,8 +159,8 @@ class EvmEventProcessor(
     }
 
     @Synchronized
-    private fun processLogEventsAndUpdateOffsets(
-            logs: List<Array<Gtv>>,
+    fun processLogEventsAndUpdateOffsets(
+            logs: List<EvmBlockOp>,
             newLastReadLogBlockHeight: BigInteger
     ) {
         eventBlocks.addAll(logs)
@@ -378,30 +168,11 @@ class EvmEventProcessor(
     }
 
     @Synchronized
-    private fun isQueueFull(): Boolean {
-        // Just check against the events that we can actually consume
-        return eventBlocks.filter {
-            it[EncodedBlock.NUMBER.index].asBigInteger() <= lastReadLogBlockHeight - readOffset
-        }.size > maxQueueSize
-    }
-
-    @Synchronized
     private fun pruneEvents(pruneHeight: BigInteger) {
         var nextLogEvent = eventBlocks.peek()
-        while (nextLogEvent != null && nextLogEvent[EncodedBlock.NUMBER.index].asBigInteger() <= pruneHeight) {
+        while (nextLogEvent != null && nextLogEvent.evmBlockHeight <= pruneHeight) {
             eventBlocks.poll()
             nextLogEvent = eventBlocks.peek()
         }
-    }
-
-    private fun getSkipToHeight(skipToHeight: BigInteger): BigInteger {
-
-        if (skipToHeight < BigInteger.ZERO) {
-
-            val blockNumberReply = web3jRequestHandler.ethBlockNumber()
-            return blockNumberReply.blockNumber.plus(skipToHeight)
-        }
-
-        return skipToHeight
     }
 }

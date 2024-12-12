@@ -8,6 +8,7 @@ import net.postchain.common.exception.UserMistake
 import net.postchain.core.BlockchainConfiguration
 import net.postchain.core.BlockchainEngine
 import net.postchain.core.BlockchainProcess
+import net.postchain.core.Shutdownable
 import net.postchain.core.SynchronizationInfrastructureExtension
 import net.postchain.eif.config.EifEventReceiverConfig
 import net.postchain.eif.config.EifEvmBlockchainConfig
@@ -28,7 +29,7 @@ const val EIF_CONFIG_EVENTS_QUERY = "eif.get_events"
 class EifSynchronizationInfrastructureExtension(
         private val postchainContext: PostchainContext
 ) : SynchronizationInfrastructureExtension {
-    private val eventProcessors = mutableMapOf<BlockchainRid, MutableMap<Long, EventProcessor>>()
+    private val eventFetchers = mutableMapOf<BlockchainRid, MutableMap<Long, Shutdownable?>>()
     private val eifMetricsRegistry = EifMetricsRegistry()
 
     companion object : KLogging()
@@ -43,7 +44,9 @@ class EifSynchronizationInfrastructureExtension(
                 val eventReceiverConfig = cfg.rawConfig["eif"]?.toObject<EifEventReceiverConfig>()
                         ?: throw UserMistake("No EIF config present")
 
-                eventProcessors[cfg.blockchainRid] = mutableMapOf()
+                ext.config = eventReceiverConfig
+
+                eventFetchers[cfg.blockchainRid] = mutableMapOf()
                 for ((evmBlockchainName, evmBlockchainConfig) in eventReceiverConfig.chains) {
                     if (evmBlockchainConfig.skipToHeight == 0L) {
                         logger.warn("Skip to height config is set to 0 for EVM network: $evmBlockchainName. Consider changing it to avoid redundant queries.")
@@ -62,9 +65,9 @@ class EifSynchronizationInfrastructureExtension(
                         (EIF_CONFIG_EVENTS_QUERY in compositeModule.getQueries())
                     } == true
 
-                    val eventProcessor = initializeEventProcessor(cfg, evmBlockchainConfig, engine, evmConfig, hasDynamicContracts, hasDynamicEvents)
+                    val (eventProcessor, eventFetcher) = initializeEventProcessor(cfg, evmBlockchainConfig, engine, evmConfig, hasDynamicContracts, hasDynamicEvents)
                     ext.addEventProcessor(evmBlockchainConfig.networkId, eventProcessor)
-                    eventProcessors[cfg.blockchainRid]?.set(evmBlockchainConfig.networkId, eventProcessor)
+                    eventFetchers[cfg.blockchainRid]?.set(evmBlockchainConfig.networkId, eventFetcher)
                     eifMetricsRegistry.registerMetrics(cfg.chainID, cfg.blockchainRid, evmBlockchainConfig.networkId, eventProcessor)
                 }
             }
@@ -73,24 +76,38 @@ class EifSynchronizationInfrastructureExtension(
 
     override fun disconnectProcess(process: BlockchainProcess) {
         val blockchainRid = process.blockchainEngine.getConfiguration().blockchainRid
-        val eventProcessors = eventProcessors.remove(blockchainRid)
+        val blockchainEventProcessors = eventFetchers.remove(blockchainRid)
                 ?: throw ProgrammerMistake("Blockchain $blockchainRid not attached")
         eifMetricsRegistry.unregisterMetrics(blockchainRid)
-        eventProcessors.values.forEach { it.shutdown() }
+        blockchainEventProcessors.values.forEach {
+            it?.shutdown()
+        }
     }
 
     override fun shutdown() {
         eifMetricsRegistry.unregisterAllMetrics()
-        eventProcessors.values.forEach { it.values.forEach { eventProcessor -> eventProcessor.shutdown() } }
-        eventProcessors.clear()
+        eventFetchers.values.forEach { blockchainEventProcessors ->
+            blockchainEventProcessors.values.forEach {
+                it?.shutdown()
+            }
+        }
+        eventFetchers.clear()
     }
 
     private fun initializeEventProcessor(cfg: BlockchainConfiguration, eifEvmBlockchainConfig: EifEvmBlockchainConfig,
                                          engine: BlockchainEngine, evmConfig: EvmConfig,
-                                         hasDynamicContacts: Boolean, hasDynamicEvents: Boolean): EventProcessor {
+                                         hasDynamicContacts: Boolean, hasDynamicEvents: Boolean): Pair<EventProcessor, Shutdownable?> {
+        val eventProcessor = EvmEventProcessor(
+                BigInteger.valueOf(eifEvmBlockchainConfig.readOffset),
+                eifEvmBlockchainConfig.maxQueueSize,
+                engine,
+        )
         return if ("ignore".equals(evmConfig.urls.first(), ignoreCase = true)) {
-            logger.warn("EIF is running in disconnected mode. No events will be validated against ethereum.")
-            NoOpEventProcessor()
+            logger.warn("EIF is running in disconnected mode. No events will be fetched from or validated against ethereum.")
+            NoOpEventProcessor() to null
+        } else if ("test".equals(evmConfig.urls.first(), ignoreCase = true)) {
+            logger.info("EIF is running in test mode. No events will be fetched from or validated against ethereum.")
+            eventProcessor to null
         } else {
             val staticContracts = eifEvmBlockchainConfig.contracts ?: listOf()
             if (staticContracts.isEmpty() && !hasDynamicContacts) throw UserMistake("No contracts configured for ${cfg.blockchainRid}")
@@ -98,22 +115,22 @@ class EifSynchronizationInfrastructureExtension(
             if (staticEvents.isEmpty() && !hasDynamicEvents) throw UserMistake("No events configured for ${cfg.blockchainRid}")
             val web3jServices = Web3jServiceFactory.buildServices(evmConfig.urls, evmConfig.connectTimeout, evmConfig.readTimeout, evmConfig.writeTimeout)
             val metrics = RpcUsageMetrics(cfg.chainID, cfg.blockchainRid, eifEvmBlockchainConfig.networkId)
-            EvmEventProcessor(
-                        eifEvmBlockchainConfig.networkId,
-                        staticContracts,
-                        hasDynamicContacts,
-                        staticEvents,
-                        hasDynamicEvents,
-                        BigInteger.valueOf(eifEvmBlockchainConfig.evmReadOffset),
-                        BigInteger.valueOf(eifEvmBlockchainConfig.readOffset),
-                        evmConfig.maxReadAhead,
-                        eifEvmBlockchainConfig.maxQueueSize,
-                        BigInteger.valueOf(eifEvmBlockchainConfig.skipToHeight),
-                        BigInteger.valueOf(evmConfig.lastEvmBlockHeight),
-                        engine,
-                        Web3jRequestHandler(evmConfig.minRetryDelay, evmConfig.maxRetryDelay, evmConfig.maxTryErrors, evmConfig.urls, web3jServices, metrics),
-                        evmConfig.delayWhenNoNewBlocks
+            val eventFetcher = EvmEventFetcher(
+                    eifEvmBlockchainConfig.networkId,
+                    staticContracts,
+                    hasDynamicContacts,
+                    staticEvents,
+                    hasDynamicEvents,
+                    BigInteger.valueOf(eifEvmBlockchainConfig.evmReadOffset),
+                    evmConfig.maxReadAhead,
+                    BigInteger.valueOf(eifEvmBlockchainConfig.skipToHeight),
+                    BigInteger.valueOf(evmConfig.lastEvmBlockHeight),
+                    engine,
+                    Web3jRequestHandler(evmConfig.minRetryDelay, evmConfig.maxRetryDelay, evmConfig.maxTryErrors, evmConfig.urls, web3jServices, metrics),
+                    evmConfig.delayWhenNoNewBlocks,
+                    eventProcessor,
             )
+            eventProcessor to eventFetcher
         }
     }
 }

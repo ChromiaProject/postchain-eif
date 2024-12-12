@@ -2,7 +2,16 @@
 
 ### EVM Event Receiver Blockchain Configuration
 
-EVM Event Receiver blockchain configuration contains a list of EVM chain configurations. The last has the following configuration properties:
+EVM Event Receiver blockchain configuration has the following configuration properties:  
+
+
+| Name                                         | Description                                                                      | Type | Required           | Default |
+|----------------------------------------------|----------------------------------------------------------------------------------|------|--------------------|---------|
+| `max_event_delay`                            | Trigger block building after this time has passed if there are any queued events | int  |                    | 1000 ms |
+| `number_of_events_to_trigger_block_building` | Trigger block building when there are at least this number of events queued      | int  |                    | 100     |
+| `chains`                                     | Map of EVM chains.                                                               | map  | :white_check_mark: |         |
+
+Each entry in `chains` has the following configuration properties:
 
 | Name              | Description                                                                                                                                                                                                                                                                                                                        | Type          | Required           | Default |
 |-------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|--------------------|---------|
@@ -23,6 +32,8 @@ blockchains:
     module: event_receiver
     config:
       eif:
+        max_event_delay: 2000
+        number_of_events_to_trigger_block_building: 200
         chains:
           sepolia:
             network_id: 11155111
@@ -119,11 +130,11 @@ EVM Event Receiver node configuration has the following properties.
 
 
 #### EVM chain-specific properties:
-| Name                          | Description                                                                                                                                                                                                                                                                                                                 | Type         | Default | Environment Variable                           |
-|-------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|---------|------------------------------------------------|
-| `${chain}.urls`               | CSV list of URLs for connecting to EVM nodes (HTTP URLs or IPC socket paths)                                                                                                                                                                                                                                                | list<string> | [ ]     | `POSTCHAIN_EIF_${CHAIN}_URLS`                  |
-| `${chain}.lastEvmBlockHeight` | The EVM block height from which the Chromia node will start reading block events. This applies only when this value is higher than the last committed EVM block height on the Chromia node. Typically, this is used when restarting the Chromia node after a long offline period to avoid querying unnecessary EVM blocks.  | int          | 0       | `POSTCHAIN_EIF_${CHAIN}_LAST_EVM_BLOCK_HEIGHT` |
-| `${chain}.maxReadAhead`       | The maximum number of blocks per request whose events will be requested ahead of the current block height                                                                                                                                                                                                                   | int          | 2000    | `POSTCHAIN_EIF_${CHAIN}_MAX_READ_AHEAD`        |
+| Name                          | Description                                                                                                                                                                                                                                                                                                                | Type         | Default | Environment Variable                           |
+|-------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|---------|------------------------------------------------|
+| `${chain}.urls`               | CSV list of URLs for connecting to EVM nodes (HTTP URLs or IPC socket paths). Can be set to special value `ignore` to run in disconnected mode for testing purposes.                                                                                                                                                       | list<string> |         | `POSTCHAIN_EIF_${CHAIN}_URLS`                  |
+| `${chain}.lastEvmBlockHeight` | The EVM block height from which the Chromia node will start reading block events. This applies only when this value is higher than the last committed EVM block height on the Chromia node. Typically, this is used when restarting the Chromia node after a long offline period to avoid querying unnecessary EVM blocks. | int          | 0       | `POSTCHAIN_EIF_${CHAIN}_LAST_EVM_BLOCK_HEIGHT` |
+| `${chain}.maxReadAhead`       | The maximum number of blocks per request whose events will be requested ahead of the current block height                                                                                                                                                                                                                  | int          | 2000    | `POSTCHAIN_EIF_${CHAIN}_MAX_READ_AHEAD`        |
 
 
 #### Configuration when running Master-Sub architecture
