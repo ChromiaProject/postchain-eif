@@ -137,7 +137,7 @@ blockchains:
         system_max_priority_fee_per_gas: 25000000000
         system_max_fee_per_gas: 180000000000
       transaction_submitter.anchoring:
-        anchoring_interval: 3600000 # every 1 hour
+        anchoring_interval: 7200000 # every 2 hours
       chain_version: *chain_version
     config:
       gtx:
