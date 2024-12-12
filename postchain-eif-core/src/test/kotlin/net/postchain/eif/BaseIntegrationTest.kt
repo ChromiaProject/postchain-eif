@@ -1,6 +1,7 @@
 package net.postchain.eif
 
 import net.postchain.common.hexStringToByteArray
+import net.postchain.crypto.Secp256K1CryptoSystem
 import net.postchain.devtools.ManagedModeTest
 import net.postchain.eif.transaction.TransactionSubmitter
 import net.postchain.gtv.Gtv
@@ -34,6 +35,8 @@ enum class AuthType {
 }
 
 abstract class EifBaseIntegrationTest(private val prependUrls: List<String> = listOf()) : ManagedModeTest() {
+
+    val myCS = Secp256K1CryptoSystem()
 
     val hashCalculator = GtvMerkleHashCalculator(myCS)
 

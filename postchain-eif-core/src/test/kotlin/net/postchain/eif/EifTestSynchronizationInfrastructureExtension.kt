@@ -4,6 +4,8 @@ package net.postchain.eif
 import net.postchain.PostchainContext
 import net.postchain.core.BlockchainProcess
 import net.postchain.core.SynchronizationInfrastructureExtension
+import net.postchain.eif.config.EifEventReceiverConfig
+import net.postchain.gtv.mapper.toObject
 import net.postchain.gtx.GTXBlockchainConfiguration
 
 @Suppress("UNUSED_PARAMETER")
@@ -13,11 +15,14 @@ class EifTestSynchronizationInfrastructureExtension(
 
     override fun connectProcess(process: BlockchainProcess) {
         val engine = process.blockchainEngine
-        val proc = EifTestEventProcessor()
+        val proc = StubEventProcessor()
         val gtxModule = (engine.getConfiguration() as GTXBlockchainConfiguration).module
         val txExtensions = gtxModule.getSpecialTxExtensions()
         for (te in txExtensions) {
-            if (te is EifSpecialTxExtension) te.addEventProcessor(1L, proc)
+            if (te is EifSpecialTxExtension) {
+                engine.getConfiguration().rawConfig["eif"]?.toObject<EifEventReceiverConfig>()?.let { te.config = it }
+                te.addEventProcessor(1L, proc)
+            }
         }
     }
 

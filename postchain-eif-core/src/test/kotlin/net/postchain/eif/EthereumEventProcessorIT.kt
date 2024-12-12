@@ -12,7 +12,6 @@ import net.postchain.eif.contracts.TokenBridge
 import net.postchain.eif.web3j.Web3jRequestHandler
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvNull
-import net.postchain.gtx.data.OpData
 import org.awaitility.Awaitility
 import org.awaitility.Duration
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -71,11 +70,27 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
         val contractDeployBlockNumber = web3jServices[0].ethGetTransactionByHash(contractDeployTransactionHash)
                 .send().result.blockNumber
         val eventsToRead = listOf(TokenBridge.DEPOSITEDERC20_EVENT)
-        val evmEventProcessor =
-                EvmEventProcessor(1L, listOf(bridge.contractAddress), hasDynamicContacts = false, eventsToRead,
-                        hasDynamicEvents = false, BigInteger.ZERO, BigInteger.ONE, 200L,
-                        100L, contractDeployBlockNumber, BigInteger.ZERO, engineMock,
-                        Web3jRequestHandler(500, 60_000, 2, mutableListOf(url), web3jServices), 500)
+
+        val evmEventProcessor = EvmEventProcessor(
+                BigInteger.ONE,
+                100L,
+                engineMock,
+        )
+        val evmEventFetcher = EvmEventFetcher(
+                1L,
+                listOf(bridge.contractAddress),
+                hasDynamicContacts = false,
+                eventsToRead,
+                hasDynamicEvents = false,
+                BigInteger.ZERO,
+                200L,
+                contractDeployBlockNumber,
+                BigInteger.ZERO,
+                engineMock,
+                Web3jRequestHandler(500, 60_000, 2, mutableListOf(url), web3jServices),
+                500,
+                evmEventProcessor
+        )
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contract
         val testToken = deployRemoteCall(TestToken::class.java, web3jServices[0], transactionManager, gasProvider, testTokenBinary, "").send().apply {
@@ -94,29 +109,23 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
                 .atMost(Duration.ONE_MINUTE)
                 .untilAsserted {
                     val eventBlocks = evmEventProcessor.getEventData()
-                    val events = eventBlocks.flatMap { it[EncodedBlock.EVENTS.index].asArray().asList() }
+                    val events = eventBlocks.flatMap { it.events }
                     assertThat(events.size).isEqualTo(5)
                 }
 
         // validate events
         val eventData = evmEventProcessor.getEventData()
-        val eventBlocksToValidate = eventData
-                .map { OpData(OP_EVM_BLOCK, it) }
-        assertTrue(evmEventProcessor.isValidEventData(eventBlocksToValidate))
+        assertTrue(evmEventProcessor.isValidEventData(eventData))
         // Test if NoOp version can also validate
-        assertTrue(NoOpEventProcessor().isValidEventData(eventBlocksToValidate))
+        assertTrue(NoOpEventProcessor().isValidEventData(eventData))
 
         // Verify that we can't skip any events by removing a block
-        assertFalse(evmEventProcessor.isValidEventData(eventBlocksToValidate.subList(1, eventBlocksToValidate.size)))
+        assertFalse(evmEventProcessor.isValidEventData(eventData.subList(1, eventData.size)))
 
         // Verify that we can't skip any events by removing them from the first block in the list
-        val eventBlocksWithoutEvents = eventBlocksToValidate.mapIndexed { i, eventBlock ->
+        val eventBlocksWithoutEvents = eventData.mapIndexed { i, eventBlock ->
             if (i == 0) {
-                OpData(OP_EVM_BLOCK, arrayOf(
-                        eventBlock.args[EncodedBlock.NUMBER.index],
-                        eventBlock.args[EncodedBlock.HASH.index],
-                        gtv(emptyList())
-                ))
+                eventBlock.copy(events = emptyList())
             } else {
                 eventBlock
             }
@@ -124,7 +133,7 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
         assertFalse(evmEventProcessor.isValidEventData(eventBlocksWithoutEvents))
 
         // Mock that the block was validated and committed to DB
-        evmEventProcessor.markAsProcessed(eventBlocksToValidate)
+        evmEventProcessor.markAsProcessed(eventData)
 
         // Assert events before last committed block are not included now
         assertTrue(evmEventProcessor.getEventData().isEmpty())
@@ -142,12 +151,12 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
                 .atMost(Duration.ONE_MINUTE)
                 .untilAsserted {
                     val eventBlocks = evmEventProcessor.getEventData()
-                    val events = eventBlocks.flatMap { it[EncodedBlock.EVENTS.index].asArray().asList() }
+                    val events = eventBlocks.flatMap { it.events }
                     assertThat(events.size).isEqualTo(1)
                 }
 
         val lastEventBlock = evmEventProcessor.getEventData().first()
-        val lastEvent = lastEventBlock[EncodedBlock.EVENTS.index].asArray().first()
+        val lastEvent = lastEventBlock.events.first()
         val indexedValues = lastEvent[EncodedEvent.INDEXED_VALUES.index].asArray()
         val nonIndexedValues = lastEvent[EncodedEvent.NON_INDEXED_VALUES.index].asArray()
 
@@ -156,7 +165,7 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
         assertThat(testToken.contractAddress).isEqualTo("0x${indexedValues[1].asByteArray().toHex().lowercase()}") // token
         assertThat(nonIndexedValues[0].asBigInteger()).isEqualTo(max) // value
 
-        evmEventProcessor.shutdown()
+        evmEventFetcher.shutdown()
     }
 
     @Test
@@ -195,13 +204,26 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
         val contractDeployTransactionHash = bridgeFirst.transactionReceipt.get().transactionHash
         val contractDeployBlockNumber = web3jServices[0].ethGetTransactionByHash(contractDeployTransactionHash)
                 .send().result.blockNumber
-        val evmEventProcessor =
-                EvmEventProcessor(networkId,
-                        listOf(bridgeFirst.contractAddress), hasDynamicContacts = true,
-                        listOf(TokenBridge.ALLOWTOKEN_EVENT), hasDynamicEvents = true,
-                        BigInteger.ZERO, BigInteger.ONE, 200L,
-                        100L, contractDeployBlockNumber, BigInteger.ZERO, engineMock,
-                        Web3jRequestHandler(500, 60_000, 2, mutableListOf(url), web3jServices), 500)
+
+        val evmEventProcessor = EvmEventProcessor(
+                BigInteger.ONE,
+                100L,
+                engineMock,
+        )
+        val evmEventFetcher = EvmEventFetcher(
+                networkId,
+                listOf(bridgeFirst.contractAddress),
+                hasDynamicContacts = true,
+                listOf(TokenBridge.ALLOWTOKEN_EVENT),
+                hasDynamicEvents = true,
+                BigInteger.ZERO,
+                200L,
+                contractDeployBlockNumber,
+                BigInteger.ZERO,
+                engineMock,
+                Web3jRequestHandler(500, 60_000, 2, mutableListOf(url), web3jServices), 500,
+                evmEventProcessor
+        )
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contracts
         val testToken = deployRemoteCall(TestToken::class.java, web3jServices[0], transactionManager, gasProvider, testTokenBinary, "").send().apply {
@@ -223,7 +245,7 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
                 .atMost(Duration.ONE_MINUTE)
                 .untilAsserted {
                     val eventBlocks = evmEventProcessor.getEventData()
-                    val events = eventBlocks.flatMap { it[EncodedBlock.EVENTS.index].asArray().asList() }
+                    val events = eventBlocks.flatMap { it.events }
                     assertThat(events.size).isEqualTo(4)
                     val eventContractAddresses = events.map {
                         "0x${it[EncodedEvent.CONTRACT.index].asByteArray().toHex()}".lowercase() to it[EncodedEvent.NAME.index].asString()
@@ -236,6 +258,6 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
                     )
                 }
 
-        evmEventProcessor.shutdown()
+        evmEventFetcher.shutdown()
     }
 }

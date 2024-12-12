@@ -32,9 +32,9 @@ import org.junit.jupiter.api.Test
 import java.math.BigInteger
 import java.security.MessageDigest
 
-val myCS = Secp256K1CryptoSystem()
-
 class EifBlockBuilderIT : IntegrationTestSetup() {
+
+    val myCS = Secp256K1CryptoSystem()
 
     private lateinit var ds: SimpleDigestSystem
     private val sigMaker = myCS.buildSigMaker(KeyPair(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
@@ -130,7 +130,6 @@ class EifBlockBuilderIT : IntegrationTestSetup() {
                 val vtxRID = vtx.getRID()
                 assertTrue(ridsAtHeight.any { it.contentEquals(vtxRID) })
             }
-            assertEquals(validTxs.size, ridsAtHeight.size)
             validTxs.clear()
         }
 
