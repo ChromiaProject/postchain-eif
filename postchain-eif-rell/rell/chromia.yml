@@ -276,6 +276,7 @@ blockchains:
             network_id: 97
             evm_read_offset: 10
             skip_to_height: 5801241
+            events: !include configs/events.yml
       icmf:
         receiver:
           directory-chain:
