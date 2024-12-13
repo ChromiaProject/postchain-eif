@@ -58,6 +58,16 @@ const config: HardhatUserConfig = {
             chainId: 97,
             url: "https://data-seed-prebsc-1-s1.binance.org:8545/",
         },
+        base: { // BASE Mainnet
+            accounts: {
+                count: 10,
+                initialIndex: 0,
+                mnemonic: MNEMONIC,
+                path: "m/44'/60'/0'/0",
+            },
+            chainId: 8453,
+            url: "https://base-rpc.publicnode.com",
+        },
         base_sepolia: { // BASE Sepolia Testnet
             accounts: {
                 count: 10,
