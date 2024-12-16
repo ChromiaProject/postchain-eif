@@ -50,7 +50,6 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
         return listOf()
     }
 
-
     override fun validateSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext, ops: List<OpData>): Boolean {
         if (position == SpecialTransactionPosition.Begin && processors.isNotEmpty()) {
             val index = bctx.height.mod(processors.size)

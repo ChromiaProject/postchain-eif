@@ -13,7 +13,12 @@
                 <string>net.postchain.base.BaseBlockBuildingStrategy</string>
             </entry>
             <entry key="maxblocktime">
-                <int>60000</int>
+                <!-- Set this value extremely high to let __evm_block to trigger block building -->
+                <int>600000</int>
+            </entry>
+            <entry key="maxtxdelay">
+                <!-- Set this value longer than Awaitility's atMost() duration to let __evm_block to trigger block building -->
+                <int>65000</int>
             </entry>
         </dict>
     </entry>
@@ -55,6 +60,14 @@
     </entry>
     <entry key="eif">
         <dict>
+            <entry key="max_event_delay">
+                <!-- Set this value low enough to let `__evm_block` to trigger block building -->
+                <int>1000</int>
+            </entry>
+            <entry key="number_of_events_to_trigger_block_building">
+                <!-- Single __evm_block event triggers block building -->
+                <int>1</int>
+            </entry>
             <entry key="chains">
                 <dict>
                     <entry key="ethereum">
