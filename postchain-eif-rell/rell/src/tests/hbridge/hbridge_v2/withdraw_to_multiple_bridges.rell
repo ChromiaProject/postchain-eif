@@ -1,0 +1,283 @@
+@test module;
+
+/**
+ * Once HBridge v2 becomes the default version, perform the following
+ *  - Remove `@test module;`
+ *  - Remove the `blockchains.withdraw_to_multiple_bridges_test` profile from the chromia.yml file
+ */
+
+import lib.ft4.auth;
+import lib.ft4.assets;
+import hbridge;
+import ^^.hbridge.{
+    // Constants
+    network_id1, network_id2, evm_address, asset_info, CHR, FOO, BAR, bridge_address1, bridge_address2, bridge_address3,
+    // Assets
+    register_ft4_asset, register_erc20_asset, register_bridge_with_erc20_assets,
+    // Accounts
+    _register_ft_account_and_link_evm_address, _mint, ensure_bridge_account,
+    // Asserts
+    assert_withdraw,
+};
+
+function test_can_not_call_operation__bridge_ft4_token_to_evm__if_hbridge_uses_v2() {
+    rell.test.tx().op(
+        hbridge.bridge_ft4_token_to_evm(network_id1, x"", 1, evm_address)
+    ).run_must_fail("Unsupported HBridge version 2 for the `bridge_ft4_token_to_evm` operation. Version 1 is required.");
+}
+
+function test_withdraw_foreign_asset_to_evm_with_already_linked_account() {
+    val ft_asset = register_ft4_asset(CHR);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.foreign);
+    register_bridge_with_erc20_assets(network_id1, bridge_address1, [erc20]);
+
+    _withdraw_asset_to_evm_with_already_linked_account(ft_asset);
+}
+
+function test_withdraw_native_asset_to_evm_with_already_linked_account_ends_up_in_bridge_account() {
+    val ft_asset = register_ft4_asset(CHR);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.native);
+
+    val withdraw_amount = _withdraw_asset_to_evm_with_already_linked_account(ft_asset);
+
+    // Bridge balances
+    val bridge_account = ensure_bridge_account(erc20.virtual_blockchain_rid);
+    assert_equals(assets.get_asset_balance(bridge_account, erc20.asset), withdraw_amount);
+}
+
+function test_withdraw_to_evm_using_most_recent_erc20_token_address_by_default() {
+    val ft_asset = register_ft4_asset(CHR);
+    val erc20_foo = register_erc20_asset(ft_asset, FOO, network_id1, bridge_mode = hbridge.bridge_mode.foreign);
+    val erc20_bar = register_erc20_asset(ft_asset, BAR, network_id1, bridge_mode = hbridge.bridge_mode.foreign);
+    register_bridge_with_erc20_assets(network_id1, bridge_address1, [erc20_foo, erc20_bar]);
+
+    _withdraw_asset_to_evm_with_already_linked_account(ft_asset, BAR); // withdrawal to BAR token contract
+
+    // no withdrawals to the FOO token contract
+    assert_true(empty(
+        hbridge.get_erc20_withdrawal(network_id1, FOO.token_address, evm_address)
+    ));
+}
+
+function test_withdraw_foreign_asset_to_multiple_evm_bridges() {
+    // Assets
+    val ft_chr_asset = register_ft4_asset(CHR);
+    val ft_foo_asset = register_ft4_asset(FOO);
+    //  - on network 1
+    val erc20_chr_network1 = register_erc20_asset(ft_chr_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.foreign);
+    register_bridge_with_erc20_assets(network_id1, bridge_address1, [erc20_chr_network1]);
+    //  - on network 2
+    val erc20_foo_network2 = register_erc20_asset(ft_foo_asset, FOO, network_id2, bridge_mode = hbridge.bridge_mode.foreign);
+    register_bridge_with_erc20_assets(network_id2, bridge_address2, [erc20_foo_network2]);
+    register_bridge_with_erc20_assets(network_id2, bridge_address3, [erc20_foo_network2]);
+
+    // Test
+    _withdraw_assets_to_multiple_evm_bridges(ft_chr_asset, ft_foo_asset);
+}
+
+function test_withdraw_native_asset_to_multiple_evm_bridges() {
+    // Assets
+    val ft_chr_asset = register_ft4_asset(CHR);
+    val ft_foo_asset = register_ft4_asset(FOO);
+    //  - on network 1
+    val erc20_chr_network1 = register_erc20_asset(ft_chr_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.native);
+    register_bridge_with_erc20_assets(network_id1, bridge_address1, [erc20_chr_network1]);
+    //  - on network 2
+    val erc20_foo_network2 = register_erc20_asset(ft_foo_asset, FOO, network_id2, bridge_mode = hbridge.bridge_mode.native);
+    register_bridge_with_erc20_assets(network_id2, bridge_address2, [erc20_foo_network2]);
+    register_bridge_with_erc20_assets(network_id2, bridge_address3, [erc20_foo_network2]);
+
+    // Test
+    val (withdraw_chr_amount, withdraw_foo_amount) = _withdraw_assets_to_multiple_evm_bridges(ft_chr_asset, ft_foo_asset);
+
+    // Bridge balances
+    val bridge1_account = ensure_bridge_account(erc20_chr_network1.virtual_blockchain_rid);
+    assert_equals(assets.get_asset_balance(bridge1_account, erc20_chr_network1.asset), withdraw_chr_amount);
+    val bridge2_account = ensure_bridge_account(erc20_foo_network2.virtual_blockchain_rid);
+    assert_equals(assets.get_asset_balance(bridge2_account, erc20_foo_network2.asset), withdraw_foo_amount);
+}
+
+function _withdraw_assets_to_multiple_evm_bridges(ft_chr_asset: assets.asset, ft_foo_asset: assets.asset): (big_integer, big_integer) {
+    // Accounts
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
+    //  - CHR
+    val amount_chr = _mint(ft_account, ft_chr_asset);
+    assert_equals(assets.get_asset_balance(ft_account, ft_chr_asset), amount_chr);
+    val withdraw_chr_amount = amount_chr / 10;
+    //  - FOO
+    val amount_foo = _mint(ft_account, ft_foo_asset);
+    assert_equals(assets.get_asset_balance(ft_account, ft_foo_asset), amount_foo);
+    val withdraw_foo_amount = amount_foo / 20;
+
+    // Withdrawal / network1: CHR -> bridge1
+    rell.test.tx().nop()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft_asset_to_evm(ft_chr_asset.id, withdraw_chr_amount, network_id1, evm_address, bridge_address1))
+        .sign(rell.test.keypairs.alice).run();
+    assert_withdraw(1, evm_address, withdraw_chr_amount, asset = CHR, network_id = network_id1, bridge_address = bridge_address1, version = 2);
+
+    // Withdrawal / network2: FOO -> bridge2
+    rell.test.tx().nop()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft_asset_to_evm(ft_foo_asset.id, withdraw_foo_amount, network_id2, evm_address, bridge_address2))
+        .sign(rell.test.keypairs.alice).run();
+    assert_withdraw(2, evm_address, withdraw_foo_amount, asset = FOO, network_id = network_id2, bridge_address = bridge_address2, version = 2);
+
+    // Withdrawal / network2: FOO -> bridge3
+    rell.test.tx().nop()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft_asset_to_evm(ft_foo_asset.id, withdraw_foo_amount, network_id2, evm_address, bridge_address3))
+        .sign(rell.test.keypairs.alice).run();
+    assert_withdraw(3, evm_address, withdraw_foo_amount, asset = FOO, network_id = network_id2, bridge_address = bridge_address3, version = 2, expected_nr_withdrawals = 2);
+
+    // Withdrawal / network2: FOO -> bridge3 (again)
+    rell.test.tx().nop()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft_asset_to_evm(ft_foo_asset.id, withdraw_foo_amount, network_id2, evm_address, bridge_address3))
+        .sign(rell.test.keypairs.alice).run();
+    assert_withdraw(4, evm_address, withdraw_foo_amount, asset = FOO, network_id = network_id2, bridge_address = bridge_address3, version = 2, expected_nr_withdrawals = 3);
+
+    assert_equals(assets.get_asset_balance(ft_account, ft_chr_asset), amount_chr - withdraw_chr_amount);
+    assert_equals(assets.get_asset_balance(ft_account, ft_foo_asset), amount_foo - 3 * withdraw_foo_amount);
+
+    return (withdraw_chr_amount, 3 * withdraw_foo_amount);
+}
+
+function _withdraw_asset_to_evm_with_already_linked_account(ft_asset: assets.asset, asset_info = CHR): big_integer {
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
+    val amount = _mint(ft_account, ft_asset);
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
+    val withdraw_amount = amount / 2;
+
+    rell.test.tx()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft_asset_to_evm(ft_asset.id, withdraw_amount, network_id1, evm_address, bridge_address1))
+        .sign(rell.test.keypairs.alice).run();
+
+    assert_withdraw(1, evm_address, withdraw_amount, asset = asset_info, bridge_address = bridge_address1, version = 2);
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), withdraw_amount);
+
+    return withdraw_amount;
+}
+
+function test_can_not_withdraw_to_evm_without_linked_evm_token() {
+    val ft_asset = register_ft4_asset(CHR);
+
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
+    val amount = _mint(ft_account, ft_asset);
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
+    val withdraw_amount = amount / 2;
+
+    rell.test.tx()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft_asset_to_evm(ft_asset.id, withdraw_amount, network_id1, evm_address, bridge_address1))
+        .sign(rell.test.keypairs.alice)
+        .run_must_fail("ERC20 token not found");
+}
+
+function test_can_not_withdraw_foreign_asset_to_evm_without_linked_account() {
+    val ft_asset = register_ft4_asset(CHR);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.foreign);
+    _can_not_withdraw_to_evm_without_linked_account(ft_asset);
+}
+
+function test_can_not_withdraw_native_asset_to_evm_without_linked_account() {
+    val ft_asset = register_ft4_asset(CHR);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.native);
+    _can_not_withdraw_to_evm_without_linked_account(ft_asset);
+}
+
+function _can_not_withdraw_to_evm_without_linked_account(ft_asset: assets.asset) {
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address(false);
+    val amount = _mint(ft_account, ft_asset);
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
+    val withdraw_amount = amount / 2;
+
+    rell.test.tx()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft_asset_to_evm(ft_asset.id, withdraw_amount, network_id1, evm_address, bridge_address1))
+        .sign(rell.test.keypairs.alice)
+        .run_must_fail("Can only withdraw to your own account");
+}
+
+function test_can_not_withdraw_foreign_asset_to_evm_with_no_balance() {
+    val ft_asset = register_ft4_asset(CHR);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.foreign);
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
+
+    rell.test.tx()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft_asset_to_evm(ft_asset.id, 100000000000000000L, network_id1, evm_address, bridge_address1))
+        .sign(rell.test.keypairs.alice)
+        .run_must_fail("Insufficient balance");
+}
+
+function test_can_not_withdraw_foreign_asset_to_evm_with_insufficient_balance() {
+    val ft_asset = register_ft4_asset(CHR);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.foreign);
+
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
+    val amount = _mint(ft_account, ft_asset);
+
+    rell.test.tx()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft_asset_to_evm(ft_asset.id, amount + 1, network_id1, evm_address, bridge_address1))
+        .sign(rell.test.keypairs.alice)
+        .run_must_fail("Insufficient balance");
+}
+
+function test_can_not_withdraw_native_asset_to_evm_with_no_balance() {
+    val ft_asset = register_ft4_asset(CHR);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.native);
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
+
+    rell.test.tx()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft_asset_to_evm(ft_asset.id, 100000000000000000L, network_id1, evm_address, bridge_address1))
+        .sign(rell.test.keypairs.alice)
+        .run_must_fail("User does not have asset");
+}
+
+function test_can_not_withdraw_native_asset_to_evm_with_insufficient_balance() {
+    val ft_asset = register_ft4_asset(CHR);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.native);
+
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
+    val amount = _mint(ft_account, ft_asset);
+
+    rell.test.tx()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft_asset_to_evm(ft_asset.id, amount + 1, network_id1, evm_address, bridge_address1))
+        .sign(rell.test.keypairs.alice)
+        .run_must_fail("Balance is too low");
+}
+
+function test_can_not_withdraw_foreign_asset_negative_or_zero_amount_to_evm() {
+    val ft_asset = register_ft4_asset(CHR);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.foreign);
+    _can_not_withdraw_negative_or_zero_amount_to_evm(ft_asset);
+}
+
+function test_can_not_withdraw_native_asset_negative_or_zero_amount_to_evm() {
+    val ft_asset = register_ft4_asset(CHR);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.native);
+    _can_not_withdraw_negative_or_zero_amount_to_evm(ft_asset);
+}
+
+function _can_not_withdraw_negative_or_zero_amount_to_evm(ft_asset: assets.asset) {
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
+
+    // 0
+    rell.test.tx()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft_asset_to_evm(ft_asset.id, 0L, network_id1, evm_address, bridge_address1))
+        .sign(rell.test.keypairs.alice)
+        .run_must_fail("Parameter amount: value must be non-zero positive, actual: 0");
+
+    // -1
+    rell.test.tx()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft_asset_to_evm(ft_asset.id, -1L, network_id1, evm_address, bridge_address1))
+        .sign(rell.test.keypairs.alice)
+        .run_must_fail("Parameter amount: value must be non-zero positive, actual: -1");
+}

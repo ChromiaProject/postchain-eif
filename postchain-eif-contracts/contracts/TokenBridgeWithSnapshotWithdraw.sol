@@ -41,14 +41,7 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
     // Check that state header has correct discriminator and tag
     function requireERC20StateHeader(ERC20StateHeader memory header, bytes32 expectedTag) internal view {
         require(header.tag == expectedTag, "TokenBridge: invalid snapshot tag");
-
-        uint256 networkDiscriminator = networkId << 160;
-        uint256 contractSpecificDiscriminator = networkDiscriminator + uint160(address(this));
-
-        bool isValidDiscriminator = (header.discriminator == networkDiscriminator) ||
-            (header.discriminator == contractSpecificDiscriminator);
-
-        require(isValidDiscriminator, "TokenBridge: invalid bridge contract");
+        _verifyDiscriminator(header.discriminator);
     }
 
     /**
@@ -91,13 +84,13 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
             require(wd.status == Status.Withdrawable, "TokenBridge: event hash was already used");
         }
 
-        (IERC20 token, address e_beneficiary, uint256 amount, uint256 netId) = eventHash.verifyEvent(_event);
+        (IERC20 token, address e_beneficiary, uint256 amount, uint256 discriminator) = eventHash.verifyEvent(_event);
         require(e_beneficiary == beneficiary, "TokenBridge: beneficiary does not match");
 
         if (!withdrawalRequestProcessed) {
             // here we essentially replicate the logic of _updateWithdraw which is triggered by withdrawRequest
+            _verifyDiscriminator(discriminator);
             require(_allowedToken[token], "TokenBridge: not allow token");
-            require(networkId == netId, "TokenBridge: incorrect network id");
             require(amount > 0, "TokenBridge: invalid amount to make request withdraw");
             // We don't need to fill the record with real data, just mark it as withdrawn
             // to prevent duplicate withdraw

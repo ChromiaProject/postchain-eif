@@ -37,7 +37,7 @@ function register_erc20_asset(
     mode: bridge_mode,
     use_snapshots: boolean = false
 ): erc20_asset {
-    require(empty(erc20_asset @? { network_id, token_address }), "token already exists");
+    require(empty(erc20_asset @? { network_id, token_address }), "ERC-20 Token already exists: %s".format(token_address));
     val erc20_asset = create erc20_asset (
         network_id,
         token_address = token_address,

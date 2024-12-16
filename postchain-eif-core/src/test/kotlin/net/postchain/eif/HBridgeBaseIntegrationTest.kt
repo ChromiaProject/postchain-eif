@@ -187,17 +187,7 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
             .buildGtx()
             .encode()
 
-    fun configureContract(
-            contractAddress: String,
-            bcRid: BlockchainRid,
-            keyPair: KeyPair
-    ) = configureContract(
-            contractAddress.substringAfter("0x").hexStringToByteArray(),
-            bcRid,
-            keyPair
-    )
-
-    fun configureContract(
+    fun configureEventReceiverContract(
             contractAddress: ByteArray,
             bcRid: BlockchainRid,
             keyPair: KeyPair
@@ -206,6 +196,21 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
                     "eif.hbridge.add_contract_config",
                     gtv(networkId),
                     gtv(contractAddress),
+            )
+            .finish()
+            .sign(cryptoSystem.buildSigMaker(keyPair))
+            .buildGtx()
+            .encode()
+
+    fun configureBridgeWithErc20Assets(
+            bridgeAddress: ByteArray,
+            bcRid: BlockchainRid,
+            keyPair: KeyPair
+    ): ByteArray = GtxBuilder(bcRid, listOf(keyPair.pubKey.data), myCS)
+            .addOperation(
+                    "eif.hbridge.register_bridge_with_erc20_assets",
+                    gtv(networkId),
+                    gtv(bridgeAddress)
             )
             .finish()
             .sign(cryptoSystem.buildSigMaker(keyPair))
@@ -285,8 +290,8 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
                 .encode())
     }
 
-    // Withdraw ft3 token on postchain
-    fun withdrawOnPostchain(
+    // Withdraw ft token on postchain
+    fun withdrawOnPostchainV1(
             userCredentials: UserCredentials,
             userAccount: FtAccount,
             assetId: ByteArray,
@@ -303,6 +308,37 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
                 gtv(assetId),
                 gtv(withdrawAmount),
                 gtv(userCredentials.evmAddressBA)
+        )
+        b.addOperation("nop", GtvInteger(System.currentTimeMillis()))
+
+        val signer = cryptoSystem.buildSigMaker(userCredentials.keyPair)
+        val tx = b.finish().sign(signer).buildGtx()
+        val txRid = tx.calculateTxRid(hashCalculator)
+        enqueueTx(tx.encode())
+
+        return txRid
+    }
+
+    // Withdraw ft token on postchain
+    fun withdrawOnPostchainV2(
+            userCredentials: UserCredentials,
+            userAccount: FtAccount,
+            assetId: ByteArray,
+            withdrawAmount: BigInteger,
+            bridgeAddress: ByteArray,
+            bcRid: BlockchainRid
+    ): Hash {
+
+        val b = GtxBuilder(bcRid, listOf(userCredentials.keyPair.pubKey.data), myCS)
+
+        b.addOperation("ft4.ft_auth", gtv(userAccount.accountId), gtv(userAccount.authDescriptorId))
+        b.addOperation(
+                "eif.hbridge.bridge_ft_asset_to_evm",
+                gtv(assetId),
+                gtv(withdrawAmount),
+                gtv(networkId),
+                gtv(userCredentials.evmAddressBA),
+                gtv(bridgeAddress)
         )
         b.addOperation("nop", GtvInteger(System.currentTimeMillis()))
 
@@ -450,6 +486,9 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
             web3j.ethBlockNumber().send().blockNumber >= targetBlockNumber
         }
     }
+
+    fun networkContractDiscriminator(networkId: Long, contractAddress: ByteArray) =
+            gtv(BigInteger.valueOf(networkId).shiftLeft(160) + BigInteger(contractAddress))
 
     @Suppress("EnumEntryName")
     enum class WithdrawalStatus {

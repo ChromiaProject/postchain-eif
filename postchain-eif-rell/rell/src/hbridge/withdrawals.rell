@@ -8,6 +8,7 @@
     token_address: byte_array;
     index network_id, token_address;
     index beneficiary: byte_array;
+    index bridge_address: byte_array = x"";
     amount: big_integer;
     timestamp;
     index event_hash: byte_array;
@@ -57,6 +58,7 @@ struct erc20_withdrawal_info {
     network_id: integer;
     token_address: byte_array;
     beneficiary: byte_array;
+    bridge_address: byte_array;
     amount: big_integer;
     timestamp;
     event_hash: byte_array;
@@ -89,6 +91,7 @@ function map_withdrawal(withdrawal: erc20_withdrawal, status: withdrawal_status?
     network_id = withdrawal.network_id,
     token_address = withdrawal.token_address,
     beneficiary = withdrawal.beneficiary,
+    bridge_address = withdrawal.bridge_address,
     amount = withdrawal.amount,
     timestamp = withdrawal.transaction.block.timestamp,
     event_hash = withdrawal.event_hash,

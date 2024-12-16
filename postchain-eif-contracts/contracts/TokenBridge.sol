@@ -94,7 +94,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     }
 
     modifier onlyValidator() {
-        require(validator.isValidator(msg.sender),  "TokenBridge: sender is not a validator.");
+        require(validator.isValidator(msg.sender), "TokenBridge: sender is not a validator.");
         _;
     }
 
@@ -254,9 +254,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     function _updateWithdraw(bytes32 hash, bytes memory _event, uint height, bytes32 blockRid) internal returns (bool) {
         Withdraw storage wd = _withdraw[hash];
         {
-            (IERC20 token, address beneficiary, uint256 amount, uint256 netId) = hash.verifyEvent(_event);
+            (IERC20 token, address beneficiary, uint256 amount, uint256 discriminator) = hash.verifyEvent(_event);
+            _verifyDiscriminator(discriminator);
             require(_allowedToken[token], "TokenBridge: not allow token");
-            require(networkId == netId, "TokenBridge: incorrect network id");
             require(amount > 0, "TokenBridge: invalid amount to make request withdraw");
             wd.token = token;
             wd.beneficiary = beneficiary;
@@ -311,5 +311,15 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
             out |= bytes32(b[offset + i] & 0xFF) >> (i * 8);
         }
         return out;
+    }
+
+    function _verifyDiscriminator(uint256 discriminator) internal view {
+        uint256 networkDiscriminator = networkId << 160;
+        uint256 networkContractDiscriminator = networkDiscriminator + uint160(address(this));
+
+        bool isValidDiscriminator = (discriminator == networkDiscriminator)
+            || (discriminator == networkContractDiscriminator);
+
+        require(isValidDiscriminator, "TokenBridge: invalid network ID or bridge contract");
     }
 }

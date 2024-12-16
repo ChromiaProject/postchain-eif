@@ -22,6 +22,7 @@ import {
     hashGtvBytes64Leaf,
     hashGtvIntegerLeaf,
     hashGtvStringLeaf,
+    networkContractDiscriminatorHex,
     postchainMerkleNodeHash,
     strip0x, toHex
 } from "./utils";
@@ -177,14 +178,14 @@ describe("ChromiaToken Bridge Test", () => {
 
             const blockNumber = zeroPadValue(toBeHex(1), 32);
             const serialNumber = zeroPadValue(toBeHex(1), 32);
-            const networkId = zeroPadValue(toBeHex(network.config.chainId == undefined ? 1 : network.config.chainId), 32);
-            const zeroNetworkId = zeroPadValue(toBeHex(0), 32);
-            const contractAddress = zeroPadValue(chromiaTokenAddress, 32);
+            const networkId = network.config.chainId == undefined ? 1 : network.config.chainId;
+            const discriminator = zeroPadValue(networkContractDiscriminatorHex(networkId, bridgeAddress), 32);
+            const tokenAddress = zeroPadValue(chromiaTokenAddress, 32);
             const toAddress = zeroPadValue(user.address, 32);
             const amountHex = zeroPadValue(toBeHex(toDeposit), 32);
 
             // normal event
-            let event: string = buildWithdrawEvent(serialNumber, networkId, contractAddress, toAddress, amountHex);
+            let event: string = buildWithdrawEvent(serialNumber, discriminator, tokenAddress, toAddress, amountHex);
             let data = toHex(event);
             let hashEventLeaf = keccak256(data);
             let hashRootEvent = keccak256(keccak256(hashEventLeaf));
@@ -194,14 +195,16 @@ describe("ChromiaToken Bridge Test", () => {
             let hashedLeaf = hashGtvBytes64Leaf(toHex(eifLeaf));
             let extraDataMerkleRoot = calcExtraDataMerkleRoot(EIF_HEADER_KEY_HASH, hashedLeaf);
             
-            // malicious event, toAddress and contractAddress swapped
-            let maliciousEvent: string = buildWithdrawEvent(serialNumber, networkId, toAddress, contractAddress, amountHex);
+            // malicious event, toAddress and tokenAddress swapped
+            let maliciousEvent: string = buildWithdrawEvent(serialNumber, discriminator, toAddress, tokenAddress, amountHex);
             let maliciousData = toHex(maliciousEvent);
             let maliciousHashEventLeaf = keccak256(keccak256(data));
             let maliciousBlockchainRid = "efe4a2423cc6d39eb91bc9baac4ec325825ff7c12093d45a554dab732129eefc";
 
             // wrong networkId event
-            let wrongNetworkIdEvent: string = buildWithdrawEvent(serialNumber, zeroNetworkId, contractAddress, toAddress, amountHex);
+            const zeroNetworkId = 0;
+            const zeroNetworkIdDiscriminator = zeroPadValue(networkContractDiscriminatorHex(zeroNetworkId, bridgeAddress), 32);
+            let wrongNetworkIdEvent: string = buildWithdrawEvent(serialNumber, zeroNetworkIdDiscriminator, tokenAddress, toAddress, amountHex);
             let wrongNetworkIdData = toHex(wrongNetworkIdEvent);
             let wrongNetworkIdHashEventLeaf = keccak256(wrongNetworkIdData);
             let wrongNetworkIdHashRoot = keccak256(keccak256(wrongNetworkIdHashEventLeaf));
@@ -330,7 +333,7 @@ describe("ChromiaToken Bridge Test", () => {
 
             await expect(bridge.withdrawRequest(
                 wrongNetworkIdData, wrongNetworkIdEventProof, wrongNetworkIdBlockHeader, wrongNetworkIdSigs, validators, wrongNetworkIdExtraProof
-            )).to.rejectedWith("TokenBridge: incorrect network id");
+            )).to.rejectedWith("TokenBridge: invalid network ID or bridge contract");
 
             await expect(bridge.withdrawRequest(
                 maliciousData, eventProof, blockHeader, sigs, validators, extraProof
@@ -458,13 +461,14 @@ describe("ChromiaToken Bridge Test", () => {
 
             const blockNumber = zeroPadValue(toBeHex(2), 32);
             const serialNumber = zeroPadValue(toBeHex(2), 32);
-            const networkId = zeroPadValue(toBeHex(network.config.chainId == undefined ? 1 : network.config.chainId), 32);
-            const contractAddress = zeroPadValue(chromiaTokenAddress, 32);
+            const networkId = network.config.chainId == undefined ? 1 : network.config.chainId;
+            const discriminator = zeroPadValue(networkContractDiscriminatorHex(networkId, bridgeAddress), 32);
+            const tokenAddress = zeroPadValue(chromiaTokenAddress, 32);
             const toAddress = zeroPadValue(bridgeDelegatorAddress, 32);
             const amountHex = zeroPadValue(toBeHex(toDeposit), 32);
             
             // normal event
-            let event: string = buildWithdrawEvent(serialNumber, networkId, contractAddress, toAddress, amountHex);
+            let event: string = buildWithdrawEvent(serialNumber, discriminator, tokenAddress, toAddress, amountHex);
             let data = toHex(event);
             let hashEventLeaf = keccak256(data);
             let hashRootEvent = keccak256(keccak256(hashEventLeaf));
@@ -474,8 +478,8 @@ describe("ChromiaToken Bridge Test", () => {
             let hashedLeaf = hashGtvBytes64Leaf(toHex(eifLeaf));
             let extraDataMerkleRoot = calcExtraDataMerkleRoot(EIF_HEADER_KEY_HASH, hashedLeaf);
 
-            // malicious event, toAddress and contractAddress swapped
-            let maliciousEvent: string = buildWithdrawEvent(serialNumber, networkId, toAddress, contractAddress, amountHex);
+            // malicious event, toAddress and tokenAddress swapped
+            let maliciousEvent: string = buildWithdrawEvent(serialNumber, discriminator, toAddress, tokenAddress, amountHex);
             let maliciousData = toHex(maliciousEvent);            
             let maliciousHashEventLeaf = keccak256(keccak256(data));
 
