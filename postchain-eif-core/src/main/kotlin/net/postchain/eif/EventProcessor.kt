@@ -15,7 +15,6 @@ import net.postchain.gtv.GtvString
 import java.math.BigInteger
 import java.util.LinkedList
 import java.util.Queue
-import java.util.stream.Collectors
 
 enum class EncodedEvent(val index: Int) {
     TX_HASH(0),
@@ -133,7 +132,7 @@ class EvmEventProcessor(
     @Synchronized
     override fun getEventData(): List<EvmBlockOp> = eventBlocks.stream()
             .takeWhile { it.evmBlockHeight <= lastReadLogBlockHeight - readOffset }
-            .collect(Collectors.toList())
+            .toList()
 
     fun getLastCommittedEvmBlockHeight(networkId: Long): BigInteger? {
         val block = blockchainEngine.getBlockQueries().query("get_last_evm_block", gtv("network_id" to gtv(networkId))).get()
