@@ -38,6 +38,9 @@ namespace evm_events {
 val contract_address = x"b7eB5d60Dd5610A82A4844Beb3F7d750316d3D32";
 val network_id1 = 1;
 val network_id2 = 2;
+val bridge_address1 = x"b7eB5d60Dd5610A82A4844Beb3F7d75030000001";
+val bridge_address2 = x"b7eB5d60Dd5610A82A4844Beb3F7d75030000002";
+val bridge_address3 = x"b7eB5d60Dd5610A82A4844Beb3F7d75030000003";
 
 struct asset_info {
     token_address: byte_array;
@@ -100,8 +103,13 @@ function register_ft4_asset(asset_info: asset_info): assets.asset {
     return assets.Asset(asset_id);
 }
 
-function register_erc20_asset(ft4_asset: assets.asset, asset_info: asset_info, network_id: integer,
-        enable_snapshots: boolean = false, hbridge.bridge_mode = hbridge.bridge_mode.foreign): erc20_asset {
+function register_erc20_asset(
+    ft4_asset: assets.asset,
+    asset_info: asset_info,
+    network_id: integer,
+    enable_snapshots: boolean = false,
+    hbridge.bridge_mode = hbridge.bridge_mode.foreign
+): erc20_asset {
     rell.test.tx().op(
         helpers.register_erc20_asset_op(network_id, asset_info.token_address, ft4_asset, bridge_mode, enable_snapshots)
     ).run();
@@ -117,6 +125,31 @@ function register_erc20_asset(ft4_asset: assets.asset, asset_info: asset_info, n
     );
 
     return erc20_asset @ { network_id, .token_address == asset_info.token_address };
+}
+
+function register_bridge_and_foreign_asset(asset: asset_info, network_id: integer, bridge_address: byte_array): assets.asset {
+    val ft4_asset = register_ft4_asset(asset);
+    val erc20_asset = register_erc20_asset(ft4_asset, asset, network_id, enable_snapshots = true, bridge_mode = hbridge.bridge_mode.foreign);
+    // register bridge with erc20 asset
+    rell.test.tx().op(
+        helpers.register_bridge_with_erc20_assets_op(
+            network_id = network_id,
+            bridge_contract_address = bridge_address,
+            erc20_assets = [erc20_asset]
+        )
+    ).run();
+
+    return ft4_asset;
+}
+
+function register_bridge_with_erc20_assets(network_id: integer, bridge_address: byte_array, erc20_assets: list<hbridge.erc20_asset>) {
+    rell.test.tx().op(
+        helpers.register_bridge_with_erc20_assets_op(
+            network_id = network_id,
+            bridge_contract_address = bridge_address,
+            erc20_assets = erc20_assets
+        )
+    ).run();
 }
 
 function link_eoa_account(
@@ -244,17 +277,17 @@ function run_block_after_timeout() {
     rell.test.block().run();
 }
 
-function assert_withdraw(serial: integer, evm_address: byte_array, amount: big_integer, asset: asset_info = CHR, expected_nr_withdrawals: integer = 1) {
+function assert_withdraw(
+    serial: integer,
+    evm_address: byte_array,
+    amount: big_integer,
+    asset: asset_info = CHR,
+    expected_nr_withdrawals: integer = 1,
+    network_id: integer = network_id1,
+    bridge_address: byte_array = x"",
+    version: integer = 1
+) {
     val timestamp = rell.test.last_block_time_or_null ?: 0;
-
-    val withdraw_info = [
-        serial.to_gtv(),
-        network_id1.to_gtv(),
-        eif_utils.evm_address_to_32_byte_array(asset.token_address).to_gtv(),
-        eif_utils.evm_address_to_32_byte_array(evm_address).to_gtv(),
-        amount.to_gtv()
-    ];
-
     val events = rell.test.get_events();
 
     val event_data = if (events.size() > 1)
@@ -262,14 +295,19 @@ function assert_withdraw(serial: integer, evm_address: byte_array, amount: big_i
     else
         events[0];
 
-    assert_equals(event_data, ("eif_event", withdraw_info.to_gtv_pretty()));
+    val withdraw_info = if (version == 2)
+        pack_withdrawal_event_v2(serial, network_id, asset.token_address, evm_address, bridge_address, amount)
+    else
+        pack_withdrawal_event_v1(serial, network_id, asset.token_address, evm_address, amount);
 
-    val wdrs = hbridge.get_erc20_withdrawal(network_id1, asset.token_address, evm_address);
+    assert_equals(event_data, ("eif_event", withdraw_info[0]));
+
+    val wdrs = hbridge.get_erc20_withdrawal(network_id, asset.token_address, evm_address);
     assert_equals(wdrs.size(), expected_nr_withdrawals);
     val wdr = wdrs @ {} (@omit @sort_desc .serial, $) limit 1;
     assert_equals(
         (wdr.serial, wdr.network_id, wdr.token_address, wdr.beneficiary, wdr.amount, wdr.transaction.block.timestamp),
-        (serial, network_id1, asset.token_address, evm_address, amount, timestamp)
+        (serial, network_id, asset.token_address, evm_address, amount, timestamp)
     );
 }
 

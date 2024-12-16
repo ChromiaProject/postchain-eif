@@ -20,6 +20,7 @@ import {
     hashGtvBytes64Leaf,
     hashGtvIntegerLeaf,
     hashGtvStringLeaf,
+    networkContractDiscriminatorHex,
     postchainMerkleNodeHash,
     strip0x, toHex
 } from "./utils";
@@ -193,14 +194,14 @@ describe("Token Bridge Test", () => {
 
             const blockNumber = zeroPadValue(toBeHex(1), 32);
             const serialNumber = zeroPadValue(toBeHex(1), 32);
-            const networkId = zeroPadValue(toBeHex(network.config.chainId == undefined ? 1 : network.config.chainId), 32);
-            const zeroNetworkId = zeroPadValue(toBeHex(0), 32);
-            const contractAddress = zeroPadValue(tokenAddress, 32);
+            const networkId = network.config.chainId == undefined ? 1 : network.config.chainId;
+            const discriminator = zeroPadValue(networkContractDiscriminatorHex(networkId, bridgeAddress), 32);
+            const tokenAddress32 = zeroPadValue(tokenAddress, 32);
             const toAddress = zeroPadValue(user.address, 32);
             const amountHex = zeroPadValue(toBeHex(toDeposit), 32);
 
             // normal event
-            let event: string = buildWithdrawEvent(serialNumber, networkId, contractAddress, toAddress, amountHex);
+            let event: string = buildWithdrawEvent(serialNumber, discriminator, tokenAddress32, toAddress, amountHex);
             let data = toHex(event);
             let hashEventLeaf = keccak256(data);
             let hashRootEvent = keccak256(keccak256(hashEventLeaf));
@@ -210,24 +211,39 @@ describe("Token Bridge Test", () => {
             let hashedLeaf = hashGtvBytes64Leaf(toHex(eifLeaf));
             let extraDataMerkleRoot = calcExtraDataMerkleRoot(EIF_HEADER_KEY_HASH, hashedLeaf);
 
-            // malicious event, toAddress and contractAddress swapped
-            let maliciousEvent: string = buildWithdrawEvent(serialNumber, networkId, toAddress, contractAddress, amountHex);
+            // malicious event, toAddress and tokenAddress32 swapped
+            let maliciousEvent: string = buildWithdrawEvent(serialNumber, discriminator, toAddress, tokenAddress32, amountHex);
             let maliciousData = toHex(maliciousEvent);
             let maliciousHashEventLeaf = keccak256(keccak256(maliciousData));
             let maliciousBlockchainRid = "efe4a2423cc6d39eb91bc9baac4ec325825ff7c12093d45a554dab732129eefc";
 
-            // wrong networkId event
-            let wrongNetworkIdEvent: string = buildWithdrawEvent(serialNumber, zeroNetworkId, contractAddress, toAddress, amountHex);
+            // even with a wrong network discriminator
+            const zeroNetworkId = 0;
+            const zeroNetworkIdDiscriminator = zeroPadValue(networkContractDiscriminatorHex(zeroNetworkId, bridgeAddress), 32);
+            let wrongNetworkIdEvent: string = buildWithdrawEvent(serialNumber, zeroNetworkIdDiscriminator, tokenAddress32, toAddress, amountHex);
             let wrongNetworkIdData = toHex(wrongNetworkIdEvent);
             let wrongNetworkIdHashEventLeaf = keccak256(wrongNetworkIdData);
             let wrongNetworkIdHashRoot = keccak256(keccak256(wrongNetworkIdHashEventLeaf));
             let wrongNetworkIdEifLeaf = strip0x(wrongNetworkIdHashRoot) + strip0x(hashRootState);
             let wrongNetworkIdHashedLeaf = hashGtvBytes64Leaf(toHex(wrongNetworkIdEifLeaf));
             let wrongNetworkIdExtraDataMerkleRoot = calcExtraDataMerkleRoot(EIF_HEADER_KEY_HASH, wrongNetworkIdHashedLeaf);
-            let wrongExtraDataKeyMerkleRoot = "18FE5D1F22C3A31458AADFDA6C0970029D489F4C188E2C61AE98D1461CFE99A5";
+
+            // event with a wrong bridge contract discriminator
+            const wrongTargetBridgeAddress = tokenAddress; // tokenAddress instead of bridgeAddress
+            const wrongTargetBridgeDiscriminator = zeroPadValue(networkContractDiscriminatorHex(networkId, wrongTargetBridgeAddress), 32);
+            let wrongTargetBridgeEvent: string = buildWithdrawEvent(serialNumber, wrongTargetBridgeDiscriminator, tokenAddress32, toAddress, amountHex);
+            let wrongTargetBridgeData = toHex(wrongTargetBridgeEvent);
+            let wrongTargetBridgeHashEventLeaf = keccak256(wrongTargetBridgeData);
+            let wrongTargetBridgeHashRoot = keccak256(keccak256(wrongTargetBridgeHashEventLeaf));
+            let wrongTargetBridgeEifLeaf = strip0x(wrongTargetBridgeHashRoot) + strip0x(hashRootState);
+            let wrongTargetBridgeHashedLeaf = hashGtvBytes64Leaf(toHex(wrongTargetBridgeEifLeaf));
+            let wrongTargetBridgeExtraDataMerkleRoot = calcExtraDataMerkleRoot(EIF_HEADER_KEY_HASH, wrongTargetBridgeHashedLeaf);
+
+            // wrong extra data key
+            let wrongExtraDataKeyMerkleRoot = calcExtraDataMerkleRoot(hashGtvStringLeaf("fake"), hashedLeaf);
 
             // event with a non-registered token (toAddress)
-            let unknownTokenEvent: string = buildWithdrawEvent(serialNumber, networkId, toAddress, toAddress, amountHex);
+            let unknownTokenEvent: string = buildWithdrawEvent(serialNumber, discriminator, toAddress, toAddress, amountHex);
             let unknownTokenData = toHex(unknownTokenEvent);
             let unknownTokenHashEventLeaf = keccak256(unknownTokenData);
             let unknownTokenHashRootEvent = keccak256(keccak256(unknownTokenHashEventLeaf));
@@ -256,6 +272,9 @@ describe("Token Bridge Test", () => {
             let wrongNetworkIdNode5678 = postchainMerkleNodeHash([0x00, node56, toHex(wrongNetworkIdExtraDataMerkleRoot)]);
             let wrongNetworkIdBlockRid = postchainMerkleNodeHash([0x7, node1234, wrongNetworkIdNode5678]);
 
+            let wrongTargetBridgeNode5678 = postchainMerkleNodeHash([0x00, node56, toHex(wrongTargetBridgeExtraDataMerkleRoot)]);
+            let wrongTargetBridgeBlockRid = postchainMerkleNodeHash([0x7, node1234, wrongTargetBridgeNode5678]);
+
             let wrongExtraDataKeyNode5678 = postchainMerkleNodeHash([0x00, node56, toHex(wrongExtraDataKeyMerkleRoot)]);
             let wrongExtraDataKeyBlockRid = postchainMerkleNodeHash([0x7, node1234, wrongExtraDataKeyNode5678]);
 
@@ -282,6 +301,11 @@ describe("Token Bridge Test", () => {
                 blockRid: wrongNetworkIdBlockRid,
                 extraDataMerkleRoot: wrongNetworkIdExtraDataMerkleRoot,
             }).build();
+
+            let wrongTargetBridgeBlockHeader = blockHeaderBuilder.update({ 
+                blockRid: wrongTargetBridgeBlockRid,
+                extraDataMerkleRoot: wrongTargetBridgeExtraDataMerkleRoot,
+            }).build();
             
             let wrongExtraDataKeyBlockHeader = blockHeaderBuilder.update({ 
                 blockRid: wrongExtraDataKeyBlockRid,
@@ -303,6 +327,10 @@ describe("Token Bridge Test", () => {
             let wrongNetworkIdSig1 = await validator1.signMessage(ethers.getBytes(wrongNetworkIdBlockRid));
             let wrongNetworkIdSig2 = await validator2.signMessage(ethers.getBytes(wrongNetworkIdBlockRid));
             let wrongNetworkIdSig3 = await validator3.signMessage(ethers.getBytes(wrongNetworkIdBlockRid));
+
+            let wrongTargetBridgeSig1 = await validator1.signMessage(ethers.getBytes(wrongTargetBridgeBlockRid));
+            let wrongTargetBridgeSig2 = await validator2.signMessage(ethers.getBytes(wrongTargetBridgeBlockRid));
+            let wrongTargetBridgeSig3 = await validator3.signMessage(ethers.getBytes(wrongTargetBridgeBlockRid));
 
             let wrongExtraDataKeySig1 = await validator1.signMessage(ethers.getBytes(wrongExtraDataKeyBlockRid));
             let wrongExtraDataKeySig2 = await validator2.signMessage(ethers.getBytes(wrongExtraDataKeyBlockRid));
@@ -333,6 +361,11 @@ describe("Token Bridge Test", () => {
                 position: 0,
                 merkleProofs: merkleProof,
             };
+            let wrongTargetBridgeEventProof = {
+                leaf: wrongTargetBridgeHashEventLeaf,
+                position: 0,
+                merkleProofs: merkleProof,
+            };
             let unknownTokenEventProof = {
                 leaf: unknownTokenHashEventLeaf,
                 position: 0,
@@ -351,6 +384,13 @@ describe("Token Bridge Test", () => {
                 hashedLeaf: wrongNetworkIdHashedLeaf,
                 position: 1,
                 extraRoot: toHex(wrongNetworkIdExtraDataMerkleRoot),
+                extraMerkleProofs: [EIF_HEADER_KEY_HASH],
+            };
+            let wrongTargetBridgeExtraProof = {
+                leaf: toHex(wrongTargetBridgeEifLeaf),
+                hashedLeaf: wrongTargetBridgeHashedLeaf,
+                position: 1,
+                extraRoot: toHex(wrongTargetBridgeExtraDataMerkleRoot),
                 extraMerkleProofs: [EIF_HEADER_KEY_HASH],
             };
             let invalidExtraLeaf = {
@@ -393,6 +433,7 @@ describe("Token Bridge Test", () => {
             };
             let sigs = [sig1, sig2, sig3];
             let wrongNetworkIdSigs = [wrongNetworkIdSig1, wrongNetworkIdSig2, wrongNetworkIdSig3];
+            let wrongTargetBridgeSigs = [wrongTargetBridgeSig1, wrongTargetBridgeSig2, wrongTargetBridgeSig3];
             let wrongExtraDataKeySigs = [wrongExtraDataKeySig1, wrongExtraDataKeySig2, wrongExtraDataKeySig3];
             let unknownTokenSigs = [unknownTokenSig1, unknownTokenSig2, unknownTokenSig3];
             let validators = [validator1.address, validator2.address, validator3.address];
@@ -405,7 +446,11 @@ describe("Token Bridge Test", () => {
 
             await expect(bridge.withdrawRequest(
                 wrongNetworkIdData, wrongNetworkIdEventProof, wrongNetworkIdBlockHeader, wrongNetworkIdSigs, validators, wrongNetworkIdExtraProof
-            )).to.rejectedWith('TokenBridge: incorrect network id');
+            )).to.rejectedWith('TokenBridge: invalid network ID or bridge contract');
+
+            await expect(bridge.withdrawRequest(
+                wrongTargetBridgeData, wrongTargetBridgeEventProof, wrongTargetBridgeBlockHeader, wrongTargetBridgeSigs, validators, wrongTargetBridgeExtraProof
+            )).to.rejectedWith('TokenBridge: invalid network ID or bridge contract');
 
             await expect(bridge.withdrawRequest(
                 data, eventProof, wrongExtraDataKeyBlockHeader, wrongExtraDataKeySigs, validators, wrongExtraDataKeyExtraProof
@@ -545,13 +590,14 @@ describe("Token Bridge Test", () => {
 
             const blockNumber = zeroPadValue(toBeHex(2), 32);
             const serialNumber = zeroPadValue(toBeHex(2), 32);
-            const networkId = zeroPadValue(toBeHex(network.config.chainId == undefined ? 1 : network.config.chainId), 32);
-            const contractAddress = zeroPadValue(tokenAddress, 32);
+            const networkId = network.config.chainId == undefined ? 1 : network.config.chainId;
+            const discriminator = zeroPadValue(networkContractDiscriminatorHex(networkId, bridgeAddress), 32);
+            const tokenAddress32 = zeroPadValue(tokenAddress, 32);
             const toAddress = zeroPadValue(bridgeDelegatorAddress, 32);
             const amountHex = zeroPadValue(toBeHex(toDeposit), 32);
 
             // normal event
-            let event: string = buildWithdrawEvent(serialNumber, networkId, contractAddress, toAddress, amountHex);
+            let event: string = buildWithdrawEvent(serialNumber, discriminator, tokenAddress32, toAddress, amountHex);
             let data = toHex(event);
             let hashEventLeaf = keccak256(data);
             let hashRootEvent = keccak256(keccak256(hashEventLeaf));
@@ -561,8 +607,8 @@ describe("Token Bridge Test", () => {
             let hashedLeaf = hashGtvBytes64Leaf(toHex(eifLeaf));
             let extraDataMerkleRoot = calcExtraDataMerkleRoot(EIF_HEADER_KEY_HASH, hashedLeaf);
 
-            // malicious event, toAddress and contractAddress swapped
-            let maliciousEvent: string = buildWithdrawEvent(serialNumber, networkId, toAddress, contractAddress, amountHex);
+            // malicious event, toAddress and tokenAddress32 swapped
+            let maliciousEvent: string = buildWithdrawEvent(serialNumber, discriminator, toAddress, tokenAddress32, amountHex);
             let maliciousData = toHex(maliciousEvent);
             let maliciousHashEventLeaf = keccak256(keccak256(data));
 

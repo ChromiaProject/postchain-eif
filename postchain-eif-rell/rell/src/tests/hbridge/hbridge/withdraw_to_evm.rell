@@ -1,3 +1,10 @@
+/**
+ * Once HBridge v2 becomes the default version, perform the following:
+ *  - Add `@test module;`
+ *  - Add `blockchains.withdraw_to_evm_test` profile to the chromia.yml file to run this test suite
+ *    (cf. `blockchains.withdraw_to_multiple_bridges_test`).
+ */
+
 function test_withdraw_foreign_asset_to_ethereum_with_already_linked_account() {
     val ft_asset = register_foreign_asset();
     _withdraw_to_ethereum_with_already_linked_account(ft_asset);
@@ -79,6 +86,90 @@ function test_withdraw_to_ethereum_using_specific_erc20_token_address() {
     ));
 
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount / 2);
+}
+
+function test_can_not_withdraw_if_no_bridges_are_configured_for_this_network_but_exist_for_other_neworks() {
+    // CHR
+    val ft_chr_asset = register_ft4_asset(CHR);
+    val erc20_chr_asset = register_erc20_asset(ft_chr_asset, CHR, network_id1);
+    // FOO
+    val ft_foo_asset = register_ft4_asset(FOO);
+    val erc20_foo_asset = register_erc20_asset(ft_foo_asset, FOO, network_id2);
+
+    // Register bridge for network 2
+    rell.test.tx().op(
+        helpers.register_bridge_with_erc20_assets_op(
+            network_id = network_id2,
+            bridge_contract_address = bridge_address2,
+            erc20_assets = [erc20_foo_asset]
+        )
+    ).run();
+
+    // Register FT account
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
+
+    // Verify that withdrawal is not possible
+    rell.test.tx()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft4_token_to_evm(network_id1, ft_chr_asset.id, 1, evm_address))
+        .sign(rell.test.keypairs.alice)
+        .run_must_fail("No bridges are configured for network ID 1");
+}
+
+function test_can_not_withdraw_if_more_than_one_bridge_is_configured_for_this_network() {
+    // CHR
+    val ft_chr_asset = register_ft4_asset(CHR);
+    val erc20_chr_asset = register_erc20_asset(ft_chr_asset, CHR, network_id1);
+    // FOO
+    val ft_foo_asset = register_ft4_asset(FOO);
+    val erc20_foo_asset = register_erc20_asset(ft_foo_asset, FOO, network_id1);
+
+    // Register 2 bridges for network 1
+    rell.test.tx().op(
+        helpers.register_bridge_with_erc20_assets_op(
+            network_id = network_id1,
+            bridge_contract_address = bridge_address1,
+            erc20_assets = [erc20_chr_asset]
+        ),
+        helpers.register_bridge_with_erc20_assets_op(
+            network_id = network_id1,
+            bridge_contract_address = bridge_address2,
+            erc20_assets = [erc20_foo_asset]
+        )
+    ).run();
+
+    // Register FT account
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
+
+    // Verify that withdrawal is not possible
+    rell.test.tx()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft4_token_to_evm(network_id1, ft_chr_asset.id, 1, evm_address))
+        .sign(rell.test.keypairs.alice)
+        .run_must_fail("More than one bridge is configured for network ID 1");
+}
+
+function test_can_not_call_operation__bridge_ft_asset_to_evm__if_hbridge_uses_v1() {
+    rell.test.tx().op(
+        hbridge.bridge_ft_asset_to_evm(x"", 1, network_id1, evm_address, bridge_address1)
+    ).run_must_fail("Unsupported HBridge version 1 for the `bridge_ft_asset_to_evm` operation. Version 2 is required.");
+}
+
+function test_withdraw_if_only_one_bridge_is_configured_for_the_network() {
+    // CHR
+    val ft_chr_asset = register_ft4_asset(CHR);
+    val erc20_chr_asset = register_erc20_asset(ft_chr_asset, CHR, network_id1);
+
+    // Register only one bridges for network 1
+    rell.test.tx().op(
+        helpers.register_bridge_with_erc20_assets_op(
+            network_id = network_id1,
+            bridge_contract_address = bridge_address1,
+            erc20_assets = [erc20_chr_asset]
+        )
+    ).run();
+
+    _withdraw_to_ethereum_with_already_linked_account(ft_chr_asset);
 }
 
 function test_can_not_withdraw_to_ethereum_without_linked_token() {
@@ -200,6 +291,12 @@ function _can_not_withdraw_negative_or_zero_amount_to_ethereum(ft_asset: ft4.ass
 }
 
 function _register_ft_account_and_link_evm_address(link_evm_account: boolean = true) {
+    // Keys
+    val ft_keypair = rell.test.keypairs.alice;
+    val evm_keypair = rell.test.keypairs.eve;
+    val evm_address = crypto.eth_pubkey_to_address(evm_keypair.pub);
+
+    // Register FT account
     val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
     val account_id = rell.test.pubkeys.alice.hash();
     rell.test.tx().op(
@@ -207,15 +304,9 @@ function _register_ft_account_and_link_evm_address(link_evm_account: boolean = t
     ).sign(admin_privkey).run();
     val ft_account = accounts.Account(account_id);
 
-    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
-
+    // Link EVM address to FT account
     if (link_evm_account) {
-        link_eoa_account(
-            rell.test.keypairs.eve,
-            rell.test.keypairs.alice,
-            account_id,
-            auth_descriptor.hash()
-        );
+        link_eoa_account(evm_keypair, ft_keypair, account_id, auth_descriptor.hash());
     }
 
     return (

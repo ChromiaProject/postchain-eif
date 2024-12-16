@@ -66,6 +66,8 @@ blockchains:
       <<: *common_args
       eif_event_receiver:
         enable_icmf: false
+      hbridge:
+        version: 2
 
 compile:
   source: src

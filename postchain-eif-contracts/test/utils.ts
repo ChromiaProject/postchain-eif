@@ -51,3 +51,9 @@ export var hashGtvIntegerLeaf = function (num: number): string {
 export function hashGtvStringLeaf(text: string): string {
     return ethers.solidityPackedSha256(['uint8', 'uint8', 'uint8', 'uint8', 'uint8', 'string'], [0x1, 0xA2, text.length + 2, 0xC, text.length, text])
 }
+
+export function networkContractDiscriminatorHex(networkId: number, contractAddress: string): string {
+    const networkDiscriminator = BigInt(networkId) * (2n ** 160n);
+    const contractDiscriminator = BigInt(contractAddress);
+    return toHex((networkDiscriminator + contractDiscriminator).toString(16));
+}

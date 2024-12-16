@@ -1,6 +1,7 @@
 package net.postchain.eif
 
 import assertk.assertThat
+import assertk.assertions.contains
 import assertk.assertions.isEqualTo
 import mu.KotlinLogging
 import net.postchain.common.data.Hash
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.TestMethodOrder
+import org.junit.jupiter.api.assertThrows
 import org.junitpioneer.jupiter.DisableIfTestFails
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.FunctionEncoder
@@ -29,6 +31,7 @@ import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.DynamicArray
 import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.abi.datatypes.generated.Uint256
+import org.web3j.protocol.exceptions.TransactionException
 import org.web3j.tx.Contract
 import java.math.BigInteger
 
@@ -47,15 +50,11 @@ class HBridgeMultipleBridgesIT : HBridgeBaseIntegrationTest() {
 
     // Contracts
     private lateinit var bridge1: TokenBridgeWithSnapshotWithdraw
+    private lateinit var bridge1Address: ByteArray
     private lateinit var bridge2: TokenBridgeWithSnapshotWithdraw
+    private lateinit var bridge2Address: ByteArray
     private lateinit var testToken: TestToken
     private lateinit var withdrawalTxRid1: Hash
-
-    private var lastSnapshotBlockHeight = -1L
-
-    private lateinit var wdTxHashInitiatedBeforeMassExit: Hash
-    private lateinit var wdTxHashRequestedBeforeMassExit: Hash
-    private lateinit var wdTxHashInitiatedAfterMassExit: Hash
 
     @Test
     @Order(1)
@@ -70,9 +69,11 @@ class HBridgeMultipleBridgesIT : HBridgeBaseIntegrationTest() {
         bridge1 = Contract.deployRemoteCall(TokenBridgeWithSnapshotWithdraw::class.java, web3j, transactionManager, gasProvider, tokenBridgeWithSnapshotWithdrawBinary, "").send().apply {
             initialize(Address(validator.contractAddress), Uint256(2)).send()
         }
+        bridge1Address = bridge1.contractAddress.substring(2).hexStringToByteArray()
         bridge2 = Contract.deployRemoteCall(TokenBridgeWithSnapshotWithdraw::class.java, web3j, transactionManager, gasProvider, tokenBridgeWithSnapshotWithdrawBinary, "").send().apply {
             initialize(Address(validator.contractAddress), Uint256(2)).send()
         }
+        bridge2Address = bridge2.contractAddress.substring(2).hexStringToByteArray()
 
         // Deploy a test token
         testToken = Contract.deployRemoteCall(TestToken::class.java, web3j, transactionManager, gasProvider, testTokenBinary, "").send()
@@ -120,8 +121,8 @@ class HBridgeMultipleBridgesIT : HBridgeBaseIntegrationTest() {
         bridge2.setBlockchainRid(Bytes32(bcRid.data)).send()
 
         // Configure dynamic bridges
-        enqueueTx(configureContract(bridge1.contractAddress, bcRid, adminKeyPair))
-        enqueueTx(configureContract(bridge2.contractAddress, bcRid, adminKeyPair))
+        enqueueTx(configureEventReceiverContract(bridge1Address, bcRid, adminKeyPair))
+        enqueueTx(configureEventReceiverContract(bridge2Address, bcRid, adminKeyPair))
         sealBlock()
     }
 
@@ -149,6 +150,8 @@ class HBridgeMultipleBridgesIT : HBridgeBaseIntegrationTest() {
 
         // Register ERC-20 asset
         enqueueTx(registerERC20Asset(testTokenAddress, assetId, bcRid, adminKeyPair, BridgeMode.foreign))
+        enqueueTx(configureBridgeWithErc20Assets(bridge1Address, bcRid, adminKeyPair))
+        enqueueTx(configureBridgeWithErc20Assets(bridge2Address, bcRid, adminKeyPair))
 
         // Register FT4 Alice account
         aliceAccount = registerAccount(aliceCredentials.keyPair.pubKey, bcRid, adminKeyPair)
@@ -193,6 +196,7 @@ class HBridgeMultipleBridgesIT : HBridgeBaseIntegrationTest() {
         logger.info { "withdraw ${prettyAmount(withdrawAmount1)} tokens to bridge1" }
         withdrawalTxRid1 = withdrawTokenToEvm(
                 bridge1,
+                bridge1Address,
                 withdrawAmount1,
                 initialBalanceOnChromia = depositAmount1 + depositAmount2,
                 initialBalanceOnEvm = initialMint - (depositAmount1 + depositAmount2)
@@ -205,6 +209,7 @@ class HBridgeMultipleBridgesIT : HBridgeBaseIntegrationTest() {
         logger.info { "withdraw ${prettyAmount(withdrawAmount2)} tokens to bridge2" }
         withdrawTokenToEvm(
                 bridge2,
+                bridge2Address,
                 withdrawAmount2,
                 initialBalanceOnChromia = depositAmount1 + depositAmount2 - withdrawAmount1,
                 initialBalanceOnEvm = initialMint - (depositAmount1 + depositAmount2) + withdrawAmount1
@@ -213,7 +218,7 @@ class HBridgeMultipleBridgesIT : HBridgeBaseIntegrationTest() {
 
     @Test
     @Order(7)
-    fun `double spending - withdraw token on bridge2 after withdrawal on bridge1`() {
+    fun `double spending prevented - cannot withdraw token on bridge2 after withdrawal on bridge1`() {
         logger.info { "withdraw ${prettyAmount(withdrawAmount1)} tokens to bridge2 after withdrawal on bridge1" }
 
         // Get withdrawal1 even hash and proof
@@ -223,40 +228,38 @@ class HBridgeMultipleBridgesIT : HBridgeBaseIntegrationTest() {
         ).get().toObject<EventMerkleProof>()
 
         // Requesting withdrawal1 on a bridge2
-        bridge2.withdrawRequest(
-                eventProof1.web3EventData(),
-                eventProof1.web3EventProof(),
-                eventProof1.web3BlockHeader(),
-                eventProof1.web3Signatures(),
-                eventProof1.web3Signers(),
-                eventProof1.web3ExtraProofData()
-        ).send()
+        val exception = assertThrows<TransactionException> {
+            bridge2.withdrawRequest(
+                    eventProof1.web3EventData(),
+                    eventProof1.web3EventProof(),
+                    eventProof1.web3BlockHeader(),
+                    eventProof1.web3Signatures(),
+                    eventProof1.web3Signers(),
+                    eventProof1.web3ExtraProofData()
+            ).send()
+        }
+        assertThat(exception.message!!).contains("TokenBridge: invalid network ID or bridge contract")
         buildEvmBlocks()
-
-        // Verifying that the withdrawal status has changed: withdrawn --> requested
-        verifyWithdrawalStatusOnPostchain(eventHash1, WithdrawalStatus.requested)
-
-        // Trying to complete the withdrawal1 on the bridge2
-        bridge2.withdraw(Bytes32(eventHash1), aliceCredentials.evmAddress).send()
-        buildEvmBlocks()
-        aliceBalance = testToken.balanceOf(aliceCredentials.evmAddress).send()
-        assertThat(aliceBalance.value).isEqualTo(
-                initialMint - (depositAmount1 + depositAmount2) + withdrawAmount1 + withdrawAmount2
-                        + withdrawAmount1 // <-- double spending
-        )
 
         // Verifying that the withdrawal is still completed
         verifyWithdrawalStatusOnPostchain(eventHash1, WithdrawalStatus.withdrawn)
+
+        // Alice's balance has not changed
+        aliceBalance = testToken.balanceOf(aliceCredentials.evmAddress).send()
+        assertThat(aliceBalance.value).isEqualTo(
+                initialMint - (depositAmount1 + depositAmount2) + withdrawAmount1 + withdrawAmount2
+        )
     }
 
     private fun withdrawTokenToEvm(
             bridge: TokenBridgeWithSnapshotWithdraw,
+            bridgeAddress: ByteArray,
             withdrawAmount: BigInteger,
             initialBalanceOnChromia: BigInteger,
             initialBalanceOnEvm: BigInteger,
     ): Hash {
         // Alice withdraws `withdrawAmount1` amount of tokens to the bridge
-        val txRid = withdrawOnPostchain(aliceCredentials, aliceAccount, assetId, withdrawAmount, bcRid)
+        val txRid = withdrawOnPostchainV2(aliceCredentials, aliceAccount, assetId, withdrawAmount, bridgeAddress, bcRid)
         sealBlock()
         snapshotHeights.add(currentBlockHeight)
         assertEquals(initialBalanceOnChromia - withdrawAmount, getAssetBalance(aliceAccount))

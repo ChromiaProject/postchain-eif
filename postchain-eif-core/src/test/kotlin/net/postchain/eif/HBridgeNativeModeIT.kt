@@ -65,6 +65,7 @@ class HBridgeNativeModeIT : HBridgeBaseIntegrationTest() {
 
     // Contracts
     private lateinit var bridge: ChromiaTokenBridge
+    private lateinit var bridgeAddress: ByteArray
     private lateinit var minter: TokenMinterTest
     private lateinit var chromiaTestToken: ChromiaTestToken
 
@@ -85,6 +86,7 @@ class HBridgeNativeModeIT : HBridgeBaseIntegrationTest() {
         bridge = Contract.deployRemoteCall(ChromiaTokenBridge::class.java, web3j, transactionManager, gasProvider, chromiaTokenBridgeBinary, "").send().apply {
             initialize(Address(validator.contractAddress), Uint256(2)).send()
         }
+        bridgeAddress = bridge.contractAddress.substring(2).hexStringToByteArray()
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contract
         chromiaTestToken = Contract.deployRemoteCall(ChromiaTestToken::class.java, web3j, transactionManager, gasProvider, chromiaTestTokenBinary, "").send()
@@ -127,7 +129,8 @@ class HBridgeNativeModeIT : HBridgeBaseIntegrationTest() {
                 .query("eif.api_version", gtv(emptyMap())).get().asInteger()
         logger.info { "EIF API version: $apiVersion" }
 
-        enqueueTx(configureContract("39615b16b74589919c9ce1ea73f1fc5d53141a78".hexStringToByteArray(), bcRid, adminKeyPair))
+        enqueueTx(configureEventReceiverContract(bridgeAddress, bcRid, adminKeyPair))
+        sealBlock()
     }
 
     @Test
@@ -152,6 +155,7 @@ class HBridgeNativeModeIT : HBridgeBaseIntegrationTest() {
         assetId = value["data"]?.get(0)?.get("id")!!.asByteArray()
 
         enqueueTx(registerERC20Asset(testTokenAddress, assetId, bcRid, adminKeyPair, BridgeMode.native))
+        enqueueTx(configureBridgeWithErc20Assets(bridgeAddress, bcRid, adminKeyPair))
 
         aliceAccount = registerAccount(aliceCredentials.keyPair.pubKey, bcRid, adminKeyPair)
         linkAccount(aliceCredentials, aliceAccount, bcRid)
@@ -182,7 +186,7 @@ class HBridgeNativeModeIT : HBridgeBaseIntegrationTest() {
     fun `withdraw token to evm`() {
         logger.info { "withdraw token to evm" }
 
-        val txRid = withdrawOnPostchain(aliceCredentials, aliceAccount, assetId, withdrawAmount, bcRid)
+        val txRid = withdrawOnPostchainV2(aliceCredentials, aliceAccount, assetId, withdrawAmount, bridgeAddress, bcRid)
         sealBlock()
         snapshotHeights.add(currentBlockHeight)
         assertEquals(initialMint - withdrawAmount, getAssetBalance(aliceAccount))
@@ -195,7 +199,7 @@ class HBridgeNativeModeIT : HBridgeBaseIntegrationTest() {
         // Query to get the event proof to withdraw fund on evm
         val eventData = gtv(
                 gtv(serial),
-                gtv(networkId),
+                networkContractDiscriminator(networkId, bridgeAddress),
                 gtv(to32Bytes(chromiaTestToken.contractAddress.substring(2))),
                 gtv(to32Bytes(aliceCredentials.evmAddressStr)),
                 gtv(withdrawAmount)
@@ -303,7 +307,7 @@ class HBridgeNativeModeIT : HBridgeBaseIntegrationTest() {
         logger.info { "withdraw 1 CHR $multiWithdrawTimes times in one block" }
         val lastTxRid = (0 until multiWithdrawTimes).map {
             Thread.sleep(1) // To get unique nop
-            withdrawOnPostchain(aliceCredentials, aliceAccount, assetId, multiWithdrawAmount, bcRid)
+            withdrawOnPostchainV2(aliceCredentials, aliceAccount, assetId, multiWithdrawAmount, bridgeAddress, bcRid)
         }.last()
         sealBlock()
 
@@ -334,7 +338,7 @@ class HBridgeNativeModeIT : HBridgeBaseIntegrationTest() {
         assertEquals(withdrawAmount + multiWithdrawAmount, aliceBalance.value)
 
         logger.info { "\tmaking a new withdrawal in next block" }
-        val nextBlockWithdraw = withdrawOnPostchain(aliceCredentials, aliceAccount, assetId, multiWithdrawAmount, bcRid)
+        val nextBlockWithdraw = withdrawOnPostchainV2(aliceCredentials, aliceAccount, assetId, multiWithdrawAmount, bridgeAddress, bcRid)
         sealBlock()
 
         assertEquals(
@@ -430,7 +434,7 @@ class HBridgeNativeModeIT : HBridgeBaseIntegrationTest() {
         nodeTransactionManager.sendTransaction(
                 gasPricePauseFunction,
                 gasLimitPauseFunction,
-                bridge.contractAddress,
+                bridgeAddress.toHex(),
                 pauseFunctionData,
                 BigInteger.ZERO
         )
@@ -447,7 +451,7 @@ class HBridgeNativeModeIT : HBridgeBaseIntegrationTest() {
         transactionManager.sendTransaction(
                 gasPriceUnpauseFunction,
                 gasLimitUnpauseFunction,
-                bridge.contractAddress,
+                bridgeAddress.toHex(),
                 unpauseFunctionData,
                 BigInteger.ZERO
         )

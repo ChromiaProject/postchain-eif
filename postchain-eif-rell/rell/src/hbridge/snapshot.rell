@@ -28,7 +28,7 @@ entity state_slot {
     recipient_address: byte_array;
     type: state_slot_type;
     local: boolean;
-    discriminator: big_integer; // binds slot to a specific network, and, optionally, a specific bridge contract within the network
+    discriminator: big_integer; // binds slot to a specific (v1) network, or (v2) network and bridge contract address
     index network_id, recipient_address, type, local;
 }
 
@@ -62,11 +62,6 @@ function get_next_state_slot_id(): integer {
     }
 }
 
-function network_id_to_discriminator(network_id: integer): big_integer {
-    // this is how we do (network_id << 160) in Rell, OMG
-    return big_integer(network_id) * big_integer.from_hex("1" + "00".repeat(20));
-}
-
 function maybe_create_local_erc20_state_slot(account: ft4.accounts.account, erc20_asset): state_slot? {
     val account_address = find_address_for_ft4_account(account, erc20_asset.network_id);
     if (not empty(account_address)) {
@@ -80,10 +75,7 @@ function maybe_create_local_erc20_state_slot(account: ft4.accounts.account, erc2
                 network_id,
                 recipient_address = account_address,
                 type = state_slot_type.erc20,
-                // currently we use network_id as a discriminator, which is fine as long
-                // as there's only one bridge contract per network (or tokens supported by the bridge contracts are disjoint)
-                // future version might support more specific discriminators
-                discriminator = network_id_to_discriminator(network_id),
+                discriminator = build_discriminator(erc20_asset),
                 local = true
             );
         }
@@ -119,7 +111,7 @@ function emit_erc20_withdrawal_state(state_slot: state_slot, event_hashes: list<
     val state_parts = list<gtv>();
     state_parts.add(ERC20_WITHDRAWAL_STATE_TAG.to_gtv());
     state_parts.add(utils.evm_address_to_32_byte_array(state_slot_data.recipient_address).to_gtv());
-    state_parts.add(state_slot_data.discriminator.to_gtv()); // discriminator already already includes network_id
+    state_parts.add(state_slot_data.discriminator.to_gtv()); // discriminator includes (v1) network_id, or (v2) network_id and bridge_address
     for (event_hash in event_hashes) {
         state_parts.add(event_hash.to_gtv());
     }
@@ -140,11 +132,12 @@ function add_erc20_withdrawal_to_snapshot(ew: erc20_withdrawal) {
     val beneficiary = withdrawal_info.beneficiary;
     
     // Create state_slot as needed
+    val discriminator = build_discriminator(asset);
     var state_slot = state_slot @? {
         .recipient_address == beneficiary,
         .type == state_slot_type.erc20_withdrawal,
         .network_id == network_id,
-        .discriminator == network_id_to_discriminator(network_id),
+        .discriminator == discriminator,
         .local == true
     };
     
@@ -154,7 +147,7 @@ function add_erc20_withdrawal_to_snapshot(ew: erc20_withdrawal) {
             network_id,
             recipient_address = beneficiary,
             type = state_slot_type.erc20_withdrawal,
-            discriminator = network_id_to_discriminator(network_id),
+            discriminator = discriminator,
             local = true
         );
     }
@@ -188,7 +181,7 @@ function emit_erc20_state(state_slot: state_slot, balance_records: list<balance_
     val state_parts = list<gtv>();
     state_parts.add(ERC20_STATE_TAG.to_gtv());
     state_parts.add(utils.evm_address_to_32_byte_array(state_slot_data.recipient_address).to_gtv());
-    state_parts.add(state_slot_data.discriminator.to_gtv()); // discriminator already includes network_id
+    state_parts.add(state_slot_data.discriminator.to_gtv()); // discriminator includes (v1) network_id, or (v2) network_id and bridge_address
 
     for (balance_record in balance_records) {
         state_parts.add(utils.evm_address_to_32_byte_array(balance_record.token_address).to_gtv());
@@ -272,6 +265,19 @@ function emit_local_erc20_state_slot(state_slot) {
             }
         }
     }
+}
+
+function build_discriminator(erc20_asset): big_integer {
+    if (chain_context.args.version == 1) {
+        return network_discriminator(erc20_asset.network_id);
+    }
+
+    // Get primary bridge
+    val primary_bridge = require(
+        bridge_erc20_asset @? { erc20_asset } ( @omit @sort .rowid, .bridge_contract.contract_address ) limit 1,
+        "Bridge address for ERC-20 token %s not found on network ID %d".format(erc20_asset.token_address, erc20_asset.network_id)
+    );
+    return network_contract_discriminator(erc20_asset.network_id, primary_bridge);
 }
 
 /*

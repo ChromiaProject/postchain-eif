@@ -82,10 +82,10 @@ export function calcExtraDataMerkleRoot(extraHeaderKeyHash: BytesLike, updateEve
     return postchainMerkleNodeHash([0x08, extraHeaderKeyHash, updateEventLeafHash]);
 }
 
-export function buildWithdrawEvent(serialNumber: string, networkId: string, contractAddress: string, toAddress: string, amountHex: string): string {
+export function buildWithdrawEvent(serialNumber: string, discriminator: string, contractAddress: string, toAddress: string, amountHex: string): string {
     return ''
         .concat(strip0x(serialNumber))
-        .concat(strip0x(networkId))
+        .concat(strip0x(discriminator))
         .concat(strip0x(contractAddress))
         .concat(strip0x(toAddress))
         .concat(strip0x(amountHex));

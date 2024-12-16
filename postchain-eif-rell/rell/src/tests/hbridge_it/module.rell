@@ -32,3 +32,10 @@ operation add_contract_config(network_id: integer, contract: byte_array) {
 
     create contract_config(network_id, contract);
 }
+
+operation register_bridge_with_erc20_assets(network_id: integer, bridge_address: byte_array) {
+    admin.require_admin();
+
+    val erc20_assets = hbridge.erc20_asset @* { network_id };
+    hbridge.register_bridge_with_erc20_assets(network_id, bridge_address, erc20_assets);
+}

@@ -54,22 +54,78 @@ function bridge_ft4_token_to_evm_auth_message(gtv) {
 }
 
 operation bridge_ft4_token_to_evm(network_id: integer, asset_id: byte_array, amount: big_integer, beneficiary: byte_array) {
+    require(
+        chain_context.args.version == 1,
+        "Unsupported HBridge version %d for the `bridge_ft4_token_to_evm` operation. Version 1 is required.".format(chain_context.args.version)
+    );
+
+    // In order to not ruin existing bridges we skip validation if no bridge has been defined
+    if (exists(bridge_contract @* {})) {
+        val network_bridges = bridge_contract @* { network_id };
+        require(network_bridges.size() > 0, "No bridges are configured for network ID %d".format(network_id));
+        require(network_bridges.size() < 2, "More than one bridge is configured for network ID %d. Use `bridge_ft_asset_to_evm` operation.".format(network_id));
+    }
+
     val ft4_asset = ft4.assets.Asset(asset_id);
     val erc20 = erc20_asset @? { .network_id == network_id, .asset == ft4_asset } (@omit @sort_desc .rowid, $) limit 1;
     require(erc20, "ERC20 token not found for network ID %d and ft4 asset ID %s".format(network_id, asset_id));
 
     val from_account = ft4.auth.authenticate();
-
+    require(withdraw_check_access_list(from_account.id), "Account id %s not on access list.".format(from_account.id));
     require(
         evm_eoa_account_link @? { from_account, beneficiary } ??
         or evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
         "Can only withdraw to your own account"
     );
 
-    require(withdraw_check_access_list(from_account.id), "Account id %s not on access list.".format(from_account.id));
-
     bridge_deduct_balance(from_account, erc20, amount);
     emit_withdrawal_event(erc20.network_id, erc20.token_address, beneficiary, amount);
+}
+
+@extend(ft4.auth.auth_handler)
+function () = ft4.auth.add_auth_handler(
+    scope = rell.meta(bridge_ft_asset_to_evm).mount_name,
+    flags = ["T"],
+    message = bridge_ft_asset_to_evm_auth_message(*)
+);
+
+function bridge_ft_asset_to_evm_auth_message(gtv) {
+    val args = struct<bridge_ft_asset_to_evm>.from_gtv(gtv);
+    return "Please sign the message to bridge %d of FT4 token %s\nfrom Chromia account {account_id} for beneficiary %s on network %d".format(
+        args.amount, args.asset_id, args.beneficiary, args.network_id
+    );
+}
+
+operation bridge_ft_asset_to_evm(
+    asset_id: byte_array,
+    amount: big_integer,
+    network_id: integer,
+    beneficiary: byte_array,
+    bridge_address: byte_array,
+) {
+    require(
+        chain_context.args.version >= 2,
+        "Unsupported HBridge version %d for the `bridge_ft_asset_to_evm` operation. Version 2 is required.".format(chain_context.args.version)
+    );
+
+    val ft4_asset = ft4.assets.Asset(asset_id);
+    val erc20 = erc20_asset @? { .network_id == network_id, .asset == ft4_asset } (@omit @sort_desc .rowid, $) limit 1;
+    require(erc20, "ERC20 token not found for network ID %d and ft4 asset ID %s".format(network_id, asset_id));
+    require(
+        validate_bridge_contract(bridge_address, erc20),
+        "Bridge address %s or ERC-20 token %s are not registered on network ID %d".format(bridge_address, erc20.token_address, network_id)
+    );
+
+    val from_account = ft4.auth.authenticate();
+    require(withdraw_check_access_list(from_account.id), "Account id %s not on access list.".format(from_account.id));
+    require(
+        evm_eoa_account_link @? { from_account, beneficiary } ??
+        or evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
+        "Can only withdraw to your own account"
+    );
+
+    bridge_deduct_balance(from_account, erc20, amount);
+    emit_withdrawal_event(erc20.network_id, erc20.token_address, beneficiary, amount, bridge_address);
 }
 
 @extend(ft4.auth.auth_handler)

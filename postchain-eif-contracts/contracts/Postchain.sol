@@ -14,7 +14,7 @@ library Postchain {
 
     struct Event {
         uint256 serialNumber;
-        uint256 networkId;
+        uint256 discriminator;
         IERC20 token;
         address beneficiary;
         uint256 amount;
@@ -37,7 +37,7 @@ library Postchain {
         if (hash != _hash) {
             revert("Postchain: invalid event");
         }
-        return (evt.token, evt.beneficiary, evt.amount, evt.networkId);
+        return (evt.token, evt.beneficiary, evt.amount, evt.discriminator);
     }
 
     function verifyBlockHeader(

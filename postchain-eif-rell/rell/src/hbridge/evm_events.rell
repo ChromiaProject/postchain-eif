@@ -232,60 +232,6 @@ function bounce_deposit_event(network_id: integer, token_address: byte_array, be
     emit_withdrawal_event(network_id, token_address, beneficiary, amount);
 }
 
-function emit_withdrawal_event(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
-    val next_serial = common.event_counter.counter + 1;
-    common.event_counter.counter = next_serial;
-
-    val event_hash = calculate_withdrawal_event_evm_hash(
-        next_serial,
-        network_id,
-        token_address,
-        beneficiary,
-        amount
-    );
-
-    val withdrawal = create erc20_withdrawal(
-        serial = next_serial,
-        network_id,
-        token_address,
-        beneficiary,
-        amount,
-        timestamp = op_context.last_block_time,
-        event_hash
-    );
-
-    update_withdrawal_status(event_hash, withdrawal_status.created);
-
-    add_erc20_withdrawal_to_snapshot(withdrawal);
-
-    val withdraw_info = [
-        next_serial.to_gtv(),
-        network_id.to_gtv(),
-        utils.evm_address_to_32_byte_array(token_address).to_gtv(),
-        utils.evm_address_to_32_byte_array(beneficiary).to_gtv(),
-        amount.to_gtv()
-    ];
-
-    op_context.emit_event("eif_event", withdraw_info.to_gtv());
-}
-
-function calculate_withdrawal_event_evm_hash(
-    serial: integer,
-    network_id: integer,
-    token_address: byte_array,
-    beneficiary: byte_array,
-    amount: big_integer
-): byte_array {
-
-    val data = utils.integer_to_32_byte_array(serial)
-        + utils.integer_to_32_byte_array(network_id)
-        + utils.evm_address_to_32_byte_array(token_address)
-        + utils.evm_address_to_32_byte_array(beneficiary)
-        + utils.big_integer_to_32_byte_array(amount);
-
-    return crypto.keccak256(data);
-}
-
 function validate_bridge_contract(bridge_address: byte_array, erc20_asset): boolean {
     // In order to not ruin existing bridges we skip validation if no bridge has been defined
     if (empty(bridge_contract @* {})) return true;

@@ -1,0 +1,55 @@
+
+function test_network_discriminator() {
+    // Use symbolic computation in tests
+    val base = big_integer.from_hex("1" + "00".repeat(20));
+
+    assert_equals(network_discriminator(0), 0L);
+
+    // Ethereum Mainnet and Sepolia
+    assert_equals(network_discriminator(1), 1L * base);
+    assert_equals(network_discriminator(11155111), 11155111L * base);
+
+    // BSC mainnet and testnet
+    assert_equals(network_discriminator(56), 56L * base);
+    assert_equals(network_discriminator(97), 97L * base);
+}
+
+function test_network_contract_discriminator() {
+    // Use symbolic computation in tests
+    val base = big_integer.from_hex("1" + "00".repeat(20));
+
+    assert_equals(
+        network_contract_discriminator(0, x"0f7FFcb5C0B8caD7917A8d685E1fb8e2BCe15614"),
+        0L * base + big_integer.from_bytes_unsigned(x"0f7FFcb5C0B8caD7917A8d685E1fb8e2BCe15614")
+    );
+
+    // Ethereum Mainnet and Sepolia
+    assert_equals(
+        network_contract_discriminator(1, x"0f7FFcb5C0B8caD7917A8d685E1fb8e2BCe15614"),
+        1L * base +  big_integer.from_bytes_unsigned(x"0f7FFcb5C0B8caD7917A8d685E1fb8e2BCe15614")
+    );
+    assert_equals(
+        network_contract_discriminator(11155111, x"0f7FFcb5C0B8caD7917A8d685E1fb8e2BCe15614"),
+        11155111L * base + big_integer.from_bytes_unsigned(x"0f7FFcb5C0B8caD7917A8d685E1fb8e2BCe15614")
+    );
+
+    // BSC mainnet and testnet
+    assert_equals(
+        network_contract_discriminator(56, x"0f7FFcb5C0B8caD7917A8d685E1fb8e2BCe15614"),
+        56L * base + big_integer.from_bytes_unsigned(x"0f7FFcb5C0B8caD7917A8d685E1fb8e2BCe15614")
+    );
+    assert_equals(
+        network_contract_discriminator(97, x"0f7FFcb5C0B8caD7917A8d685E1fb8e2BCe15614"),
+        97L * base + big_integer.from_bytes_unsigned(x"0f7FFcb5C0B8caD7917A8d685E1fb8e2BCe15614")
+    );
+
+    // Verify that address is read as unsigned big_integer
+    assert_equals(
+        network_contract_discriminator(56, x"ffffffffffffffffffffffffffffffffffffffff"),
+        56L * base + ((16L).pow(40) - 1L)
+    );
+    assert_equals(
+        network_contract_discriminator(11155111, x"ffffffffffffffffffffffffffffffffffffffff"),
+        11155111L * base + ((16L).pow(40) - 1L)
+    );
+}

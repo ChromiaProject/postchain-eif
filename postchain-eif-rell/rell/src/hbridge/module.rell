@@ -18,6 +18,13 @@ namespace ft4 {
 
 struct module_args {
     evm_read_offsets: gtv = map<text, integer>().to_gtv();
+
+    /**
+     * HBridge versions:
+     * - Version 1: Initial HBridge implementation
+     * - Version 2: Added support for multiple bridges
+     */
+    version: integer = 1;
 }
 
 enum bridge_mode {
