@@ -15,7 +15,7 @@ import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvEncoder
 import net.postchain.gtv.generateProof
 import net.postchain.gtv.mapper.Name
-import net.postchain.gtv.merkle.GtvMerkleHashCalculator
+import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV1
 import net.postchain.gtv.merkle.MerkleBasics
 import net.postchain.gtv.merkle.path.GtvPath
 import net.postchain.gtv.merkle.path.GtvPathFactory
@@ -29,7 +29,7 @@ class EvmMerkleProofBuilder(
         private val extraHeaderPath: List<String>
 ) {
 
-    private val merkleHashCalculator = GtvMerkleHashCalculator(cryptoSystem)
+    private val merkleHashCalculator = GtvMerkleHashCalculatorV1(cryptoSystem)
 
     fun build(ctx: EContext, blockHeight: Long, blockRid: ByteArray, data: ByteArray, hash: ByteArray, position: Long, clientProvidedSignatures: Array<Signature>? = null): EvmMerkleProof {
         val db = DatabaseAccess.of(ctx)

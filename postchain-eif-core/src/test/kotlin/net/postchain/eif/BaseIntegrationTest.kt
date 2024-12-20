@@ -6,7 +6,7 @@ import net.postchain.devtools.ManagedModeTest
 import net.postchain.eif.transaction.TransactionSubmitter
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvFactory.gtv
-import net.postchain.gtv.merkle.GtvMerkleHashCalculator
+import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV1
 import org.apache.logging.log4j.Level
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -38,7 +38,7 @@ abstract class EifBaseIntegrationTest(private val prependUrls: List<String> = li
 
     val myCS = Secp256K1CryptoSystem()
 
-    val hashCalculator = GtvMerkleHashCalculator(myCS)
+    val hashCalculator = GtvMerkleHashCalculatorV1(myCS)
 
     val networkId = 1337L
     val gasProvider = DefaultGasProvider()

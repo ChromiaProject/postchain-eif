@@ -6,11 +6,11 @@ import net.postchain.common.BlockchainRid
 import net.postchain.core.BlockRid
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.merkle.GtvMerkleBasics.HASH_PREFIX_NODE_GTV_ARRAY
-import net.postchain.gtv.merkle.GtvMerkleHashCalculator
+import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV1
 import net.postchain.gtv.merkle.MerkleBasics.HASH_PREFIX_NODE
 import net.postchain.gtv.merkleHash
 
-fun encodeBlockHeaderDataForEVM(blockRid: ByteArray, blockHeaderData: BlockHeaderData, merkleHashCalculator: GtvMerkleHashCalculator) = SimpleGtvEncoder.encodeGtv(gtv(
+fun encodeBlockHeaderDataForEVM(blockRid: ByteArray, blockHeaderData: BlockHeaderData, merkleHashCalculator: GtvMerkleHashCalculatorV1) = SimpleGtvEncoder.encodeGtv(gtv(
         blockHeaderData.gtvBlockchainRid,
         gtv(blockRid),
         blockHeaderData.gtvPreviousBlockRid,
@@ -49,7 +49,7 @@ data class DecodedBlockHeaderDataForEVM(
         val dependenciesHash: ByteArray,
         val extraHash: ByteArray
 ) {
-    fun verifyBlockRid(hashCalculator: GtvMerkleHashCalculator): Boolean {
+    fun verifyBlockRid(hashCalculator: GtvMerkleHashCalculatorV1): Boolean {
         // Same procedure as in Postchain.sol
         val node12 = hashCalculator.calculateNodeHash(
                 HASH_PREFIX_NODE,

@@ -18,7 +18,7 @@ import net.postchain.eif.encodeSignatureWithV
 import net.postchain.eif.getEthereumAddress
 import net.postchain.eif.transaction.EvmBlockHeaderValidator
 import net.postchain.gtv.GtvFactory.gtv
-import net.postchain.gtv.merkle.GtvMerkleHashCalculator
+import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV1
 import net.postchain.gtx.GTXModule
 import net.postchain.gtx.data.OpData
 import net.postchain.gtx.special.GTXSpecialTxExtension
@@ -31,7 +31,7 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
 
     private lateinit var module: GTXModule
     private lateinit var cryptoSystem: CryptoSystem
-    private lateinit var hashCalculator: GtvMerkleHashCalculator
+    private lateinit var hashCalculator: GtvMerkleHashCalculatorV1
 
     private val evmBlockHeaderValidator = EvmBlockHeaderValidator("Validation of EVM anchoring failed:")
 
@@ -86,7 +86,7 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
     override fun init(module: GTXModule, chainID: Long, blockchainRID: BlockchainRid, cs: CryptoSystem) {
         this.module = module
         cryptoSystem = cs
-        hashCalculator = GtvMerkleHashCalculator(cs)
+        hashCalculator = GtvMerkleHashCalculatorV1(cs)
     }
 
     override fun needsSpecialTransaction(position: SpecialTransactionPosition): Boolean {

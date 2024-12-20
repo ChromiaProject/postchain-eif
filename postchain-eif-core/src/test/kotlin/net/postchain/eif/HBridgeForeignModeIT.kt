@@ -20,7 +20,7 @@ import net.postchain.gtv.GtvEncoder
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvNull
 import net.postchain.gtv.mapper.toObject
-import net.postchain.gtv.merkle.GtvMerkleHashCalculator
+import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV1
 import org.awaitility.Awaitility.await
 import org.awaitility.Duration
 import org.junit.jupiter.api.Assertions.assertArrayEquals
@@ -455,7 +455,7 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
         sealBlock()
         sealBlock()
 
-        val merkleHashCalculator = GtvMerkleHashCalculator(Secp256K1CryptoSystem())
+        val merkleHashCalculator = GtvMerkleHashCalculatorV1(Secp256K1CryptoSystem())
         repeat(1) { // the 2nd iteration reassigns the mass exit block
             // Get the last snapshot block height as mass-exit block
             lastSnapshotBlockHeight = currentBlockHeight

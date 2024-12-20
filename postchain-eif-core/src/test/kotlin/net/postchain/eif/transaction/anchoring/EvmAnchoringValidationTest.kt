@@ -24,7 +24,7 @@ import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvEncoder
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvNull
-import net.postchain.gtv.merkle.GtvMerkleHashCalculator
+import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV1
 import net.postchain.gtv.merkleHash
 import net.postchain.gtx.GTXModule
 import net.postchain.gtx.data.OpData
@@ -40,7 +40,7 @@ import java.security.Security
 class EvmAnchoringValidationTest {
 
     private val cryptoSystem = Secp256K1CryptoSystem()
-    private val hashCalculator = GtvMerkleHashCalculator(cryptoSystem)
+    private val hashCalculator = GtvMerkleHashCalculatorV1(cryptoSystem)
     private val mockContext: BlockEContext = mock {}
     private val systemAnchoringBrid = BlockchainRid.ZERO_RID
     private val systemAnchoringSigner1 = cryptoSystem.generateKeyPair()

@@ -23,7 +23,7 @@ import net.postchain.gtv.GtvDictionary
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvInteger
 import net.postchain.gtv.GtvNull
-import net.postchain.gtv.merkle.GtvMerkleHashCalculator
+import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV1
 import net.postchain.gtv.merkleHash
 import net.postchain.gtx.GtxBuilder
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -269,7 +269,7 @@ class EifBlockBuilderIT : IntegrationTestSetup() {
         assertEquals(root.toHex(), eifStateRoot!!.toHex())
 
         val eventAndStateData = GtvDictionary.build(mapOf(EIF to GtvByteArray(EMPTY_HASH + eifStateRoot)))
-        val eventAndStateDataHash = eventAndStateData.merkleHash(GtvMerkleHashCalculator(Secp256K1CryptoSystem()))
+        val eventAndStateDataHash = eventAndStateData.merkleHash(GtvMerkleHashCalculatorV1(Secp256K1CryptoSystem()))
         // Verify account state merkle proof
         for (pos in 0..15) {
             val args = gtv(
@@ -319,7 +319,7 @@ class EifBlockBuilderIT : IntegrationTestSetup() {
         assertEquals(root2.toHex(), eifStateRoot2!!.toHex())
 
         val eventAndStateData2 = GtvDictionary.build(mapOf(EIF to GtvByteArray(EMPTY_HASH + eifStateRoot2)))
-        val eventAndStateDataHash2 = eventAndStateData2.merkleHash(GtvMerkleHashCalculator(Secp256K1CryptoSystem()))
+        val eventAndStateDataHash2 = eventAndStateData2.merkleHash(GtvMerkleHashCalculatorV1(Secp256K1CryptoSystem()))
 
         for (pos in 0..16) {
             val args = gtv(
@@ -436,7 +436,7 @@ class EifBlockBuilderIT : IntegrationTestSetup() {
         assertEquals(eventRootHash.toHex(), eifRootEvent!!.toHex())
 
         val eventAndStateData = GtvDictionary.build(mapOf(EIF to GtvByteArray(eifRootEvent + eifRootState)))
-        val eventAndStateDataHash = eventAndStateData.merkleHash(GtvMerkleHashCalculator(Secp256K1CryptoSystem()))
+        val eventAndStateDataHash = eventAndStateData.merkleHash(GtvMerkleHashCalculatorV1(Secp256K1CryptoSystem()))
         // Verify event merkle proof
         for (pos in 0..3) {
             val args = gtv(

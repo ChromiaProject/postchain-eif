@@ -30,7 +30,7 @@ import net.postchain.gtv.GtvFactory
 import net.postchain.gtv.GtvNull
 import net.postchain.gtv.generateProof
 import net.postchain.gtv.mapper.GtvObjectMapper
-import net.postchain.gtv.merkle.GtvMerkleHashCalculator
+import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV1
 import net.postchain.gtv.merkle.MerkleBasics
 import net.postchain.gtv.merkle.path.GtvPath
 import net.postchain.gtv.merkle.path.GtvPathFactory
@@ -49,7 +49,7 @@ import java.security.Security
 
 class EvmEvmSignerUpdateValidationTest {
     private val cryptoSystem = Secp256K1CryptoSystem()
-    private val hashCalculator = GtvMerkleHashCalculator(cryptoSystem)
+    private val hashCalculator = GtvMerkleHashCalculatorV1(cryptoSystem)
     private val mockContext: BlockEContext = mock {}
     private val directoryChainBrid = BlockchainRid.ZERO_RID
     private val directoryChainSigner = cryptoSystem.generateKeyPair()

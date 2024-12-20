@@ -19,7 +19,7 @@ import net.postchain.eif.transaction.signerupdate.directorychain.SignerUpdateGTX
 import net.postchain.gtv.GtvDecoder
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.mapper.toObject
-import net.postchain.gtv.merkle.GtvMerkleHashCalculator
+import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV1
 import net.postchain.gtx.GTXModule
 import net.postchain.gtx.data.OpData
 import net.postchain.gtx.special.GTXSpecialTxExtension
@@ -33,7 +33,7 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
 
     private lateinit var module: GTXModule
     private lateinit var cryptoSystem: CryptoSystem
-    private lateinit var hashCalculator: GtvMerkleHashCalculator
+    private lateinit var hashCalculator: GtvMerkleHashCalculatorV1
 
     private val evmBlockHeaderValidator = EvmBlockHeaderValidator("Validation of signer update failed:")
     private val keccakDigest = SimpleDigestSystem(MessageDigest.getInstance(KECCAK256))
@@ -102,7 +102,7 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
     override fun init(module: GTXModule, chainID: Long, blockchainRID: BlockchainRid, cs: CryptoSystem) {
         this.module = module
         this.cryptoSystem = cs
-        this.hashCalculator = GtvMerkleHashCalculator(cs)
+        this.hashCalculator = GtvMerkleHashCalculatorV1(cs)
     }
 
     override fun needsSpecialTransaction(position: SpecialTransactionPosition) = when (position) {
