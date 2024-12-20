@@ -1,9 +1,14 @@
 # Transaction Submitter Configuration
 
-## Transaction Submitter Chain Configuration
+## Transaction Submitter Blockchain Configuration
 
-Transaction submitter blockchain configuration contains configuration per EVM under configuration
-parameter `chains`. Each item in the list have the following configuration properties:
+Transaction submitter blockchain configuration has the following configuration properties under `transaction_submitter`:
+
+| Name                                         | Description                                                                      | Type | Required           | Default |
+|----------------------------------------------|----------------------------------------------------------------------------------|------|--------------------|---------|
+| `chains`                                     | Map of EVM chains.                                                               | map  | :white_check_mark: |         |
+
+Each entry in `chains` has the following configuration properties:
 
 | Name                              | Description                                                                                                                                                                                              | Type   | Required           | Default |
 |-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------|--------------------|---------|
