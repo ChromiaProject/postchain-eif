@@ -49,7 +49,8 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                         postchainContext.appConfig.privKeyByteArray,
                         postchainContext.appConfig.pubKeyByteArray,
                         validateSpecialOps = process::isSigner,
-                        pollEvmReceipts = !nodeIsReplica
+                        pollEvmReceipts = !nodeIsReplica,
+                        blockQueries = process.blockchainEngine.getBlockQueries(),
                 )
 
                 // Do not start the transaction submitter if we are a replica node

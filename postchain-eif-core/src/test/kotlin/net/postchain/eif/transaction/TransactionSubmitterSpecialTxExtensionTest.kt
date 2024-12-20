@@ -7,20 +7,23 @@ import net.postchain.base.SpecialTransactionPosition
 import net.postchain.common.BlockchainRid
 import net.postchain.common.hexStringToByteArray
 import net.postchain.core.BlockEContext
+import net.postchain.core.block.BlockQueries
 import net.postchain.crypto.KeyPair
 import net.postchain.crypto.Secp256K1CryptoSystem
 import net.postchain.eif.TestLogAppender
+import net.postchain.gtv.GtvFactory.gtv
 import org.apache.logging.log4j.Level
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.mockito.Mockito
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 import java.math.BigInteger
+import java.util.concurrent.CompletableFuture
 
 class TransactionSubmitterSpecialTxExtensionTest {
 
@@ -50,11 +53,15 @@ class TransactionSubmitterSpecialTxExtensionTest {
         module = TransactionSubmitterTestGTXModule()
 
         txExtension.init(module, 0, BlockchainRid.ZERO_RID, cryptoSystem)
+        val blockQueries = mock<BlockQueries> {
+            on { query(any(), any()) } doReturn CompletableFuture.completedStage(gtv(listOf()))
+        }
         txExtension.setConfig(
                 updatedSigner.privKey.data,
                 updatedSigner.pubKey.data,
                 { true },
-                true
+                true,
+                blockQueries,
         )
     }
 
@@ -67,7 +74,7 @@ class TransactionSubmitterSpecialTxExtensionTest {
         txDb.effectiveGasPrice = BigInteger.TEN
         txDb.gasUsed = BigInteger.TEN
 
-        Mockito.`when`(transactionSubmitter.getPendingTx(eq(txDb.rowId))).doReturn(txDb)
+        whenever(transactionSubmitter.getPendingTx(eq(txDb.rowId))).doReturn(txDb)
 
         val tx = mkEvmSubmitTxRellRequest(contractAddress = "00")
         module.addTransaction(tx)
@@ -76,7 +83,7 @@ class TransactionSubmitterSpecialTxExtensionTest {
                 txExtension.buildTxUpdateOp(0, RellTransactionStatus.SUCCESS),
         )
 
-     assertThat(txExtension.validateSpecialOperations(SpecialTransactionPosition.Begin, mock<BlockEContext>(), ops)).isFalse()
+        assertThat(txExtension.validateSpecialOperations(SpecialTransactionPosition.Begin, mock<BlockEContext>(), ops)).isFalse()
         testLogAppender.assertWarn("Validation failed. Transaction 0 is set to SUCCESS but without a receipt")
     }
 
@@ -89,7 +96,7 @@ class TransactionSubmitterSpecialTxExtensionTest {
         txDb.effectiveGasPrice = BigInteger.TEN
         txDb.gasUsed = BigInteger.TEN
 
-        Mockito.`when`(transactionSubmitter.getPendingTx(eq(txDb.rowId))).doReturn(txDb)
+        whenever(transactionSubmitter.getPendingTx(eq(txDb.rowId))).doReturn(txDb)
 
         val tx = mkEvmSubmitTxRellRequest(contractAddress = "00")
         module.addTransaction(tx)
@@ -111,7 +118,7 @@ class TransactionSubmitterSpecialTxExtensionTest {
         txDb.effectiveGasPrice = BigInteger.TEN
         txDb.gasUsed = BigInteger.TEN
 
-        Mockito.`when`(transactionSubmitter.getPendingTx(eq(txDb.rowId))).doReturn(txDb)
+        whenever(transactionSubmitter.getPendingTx(eq(txDb.rowId))).doReturn(txDb)
 
         val tx = mkEvmSubmitTxRellRequest(contractAddress = "00")
         module.addTransaction(tx)
@@ -137,9 +144,9 @@ class TransactionSubmitterSpecialTxExtensionTest {
         val txProcessedByOther = mkEvmSubmitTxRellRequest(rowId = 0, contractAddress = "00", status = RellTransactionStatus.PENDING, processedBy = "AABBCC".hexStringToByteArray())
 
         // Mock required empty collections and one with our pending transaction
-        Mockito.`when`(transactionSubmitter.getVerifiedTransactions()).thenReturn(mutableListOf())
-        Mockito.`when`(transactionSubmitter.getSubmitTxUpdates()).thenReturn(mutableListOf())
-        Mockito.`when`(transactionSubmitter.getPendingTxs()).thenReturn(mutableMapOf("00" to EvmPendingTx.fromEvmSubmitTxRellRequest(txProcessedByMe, "AA")))
+        whenever(transactionSubmitter.getVerifiedTransactions()) doReturn mutableListOf()
+        whenever(transactionSubmitter.getSubmitTxUpdates()) doReturn mutableListOf()
+        whenever(transactionSubmitter.getPendingTxs()) doReturn mutableMapOf("00" to EvmPendingTx.fromEvmSubmitTxRellRequest(txProcessedByMe, "AA"))
 
         // Make the new transaction (processed by the other node) available
         module.addTransaction(txProcessedByOther)
@@ -150,5 +157,23 @@ class TransactionSubmitterSpecialTxExtensionTest {
         // Make sure it was cancelled
         verify(transactionSubmitter, times(1)).cancelPendingTx(any())
         verify(transactionSubmitter, times(1)).removePendingTx(any())
+    }
+
+    @Test
+    fun `shouldBuildBlock - return false when no transactions to produce`() {
+
+        whenever(transactionSubmitter.getVerifiedTransactions()) doReturn mutableListOf()
+        whenever(transactionSubmitter.getSubmitTxUpdates()) doReturn mutableListOf()
+
+        assertThat(txExtension.shouldBuildBlock()).isFalse()
+    }
+
+    @Test
+    fun `shouldBuildBlock - return true when there are transactions to produce`() {
+
+        whenever(transactionSubmitter.getVerifiedTransactions()) doReturn mutableListOf()
+        whenever(transactionSubmitter.getSubmitTxUpdates()) doReturn mutableListOf(mock())
+
+        assertThat(txExtension.shouldBuildBlock()).isTrue()
     }
 }

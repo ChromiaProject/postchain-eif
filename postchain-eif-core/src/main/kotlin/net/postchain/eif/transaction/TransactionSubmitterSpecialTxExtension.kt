@@ -3,12 +3,16 @@ package net.postchain.eif.transaction
 import mu.KLogging
 import net.postchain.base.SpecialTransactionPosition
 import net.postchain.common.BlockchainRid
+import net.postchain.concurrent.util.get
 import net.postchain.core.BlockEContext
 import net.postchain.core.EContext
+import net.postchain.core.block.BlockData
+import net.postchain.core.block.BlockQueries
 import net.postchain.crypto.CryptoSystem
 import net.postchain.crypto.KeyPair
 import net.postchain.crypto.SigMaker
 import net.postchain.crypto.Signature
+import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvNull
@@ -17,10 +21,10 @@ import net.postchain.gtv.merkle.GtvMerkleHashCalculator
 import net.postchain.gtv.merkleHash
 import net.postchain.gtx.GTXModule
 import net.postchain.gtx.data.OpData
-import net.postchain.gtx.special.GTXSpecialTxExtension
+import net.postchain.gtx.special.GTXBlockBuildingAffectingSpecialTxExtension
 import java.math.BigInteger
 
-class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
+class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialTxExtension {
     companion object : KLogging() {
         const val UPDATE_EVM_TRANSACTION_STATUS = "__update_evm_transaction_status"
         const val UPDATE_EVM_TRANSACTION_RECEIPT = "__update_evm_transaction_receipt"
@@ -42,6 +46,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
     private var validateSpecialOps: () -> Boolean = { false }
     private var pollEvmReceipts = false
     private var startupJobsRun = false
+    private lateinit var blockQueries: BlockQueries
 
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
 
@@ -411,13 +416,15 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
             privKey: ByteArray,
             pubKey: ByteArray,
             validateSpecialOps: () -> Boolean,
-            pollEvmReceipts: Boolean
+            pollEvmReceipts: Boolean,
+            blockQueries: BlockQueries
     ) {
         this.privKey = privKey
         this.pubKey = pubKey
         this.sigMaker = cryptoSystem.buildSigMaker(KeyPair(pubKey, privKey))
         this.validateSpecialOps = validateSpecialOps
         this.pollEvmReceipts = pollEvmReceipts
+        this.blockQueries = blockQueries
 
         logger.info { "Transaction submitter special tx extension config: pollEvmReceipts: ${this.pollEvmReceipts}" }
     }
@@ -460,7 +467,7 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
 
     private fun getOpsForTx(ops: List<OpData>, opName: String, requestId: Long): List<OpData> {
         return ops
-                .filter { op -> op.opName == opName && op.args[0].asInteger() == requestId}
+                .filter { op -> op.opName == opName && op.args[0].asInteger() == requestId }
     }
 
     // If the processedBy value is updated it means another node has been assigned the task to submit this transaction
@@ -493,5 +500,17 @@ class TransactionSubmitterSpecialTxExtension : GTXSpecialTxExtension {
             startupJobsRun = true
             addNewPendingTransactions(bctx)
         }
+    }
+
+    override fun blockCommitted(blockData: BlockData) {}
+
+    override fun shouldBuildBlock(): Boolean {
+        if (!::blockQueries.isInitialized) return false
+
+        return blockQueries.query(FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT, gtv("exclude_taken_by_key" to gtv(pubKey))).get<Gtv>().asArray().isNotEmpty()
+                ||
+                transactionSubmitters.values.any<TransactionSubmitter> { txSubmitter ->
+                    txSubmitter.getSubmitTxUpdates().isNotEmpty<EvmSubmitTransactionResult>() || txSubmitter.getVerifiedTransactions().isNotEmpty<EvmPendingTx>()
+                }
     }
 }

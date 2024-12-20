@@ -2,8 +2,7 @@
 
 ### EVM Event Receiver Blockchain Configuration
 
-EVM Event Receiver blockchain configuration has the following configuration properties:  
-
+EVM Event Receiver blockchain configuration has the following configuration properties under `eif`:  
 
 | Name                                         | Description                                                                      | Type | Required           | Default |
 |----------------------------------------------|----------------------------------------------------------------------------------|------|--------------------|---------|
