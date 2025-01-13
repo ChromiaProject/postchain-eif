@@ -5,7 +5,7 @@ import ^.eif.messaging;
 import ^.eif.version;
 import .model.*;
 import .queries.*;
-import chain_version;
+import ^.chain_version;
 
 struct module_args {
     enable_icmf: boolean = true;
