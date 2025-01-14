@@ -13,6 +13,7 @@
     "deploy:snapshots": "npx hardhat deploy:snapshots",
     "deploy:directoryValidator": "npx hardhat deploy:directoryValidator",
     "deploy:anchoring": "npx hardhat deploy:anchoring",
+    "deploy:validator": "npx hardhat deploy:validator",
     "prepare:bridge": "npx hardhat prepare:bridge",
     "upgrade:bridge": "npx hardhat upgrade:bridge",
     "import:bridge": "npx hardhat import:bridge",

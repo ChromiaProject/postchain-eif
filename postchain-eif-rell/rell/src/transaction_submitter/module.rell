@@ -7,6 +7,10 @@ import .utils.*;
 import lib.icmf.*;
 import lib.icmf.receiver.{ receive_icmf_message };
 
+object transaction_submitter_config {
+    mutable hash: byte_array = x"";
+}
+
 /** Limit the overall time for a transaction to be submitted and verified */
 function timeout_evm_transactions() {
     val timeout_timestamp = get_last_blocktime() - chain_context.args.tx_timeout;
@@ -75,6 +79,11 @@ operation __update_evm_transaction_receipt(row_id: integer, block_hash: text, ef
 }
 
 operation __begin_block(height: integer) {
+    val config_hash = chain_context.raw_config.hash();
+    if (config_hash != transaction_submitter_config.hash) {
+        if (height > 0) on_configuration_update();
+        transaction_submitter_config.hash = config_hash;
+    }
     timeout_evm_transactions();
     timeout_verify_evm_transactions();
     timeout_submit_evm_transactions();
@@ -391,3 +400,5 @@ function extract_number_of_signers_from_current_configuration(): integer {
 }
 
 @extendable function on_transaction_completed(transaction: evm_submit_transaction, status: transaction_status) {}
+
+@extendable function on_configuration_update() {}

@@ -74,6 +74,11 @@ blockchains:
               - address: "2Cf48D2891CC286d18596Df1261D011d1B78E03E"
                 validator_contract: "FdB06dB69e45a732bDF0B44FA590dAcb33deE281"
                 network_id: 97
+          - blockchain_rid: x"335C75E08AFAC7D6678263F1A13D5AFED9CD009344B6349107D7CEEA3A40EA08" # token-chain
+            bridge_contracts:
+              - address: "" # There is no single bridge address for token chain
+                validator_contract: "" # TODO: Replace with token chain validator
+                network_id: 97
         contract_tx_rate_limit: 60000
         tx_node_submit_timeout: 1800000 # 30m
         tx_timeout: 1200000 # 20m

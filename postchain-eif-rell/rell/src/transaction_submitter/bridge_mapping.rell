@@ -88,6 +88,8 @@ function get_validator_contracts(blockchain_rid: byte_array): list<(validator_co
     return blockchain_bridge_contract @* { blockchain_rid } ( .validator_contract, .network_id );
 }
 
+function get_system_chains_with_bridges() = list<system_chain_bridges>.from_gtv_pretty(chain_context.args.system_chain_bridges);
+
 function get_system_chain_bridge_contracts(blockchain_rid: byte_array): list<system_chain_bridge_contract>? {
     val chains = list<system_chain_bridges>.from_gtv_pretty(chain_context.args.system_chain_bridges);
 

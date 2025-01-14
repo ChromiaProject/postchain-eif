@@ -266,27 +266,46 @@ function handle_bridge_mapping_updates(
     if (topic == bridge_mapping_topic) {
         val bridge_mapping_message = bridge_mapping_message.from_gtv(body);
 
-        if (not bridge_mapping_message.deleted) {
-            val latest_ignored_signer_update = latest_signer_update_for_unmapped_chain @? {
-                .blockchain_rid == bridge_mapping_message.blockchain_rid
-            }.signer_list_update_message;
-            val latest_signer_update = signer_list_update @? {
-                .blockchain_rid == bridge_mapping_message.blockchain_rid
-            } (@omit @sort_desc .serial, $) limit 1;
-            if (exists(latest_ignored_signer_update) and exists(latest_signer_update)) {
-                // Check if we should submit ignored update
-                val latest_ignored_signer_update_message = signer_list_update_message.from_gtv(gtv.from_bytes(latest_ignored_signer_update));
-                if (latest_ignored_signer_update_message.serial > latest_signer_update.serial) {
-                    apply_signer_update(latest_ignored_signer_update_message);
-                } else {
-                    check_and_resubmit_latest_update_if_needed(bridge_mapping_message, latest_signer_update);
-                }
-            } else if (exists(latest_ignored_signer_update)) {
-                val latest_ignored_signer_update_message = signer_list_update_message.from_gtv(gtv.from_bytes(latest_ignored_signer_update));
+        handle_new_bridge_mapping(bridge_mapping_message);
+    }
+}
+
+@extend(on_configuration_update)
+function check_for_new_system_bridges() {
+    for (system_chain in get_system_chains_with_bridges()) {
+        for (bridge_contract in system_chain.bridge_contracts) {
+            handle_new_bridge_mapping(bridge_mapping_message(
+                blockchain_rid = system_chain.blockchain_rid,
+                validator_contract = bridge_contract.validator_contract,
+                bridge_contract = bridge_contract.address,
+                evm_network_id = bridge_contract.network_id,
+                deleted = false
+            ));
+        }
+    }
+}
+
+function handle_new_bridge_mapping(bridge_mapping_message) {
+    if (not bridge_mapping_message.deleted) {
+        val latest_ignored_signer_update = latest_signer_update_for_unmapped_chain @? {
+            .blockchain_rid == bridge_mapping_message.blockchain_rid
+        }.signer_list_update_message;
+        val latest_signer_update = signer_list_update @? {
+            .blockchain_rid == bridge_mapping_message.blockchain_rid
+        } (@omit @sort_desc .serial, $) limit 1;
+        if (exists(latest_ignored_signer_update) and exists(latest_signer_update)) {
+            // Check if we should submit ignored update
+            val latest_ignored_signer_update_message = signer_list_update_message.from_gtv(gtv.from_bytes(latest_ignored_signer_update));
+            if (latest_ignored_signer_update_message.serial > latest_signer_update.serial) {
                 apply_signer_update(latest_ignored_signer_update_message);
-            } else if (exists(latest_signer_update)) {
+            } else {
                 check_and_resubmit_latest_update_if_needed(bridge_mapping_message, latest_signer_update);
             }
+        } else if (exists(latest_ignored_signer_update)) {
+            val latest_ignored_signer_update_message = signer_list_update_message.from_gtv(gtv.from_bytes(latest_ignored_signer_update));
+            apply_signer_update(latest_ignored_signer_update_message);
+        } else if (exists(latest_signer_update)) {
+            check_and_resubmit_latest_update_if_needed(bridge_mapping_message, latest_signer_update);
         }
     }
 }
