@@ -10,7 +10,7 @@ import net.postchain.gtv.GtvDictionary
 import net.postchain.gtv.GtvEncoder
 import net.postchain.gtv.generateProof
 import net.postchain.gtv.merkle.GtvMerkleBasics
-import net.postchain.gtv.merkle.GtvMerkleHashCalculator
+import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV2
 import net.postchain.gtv.merkle.MerkleBasics
 import net.postchain.gtv.merkle.path.GtvPath
 import net.postchain.gtv.merkle.path.GtvPathFactory
@@ -42,7 +42,7 @@ class ProofTreeParserTest {
         val leaf = gtvExtra["e"]!!
         val gtvPath: GtvPath = GtvPathFactory.buildFromArrayOfPointers(path)
         val gtvPaths = GtvPathSet(setOf(gtvPath))
-        val calculator = GtvMerkleHashCalculator(cryptoSystem)
+        val calculator = GtvMerkleHashCalculatorV2(cryptoSystem)
         val extraProofTree = gtvExtra.generateProof(gtvPaths, calculator)
         assertEquals(gtvExtra.merkleHash(calculator).toHex(), extraProofTree.merkleHash(calculator).toHex())
         val proofs = ProofTreeParser.getProofListAndPosition(extraProofTree.root)

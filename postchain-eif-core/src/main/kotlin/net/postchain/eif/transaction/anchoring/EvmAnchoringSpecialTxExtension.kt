@@ -18,7 +18,6 @@ import net.postchain.eif.encodeSignatureWithV
 import net.postchain.eif.getEthereumAddress
 import net.postchain.eif.transaction.EvmBlockHeaderValidator
 import net.postchain.gtv.GtvFactory.gtv
-import net.postchain.gtv.merkle.GtvMerkleHashCalculator
 import net.postchain.gtx.GTXModule
 import net.postchain.gtx.data.OpData
 import net.postchain.gtx.special.GTXSpecialTxExtension
@@ -31,7 +30,6 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
 
     private lateinit var module: GTXModule
     private lateinit var cryptoSystem: CryptoSystem
-    private lateinit var hashCalculator: GtvMerkleHashCalculator
 
     private val evmBlockHeaderValidator = EvmBlockHeaderValidator("Validation of EVM anchoring failed:")
 
@@ -68,7 +66,7 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
                 return listOf()
             }
 
-            val blockHeaderData = encodeBlockHeaderDataForEVM(lastBlock.header.blockRID, BlockHeaderData.fromBinary(lastBlock.header.rawData), hashCalculator)
+            val blockHeaderData = encodeBlockHeaderDataForEVM(lastBlock.header.blockRID, BlockHeaderData.fromBinary(lastBlock.header.rawData))
             val signatures = blockWitness.getSignatures().map {
                 EifSignature(
                         sig = encodeSignatureWithV(lastBlock.header.blockRID, it),
@@ -86,7 +84,6 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
     override fun init(module: GTXModule, chainID: Long, blockchainRID: BlockchainRid, cs: CryptoSystem) {
         this.module = module
         cryptoSystem = cs
-        hashCalculator = GtvMerkleHashCalculator(cs)
     }
 
     override fun needsSpecialTransaction(position: SpecialTransactionPosition): Boolean {
@@ -125,7 +122,7 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
             return false
         }
 
-        if (!decodedHeader.verifyBlockRid(hashCalculator)) {
+        if (!decodedHeader.verifyBlockRid()) {
             logger.warn("Validation failed. Invalid block rid.")
             return false
         }

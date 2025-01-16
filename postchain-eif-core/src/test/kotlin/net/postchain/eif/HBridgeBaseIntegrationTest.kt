@@ -15,6 +15,7 @@ import net.postchain.core.block.BlockQueries
 import net.postchain.crypto.KeyPair
 import net.postchain.crypto.PubKey
 import net.postchain.crypto.devtools.KeyPairHelper
+import net.postchain.crypto.sha256Digest
 import net.postchain.devtools.PostchainTestNode
 import net.postchain.devtools.PostchainTestNode.Companion.DEFAULT_CHAIN_IID
 import net.postchain.eif.contracts.Validator
@@ -25,6 +26,7 @@ import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvInteger
 import net.postchain.gtv.GtvNull
 import net.postchain.gtv.gtvml.GtvMLParser
+import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV2
 import net.postchain.gtv.merkleHash
 import net.postchain.gtx.GtxBuilder
 import org.awaitility.Awaitility.await
@@ -49,6 +51,7 @@ import java.security.MessageDigest
 abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
 
     lateinit var ds: SimpleDigestSystem
+    private val merkleHashCalculator = GtvMerkleHashCalculatorV2(::sha256Digest)
 
     val decimals = 18
     inline val Int.chr: BigInteger get() = BigInteger(this.toString() + "0".repeat(decimals), 10)
@@ -134,7 +137,7 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
             bcRid: BlockchainRid,
             keyPair: KeyPair
     ): ByteArray {
-        val b = GtxBuilder(bcRid, listOf(keyPair.pubKey.data), myCS)
+        val b = GtxBuilder(bcRid, listOf(keyPair.pubKey.data), myCS, merkleHashCalculator)
         b.addOperation(
                 "ft4.admin.register_asset",
                 gtv(tokenName), gtv(tokenSymbol), gtv(tokenDecimal), gtv(tokenIconUrl)
@@ -155,7 +158,7 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
             assetId: ByteArray,
             amount: BigInteger,
             keyPair: KeyPair,
-    ): ByteArray = GtxBuilder(bcRid, listOf(keyPair.pubKey.data), myCS)
+    ): ByteArray = GtxBuilder(bcRid, listOf(keyPair.pubKey.data), myCS, merkleHashCalculator)
             .addOperation(
                     "ft4.admin.mint",
                     gtv(account.accountId),
@@ -173,7 +176,7 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
             bcRid: BlockchainRid,
             keyPair: KeyPair,
             mode: BridgeMode,
-    ): ByteArray = GtxBuilder(bcRid, listOf(keyPair.pubKey.data), myCS)
+    ): ByteArray = GtxBuilder(bcRid, listOf(keyPair.pubKey.data), myCS, merkleHashCalculator)
             .addOperation(
                     "eif.hbridge.register_erc20_asset",
                     gtv(networkId),
@@ -191,7 +194,7 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
             contractAddress: ByteArray,
             bcRid: BlockchainRid,
             keyPair: KeyPair
-    ): ByteArray = GtxBuilder(bcRid, listOf(keyPair.pubKey.data), myCS)
+    ): ByteArray = GtxBuilder(bcRid, listOf(keyPair.pubKey.data), myCS, merkleHashCalculator)
             .addOperation(
                     "eif.hbridge.add_contract_config",
                     gtv(networkId),
@@ -206,7 +209,7 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
             bridgeAddress: ByteArray,
             bcRid: BlockchainRid,
             keyPair: KeyPair
-    ): ByteArray = GtxBuilder(bcRid, listOf(keyPair.pubKey.data), myCS)
+    ): ByteArray = GtxBuilder(bcRid, listOf(keyPair.pubKey.data), myCS, merkleHashCalculator)
             .addOperation(
                     "eif.hbridge.register_bridge_with_erc20_assets",
                     gtv(networkId),
@@ -236,7 +239,7 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
 
         val authDescriptorId = auth.merkleHash(hashCalculator)
 
-        val b = GtxBuilder(bcRid, listOf(adminKeyPair.pubKey.data), myCS)
+        val b = GtxBuilder(bcRid, listOf(adminKeyPair.pubKey.data), myCS, merkleHashCalculator)
         b.addOperation("ft4.admin.register_account", auth)
 
         enqueueTx(b.finish()
@@ -280,7 +283,7 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
                 gtv(BigInteger(evmSig.v).longValueExact())
         )
 
-        val b = GtxBuilder(bcRid, listOf(userCredentials.keyPair.pubKey.data), myCS)
+        val b = GtxBuilder(bcRid, listOf(userCredentials.keyPair.pubKey.data), myCS, merkleHashCalculator)
         b.addOperation("ft4.evm_signatures", gtv(listOf(gtv(userCredentials.evmAddressBA))), gtv(listOf(signature)))
         b.addOperation("ft4.ft_auth", gtv(userAccount.accountId), gtv(userAccount.authDescriptorId))
         b.addOperation("eif.hbridge.link_evm_eoa_account", gtv(userCredentials.evmAddressBA))
@@ -299,7 +302,7 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
             bcRid: BlockchainRid
     ): Hash {
 
-        val b = GtxBuilder(bcRid, listOf(userCredentials.keyPair.pubKey.data), myCS)
+        val b = GtxBuilder(bcRid, listOf(userCredentials.keyPair.pubKey.data), myCS, merkleHashCalculator)
 
         b.addOperation("ft4.ft_auth", gtv(userAccount.accountId), gtv(userAccount.authDescriptorId))
         b.addOperation(
@@ -329,7 +332,7 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
             bcRid: BlockchainRid
     ): Hash {
 
-        val b = GtxBuilder(bcRid, listOf(userCredentials.keyPair.pubKey.data), myCS)
+        val b = GtxBuilder(bcRid, listOf(userCredentials.keyPair.pubKey.data), myCS, merkleHashCalculator)
 
         b.addOperation("ft4.ft_auth", gtv(userAccount.accountId), gtv(userAccount.authDescriptorId))
         b.addOperation(
@@ -359,7 +362,7 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
             transferAmount: BigInteger,
             bcRid: BlockchainRid
     ): ByteArray {
-        val b = GtxBuilder(bcRid, listOf(userCredentials.keyPair.pubKey.data), myCS)
+        val b = GtxBuilder(bcRid, listOf(userCredentials.keyPair.pubKey.data), myCS, merkleHashCalculator)
         b.addOperation("ft4.ft_auth", gtv(userAccount.accountId), gtv(userAccount.authDescriptorId))
         b.addOperation("ft4.transfer", gtv(recipientAccountId), gtv(assetId), gtv(transferAmount))
 

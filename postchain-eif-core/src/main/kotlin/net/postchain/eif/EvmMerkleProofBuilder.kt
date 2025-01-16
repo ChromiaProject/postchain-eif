@@ -1,8 +1,8 @@
 package net.postchain.eif
 
-import net.postchain.base.BaseBlockHeader
 import net.postchain.base.BaseBlockWitness
 import net.postchain.base.data.DatabaseAccess
+import net.postchain.base.extension.getMerkleHashVersion
 import net.postchain.base.gtv.BlockHeaderData
 import net.postchain.base.snapshot.PageStore
 import net.postchain.common.data.Hash
@@ -15,8 +15,8 @@ import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvEncoder
 import net.postchain.gtv.generateProof
 import net.postchain.gtv.mapper.Name
-import net.postchain.gtv.merkle.GtvMerkleHashCalculator
 import net.postchain.gtv.merkle.MerkleBasics
+import net.postchain.gtv.merkle.makeMerkleHashCalculator
 import net.postchain.gtv.merkle.path.GtvPath
 import net.postchain.gtv.merkle.path.GtvPathFactory
 import net.postchain.gtv.merkle.path.GtvPathSet
@@ -28,18 +28,15 @@ class EvmMerkleProofBuilder(
         private val cryptoSystem: CryptoSystem,
         private val extraHeaderPath: List<String>
 ) {
-
-    private val merkleHashCalculator = GtvMerkleHashCalculator(cryptoSystem)
-
     fun build(ctx: EContext, blockHeight: Long, blockRid: ByteArray, data: ByteArray, hash: ByteArray, position: Long, clientProvidedSignatures: Array<Signature>? = null): EvmMerkleProof {
         val db = DatabaseAccess.of(ctx)
-        val blockHeader = BaseBlockHeader(db.getBlockHeader(ctx, blockRid), merkleHashCalculator).blockHeaderRec
+        val blockHeaderData = BlockHeaderData.fromBinary(db.getBlockHeader(ctx, blockRid))
         return EvmMerkleProof(
                 data = data,
-                blockHeader = encodeBlockHeaderDataForEVM(blockRid, blockHeader, merkleHashCalculator),
+                blockHeader = encodeBlockHeaderDataForEVM(blockRid, blockHeaderData),
                 blockWitness = blockWitnessData(db, ctx, blockRid, clientProvidedSignatures),
                 proof = proof(blockHeight, hash, position),
-                extraMerkleProof = extraMerkleProof(blockHeader)
+                extraMerkleProof = extraMerkleProof(blockHeaderData)
         )
     }
 
@@ -67,10 +64,11 @@ class EvmMerkleProofBuilder(
         )
     }
 
-    private fun extraMerkleProof(blockHeader: BlockHeaderData): ExtraMerkleProof {
-        val gtvExtra = blockHeader.gtvExtra
+    private fun extraMerkleProof(blockHeaderData: BlockHeaderData): ExtraMerkleProof {
+        val gtvExtra = blockHeaderData.gtvExtra
         val gtvPath: GtvPath = GtvPathFactory.buildFromArrayOfPointers(extraHeaderPath.toTypedArray())
         val gtvPaths = GtvPathSet(setOf(gtvPath))
+        val merkleHashCalculator = makeMerkleHashCalculator(blockHeaderData.getMerkleHashVersion())
         val extraProofTree = gtvExtra.generateProof(gtvPaths, merkleHashCalculator)
         val merkleProofs = ProofTreeParser.getProofListAndPosition(extraProofTree.root)
         val proofs = merkleProofs.first

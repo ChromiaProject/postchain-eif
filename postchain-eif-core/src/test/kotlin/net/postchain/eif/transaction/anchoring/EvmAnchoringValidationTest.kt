@@ -24,7 +24,7 @@ import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvEncoder
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvNull
-import net.postchain.gtv.merkle.GtvMerkleHashCalculator
+import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV2
 import net.postchain.gtv.merkleHash
 import net.postchain.gtx.GTXModule
 import net.postchain.gtx.data.OpData
@@ -40,7 +40,7 @@ import java.security.Security
 class EvmAnchoringValidationTest {
 
     private val cryptoSystem = Secp256K1CryptoSystem()
-    private val hashCalculator = GtvMerkleHashCalculator(cryptoSystem)
+    private val hashCalculator = GtvMerkleHashCalculatorV2(cryptoSystem)
     private val mockContext: BlockEContext = mock {}
     private val systemAnchoringBrid = BlockchainRid.ZERO_RID
     private val systemAnchoringSigner1 = cryptoSystem.generateKeyPair()
@@ -87,7 +87,7 @@ class EvmAnchoringValidationTest {
         }.toTypedArray())
         rawDummyBlock = GtvEncoder.encodeGtv(dummyBlock.toGtv())
 
-        blockHeaderData = encodeBlockHeaderDataForEVM(dummyBlockRid, BlockHeaderData.fromBinary(rawDummyBlock), hashCalculator)
+        blockHeaderData = encodeBlockHeaderDataForEVM(dummyBlockRid, BlockHeaderData.fromBinary(rawDummyBlock))
         signatures = witness.getSignatures().map {
             gtv(encodeSignatureWithV(dummyBlockRid, it))
         }
@@ -122,7 +122,7 @@ class EvmAnchoringValidationTest {
 
         val newBlockRid = blockWithAnotherPrevBlockRid.toGtv().merkleHash(hashCalculator)
 
-        val wrongBlockHeaderData = encodeBlockHeaderDataForEVM(newBlockRid, BlockHeaderData.fromBinary(rawDummyBlock), hashCalculator)
+        val wrongBlockHeaderData = encodeBlockHeaderDataForEVM(newBlockRid, BlockHeaderData.fromBinary(rawDummyBlock))
         assertThat(sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
                 ANCHOR_SYSTEM_ANCHORING_BLOCK_OP,
                 arrayOf(gtv(wrongBlockHeaderData), gtv(signatures), gtv(signers))

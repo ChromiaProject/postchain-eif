@@ -1,25 +1,31 @@
 package net.postchain.eif
 
 import com.google.common.primitives.Longs
+import net.postchain.base.extension.getMerkleHashVersion
 import net.postchain.base.gtv.BlockHeaderData
 import net.postchain.common.BlockchainRid
 import net.postchain.core.BlockRid
+import net.postchain.crypto.sha256Digest
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.merkle.GtvMerkleBasics.HASH_PREFIX_NODE_GTV_ARRAY
-import net.postchain.gtv.merkle.GtvMerkleHashCalculator
+import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV2
 import net.postchain.gtv.merkle.MerkleBasics.HASH_PREFIX_NODE
+import net.postchain.gtv.merkle.makeMerkleHashCalculator
 import net.postchain.gtv.merkleHash
 
-fun encodeBlockHeaderDataForEVM(blockRid: ByteArray, blockHeaderData: BlockHeaderData, merkleHashCalculator: GtvMerkleHashCalculator) = SimpleGtvEncoder.encodeGtv(gtv(
-        blockHeaderData.gtvBlockchainRid,
-        gtv(blockRid),
-        blockHeaderData.gtvPreviousBlockRid,
-        gtv(blockHeaderData.gtvMerkleRootHash.merkleHash(merkleHashCalculator)),
-        blockHeaderData.gtvTimestamp,
-        blockHeaderData.gtvHeight,
-        gtv(blockHeaderData.gtvDependencies.merkleHash(merkleHashCalculator)),
-        gtv(blockHeaderData.gtvExtra.merkleHash(merkleHashCalculator))
-))
+fun encodeBlockHeaderDataForEVM(blockRid: ByteArray, blockHeaderData: BlockHeaderData): ByteArray {
+    val merkleHashCalculator = makeMerkleHashCalculator(blockHeaderData.getMerkleHashVersion())
+    return SimpleGtvEncoder.encodeGtv(gtv(
+            blockHeaderData.gtvBlockchainRid,
+            gtv(blockRid),
+            blockHeaderData.gtvPreviousBlockRid,
+            gtv(blockHeaderData.gtvMerkleRootHash.merkleHash(merkleHashCalculator)),
+            blockHeaderData.gtvTimestamp,
+            blockHeaderData.gtvHeight,
+            gtv(blockHeaderData.gtvDependencies.merkleHash(merkleHashCalculator)),
+            gtv(blockHeaderData.gtvExtra.merkleHash(merkleHashCalculator))
+    ))
+}
 
 fun decodeBlockHeaderDataFromEVM(encodedHeader: ByteArray): DecodedBlockHeaderDataForEVM {
     val elements = mutableListOf<ByteArray>()
@@ -49,7 +55,11 @@ data class DecodedBlockHeaderDataForEVM(
         val dependenciesHash: ByteArray,
         val extraHash: ByteArray
 ) {
-    fun verifyBlockRid(hashCalculator: GtvMerkleHashCalculator): Boolean {
+    companion object {
+        val hashCalculator = GtvMerkleHashCalculatorV2(::sha256Digest)
+    }
+
+    fun verifyBlockRid(): Boolean {
         // Same procedure as in Postchain.sol
         val node12 = hashCalculator.calculateNodeHash(
                 HASH_PREFIX_NODE,

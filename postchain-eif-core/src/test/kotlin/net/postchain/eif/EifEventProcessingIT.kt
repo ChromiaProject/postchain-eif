@@ -5,7 +5,6 @@ import assertk.assertions.isEqualTo
 import assertk.assertions.isTrue
 import net.postchain.common.BlockchainRid
 import net.postchain.common.hexStringToByteArray
-import net.postchain.common.toHex
 import net.postchain.common.wrap
 import net.postchain.concurrent.util.get
 import net.postchain.core.Transaction
@@ -15,11 +14,10 @@ import net.postchain.crypto.devtools.KeyPairHelper
 import net.postchain.devtools.IntegrationTestSetup
 import net.postchain.devtools.PostchainTestNode
 import net.postchain.gtv.GtvFactory.gtv
+import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV2
 import net.postchain.gtx.GTXModuleAware
 import net.postchain.gtx.Gtx
-import net.postchain.gtx.GtxBody
 import net.postchain.gtx.GtxBuilder
-import net.postchain.gtx.GtxOp
 import org.awaitility.Awaitility.await
 import org.awaitility.Duration
 import org.awaitility.kotlin.await
@@ -29,6 +27,7 @@ import java.math.BigInteger
 class EifEventProcessingIT : IntegrationTestSetup() {
 
     private val myCS = Secp256K1CryptoSystem()
+    private val merkleHashCalculator = GtvMerkleHashCalculatorV2(myCS)
     private val sigMaker = myCS.buildSigMaker(KeyPair(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
 
     @Test
@@ -103,7 +102,7 @@ class EifEventProcessingIT : IntegrationTestSetup() {
     }
 
     private fun makeTestTx(id: Long, value: String, bcRid: BlockchainRid): ByteArray {
-        val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS)
+        val b = GtxBuilder(bcRid, listOf(KeyPairHelper.pubKey(0)), myCS, merkleHashCalculator)
         b.addOperation("gtx_test", gtv(id), gtv(value))
         return b.finish()
                 .sign(sigMaker)

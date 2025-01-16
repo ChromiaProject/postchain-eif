@@ -17,7 +17,7 @@ import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvNull
 import net.postchain.gtv.mapper.toObject
-import net.postchain.gtv.merkle.GtvMerkleHashCalculator
+import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV2
 import net.postchain.gtv.merkleHash
 import net.postchain.gtx.GTXModule
 import net.postchain.gtx.data.OpData
@@ -37,7 +37,6 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
     }
 
     private lateinit var cryptoSystem: CryptoSystem
-    private lateinit var merkelHashCalculator: GtvMerkleHashCalculator
     private lateinit var sigMaker: SigMaker
     private val transactionSubmitters = mutableMapOf<Long, TransactionSubmitter>()
     private lateinit var module: GTXModule
@@ -389,7 +388,6 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
     override fun init(module: GTXModule, chainID: Long, blockchainRID: BlockchainRid, cs: CryptoSystem) {
         this.module = module
         this.cryptoSystem = cs
-        this.merkelHashCalculator = GtvMerkleHashCalculator(this.cryptoSystem)
     }
 
     override fun needsSpecialTransaction(position: SpecialTransactionPosition): Boolean {
@@ -440,7 +438,7 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
             sigMaker.signDigest(signatureDataHash(value, status))
 
     private fun signatureDataHash(value: Long, status: RellTransactionStatus) =
-            gtv(gtv(value), gtv(status.ordinal.toLong())).merkleHash(GtvMerkleHashCalculator(cryptoSystem))
+            gtv(gtv(value), gtv(status.ordinal.toLong())).merkleHash(GtvMerkleHashCalculatorV2(cryptoSystem))
 
     // Checks if rell has marked the tx as completed
     private fun isTxCompletedOnBlockchain(module: GTXModule, eContext: EContext, requestId: Long): Boolean {
