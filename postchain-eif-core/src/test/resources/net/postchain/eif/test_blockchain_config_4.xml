@@ -10,15 +10,7 @@
         -->
         <dict>
             <entry key="name">
-                <string>net.postchain.base.BaseBlockBuildingStrategy</string>
-            </entry>
-            <entry key="maxblocktime">
-                <!-- Set this value extremely high to let __evm_block to trigger block building -->
-                <int>600000</int>
-            </entry>
-            <entry key="maxtxdelay">
-                <!-- Set this value longer than Awaitility's atMost() duration to let __evm_block to trigger block building -->
-                <int>65000</int>
+                <string>net.postchain.devtools.OnDemandBlockBuildingStrategy</string>
             </entry>
         </dict>
     </entry>
@@ -36,8 +28,10 @@
     </entry>
     <entry key="signers">
         <array>
-            <!-- Key0 -->
             <bytea>03a301697bdfcd704313ba48e51d567543f2a182031efd6915ddc07bbcc4e16070</bytea>
+            <bytea>031B84C5567B126440995D3ED5AABA0565D71E1834604819FF9C17F5E9D5DD078F</bytea>
+            <bytea>03B2EF623E7EC933C478135D1763853CBB91FC31BA909AEC1411CA253FDCC1AC94</bytea>
+            <bytea>0203C6150397F7E4197FF784A8D74357EF20DAF1D09D823FFF8D3FC9150CBAE85D</bytea>
         </array>
     </entry>
     <entry key="gtx">
@@ -60,14 +54,6 @@
     </entry>
     <entry key="eif">
         <dict>
-            <entry key="max_event_delay">
-                <!-- Set this value low enough to let `__evm_block` to trigger block building -->
-                <int>1000</int>
-            </entry>
-            <entry key="number_of_events_to_trigger_block_building">
-                <!-- Single __evm_block event triggers block building -->
-                <int>1</int>
-            </entry>
             <entry key="chains">
                 <dict>
                     <entry key="ethereum">

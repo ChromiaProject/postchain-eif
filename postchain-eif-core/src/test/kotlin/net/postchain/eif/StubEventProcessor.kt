@@ -26,9 +26,10 @@ class StubEventProcessor : EventProcessor {
 
     override fun numberOfNewEvents(): Long = 10L
 
-    override fun isValidEventData(ops: List<EvmBlockOp>): Boolean = true
+    override fun isValidEventData(ops: List<EvmBlockOp>) = EventValidationResult(true)
 
     override fun markAsProcessed(ops: List<EvmBlockOp>) {}
+    override fun flushEvents(resetToHeight: BigInteger) {}
 
     private fun generateData(height: Long, i: Int): EvmBlockOp {
         val blockHash = ds.digest(BigInteger.valueOf(i.toLong()).toByteArray())

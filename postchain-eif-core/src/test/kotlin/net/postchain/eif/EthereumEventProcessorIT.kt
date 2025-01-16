@@ -115,12 +115,12 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
 
         // validate events
         val eventData = evmEventProcessor.getEventData()
-        assertTrue(evmEventProcessor.isValidEventData(eventData))
+        assertTrue(evmEventProcessor.isValidEventData(eventData).valid)
         // Test if NoOp version can also validate
-        assertTrue(NoOpEventProcessor().isValidEventData(eventData))
+        assertTrue(NoOpEventProcessor().isValidEventData(eventData).valid)
 
         // Verify that we can't skip any events by removing a block
-        assertFalse(evmEventProcessor.isValidEventData(eventData.subList(1, eventData.size)))
+        assertFalse(evmEventProcessor.isValidEventData(eventData.subList(1, eventData.size)).valid)
 
         // Verify that we can't skip any events by removing them from the first block in the list
         val eventBlocksWithoutEvents = eventData.mapIndexed { i, eventBlock ->
@@ -130,7 +130,7 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
                 eventBlock
             }
         }
-        assertFalse(evmEventProcessor.isValidEventData(eventBlocksWithoutEvents))
+        assertFalse(evmEventProcessor.isValidEventData(eventBlocksWithoutEvents).valid)
 
         // Mock that the block was validated and committed to DB
         evmEventProcessor.markAsProcessed(eventData)
