@@ -30,7 +30,7 @@ import net.postchain.gtv.GtvFactory
 import net.postchain.gtv.GtvNull
 import net.postchain.gtv.generateProof
 import net.postchain.gtv.mapper.GtvObjectMapper
-import net.postchain.gtv.merkle.GtvMerkleHashCalculator
+import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV2
 import net.postchain.gtv.merkle.MerkleBasics
 import net.postchain.gtv.merkle.path.GtvPath
 import net.postchain.gtv.merkle.path.GtvPathFactory
@@ -49,7 +49,7 @@ import java.security.Security
 
 class EvmEvmSignerUpdateValidationTest {
     private val cryptoSystem = Secp256K1CryptoSystem()
-    private val hashCalculator = GtvMerkleHashCalculator(cryptoSystem)
+    private val hashCalculator = GtvMerkleHashCalculatorV2(cryptoSystem)
     private val mockContext: BlockEContext = mock {}
     private val directoryChainBrid = BlockchainRid.ZERO_RID
     private val directoryChainSigner = cryptoSystem.generateKeyPair()
@@ -110,7 +110,7 @@ class EvmEvmSignerUpdateValidationTest {
         )
         rawDummyBlock = GtvEncoder.encodeGtv(dummyBlock.toGtv())
 
-        blockHeaderData = encodeBlockHeaderDataForEVM(dummyBlockRid, BlockHeaderData.fromBinary(rawDummyBlock), hashCalculator)
+        blockHeaderData = encodeBlockHeaderDataForEVM(dummyBlockRid, BlockHeaderData.fromBinary(rawDummyBlock))
         signatures = witness.getSignatures().map {
             GtvFactory.gtv(encodeSignatureWithV(dummyBlockRid, it))
         }
@@ -166,7 +166,7 @@ class EvmEvmSignerUpdateValidationTest {
         val newSignatures = witness.getSignatures().map {
             GtvFactory.gtv(encodeSignatureWithV(blockRid, it))
         }
-        val encodedHeader = encodeBlockHeaderDataForEVM(blockRid, BlockHeaderData.fromBinary(rawBlock), hashCalculator)
+        val encodedHeader = encodeBlockHeaderDataForEVM(blockRid, BlockHeaderData.fromBinary(rawBlock))
         assertThat(sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
                 ENQUEUE_SIGNER_UPDATE_TRANSACTION_OP,
                 arrayOf(
