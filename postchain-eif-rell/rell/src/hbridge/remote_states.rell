@@ -1,5 +1,5 @@
 
-val ACCOUNT_TYPE_REMOTE_BLOCKCHAIN = "FT4_REMOTE_BLOCKCHAIN";
+// val ACCOUNT_TYPE_REMOTE_BLOCKCHAIN = "FT4_REMOTE_BLOCKCHAIN";
 
 entity recovery_contract {
     index blockchain_rid: byte_array,

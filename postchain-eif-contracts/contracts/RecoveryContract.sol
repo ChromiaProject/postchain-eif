@@ -1,10 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.24;
 
-import "./TokenBridge.sol";
+// Upgradeable implementations
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+// Internal libraries
+import "./Postchain.sol";
+import "./IValidator.sol";
 import "./validatorupdate/IManagedValidator.sol";
 
-contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
+contract RecoveryContract is Initializable, PausableUpgradeable, Ownable2StepUpgradeable, ReentrancyGuardUpgradeable {
 
     using Postchain for bytes32;
 
@@ -17,14 +27,25 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
     uint8 constant ERC20_STATE_HEADER_BYTE_SIZE = 32 + 32 + 32;
     // @dev Hexadecimal representation of the "hbridge:erc20:v1" string followed by 16x 0x01 bytes, 32 bytes in total.
     bytes32 constant ERC20_STATE_TAG_V1 = 0x686272696467653a65726332303a763101010101010101010101010101010101;
-    // @dev Hexadecimal representation of the "hbridge:erc20_withdrawal:v1" followed by 7x 01 bytes, 32 bytes in total.
-    bytes32 constant ERC20_WITHDRAWAL_TAG_V1 = 0x686272696467653a65726332305f77697468647261773a763101010101010101;
 
+    uint256 public networkId;
+    IValidator public validator;
+    bytes32 internal blockchainRid;         // @dev Postchain/Chromia blockchain RID
+    bool public isBlockchainRidFinalized;   // @dev Flag to track if blockchain RID is finalized
+    mapping(IERC20 => bool) public _allowedToken;
+    bool public isMassExit;
+    PostchainBlock public massExitBlock;
     bytes32 public massExitStateRoot;
     // @dev each account state snapshot will be used to claim only one time.
     mapping(bytes32 => bool) internal _snapshots;
 
     // Structs
+    struct PostchainBlock {
+        uint height;
+        bytes32 blockRid;
+        bytes32 extraDataHashedLeaf;
+    }
+
     struct ERC20StateHeader {
         bytes32 tag;
         address beneficiary;
@@ -37,77 +58,82 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
     }
 
     // Events
+    event Initialize(IValidator indexed _validator);
+    event SetBlockchainRid(bytes32 rid);
+    event BlockchainRidFinalized(bytes32 rid);
+    event AllowToken(IERC20 indexed token);
+    event TriggerMassExit(uint indexed height, bytes32 indexed blockRid);
     event WithdrawalBySnapshot(address indexed beneficiary);
+
+    // Modifiers
+    modifier whenMassExit() {
+        require(isMassExit, "TokenBridge: mass exit was not triggered yet");
+        _;
+    }
+
+    modifier whenNotMassExit() {
+        require(!isMassExit, "TokenBridge: action is not allowed during mass exit");
+        _;
+    }
+
+    modifier onlyValidator() {
+        require(validator.isValidator(msg.sender), "TokenBridge: sender is not a validator.");
+        _;
+    }
+
+    function initialize(IValidator _validator) public initializer {
+        require(address(_validator) != address(0), "TokenBridge: validator address is invalid");
+        __Ownable_init(msg.sender);
+        __Pausable_init();
+        __ReentrancyGuard_init();
+
+        uint256 id;
+        assembly {
+            id := chainid()
+        }
+        networkId = id;
+        validator = _validator;
+        isBlockchainRidFinalized = false;
+        emit Initialize(_validator);
+    }
+
+    function renounceOwnership() public override view onlyOwner {
+        revert("TokenBridge: renounce ownership is not allowed");
+    }
+
+    function setBlockchainRid(bytes32 rid) public onlyOwner {
+        require(!isBlockchainRidFinalized, "TokenBridge: blockchain rid has been finalized");
+        require(rid != bytes32(0), "TokenBridge: blockchain rid is invalid");
+        blockchainRid = rid;
+        emit SetBlockchainRid(rid);
+    }
+
+    // Function to finalize blockchain RID
+    function finalizeBlockchainRid() public onlyOwner {
+        require(!isBlockchainRidFinalized, "TokenBridge: blockchain rid has been already finalized");
+        require(blockchainRid != bytes32(0), "TokenBridge: blockchain rid is not set");
+        isBlockchainRidFinalized = true;
+        emit BlockchainRidFinalized(blockchainRid);
+    }
+
+    function pause() onlyValidator public {
+        _pause();
+    }
+
+    function unpause() public onlyOwner {
+        _unpause();
+    }
+
+    function allowToken(IERC20 token) public onlyOwner {
+        require(address(token) != address(0), "TokenBridge: token address is invalid");
+        _allowedToken[token] = true;
+        emit AllowToken(token);
+    }
 
     // Check that state header has correct discriminator and tag
     function requireERC20StateHeader(ERC20StateHeader memory header, bytes32 expectedTag) internal view {
         require(header.tag == expectedTag, "TokenBridge: invalid snapshot tag");
         Postchain.verifyDiscriminator(networkId, header.discriminator);
-    }
-
-    /**
-     * @dev completeWithdrawalBySnapshot is used in mass exit scenario instead of the normal withdraw process.
-     *      In the mass exit scenario, we are not able to verify block headers as validators are considered non-trustworthy,
-     *      thus we need to use the snapshot data to verify the withdrawal request.
-     *      Snapshot data includes withdrawal event hashes.
-     * @param _stateRecord contains header and a list of event hashes
-     * @param n index of the event hash we want to use
-     * @param _event withdrawal event data
-     * @param stateProof the proof of the snapshot data
-     */
-    function completeWithdrawalBySnapshot(
-        bytes calldata _stateRecord,
-        uint64 n,
-        bytes memory _event,
-        Data.Proof memory stateProof
-    ) public virtual whenMassExit whenNotPaused nonReentrant {
-        require(stateProof.leaf == keccak256(_stateRecord), "TokenBridge: snapshot data is not correct");
-
-        bytes32 stateRoot = massExitStateRoot;
-
-        if (!MerkleProof.verify(stateProof.merkleProofs, stateProof.leaf, stateProof.position, stateRoot))
-            revert("TokenBridge: invalid merkle proof");
-
-        ERC20StateHeader memory header = abi.decode(_stateRecord[: ERC20_STATE_HEADER_BYTE_SIZE], (ERC20StateHeader));
-        requireERC20StateHeader(header, ERC20_WITHDRAWAL_TAG_V1);
-
-        address beneficiary = header.beneficiary;
-
-        // extract withdraw event hash from the list
-        bytes32 eventHash = bytes32(_stateRecord[
-            ERC20_STATE_HEADER_BYTE_SIZE + n * 32 :
-            ERC20_STATE_HEADER_BYTE_SIZE + (n + 1) * 32]
-        );
-
-        Withdraw storage wd = _withdraw[eventHash];
-        bool withdrawalRequestProcessed = _events[eventHash];
-        if (withdrawalRequestProcessed) {
-            require(wd.status == Status.Withdrawable, "TokenBridge: event hash was already used");
-        }
-
-        (IERC20 token, address e_beneficiary, uint256 amount, uint256 discriminator) = eventHash.verifyEvent(_event);
-        require(e_beneficiary == beneficiary, "TokenBridge: beneficiary does not match");
-
-        if (!withdrawalRequestProcessed) {
-            // here we essentially replicate the logic of _updateWithdraw which is triggered by withdrawRequest
-            Postchain.verifyDiscriminator(networkId, discriminator);
-            require(_allowedToken[token], "TokenBridge: not allow token");
-            require(amount > 0, "TokenBridge: invalid amount to make request withdraw");
-            // We don't need to fill the record with real data, just mark it as withdrawn
-            // to prevent duplicate withdraw
-            wd.amount = 0;
-            wd.status = Status.Withdrawn;
-            _withdraw[eventHash] = wd;
-            _events[eventHash] = true;
-            emit WithdrawRequestHash(eventHash);
-        } else {
-            wd.amount = 0;
-            wd.status = Status.Withdrawn;
-        }
-
-        transferWithdraw(token, beneficiary, amount);
-        emit Withdrawal(beneficiary, token, amount);
-        emit WithdrawalHash(eventHash);
     }
 
     /**
@@ -140,7 +166,8 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
                 (ERC20BalanceRecord)
             );
             if (balanceRecord.amount > 0 && _allowedToken[balanceRecord.token]) {
-                transferWithdraw(balanceRecord.token, beneficiary, balanceRecord.amount);
+//                transferWithdraw(balanceRecord.token, beneficiary, balanceRecord.amount);
+                balanceRecord.token.safeTransfer(beneficiary, balanceRecord.amount);
             }
         }
 

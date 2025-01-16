@@ -10,6 +10,10 @@ import "./utils/cryptography/MerkleProof.sol";
 import "./Data.sol";
 
 library Postchain {
+
+    // Merkle hash of GTV String "eif"
+    bytes32 constant EIF_KEY_MERKLE_HASH = 0x1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797;
+
     using MerkleProof for bytes32[];
 
     struct Event {
@@ -58,7 +62,6 @@ library Postchain {
         return (header.height, header.blockRid);
     }
 
-
     function decodeBlockHeader(
         bytes memory blockHeader
     ) internal pure returns (BlockHeaderData memory) {
@@ -94,6 +97,16 @@ library Postchain {
 
         if (blockRid != header.blockRid) revert("Postchain: invalid block header");
         return header;
+    }
+
+    function verifyDiscriminator(uint256 networkId, uint256 discriminator) internal view {
+        uint256 networkDiscriminator = networkId << 160;
+        uint256 networkContractDiscriminator = networkDiscriminator + uint160(address(this));
+
+        bool isValid = (discriminator == networkDiscriminator)
+            || (discriminator == networkContractDiscriminator);
+
+        require(isValid, "Invalid discriminator. Please verify the network ID and bridge contract.");
     }
 
 }
