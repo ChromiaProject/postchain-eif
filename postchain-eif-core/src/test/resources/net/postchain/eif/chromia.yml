@@ -85,7 +85,7 @@ libs:
     registry: https://gitlab.com/chromaway/core/directory-chain
     path: src/lib/iccf
     tagOrBranch: 1.73.7
-    rid: x"050298A4A457D8E8922CF662765739A3A16B3256C49BE646FA7D198ECF0214C5"
+    rid: x"926C1F73F5032C113F5272FCCC0B2074D38CE51DA5B992B4AD714C66480F8B7A"
     insecure: false
   icmf:
     registry: https://gitlab.com/chromaway/core/directory-chain

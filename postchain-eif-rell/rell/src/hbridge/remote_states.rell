@@ -1,0 +1,21 @@
+
+entity downstream_blockchain {
+    key blockchain_rid: byte_array;
+    recovery_contract: byte_array;
+    ft4.accounts.account;
+}
+
+@extend(ft4.crosschain.after_init_transfer) function (
+    sender: ft4.accounts.account,
+    recipient_id: byte_array,
+    ft4.assets.asset,
+    amount: big_integer,
+    hops: list<byte_array>,
+    deadline: timestamp,
+    ft4.crosschain.pending_transfer
+) {
+    val target_blockchain_rid = hops[0];
+    val downstream_blockchain_account = downstream_blockchain @? { .blockchain_rid == target_blockchain_rid } .account;
+    if (downstream_blockchain_account == null) return;
+
+}

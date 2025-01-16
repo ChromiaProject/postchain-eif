@@ -20,6 +20,8 @@ operation __evm_block(
     _evm_block(network_id, evm_block_height.to_integer(), evm_block_hash, events);
 }
 
+function is_enable_icmf() = chain_context.args.enable_icmf;
+
 function _evm_block(
     network_id: integer,
     evm_block_height: integer,
