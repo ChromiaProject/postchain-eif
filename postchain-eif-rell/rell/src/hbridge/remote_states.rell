@@ -1,8 +1,28 @@
 
-entity downstream_blockchain {
-    key blockchain_rid: byte_array;
-    recovery_contract: byte_array;
-    ft4.accounts.account;
+val ACCOUNT_TYPE_REMOTE_BLOCKCHAIN = "FT4_REMOTE_BLOCKCHAIN";
+
+entity recovery_contract {
+    index blockchain_rid: byte_array,
+    networkd_id: integer;
+    contract_address: byte_array;
+    key blockchain_rid, networkd_id, contract_address;
+}
+
+operation register_recovery_contract(blockchain_rid: byte_array, network_id: integer, contract_address: byte_array) {
+    require(
+        empty(recovery_contract @? { blockchain_rid }),
+        "Recovery contract for blockchain %s is already registered".format(blockchain_rid)
+    );
+
+    create recovery_contract(blockchain_rid, network_id, contract_address);
+}
+
+operation unregister_recovery_contract(blockchain_rid: byte_array, networkd_id: integer) {
+    delete recovery_contract @? { blockchain_rid, networkd_id };
+}
+
+query get_recovery_contract(blockchain_rid: byte_array, networkd_id: integer): byte_array? {
+    return recovery_contract @? { blockchain_rid, networkd_id } .contract_address;
 }
 
 @extend(ft4.crosschain.after_init_transfer) function (
@@ -14,8 +34,16 @@ entity downstream_blockchain {
     deadline: timestamp,
     ft4.crosschain.pending_transfer
 ) {
-    val target_blockchain_rid = hops[0];
-    val downstream_blockchain_account = downstream_blockchain @? { .blockchain_rid == target_blockchain_rid } .account;
-    if (downstream_blockchain_account == null) return;
+    log("sender: " + sender);
+    log("recipient_id: " + recipient_id);
+    log("asset: " + "ft4.assets.asset.id");
+    log("amount: " + amount);
+    log("hops: " + hops);
+    log("deadline: " + deadline);
+    log("pending_transfer: " + "ft4.crosschain.pending_transfer");
 
+//    val target_blockchain_rid = hops[0];
+//    val downstream_blockchain_account = downstream_blockchain @? { .blockchain_rid == target_blockchain_rid } .account;
+//    if (downstream_blockchain_account == null) return;
 }
+
