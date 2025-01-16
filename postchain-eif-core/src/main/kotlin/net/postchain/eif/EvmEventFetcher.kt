@@ -5,9 +5,11 @@ import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.slf4j.MDCContext
 import mu.KLogging
 import net.postchain.common.exception.ProgrammerMistake
@@ -16,7 +18,6 @@ import net.postchain.common.toHex
 import net.postchain.common.wrap
 import net.postchain.concurrent.util.get
 import net.postchain.core.BlockchainEngine
-import net.postchain.core.Shutdownable
 import net.postchain.eif.EvmEventProcessor.EvmBlock
 import net.postchain.eif.web3j.Web3jRequestHandler
 import net.postchain.gtv.GtvFactory.gtv
@@ -42,41 +43,44 @@ class EvmEventFetcher(
         private val hasDynamicEvents: Boolean,
         private val evmReadOffset: BigInteger,
         private val maxReadAhead: Long,
-        skipToHeight: BigInteger,
-        lastEvmBlockHeight: BigInteger,
+        private val skipToHeight: BigInteger,
+        private val lastEvmBlockHeight: BigInteger,
         private val blockchainEngine: BlockchainEngine,
         private val web3jRequestHandler: Web3jRequestHandler,
         private val delayWhenNoNewBlocks: Long,
         private val evmEventProcessor: EvmEventProcessor
-) : Shutdownable {
+) : EventFetcher {
     companion object : KLogging()
 
-    private val job: Job
+    private var job: Job
+    private var hasInitiatedHeights = false
 
     init {
-        job = CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-event-processor") + MDCContext()) {
-            var hasInitiatedHeights = false
-            while (isActive) {
-                try {
-                    if (!hasInitiatedHeights) {
-                        evmEventProcessor.lastReadLogBlockHeight = evmEventProcessor.getLastCommittedEvmBlockHeight(networkId)
-                                ?: getSkipToHeight(skipToHeight)
-                        if (lastEvmBlockHeight > evmEventProcessor.lastReadLogBlockHeight) {
-                            evmEventProcessor.lastReadLogBlockHeight = lastEvmBlockHeight
-                        }
-                        hasInitiatedHeights = true
-                    }
+        job = launchEventFetching()
+    }
 
-                    fetchEvents()
-                } catch (_: CancellationException) {
-                    break
-                } catch (e: Exception) {
-                    logger.error("Parsing of EVM logs unexpectedly failed: $e", e)
-                    delay(500) // Delay a bit and hope that we can recover
+    private fun launchEventFetching() =
+            CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-event-processor") + MDCContext()) {
+                while (isActive) {
+                    try {
+                        if (!hasInitiatedHeights) {
+                            evmEventProcessor.lastReadLogBlockHeight = evmEventProcessor.getLastCommittedEvmBlockHeight(networkId)
+                                    ?: getSkipToHeight(skipToHeight)
+                            if (lastEvmBlockHeight > evmEventProcessor.lastReadLogBlockHeight) {
+                                evmEventProcessor.lastReadLogBlockHeight = lastEvmBlockHeight
+                            }
+                            hasInitiatedHeights = true
+                        }
+
+                        fetchEvents()
+                    } catch (_: CancellationException) {
+                        break
+                    } catch (e: Exception) {
+                        logger.error("Parsing of EVM logs unexpectedly failed: $e", e)
+                        delay(500) // Delay a bit and hope that we can recover
+                    }
                 }
             }
-        }
-    }
 
     /**
      * Producer thread will read events from ethereum ond add to queue in this action. Main thread will consume them.
@@ -195,6 +199,16 @@ class EvmEventFetcher(
         }
 
         return skipToHeight
+    }
+
+    override fun flushEvents(resetToHeight: BigInteger) {
+        // We first need to stop the ongoing fetching to avoid conflicts
+        runBlocking {
+            job.cancelAndJoin()
+        }
+        logger.info("Flushing EVM events from network $networkId and re-fetching from height: $resetToHeight")
+        evmEventProcessor.flushEvents(resetToHeight)
+        job = launchEventFetching()
     }
 
     override fun shutdown() {

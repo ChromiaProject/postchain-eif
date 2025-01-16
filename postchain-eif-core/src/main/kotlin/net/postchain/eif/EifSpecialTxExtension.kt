@@ -10,6 +10,7 @@ import net.postchain.eif.config.EifEventReceiverConfig
 import net.postchain.gtx.GTXModule
 import net.postchain.gtx.data.OpData
 import net.postchain.gtx.special.GTXBlockBuildingAffectingSpecialTxExtension
+import java.math.BigInteger
 import java.time.Clock
 
 class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXBlockBuildingAffectingSpecialTxExtension {
@@ -17,14 +18,15 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
     companion object : KLogging()
 
     lateinit var config: EifEventReceiverConfig
+    lateinit var isSigner: () -> Boolean
 
     private var needEifTnx: Boolean = false
-    internal val processors = mutableMapOf<Long, EventProcessor>()
+    internal val processors = mutableMapOf<Long, Pair<EventProcessor, EventFetcher>>()
 
     override fun getRelevantOps() = setOf(EvmBlockOp.OP_NAME)
 
-    fun addEventProcessor(networkID: Long, processor: EventProcessor) {
-        processors[networkID] = processor
+    fun addEventProcessor(networkID: Long, processor: EventProcessor, eventFetcher: EventFetcher) {
+        processors[networkID] = processor to eventFetcher
     }
 
     override fun init(module: GTXModule, chainID: Long, blockchainRID: BlockchainRid, cs: CryptoSystem) {
@@ -41,7 +43,7 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
         if (position == SpecialTransactionPosition.Begin && processors.isNotEmpty()) {
             val index = bctx.height.mod(processors.size)
-            val proc = processors.values.toList()[index]
+            val proc = processors.values.toList()[index].first
             val data = proc.getEventData()
             return data.map { it.toOpData() }.also {
                 bctx.addAfterCommitHook { proc.markAsProcessed(data) }
@@ -53,7 +55,7 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
     override fun validateSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext, ops: List<OpData>): Boolean {
         if (position == SpecialTransactionPosition.Begin && processors.isNotEmpty()) {
             val index = bctx.height.mod(processors.size)
-            val proc = processors.values.toList()[index]
+            val (proc, fetcher) = processors.values.toList()[index]
             val decodedOps = ops.map {
                 if (it.opName != EvmBlockOp.OP_NAME) {
                     logger.error("Unknown operation: ${it.opName}")
@@ -64,7 +66,12 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
             }
             bctx.addAfterCommitHook { proc.markAsProcessed(decodedOps.filterNotNull()) }
             if (decodedOps.contains(null)) return false
-            return proc.isValidEventData(decodedOps.filterNotNull())
+            val validationResult = proc.isValidEventData(decodedOps.filterNotNull())
+            if (!validationResult.valid && validationResult.conflictingHeight != null && !isSigner()) {
+                fetcher.flushEvents(validationResult.conflictingHeight - BigInteger.ONE)
+            }
+
+            return validationResult.valid
         }
         return ops.isEmpty()
     }
@@ -92,5 +99,5 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
         return false
     }
 
-    private fun fetchNumberOfEvents(): Long = processors.values.sumOf { it.numberOfNewEvents() }
+    private fun fetchNumberOfEvents(): Long = processors.values.map { it.first }.sumOf { it.numberOfNewEvents() }
 }

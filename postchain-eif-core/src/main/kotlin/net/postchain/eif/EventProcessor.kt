@@ -29,9 +29,15 @@ enum class EncodedEvent(val index: Int) {
 interface EventProcessor {
     fun getEventData(): List<EvmBlockOp>
     fun numberOfNewEvents(): Long
-    fun isValidEventData(ops: List<EvmBlockOp>): Boolean
+    fun isValidEventData(ops: List<EvmBlockOp>): EventValidationResult
     fun markAsProcessed(ops: List<EvmBlockOp>)
+    fun flushEvents(resetToHeight: BigInteger)
 }
+
+class EventValidationResult(
+        val valid: Boolean,
+        val conflictingHeight: BigInteger? = null,
+)
 
 /**
  * This event processor is used for nodes that are not connected to a network.
@@ -47,14 +53,17 @@ class NoOpEventProcessor : EventProcessor {
     /**
      * We can at least validate structure
      */
-    override fun isValidEventData(ops: List<EvmBlockOp>): Boolean {
+    override fun isValidEventData(ops: List<EvmBlockOp>): EventValidationResult {
         for (op in ops) {
-            return op.events.all { isValidEvmEventFormat(it.asArray()) }
+            if (!op.events.all { isValidEvmEventFormat(it.asArray()) }) {
+                return EventValidationResult(false)
+            }
         }
-        return true
+        return EventValidationResult(true)
     }
 
     override fun markAsProcessed(ops: List<EvmBlockOp>) {}
+    override fun flushEvents(resetToHeight: BigInteger) {}
 
     private fun isValidEvmEventFormat(opArgs: Array<out Gtv>) = opArgs.size == 7 &&
             opArgs[EncodedEvent.TX_HASH.index] is GtvByteArray &&
@@ -86,14 +95,18 @@ class EvmEventProcessor(
     var lastReadLogBlockHeight: BigInteger = BigInteger.ZERO
 
     @Synchronized
-    override fun isValidEventData(ops: List<EvmBlockOp>): Boolean {
+    override fun isValidEventData(ops: List<EvmBlockOp>): EventValidationResult {
         // We are strict here, if we have not seen something we will not try to go and fetch it.
         // We simply verify that the same blocks and events are coming in the same order that we have seen them
         // If there are too many rejections, readOffset should be increased
         if (ops.size > eventBlocks.size) {
             // We don't have all these blocks
             logger.warn("Received unexpected blocks")
-            return false
+            val conflictingHeight = if (lastReadLogBlockHeight >= ops.last().evmBlockHeight) {
+                val firstReceivedEventHeight = ops.last().evmBlockHeight
+                eventBlocks.peek()?.evmBlockHeight?.min(firstReceivedEventHeight) ?: firstReceivedEventHeight
+            } else null
+            return EventValidationResult(false, conflictingHeight)
         }
         for ((index, eventBlock) in eventBlocks.withIndex()) {
             if (index >= ops.size) break
@@ -105,15 +118,15 @@ class EvmEventProcessor(
                         "Received unexpected block ${op.evmBlockHeight} with hash ${op.evmBlockHash} in network ${op.networkId}." +
                                 " Expected block ${eventBlock.evmBlockHeight} with hash ${eventBlock.evmBlockHash} in network ${eventBlock.networkId}"
                 )
-                return false
+                return EventValidationResult(false, op.evmBlockHeight.min(eventBlock.evmBlockHeight))
             }
 
             if (op.events != eventBlock.events) {
                 logger.warn("Events in received block ${op.evmBlockHeight} do not match expected events")
-                return false
+                return EventValidationResult(false, op.evmBlockHeight)
             }
         }
-        return true
+        return EventValidationResult(true)
     }
 
     override fun markAsProcessed(ops: List<EvmBlockOp>) {
@@ -164,6 +177,20 @@ class EvmEventProcessor(
     ) {
         eventBlocks.addAll(logs)
         lastReadLogBlockHeight = newLastReadLogBlockHeight
+    }
+
+    @Synchronized
+    override fun flushEvents(
+            resetToHeight: BigInteger,
+    ) {
+        val currentQueue = eventBlocks.toList()
+        eventBlocks.clear()
+        for (event in currentQueue) {
+            if (event.evmBlockHeight > resetToHeight) break
+            eventBlocks.add(event)
+        }
+
+        lastReadLogBlockHeight = resetToHeight
     }
 
     @Synchronized
