@@ -32,7 +32,7 @@
         <string>net.postchain.gtx.GTXBlockchainConfigurationFactory</string>
     </entry>
     <entry key="sync_ext">
-        <array><string>net.postchain.eif.EifSynchronizationInfrastructureExtension</string></array>
+        <array><string>net.postchain.eif.EifTestSynchronizationInfrastructureExtension</string></array>
     </entry>
     <entry key="signers">
         <array>
@@ -78,6 +78,9 @@
                         </dict>
                     </entry>
                 </dict>
+            </entry>
+            <entry key="disable_event_stubbing">
+                <int>1</int>
             </entry>
         </dict>
     </entry>

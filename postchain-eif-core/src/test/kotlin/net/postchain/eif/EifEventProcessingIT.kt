@@ -32,8 +32,6 @@ class EifEventProcessingIT : IntegrationTestSetup() {
 
     @Test
     fun testEifBuildBlock() {
-        configOverrides.setProperty("ethereum.urls", "test")
-
         val nodes = createNodes(1, "/net/postchain/eif/test_blockchain_config.xml")
         val node = nodes[0]
         val bcRid = systemSetup.blockchainMap[1]!!.rid // Just assume we have chain 1

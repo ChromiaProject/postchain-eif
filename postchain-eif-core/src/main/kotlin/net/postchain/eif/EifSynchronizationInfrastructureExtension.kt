@@ -105,9 +105,6 @@ class EifSynchronizationInfrastructureExtension(
         return if ("ignore".equals(evmConfig.urls.first(), ignoreCase = true)) {
             logger.warn("EIF is running in disconnected mode. No events will be fetched from or validated against ethereum.")
             NoOpEventProcessor().let { it to NoOpEventFetcher(it) }
-        } else if ("test".equals(evmConfig.urls.first(), ignoreCase = true)) {
-            logger.info("EIF is running in test mode. No events will be fetched from or validated against ethereum.")
-            eventProcessor to NoOpEventFetcher(eventProcessor)
         } else {
             val staticContracts = eifEvmBlockchainConfig.contracts ?: listOf()
             if (staticContracts.isEmpty() && !hasDynamicContacts) throw UserMistake("No contracts configured for ${cfg.blockchainRid}")
