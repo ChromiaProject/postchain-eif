@@ -135,6 +135,27 @@ $ yarn deploy:alice --network sepolia --verify
 $ yarn deploy:anchoring --network sepolia --verify --blockchain-rid {SYSTEM_ANCHORING_CHAIN_RID} --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS}
 ```
 
+#### Deploy only a validator
+
+With managed validator contract:
+
+In case directory chain validator contract is not deployed:
+
+```sh
+$ yarn deploy:directoryValidator --network sepolia --verify --blockchain-rid {DIRECTORY_CHAIN_RID}
+```
+
+Then:
+
+```sh
+$ yarn deploy:validator --network sepolia --verify --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS}
+```
+
+With manually updated validator contract
+```sh
+$ yarn deploy:validator --network sepolia --verify --app 0xCaf200436270A60Cda6543602F2Ea4224E31351d
+```
+
 ### Added plugins
 
 - Gas reporter [hardhat-gas-reporter](https://hardhat.org/plugins/hardhat-gas-reporter.html)
