@@ -122,7 +122,7 @@ test:
 
 blockchains:
   eif_event_receiver_test:
-    module: eif_event_receiver
+    module: eif_event_receiver_chain_common
     config:
       gtx:
         modules:
@@ -150,8 +150,8 @@ blockchains:
     moduleArgs:
       chain_version: *chain_version
 
-  eif_event_receiver_mainnet:
-    module: eif_event_receiver
+  eif_event_receiver:
+    module: eif_event_receiver_chain_common
     config:
       gtx:
         modules:
@@ -176,8 +176,8 @@ blockchains:
     moduleArgs:
       chain_version: *chain_version
 
-  eif_event_receiver_price_oracle_mainnet:
-    module: eif_event_receiver
+  eif_event_receiver_price_oracle:
+    module: eif_event_receiver_chain_common
     config:
       gtx:
         modules:
@@ -276,7 +276,7 @@ blockchains:
           access_mode: blacklist
 
   eif_event_receiver_token_chain:
-    module: eif_event_receiver_dynamic_icmf_config
+    module: eif_event_receiver_dynamic_icmf_config_chain_common
     config:
       gtx:
         modules:

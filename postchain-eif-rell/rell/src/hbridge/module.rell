@@ -5,7 +5,6 @@ import messaging: ^.eif.messaging;
 import common: ^.eif.common;
 import utils: ^.eif.utils;
 import version: ^.eif.version;
-import chain_version;
 
 namespace ft4 {
     import lib.ft4.accounts;

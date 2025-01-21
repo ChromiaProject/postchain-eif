@@ -5,7 +5,7 @@ definitions:
 
 blockchains:
   eif_event_receiver_testnet:
-    module: eif_event_receiver
+    module: eif_event_receiver_chain_common
     config:
       gtx:
         modules:
@@ -33,6 +33,39 @@ blockchains:
             events: !include configs/events.yml
     moduleArgs:
       chain_version: *chain_version
+
+  eif_event_receiver_token_chain_testnet:
+    module: eif_event_receiver_dynamic_icmf_config_chain_common
+    config:
+      gtx:
+        modules:
+          - "net.postchain.eif.EifGTXModule"
+          - "net.postchain.d1.icmf.IcmfSenderGTXModule"
+          - "net.postchain.d1.icmf.IcmfReceiverGTXModule"
+      sync_ext:
+        - "net.postchain.eif.EifSynchronizationInfrastructureExtension"
+        - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"
+      eif:
+        chains:
+          bsc:
+            network_id: 97
+            evm_read_offset: 10
+            skip_to_height: 5801241 # TODO: Set to current height
+            events: !include configs/events.yml
+          ethereum:
+            network_id: 11155111
+            evm_read_offset: 10
+            skip_to_height: 2000000 # TODO: Set to current height
+            events: !include configs/events.yml
+      icmf:
+        receiver:
+          directory-chain:
+            topics:
+              - "L_blockchain_rid_topic"
+    moduleArgs:
+      chain_version: *chain_version
+      eif_event_receiver_dynamic_icmf_config:
+        configuration_chain: "token_chain"
 
   transaction_submitter_testnet:
     module: transaction_submitter
