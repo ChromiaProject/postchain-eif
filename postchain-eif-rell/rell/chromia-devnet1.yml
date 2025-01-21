@@ -5,7 +5,7 @@ definitions:
 
 blockchains:
   eif_event_receiver_devnet1:
-    module: eif_event_receiver
+    module: eif_event_receiver_chain_common
     config:
       gtx:
         modules:
@@ -27,7 +27,7 @@ blockchains:
       chain_version: *chain_version
 
   eif_event_receiver_token_chain_devnet1:
-    module: eif_event_receiver_dynamic_icmf_config
+    module: eif_event_receiver_dynamic_icmf_config_chain_common
     config:
       gtx:
         modules:

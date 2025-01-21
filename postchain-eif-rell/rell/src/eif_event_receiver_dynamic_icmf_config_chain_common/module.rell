@@ -1,0 +1,4 @@
+import eif_event_receiver_dynamic_icmf_config;
+import chain_version;
+
+// This is a common entrypoint for our dynamic event receiver chains

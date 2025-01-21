@@ -5,7 +5,7 @@ definitions:
 
 blockchains:
   eif_event_receiver_mainnet:
-    module: eif_event_receiver
+    module: eif_event_receiver_chain_common
     config:
       gtx:
         modules:
@@ -35,7 +35,7 @@ blockchains:
       chain_version: *chain_version
 
   eif_event_receiver_token_chain_mainnet:
-    module: eif_event_receiver_dynamic_icmf_config
+    module: eif_event_receiver_dynamic_icmf_config_chain_common
     config:
       gtx:
         modules:
@@ -64,9 +64,11 @@ blockchains:
               topic: "L_eif_event_receiver_dynamic_config"
     moduleArgs:
       chain_version: *chain_version
+      eif_event_receiver_dynamic_icmf_config:
+        configuration_chain: "token_chain"
 
   eif_event_receiver_price_oracle_mainnet:
-    module: eif_event_receiver
+    module: eif_event_receiver_chain_common
     config:
       gtx:
         modules:

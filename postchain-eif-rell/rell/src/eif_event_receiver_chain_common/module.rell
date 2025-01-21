@@ -1,0 +1,4 @@
+import eif_event_receiver;
+import chain_version;
+
+// This is a common entrypoint for our event receiver chains
