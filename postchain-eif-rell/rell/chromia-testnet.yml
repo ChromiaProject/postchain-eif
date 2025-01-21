@@ -128,23 +128,3 @@ compile:
   source: src
   target: target
   rellVersion: 0.13.12
-
-libs:
-  ft4:
-    registry: https://bitbucket.org/chromawallet/ft3-lib
-    path: rell/src/lib/ft4
-    tagOrBranch: v0.8.0r
-    rid: x"B6AE6AC82AC735BFB9E4E412FFB76BF95380E94F371F5F6A14E71A3AA7D5FEF6"
-    insecure: false
-  iccf:
-    registry: https://gitlab.com/chromaway/core/directory-chain
-    path: src/iccf
-    tagOrBranch: 1.45.0
-    rid: x"1D567580C717B91D2F188A4D786DB1D41501086B155A68303661D25364314A4D"
-    insecure: false
-  icmf:
-    registry: https://gitlab.com/chromaway/core/directory-chain
-    path: src/messaging/icmf
-    tagOrBranch: 1.45.0
-    rid: x"19D6BC28D527E6D2239843608486A84F44EDCD244E253616F13D1C65893F35F6"
-    insecure: false
