@@ -86,7 +86,7 @@ task("deploy:chromiabridge")
         const tokenMinterFactory = await hre.ethers.getContractFactory("TokenMinterETH") as TokenMinterETH__factory; // transferFromNative ETH mainnet
         const tokenMinter = await tokenMinterFactory.deploy(DAILY_LIMIT, tokenAddress, bridgeAddress, multiSigOwner) as TokenMinterBase;
         await tokenMinter.waitForDeployment();
-        const tokenMinterAddress = tokenMinter.getAddress();
+        const tokenMinterAddress = await tokenMinter.getAddress();
         console.log("Token Minter deployed to: ", tokenMinterAddress);
 
         console.log('bridge.setTokenMinter');
