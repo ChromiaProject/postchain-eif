@@ -53,7 +53,7 @@ Run test with solidity coverage report
 $ yarn coverage
 ```
 
-### Deploy token bridge contract to a network (requires Mnemonic, infura API and Etherscan API key)
+### Deploy token bridge contract to a network (requires mnemonic, infura API and Etherscan API key)
 
 Create `.env` file by running `cp .env.example .env` and fill in the required environment variables with your own values.
 
@@ -63,11 +63,18 @@ INFURA_API_KEY="..."
 ETHERSCAN_API_KEY="..."
 ```
 
-There are two versions of the Bridge contract, TokenBridge and ChromiaTokenBridge. The TokenBridge contract is the standard bridge contract that handles depositing and withdrawing ERC20 tokens. When tokens are deposited to the TokenBridge, they are held in custody in the contract, and transfered back when the user withdraws the tokens from Chromia back to EVM.
+There are two versions of the Bridge contract, [TokenBridge](./tasks/deployers/bridge.ts) and [ChromiaTokenBridge](./tasks/deployers/chromiabridge.ts). The TokenBridge contract is the standard bridge contract that handles depositing and withdrawing ERC20 tokens. When tokens are deposited to the TokenBridge, they are held in custody in the contract, and transfered back when the user withdraws the tokens from Chromia back to EVM. The [TokenBridgeWithSnapshotWithdraw](./tasks/deployers/bridgeWithSnapshots.ts) extends the TokenBridge contract by adding support for mass exits using snapshots. This allows users to withdraw their tokens even if the chromia validators become unavailable, by using a snapshot of token balances that was recorded on-chain.
 
 The ChromiaTokenBridge is meant to be used for tokens that are native to Chromia. This contract overrides the deposit/withdraw functions to burn the ERC20 tokens on deposit and mint them on withdraw. This is done since the total avaliable supply of tokens should be handled on the Chromia side, and to enable users to directly withdraw FT4 tokens to EVM without the need for tokens already being held in the contract.
 
-#### To deploy the normal TokenBridge, run the deploy script:
+#### To deploy the standard token bridge, follow the steps below:
+
+##### Deploy validator contract
+
+With manually updated validator contract:
+```sh
+$ yarn deploy:validator --network sepolia --verify --validators 0xCaf200436270A60Cda6543602F2Ea4224E31351d,0x9F4daAfc3F52C1c92e4583413824523679ABc9a3,0x4cBe97487b517b66B43943AD97Ad8394b9DEa7dC
+```
 
 With managed validator contract:
 
@@ -80,41 +87,30 @@ $ yarn deploy:directoryValidator --network sepolia --verify --blockchain-rid {DI
 Then:
 
 ```sh
-$ yarn deploy --network sepolia --verify --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS} --offset 2
+$ yarn deploy:validator --network sepolia --verify --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS}
 ```
 
-With manually updated validator contract
-```sh
-$ yarn deploy --network sepolia --verify --app 0xCaf200436270A60Cda6543602F2Ea4224E31351d --offset 2
-```
+##### Deploy token bridge contract
 
-After deploying bridge chain on Chromia retrieve the blockchain RID of that chain and run (omit --managed-validator if
-you have a manually updated validator contract):
+To deploy the standard TokenBridge contract (`VALIDATOR_CONTRACT_ADDRESS` is obtained from the previous step):
 
 ```sh
-$ yarn setBlockchainRid:bridge --network sepolia --address {BRIDGE_CONTRACT_ADDRESS} --blockchain-rid {BRIDGE_BLOCKCHAIN_RID} --managed-validator {MANAGED_VALIDATOR_CONTRACT_ADDRESS}
+$ yarn deploy --network sepolia --verify --validator-address {VALIDATOR_CONTRACT_ADDRESS} --offset 2
 ```
 
-#### To deploy the ChromiaTokenBridge, run the deploy:native script:
-
-With managed validator contract:
-
-In case directory chain validator contract is not deployed:
+To deploy the TokenBridgeWithSnapshotWithdraw contract:
 
 ```sh
-$ yarn deploy:directoryValidator --network sepolia --verify --blockchain-rid {DIRECTORY_CHAIN_RID}
+$ yarn deploy:snapshots --network sepolia --verify --validator-address {VALIDATOR_CONTRACT_ADDRESS} --offset 2
 ```
 
-Then:
-```sh
-$ yarn deploy:native --network sepolia --verify --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS} --offset 2
-```
-
-With manually updated validator contract
+To deploy the ChromiaTokenBridge contract:
 
 ```sh
-$ yarn deploy:native --network sepolia --verify --app 0xCaf200436270A60Cda6543602F2Ea4224E31351d,0x9F4daAfc3F52C1c92e4583413824523679ABc9a3,0x4cBe97487b517b66B43943AD97Ad8394b9DEa7dC,0x4FC783e3a3beF0270858Dc5FbB837fA6f8fDbFc6 --offset 2
+$ yarn deploy:native --network sepolia --verify --validator-address {VALIDATOR_CONTRACT_ADDRESS} --offset 2
 ```
+
+##### Configure token bridge
 
 After deploying bridge chain on Chromia retrieve the blockchain RID of that chain and run (omit --managed-validator if
 you have a manually updated validator contract):
@@ -135,26 +131,6 @@ $ yarn deploy:alice --network sepolia --verify
 $ yarn deploy:anchoring --network sepolia --verify --blockchain-rid {SYSTEM_ANCHORING_CHAIN_RID} --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS}
 ```
 
-#### Deploy only a validator
-
-With managed validator contract:
-
-In case directory chain validator contract is not deployed:
-
-```sh
-$ yarn deploy:directoryValidator --network sepolia --verify --blockchain-rid {DIRECTORY_CHAIN_RID}
-```
-
-Then:
-
-```sh
-$ yarn deploy:validator --network sepolia --verify --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS}
-```
-
-With manually updated validator contract
-```sh
-$ yarn deploy:validator --network sepolia --verify --app 0xCaf200436270A60Cda6543602F2Ea4224E31351d
-```
 
 ### Added plugins
 
