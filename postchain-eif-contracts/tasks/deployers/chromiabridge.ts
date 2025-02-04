@@ -30,8 +30,12 @@ const known_artifacts_by_network: { [key: string]: KnownArtifacts } = {
     },
     "bsc_testnet": {
         "multiSigOwner": "0x6e8187435d5140214552ef3989ddb1457f4a663a", // nonsense
-        "chromiaTokenAddress": "0x8A22279d4A90B6fe1C4B30fa660cC9f926797bAA2", // nonsense
-    }
+        "chromiaTokenAddress": "0x8e59d72e4DdA56F26963C6b8c77cA1959E9A74F0", // tCHR
+    },
+    "base_sepolia": {
+        "multiSigOwner": "0x6e8187435d5140214552ef3989ddb1457f4a663a", // nonsense
+        "chromiaTokenAddress": "0x1F11F131E0866AaaBfcCaaF350A6c33Abb0308b8", // tCHR
+    },
 }
 
 task("deploy:chromiabridge")
@@ -101,6 +105,36 @@ task("deploy:chromiabridge")
                 console.log(e);
             }
         }
+    });
+
+task("deploy:chromiatokenbsc")
+    .addFlag("verify", "Verify contracts at block explorer")
+    .setAction(async ({ verify }, hre) => {
+        // Get the deployer's address
+        const [deployer] = await hre.ethers.getSigners();
+        const deployerAddress = await deployer.getAddress();
+
+        // Deploy the BSC token contract
+        const tokenFactory = await hre.ethers.getContractFactory("ChromaToken");
+        const token = await tokenFactory.deploy(deployerAddress);
+        await token.waitForDeployment();
+        const tokenAddress = await token.getAddress();
+
+        console.log("ChromaToken deployed to:", tokenAddress);
+        console.log("Owner/Minter set to:", deployerAddress);
+
+        if (verify) {
+            try {
+                await hre.run("verify:verify", {
+                    address: tokenAddress,
+                    constructorArguments: [deployerAddress],
+                });
+            } catch (e) {
+                console.log("Verification error:", e);
+            }
+        }
+
+        return tokenAddress;
     });
 
 /*
