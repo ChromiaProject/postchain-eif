@@ -31,6 +31,12 @@ blockchains:
             evm_read_offset: 10
             skip_to_height: 2000000 # Oct-01-2022 05:06:12 PM +UTC
             events: !include configs/events.yml
+          base_sepolia:
+            network_id: 84532
+            contracts:
+              - "0x71bf30cDaec15885F13A9f3448d3A27C72f0d3eA" # TransparentUpgradeableProxy / bridge contract
+            evm_read_offset: 10
+            skip_to_height: 20000000 # Jan-01-2025 09:51:28 PM +UTC
     moduleArgs:
       chain_version: *chain_version
 
@@ -79,8 +85,10 @@ blockchains:
           validator_contracts:
             - address: "83dB85F7ef4447524D3A31c0F4664a89173C68Eb" # directory validator
               network_id: 97
-#            - address: "83dB85F7ef4447524D3A31c0F4664a89173C68Eb" # directory validator TODO: correct this
-#              network_id: 11155111
+            - address: "2BcA7182ee241C29AaF63E6Fef7ECd25AE43A418" # directory validator
+              network_id: 11155111
+            - address: "b0134B981B1f8F758c39d4A9f14193cf624a4480" # directory validator
+              network_id: 84532
         # Omit this to disable anchoring
         system_anchoring_chain_config:
           blockchain_rid: x"AE21863A41714559DD02F0035FB198D0F7B49F4776CA0BCCD5B4AF9C17D694F3" # system anchoring
@@ -95,9 +103,10 @@ blockchains:
               - address: "247b4200a8e8Db6878A2A5e4CDfbF84a50f5fFa8" # token bridge
                 validator_contract: "338E16D38ac3123DAdd0E4912103fB8E5A0D42d8" # native validator
                 network_id: 97
-#              - address: "247b4200a8e8Db6878A2A5e4CDfbF84a50f5fFa8" # token bridge TODO: correct this
-#                validator_contract: "338E16D38ac3123DAdd0E4912103fB8E5A0D42d8" # native validator TODO: correct this
-#                network_id: 11155111
+              - address: "71bf30cDaec15885F13A9f3448d3A27C72f0d3eA" # token bridge
+                validator_contract: "5Bbed52263B4791e4Ea3EEF8Fc70Fb9dE14541f3" # native validator
+                network_id: 84532
+              # ETH Sepolia bridge is omitted here since it was created with directory chain validator as validator
         contract_tx_rate_limit: 60000
         tx_node_submit_timeout: 1800000 # 30m
         tx_verification_timeout: 5400000 # 90 min - from the time a TX was TAKEN
@@ -106,8 +115,10 @@ blockchains:
         network_configs:
           - id: 97
             currency_symbol: "BNB"
-#          - id: 11155111
-#            currency_symbol: "ETH"
+          - id: 11155111
+            currency_symbol: "ETH"
+          - id: 84532
+            currency_symbol: "ETH"
         system_max_priority_fee_per_gas: 25000000000
         system_max_fee_per_gas: 180000000000
       transaction_submitter.anchoring:
