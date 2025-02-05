@@ -81,7 +81,7 @@ operation __update_evm_transaction_receipt(row_id: integer, block_hash: text, ef
 operation __begin_block(height: integer) {
     val config_hash = chain_context.raw_config.hash();
     if (config_hash != transaction_submitter_config.hash) {
-        if (height > 0) on_configuration_update();
+        if (height > 0) try_call(on_configuration_update(*));
         transaction_submitter_config.hash = config_hash;
     }
     timeout_evm_transactions();

@@ -266,55 +266,66 @@ function handle_bridge_mapping_updates(
     if (topic == bridge_mapping_topic) {
         val bridge_mapping_message = bridge_mapping_message.from_gtv(body);
 
-        handle_new_bridge_mapping(bridge_mapping_message);
+        if (not bridge_mapping_message.deleted) {
+            handle_new_validator_contract(
+                bridge_mapping_message.blockchain_rid,
+                bridge_mapping_message.evm_network_id,
+                bridge_mapping_message.validator_contract
+            );
+        }
     }
 }
 
 @extend(on_configuration_update)
-function check_for_new_system_bridges() {
+function check_for_new_system_bridges_and_validators() {
+    // Directory chain validators
+    val directory_chain_brid = get_directory_chain_blockchain_rid();
+    val directory_chain_validator_contracts = get_system_chain_validator_contracts(directory_chain_brid)
+    ?: list<(validator_contract: text, network_id: integer)>();
+    for (validator in directory_chain_validator_contracts) {
+        handle_new_validator_contract(directory_chain_brid, validator.network_id, validator.validator_contract);
+    }
+
+    // System chain bridges
     for (system_chain in get_system_chains_with_bridges()) {
         for (bridge_contract in system_chain.bridge_contracts) {
-            handle_new_bridge_mapping(bridge_mapping_message(
-                blockchain_rid = system_chain.blockchain_rid,
-                validator_contract = bridge_contract.validator_contract,
-                bridge_contract = bridge_contract.address,
-                evm_network_id = bridge_contract.network_id,
-                deleted = false
-            ));
+            handle_new_validator_contract(
+                system_chain.blockchain_rid,
+                bridge_contract.network_id,
+                bridge_contract.validator_contract
+            );
         }
     }
 }
 
-function handle_new_bridge_mapping(bridge_mapping_message) {
-    if (not bridge_mapping_message.deleted) {
-        val latest_ignored_signer_update = latest_signer_update_for_unmapped_chain @? {
-            .blockchain_rid == bridge_mapping_message.blockchain_rid
-        }.signer_list_update_message;
-        val latest_signer_update = signer_list_update @? {
-            .blockchain_rid == bridge_mapping_message.blockchain_rid
-        } (@omit @sort_desc .serial, $) limit 1;
-        if (exists(latest_ignored_signer_update) and exists(latest_signer_update)) {
-            // Check if we should submit ignored update
-            val latest_ignored_signer_update_message = signer_list_update_message.from_gtv(gtv.from_bytes(latest_ignored_signer_update));
-            if (latest_ignored_signer_update_message.serial > latest_signer_update.serial) {
-                apply_signer_update(latest_ignored_signer_update_message);
-            } else {
-                check_and_resubmit_latest_update_if_needed(bridge_mapping_message, latest_signer_update);
-            }
-        } else if (exists(latest_ignored_signer_update)) {
-            val latest_ignored_signer_update_message = signer_list_update_message.from_gtv(gtv.from_bytes(latest_ignored_signer_update));
+function handle_new_validator_contract(blockchain_rid: byte_array, network_id: integer, validator_contract: text) {
+    val latest_ignored_signer_update = latest_signer_update_for_unmapped_chain @? {
+        .blockchain_rid == blockchain_rid
+    }.signer_list_update_message;
+    val latest_signer_update = signer_list_update @? {
+        .blockchain_rid == blockchain_rid
+    } (@omit @sort_desc .serial, $) limit 1;
+    if (exists(latest_ignored_signer_update) and exists(latest_signer_update)) {
+        // Check if we should submit ignored update
+        val latest_ignored_signer_update_message = signer_list_update_message.from_gtv(gtv.from_bytes(latest_ignored_signer_update));
+        if (latest_ignored_signer_update_message.serial > latest_signer_update.serial) {
             apply_signer_update(latest_ignored_signer_update_message);
-        } else if (exists(latest_signer_update)) {
-            check_and_resubmit_latest_update_if_needed(bridge_mapping_message, latest_signer_update);
+        } else {
+            check_and_resubmit_latest_update_if_needed(network_id, validator_contract, latest_signer_update);
         }
+    } else if (exists(latest_ignored_signer_update)) {
+        val latest_ignored_signer_update_message = signer_list_update_message.from_gtv(gtv.from_bytes(latest_ignored_signer_update));
+        apply_signer_update(latest_ignored_signer_update_message);
+    } else if (exists(latest_signer_update)) {
+        check_and_resubmit_latest_update_if_needed(network_id, validator_contract, latest_signer_update);
     }
 }
 
-function check_and_resubmit_latest_update_if_needed(updated_mapping: bridge_mapping_message, signer_list_update) {
+function check_and_resubmit_latest_update_if_needed(network_id: integer, validator_contract: text, signer_list_update) {
     if (signer_list_update.status != signer_list_update_status.QUEUED) {
         val transactions = signer_list_update_transaction @* { signer_list_update }.evm_submit_transaction;
         for (transaction in transactions) {
-            if (transaction.contract_address == updated_mapping.validator_contract and transaction.network_id == updated_mapping.evm_network_id) {
+            if (transaction.contract_address == validator_contract and transaction.network_id == network_id) {
                 return;
             }
         }
@@ -327,11 +338,11 @@ function check_and_resubmit_latest_update_if_needed(updated_mapping: bridge_mapp
             val old_transaction = transactions[0];
 
             val new_transaction = add_transaction_to_queue(
-                updated_mapping.validator_contract,
+                validator_contract,
                 old_transaction.function_name,
                 old_transaction.parameter_types.split("."),
                 list<gtv>.from_gtv(gtv.from_bytes(old_transaction.parameter_values)),
-                updated_mapping.evm_network_id,
+                network_id,
                 get_system_max_priority_fee_per_gas(),
                 get_system_max_fee_per_gas(),
                 chain_context.blockchain_rid
@@ -342,7 +353,7 @@ function check_and_resubmit_latest_update_if_needed(updated_mapping: bridge_mapp
             log(
                 "Submitting signer update tx for blockchain %s on network %s.".format(
                     signer_list_update.blockchain_rid,
-                    updated_mapping.evm_network_id
+                    network_id
                 )
             );
         }
