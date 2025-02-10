@@ -356,7 +356,7 @@ open class TransactionSubmitter(
                 txRequest.contractAddress,
                 functionData,
                 transactionHandler.fromAddress,
-                chainId,
+                networkId,
                 txRequest.maxPriorityFeePerGas,
                 txRequest.maxFeePerGas
         )
