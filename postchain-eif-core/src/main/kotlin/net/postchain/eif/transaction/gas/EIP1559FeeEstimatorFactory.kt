@@ -32,12 +32,12 @@ open class EIP1559FeeEstimatorFactory(
             contractAddress: String,
             functionData: String,
             fromAddress: String,
-            chainId: Long,
+            networkId: Long,
             txMaxPriorityFeePerGas: BigInteger,
             txMaxFeePerGas: BigInteger
     ): EIP1559FeeEstimator {
         return EIP1559LastBlockFeeEstimator(web3jRequestHandler, gasLimit, maxGasPrice, gasLimitMargin,
                 baseFeePerGasMargin, priorityFeePerGasMargin, contractAddress, functionData, fromAddress,
-                chainId, txMaxPriorityFeePerGas, txMaxFeePerGas)
+                networkId, txMaxPriorityFeePerGas, txMaxFeePerGas)
     }
 }
