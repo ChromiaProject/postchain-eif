@@ -3,7 +3,6 @@ package net.postchain.eif
 import mu.KLogging
 import net.postchain.PostchainContext
 import net.postchain.common.BlockchainRid
-import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.exception.UserMistake
 import net.postchain.core.BlockchainConfiguration
 import net.postchain.core.BlockchainEngine
@@ -47,28 +46,33 @@ class EifSynchronizationInfrastructureExtension(
                 ext.isSigner = process::isSigner
 
                 eventFetchers[cfg.blockchainRid] = mutableMapOf()
-                for ((evmBlockchainName, evmBlockchainConfig) in eventReceiverConfig.chains) {
-                    if (evmBlockchainConfig.skipToHeight == 0L) {
-                        logger.warn("Skip to height config is set to 0 for EVM network: $evmBlockchainName. Consider changing it to avoid redundant queries.")
+                try {
+                    for ((evmBlockchainName, evmBlockchainConfig) in eventReceiverConfig.chains) {
+                        if (evmBlockchainConfig.skipToHeight == 0L) {
+                            logger.warn("Skip to height config is set to 0 for EVM network: $evmBlockchainName. Consider changing it to avoid redundant queries.")
+                        }
+
+                        val evmConfig = EvmConfig.fromAppConfig(evmBlockchainName, postchainContext.appConfig)
+                        if (evmConfig.urls.isEmpty()) {
+                            throw UserMistake("Node does not have any URLs configured for EVM network: $evmBlockchainName")
+                        }
+
+                        val hasDynamicContracts = (cfg.module as? CompositeGTXModule)?.let { compositeModule ->
+                            (EIF_CONFIG_CONTRACTS_QUERY in compositeModule.getQueries())
+                        } == true
+
+                        val hasDynamicEvents = (cfg.module as? CompositeGTXModule)?.let { compositeModule ->
+                            (EIF_CONFIG_EVENTS_QUERY in compositeModule.getQueries())
+                        } == true
+
+                        val (eventProcessor, eventFetcher) = initializeEventProcessor(cfg, evmBlockchainConfig, engine, evmConfig, hasDynamicContracts, hasDynamicEvents)
+                        ext.addEventProcessor(evmBlockchainConfig.networkId, eventProcessor, eventFetcher)
+                        eventFetchers[cfg.blockchainRid]?.set(evmBlockchainConfig.networkId, eventFetcher)
+                        eifMetricsRegistry.registerMetrics(cfg.chainID, cfg.blockchainRid, evmBlockchainConfig.networkId, eventProcessor)
                     }
-
-                    val evmConfig = EvmConfig.fromAppConfig(evmBlockchainName, postchainContext.appConfig)
-                    if (evmConfig.urls.isEmpty()) {
-                        throw UserMistake("Node does not have any URLs configured for EVM network: $evmBlockchainName")
-                    }
-
-                    val hasDynamicContracts = (cfg.module as? CompositeGTXModule)?.let { compositeModule ->
-                        (EIF_CONFIG_CONTRACTS_QUERY in compositeModule.getQueries())
-                    } == true
-
-                    val hasDynamicEvents = (cfg.module as? CompositeGTXModule)?.let { compositeModule ->
-                        (EIF_CONFIG_EVENTS_QUERY in compositeModule.getQueries())
-                    } == true
-
-                    val (eventProcessor, eventFetcher) = initializeEventProcessor(cfg, evmBlockchainConfig, engine, evmConfig, hasDynamicContracts, hasDynamicEvents)
-                    ext.addEventProcessor(evmBlockchainConfig.networkId, eventProcessor, eventFetcher)
-                    eventFetchers[cfg.blockchainRid]?.set(evmBlockchainConfig.networkId, eventFetcher)
-                    eifMetricsRegistry.registerMetrics(cfg.chainID, cfg.blockchainRid, evmBlockchainConfig.networkId, eventProcessor)
+                } catch (e: Exception) {
+                    disconnectProcess(process)
+                    throw e
                 }
             }
         }
@@ -76,11 +80,14 @@ class EifSynchronizationInfrastructureExtension(
 
     override fun disconnectProcess(process: BlockchainProcess) {
         val blockchainRid = process.blockchainEngine.getConfiguration().blockchainRid
-        val blockchainEventProcessors = eventFetchers.remove(blockchainRid)
-                ?: throw ProgrammerMistake("Blockchain $blockchainRid not attached")
+        val blockchainEventFetchers = eventFetchers.remove(blockchainRid)
         eifMetricsRegistry.unregisterMetrics(blockchainRid)
-        blockchainEventProcessors.values.forEach {
-            it.shutdown()
+        blockchainEventFetchers?.values?.forEach {
+            try {
+                it.shutdown()
+            } catch (e: Exception) {
+                logger.error("Unexpected error when shutting down event fetcher", e)
+            }
         }
     }
 
