@@ -80,10 +80,14 @@ class EifSynchronizationInfrastructureExtension(
 
     override fun disconnectProcess(process: BlockchainProcess) {
         val blockchainRid = process.blockchainEngine.getConfiguration().blockchainRid
-        val blockchainEventProcessors = eventFetchers.remove(blockchainRid)
+        val blockchainEventFetchers = eventFetchers.remove(blockchainRid)
         eifMetricsRegistry.unregisterMetrics(blockchainRid)
-        blockchainEventProcessors?.values?.forEach {
-            it.shutdown()
+        blockchainEventFetchers?.values?.forEach {
+            try {
+                it.shutdown()
+            } catch (e: Exception) {
+                logger.error("Unexpected error when shutting down event fetcher", e)
+            }
         }
     }
 
