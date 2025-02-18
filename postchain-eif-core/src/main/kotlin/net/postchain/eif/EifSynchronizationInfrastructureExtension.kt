@@ -117,7 +117,8 @@ class EifSynchronizationInfrastructureExtension(
             if (staticContracts.isEmpty() && !hasDynamicContacts) throw UserMistake("No contracts configured for ${cfg.blockchainRid}")
             val staticEvents = eifEvmBlockchainConfig.events.let { if (it.isNull()) listOf() else it.asArray().map(GtvToEventMapper::map) }
             if (staticEvents.isEmpty() && !hasDynamicEvents) throw UserMistake("No events configured for ${cfg.blockchainRid}")
-            val web3jServices = Web3jServiceFactory.buildServices(evmConfig.urls, evmConfig.connectTimeout, evmConfig.readTimeout, evmConfig.writeTimeout)
+            val web3jServices = Web3jServiceFactory.buildServices(evmConfig.urls, evmConfig.connectTimeout,
+                    evmConfig.readTimeout, evmConfig.writeTimeout, cfg.blockchainRid)
             val metrics = RpcUsageMetrics(cfg.chainID, cfg.blockchainRid, eifEvmBlockchainConfig.networkId)
             val eventFetcher = EvmEventFetcher(
                     eifEvmBlockchainConfig.networkId,

@@ -63,7 +63,8 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                                 appConfig.urls,
                                 appConfig.connectTimeout,
                                 appConfig.readTimeout,
-                                appConfig.writeTimeout
+                                appConfig.writeTimeout,
+                                blockchainConfig.blockchainRid
                         )
                         val metrics =
                                 RpcUsageMetrics(blockchainConfig.chainID, blockchainConfig.blockchainRid, networkId)
