@@ -36,7 +36,7 @@ const config: HardhatUserConfig = {
                 path: "m/44'/60'/0'/0",
             },
             chainId: 56,
-            url: "[[FILL ME IN]]",
+            url: "https://bsc-mainnet.rpc.chromaway.com",
         },
         ethereum: { // ETH mainnet
             accounts: {
@@ -46,8 +46,18 @@ const config: HardhatUserConfig = {
                 path: "m/44'/60'/0'/0",
             },
             chainId: 1,
-            url: "[[FILL ME IN]]",
+            url: "https://eth-mainnet.rpc.chromaway.com",
         },
+        sepolia: {
+            accounts: {
+                count: 10,
+                initialIndex: 0,
+                mnemonic: MNEMONIC,
+                path: "m/44'/60'/0'/0",
+            },
+            chainId: 11155111,
+            url: "https://eth-testnet.rpc.chromaway.com",
+        },        
         bsc_testnet: { // BSC testnet
             accounts: {
                 count: 10,
