@@ -1,6 +1,7 @@
 import { task } from "hardhat/config";
-import { DirectoryChainValidator, DirectoryChainValidator__factory, IValidator, ManagedValidator__factory, Validator__factory } from "../../typechain-types";
+import { DirectoryChainValidator, DirectoryChainValidator__factory, IValidator, ManagedValidator, ManagedValidator__factory, Validator, Validator__factory } from "../../typechain-types";
 import { delay, parseValidators } from "./utils";
+import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 task("deploy:directoryValidator", "Deploy directory chain validator contract")
     .addParam("blockchainRid", "Blockchain RID of directory chain")
@@ -59,5 +60,115 @@ task("deploy:validator")
             } catch (e) {
                 console.log(e);
             }
+        }
+    });
+
+task("inspect:managedValidator", "Inspect ManagedValidator contract")
+    .addOptionalParam("validatorAddress", "Validator contract address")
+    .setAction(async ({ validatorAddress }, hre) => {
+        if (validatorAddress === undefined) {
+            throw new Error("Validator contract address is required");
+        }
+        await inspectManagedValidatorContract(validatorAddress, hre);       
+    });
+
+export async function inspectManagedValidatorContract(validatorAddress: string, hre: HardhatRuntimeEnvironment) {
+    const validatorFactory = await hre.ethers.getContractFactory("ManagedValidator") as ManagedValidator__factory;
+    const validator = validatorFactory.attach(validatorAddress) as ManagedValidator;
+
+    // Log validators
+    const count = await validator.getValidatorCount();
+    let validators = [];
+    if (count > 0) {
+        console.log(`Validators (${count}):`);
+        for (let i = 0; i < count; i++) {
+            const validator_address = await validator.validators(i);
+            console.log("  Validator " + i + ": " + validator_address);
+            validators.push(validator_address);
+        }
+    } else {
+        console.log(`Validators (${count}):`);
+        console.log(`  No validators`);
+    }       
+
+    // Log directory chain validator
+    let directoryValidatorAddress = "";
+    try {
+        directoryValidatorAddress = await validator.directoryChainValidator();
+        console.log("Directory Chain validator address: " + directoryValidatorAddress);
+    } catch (e) {
+        console.log("Validator contract does not seem to be ManagedValidator");
+        process.exit(1);
+    }
+
+    const directoryValidatorFactory = await hre.ethers.getContractFactory("DirectoryChainValidator") as DirectoryChainValidator__factory;
+    const directoryValidator = directoryValidatorFactory.attach(directoryValidatorAddress) as DirectoryChainValidator;
+
+    // Log directory chain validators
+    const directoryValidatorCount = await directoryValidator.getValidatorCount();
+    console.log(`Directory Chain validators (${directoryValidatorCount}):`);
+    if (directoryValidatorCount > 0) {
+        let directoryValidators = [];
+        for (let i = 0; i < directoryValidatorCount; i++) {
+            const validator_address = await directoryValidator.validators(i);
+            directoryValidators.push(validator_address);
+        }
+
+        // Don't print the same list of validators if it is the same as for Validator contract
+        if (JSON.stringify(validators) === JSON.stringify(directoryValidators)) {
+            console.log("  Validators are the same as for Validator contract");
+        } else {
+            for (let i = 0; i < directoryValidatorCount; i++) {
+                console.log("  Validator " + i + ": " + directoryValidators[i]);
+            }
+        }
+    } else {
+        console.log(`  No validators`);
+    }
+}
+
+task("inspect:directoryValidator", "Inspect DirectoryChainValidator contract")
+    .addOptionalParam("validatorAddress", "Validator contract address")
+    .setAction(async ({ validatorAddress }, hre) => {
+        if (validatorAddress === undefined) {
+            throw new Error("Validator contract address is required");
+        }
+
+        const directoryValidatorFactory = await hre.ethers.getContractFactory("DirectoryChainValidator") as DirectoryChainValidator__factory;
+        const directoryValidator = directoryValidatorFactory.attach(validatorAddress) as DirectoryChainValidator;
+    
+        // Log directory chain validators
+        const directoryValidatorCount = await directoryValidator.getValidatorCount();
+        console.log(`Directory Chain validators (${directoryValidatorCount}):`);
+        if (directoryValidatorCount > 0) {
+            for (let i = 0; i < directoryValidatorCount; i++) {
+                const validator_address = await directoryValidator.validators(i);
+                console.log("  Validator " + i + ": " + validator_address);
+            }
+        } else {
+            console.log(`  No validators`);
+        }
+    });
+
+task("inspect:validator", "Inspect Validator contract")
+    .addOptionalParam("validatorAddress", "Validator contract address")
+    .setAction(async ({ validatorAddress }, hre) => {
+        if (validatorAddress === undefined) {
+            throw new Error("Validator contract address is required");
+        }
+
+        const validatorFactory = await hre.ethers.getContractFactory("Validator") as Validator__factory;
+        const validator = validatorFactory.attach(validatorAddress) as Validator;
+    
+        // Log directory chain validators
+        const validatorCount = await validator.getValidatorCount();
+        console.log(`Validators (${validatorCount}):`);
+        if (validatorCount > 0) {
+            for (let i = 0; i < validatorCount; i++) {
+                const validator_address = await validator.validators(i);
+                console.log("  Validator " + i + ": " + validator_address);
+            }
+        } else {
+            console.log(`  No validators`);
         }
     });

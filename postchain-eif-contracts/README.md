@@ -90,6 +90,24 @@ Then:
 $ yarn deploy:validator --network sepolia --verify --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS}
 ```
 
+Note: If you want to inspect the validator contract, you can use the following command:
+
+For manually updated validators:
+```sh
+$ yarn inspect:validator --network sepolia --validator-address {VALIDATOR_CONTRACT_ADDRESS}
+```
+
+For managed validators:
+```sh
+$ yarn inspect:managedValidator --network sepolia --validator-address {VALIDATOR_CONTRACT_ADDRESS}
+```
+
+For directory chain validators:
+```sh
+$ yarn inspect:directoryValidator --network sepolia --validator-address {VALIDATOR_CONTRACT_ADDRESS}
+```
+
+
 ##### Deploy token bridge contract
 
 To deploy the standard TokenBridge contract (`VALIDATOR_CONTRACT_ADDRESS` is obtained from the previous step):
@@ -117,6 +135,20 @@ you have a manually updated validator contract):
 
 ```sh
 $ yarn setBlockchainRid:bridge --network sepolia --address {BRIDGE_CONTRACT_ADDRESS} --blockchain-rid {BRIDGE_BLOCKCHAIN_RID} --managed-validator {MANAGED_VALIDATOR_CONTRACT_ADDRESS}
+```
+
+Note: If you want to inspect the bridge contract, you can use the following command:
+
+For Chromia token bridge:
+
+```sh
+$ yarn inspect:chromiabridge --network sepolia --chromia-network {BRIDGE_CONTRACT_ADDRESS}
+```
+
+For your token bridge:
+
+```sh
+$ yarn inspect:bridge --network sepolia --bridge-address {BRIDGE_CONTRACT_ADDRESS}
 ```
 
 #### To deploy ALICE token for test

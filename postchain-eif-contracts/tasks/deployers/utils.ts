@@ -1,5 +1,12 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
+export const ChromiaNetwork = {
+    MAINNET: { value: "mainnet", url: "https://system.chromaway.com:7740" },
+    TESTNET: { value: "testnet", url: "https://node0.testnet.chromia.com:7740" },
+    DEVNET1: { value: "devnet1", url: "https://node0.devnet1.chromia.dev:7740" },
+    DEVNET2: { value: "devnet2", url: "https://node0.devnet2.chromia.dev:7740" },
+} as const;    
+
 export function delay(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }

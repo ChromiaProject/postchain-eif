@@ -5,7 +5,11 @@ import {
     TokenBridge,
     TokenBridge__factory
 } from "../../typechain-types";
-import { delay, verifyProxyContract } from "./utils";
+import fetch from 'node-fetch';
+import { ChromiaNetwork, delay, verifyProxyContract } from "./utils";
+import { exit } from "process";
+import { inspectManagedValidatorContract } from "./validator";
+import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 task("deploy:bridge")
     .addOptionalParam("validatorAddress", "Validator contract address")
@@ -89,4 +93,52 @@ task("allowToken:bridge")
         console.log(await bridge.allowToken(tokenAddress));
     });
 
+task("inspect:chromiabridge", "Inspect chromia token bridge contract")
+    .addParam("chromiaNetwork", "Chromia network name (mainnet, testnet, devnet1, devnet2, etc.)")
+    .setAction(async ({ chromiaNetwork }, hre) => {
+        // Get economy chain RID
+        const chromiaNode = Object.values(ChromiaNetwork).find((m) => m.value === chromiaNetwork);
+        if (chromiaNode === undefined) {
+            throw new Error(`Invalid chromia network: ${chromiaNetwork}`);
+        }
+        const dcResponse = await fetch(`${chromiaNode.url}/query/iid_0?type=get_economy_chain_rid`);
+        const economyChainRid = (await dcResponse.text()).replace(/"/g, '');
+        console.log("Economy Chain RID: " + economyChainRid);
+        
+        // Get bridge contracts
+        const ecResponse = await fetch(`${chromiaNode.url}/query/${economyChainRid}?type=eif.hbridge.get_bridge_contracts&network_id=${hre.network.config.chainId}`);
+        const ecBridges = await ecResponse.json();
+        if (!ecBridges || !ecBridges[0] || !ecBridges[0].contract_address) {
+            throw new Error('Bridge address not found');
+        }
+        const bridgeAddress = "0x" + ecBridges[0].contract_address;
+
+        await inspectTokenBridgeContract(bridgeAddress, hre);
+    });
+
+task("inspect:bridge", "Inspect token bridge contract")
+    .addParam("bridgeAddress", "Bridge contract address")
+    .setAction(async ({ bridgeAddress }, hre) => {
+        await inspectTokenBridgeContract(bridgeAddress, hre);
+    });
+
+async function inspectTokenBridgeContract(bridgeAddress: string, hre: HardhatRuntimeEnvironment) {
+    console.log("Network name: " + hre.network.name);
+    console.log("Network ID: " + hre.network.config.chainId);
+    console.log("Bridge address: " + bridgeAddress);
+
+    const factory = await hre.ethers.getContractFactory("TokenBridge") as TokenBridge__factory;
+    const bridge = factory.attach(bridgeAddress) as TokenBridge;
+
+    let validatorAddress = "";
+    try {
+        validatorAddress = await bridge.validator();
+        console.log("Validator address: " + validatorAddress);
+    } catch (e) {
+        console.log("Bridge contract does not seem to be TokenBridge");
+        exit(1);
+    }
+
+    await inspectManagedValidatorContract(validatorAddress, hre);
+}
 
