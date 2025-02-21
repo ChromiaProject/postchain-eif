@@ -22,6 +22,7 @@ function eif_event_reciever_dynamic_config_message(sender: byte_array, topic: te
 
     when (topic) {
         eif_event_receiver_dynamic_config_topic -> handle_dynamic_config_message(body);
+        eif_event_receiver_dynamic_config_topic_v2 -> handle_dynamic_config_message_v2(body);
         blockchain_rid_topic -> handle_blockchain_rid_message(body);
     }
 }
@@ -45,12 +46,35 @@ function handle_dynamic_config_message(body: gtv) {
     }
 }
 
+function handle_dynamic_config_message_v2(body: gtv) {
+    val configs = map<integer, eif_event_receiver_dynamic_config_message_v2>.from_gtv(body);
+
+    for ((network_id, config) in configs) {
+        for (contract in config.contracts) {
+            if (empty(contract_config @? { network_id, contract.address })) {
+                create contract_config(network_id, contract.address, skip_to_height = contract.skip_to_height);
+            }
+        }
+
+        for (event in config.events) {
+            val encoded_inputs = encode_inputs(event.inputs);
+            if (empty(event_config @? { network_id, .name == event.name, .inputs == encoded_inputs })) {
+                create event_config(network_id, name = event.name, inputs = encoded_inputs);
+            }
+        }
+    }
+}
+
 function handle_blockchain_rid_message(body: gtv) {
 
     val message = blockchain_rid_message.from_gtv(body);
 
     if (message.name == chain_context.args.configuration_chain) {
         receiver_icmf_update_topics(
-            [icmf_receiver_topic(topic = eif_event_receiver_dynamic_config_topic, bc_rid = message.rid)], false);
+            [
+                icmf_receiver_topic(topic = eif_event_receiver_dynamic_config_topic, bc_rid = message.rid),
+                icmf_receiver_topic(topic = eif_event_receiver_dynamic_config_topic_v2, bc_rid = message.rid),
+            ],
+            false);
     }
 }

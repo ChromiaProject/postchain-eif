@@ -70,6 +70,7 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
     // Contracts
     private lateinit var bridge: TokenBridgeWithSnapshotWithdraw
     private lateinit var bridgeAddress: ByteArray
+    private lateinit var bridgeDeployHeight: BigInteger
     private lateinit var testToken: TestToken
 
     private var lastSnapshotBlockHeight = -1L
@@ -92,6 +93,8 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
             initialize(Address(validator.contractAddress), Uint256(2)).send()
         }
         bridgeAddress = bridge.contractAddress.substring(2).hexStringToByteArray()
+        bridgeDeployHeight = web3j.ethGetTransactionByHash(bridge.transactionReceipt.get().transactionHash).send().result.blockNumber
+        logger.info { "Token bridge deployed as ${bridge.contractAddress} at height $bridgeDeployHeight" }
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contract
         testToken = Contract.deployRemoteCall(TestToken::class.java, web3j, transactionManager, gasProvider, testTokenBinary, "").send()
@@ -128,7 +131,7 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
                 .query("eif.api_version", gtv(emptyMap())).get().asInteger()
         logger.info { "EIF API version: $apiVersion" }
 
-        enqueueTx(configureEventReceiverContract(bridgeAddress, bcRid, adminKeyPair))
+        enqueueTx(configureEventReceiverContract(bridgeAddress, bridgeDeployHeight.toLong(), bcRid, adminKeyPair))
         sealBlock()
     }
 

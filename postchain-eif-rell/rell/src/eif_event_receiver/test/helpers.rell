@@ -36,8 +36,8 @@ function event(name: text, height: integer, log_index: integer, nonce: integer, 
     non_indexed_values = non_indexed_values
 );
 
-operation add_contract_config(network_id: integer, contract: byte_array) {
-    create contract_config(network_id, contract);
+operation add_contract_config(network_id: integer, contract: byte_array, skip_to_height: integer) {
+    create contract_config(network_id, contract, skip_to_height);
 }
 
 operation add_event_config(network_id: integer, name: text, inputs: text) {

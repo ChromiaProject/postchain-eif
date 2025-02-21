@@ -8,7 +8,7 @@ entity evm_block {
 }
 
 entity evm_event {
-    index evm_block;
+    evm_block;
     tnx_hash: byte_array;
     log_index: integer;
     event_signature: byte_array;
@@ -16,6 +16,8 @@ entity evm_event {
     name: text = "";
     indexed_values: byte_array;
     non_indexed_values: byte_array;
+
+    index evm_block, contract_address;
 }
 
 struct evm_block_data {

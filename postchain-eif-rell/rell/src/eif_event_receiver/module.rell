@@ -25,16 +25,16 @@ function _evm_block(
     evm_block_hash: byte_array,
     events: list<messaging.event_data>
 ) {
-
-    if (exists(evm_block @? { .network_id == network_id, evm_block_height })) {
-        log("Block %d with RID %s for chain %s already received".format(evm_block_height, evm_block_hash, network_id));
+    var block = evm_block @? { network_id, evm_block_height, evm_block_hash };
+    if (not exists(block)) {
+        block = create evm_block (
+            network_id,
+            evm_block_height,
+            evm_block_hash
+        );
+    } else {
+        log("EVM block at height %d with hash %s for network %s already received".format(evm_block_height, evm_block_hash, network_id));
     }
-
-    val block = create evm_block (
-        network_id,
-        evm_block_height,
-        evm_block_hash
-    );
 
     val relevant_events = list<messaging.event_data>();
     for (event in events) {

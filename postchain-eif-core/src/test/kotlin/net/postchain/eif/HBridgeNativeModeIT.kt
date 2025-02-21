@@ -129,7 +129,7 @@ class HBridgeNativeModeIT : HBridgeBaseIntegrationTest() {
                 .query("eif.api_version", gtv(emptyMap())).get().asInteger()
         logger.info { "EIF API version: $apiVersion" }
 
-        enqueueTx(configureEventReceiverContract(bridgeAddress, bcRid, adminKeyPair))
+        enqueueTx(configureEventReceiverContract(bridgeAddress, 0, bcRid, adminKeyPair))
         sealBlock()
     }
 

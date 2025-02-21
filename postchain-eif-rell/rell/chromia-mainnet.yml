@@ -62,6 +62,8 @@ blockchains:
           local:
             - bc-rid: x"" # Replace with token chain
               topic: "L_eif_event_receiver_dynamic_config"
+            - bc-rid: x"" # Replace with token chain
+              topic: "L_eif_event_receiver_dynamic_config_v2"
     moduleArgs:
       chain_version: *chain_version
       eif_event_receiver_dynamic_icmf_config:

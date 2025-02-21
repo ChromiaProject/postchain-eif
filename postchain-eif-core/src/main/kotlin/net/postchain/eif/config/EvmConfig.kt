@@ -12,7 +12,6 @@ data class EvmConfig(
         val delayWhenNoNewBlocks: Long,
         val maxTryErrors: Long,
         val urls: List<String>,
-        val lastEvmBlockHeight: Long,
         val maxReadAhead: Long
 ) {
     companion object {
@@ -38,7 +37,6 @@ data class EvmConfig(
                     config.getEnvOrLong(EVM_DELAY_WHEN_NO_NEW_BLOCKS, "evm.delayWhenNoNewBlocks", 2_000L),
                     config.getEnvOrLong(EVM_MAX_TRY_ERRORS, "evm.maxTryErrors", 10L),
                     config.getEnvOrListProperty(chainProperty(chain, "URLS"), "$chain.urls", listOf()),
-                    config.getEnvOrLong(chainProperty(chain, "LAST_EVM_BLOCK_HEIGHT"), "$chain.lastEvmBlockHeight", 0),
                     config.getEnvOrLong(chainProperty(chain, "MAX_READ_AHEAD"), "$chain.maxReadAhead", 2_000L)
             )
         }
@@ -53,7 +51,6 @@ data class EvmConfig(
         put(EVM_DELAY_WHEN_NO_NEW_BLOCKS, delayWhenNoNewBlocks.toString())
         put(EVM_MAX_TRY_ERRORS, maxTryErrors.toString())
         put(chainProperty(chain, "URLS"), urls.joinToString(","))
-        put(chainProperty(chain, "LAST_EVM_BLOCK_HEIGHT"), lastEvmBlockHeight.toString())
         put(chainProperty(chain, "MAX_READ_AHEAD"), maxReadAhead.toString())
     }
 }
