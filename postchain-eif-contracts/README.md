@@ -84,7 +84,7 @@ In case directory chain validator contract is not deployed:
 $ yarn deploy:directoryValidator --network sepolia --verify --blockchain-rid {DIRECTORY_CHAIN_RID}
 ```
 
-Then:
+Then (if you already know the blockchain RID of your chain you can supply it with --blockchain-rid flag):
 
 ```sh
 $ yarn deploy:validator --network sepolia --verify --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS}
@@ -131,7 +131,7 @@ $ yarn deploy:native --network sepolia --verify --validator-address {VALIDATOR_C
 ##### Configure token bridge
 
 After deploying bridge chain on Chromia retrieve the blockchain RID of that chain and run (omit --managed-validator if
-you have a manually updated validator contract):
+you have a manually updated validator contract or already set it when deploying the validator contract):
 
 ```sh
 $ yarn setBlockchainRid:bridge --network sepolia --address {BRIDGE_CONTRACT_ADDRESS} --blockchain-rid {BRIDGE_BLOCKCHAIN_RID} --managed-validator {MANAGED_VALIDATOR_CONTRACT_ADDRESS}
