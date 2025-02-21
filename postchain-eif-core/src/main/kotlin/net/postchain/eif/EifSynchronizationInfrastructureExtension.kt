@@ -4,7 +4,6 @@ import mu.KLogging
 import net.postchain.PostchainContext
 import net.postchain.common.BlockchainRid
 import net.postchain.common.exception.UserMistake
-import net.postchain.common.wrap
 import net.postchain.core.BlockchainConfiguration
 import net.postchain.core.BlockchainEngine
 import net.postchain.core.BlockchainProcess
@@ -44,6 +43,9 @@ class EifSynchronizationInfrastructureExtension(
             if (ext is EifSpecialTxExtension) {
                 val eventReceiverConfig = cfg.rawConfig["eif"]?.toObject<EifEventReceiverConfig>()
                         ?: throw UserMistake("No EIF config present")
+
+                if (eventReceiverConfig.numberOfEventsToTriggerBlockBuilding < 0) throw UserMistake("numberOfEventsToTriggerBlockBuilding cannot be negative")
+                if (eventReceiverConfig.maxEventDelay < 0) throw UserMistake("maxEventDelay cannot be negative")
 
                 ext.config = eventReceiverConfig
                 ext.isSigner = process::isSigner
@@ -112,6 +114,10 @@ class EifSynchronizationInfrastructureExtension(
                                          evmBlockchainConfig: EifEvmBlockchainConfig, engine: BlockchainEngine,
                                          evmConfig: EvmConfig, hasLegacyDynamicContracts: Boolean, hasDynamicContacts: Boolean,
                                          hasDynamicEvents: Boolean, hasLastEvmEventHeightQuery: Boolean): Pair<EventProcessor, EventFetcher> {
+        if (evmBlockchainConfig.readOffset < 0) throw UserMistake("readOffset cannot be negative")
+        if (evmBlockchainConfig.evmReadOffset < 0) throw UserMistake("evmReadOffset cannot be negative")
+        if (evmBlockchainConfig.maxQueueSize < 0) throw UserMistake("maxQueueSize cannot be negative")
+
         val eventProcessor = EvmEventProcessor(
                 BigInteger.valueOf(evmBlockchainConfig.readOffset),
                 evmBlockchainConfig.maxQueueSize,
