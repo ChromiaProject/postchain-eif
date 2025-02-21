@@ -14,13 +14,16 @@ import kotlinx.coroutines.slf4j.MDCContext
 import mu.KLogging
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.hexStringToByteArray
-import net.postchain.common.toHex
+import net.postchain.common.types.WrappedByteArray
 import net.postchain.common.wrap
 import net.postchain.concurrent.util.get
 import net.postchain.core.BlockchainEngine
 import net.postchain.eif.EvmEventProcessor.EvmBlock
 import net.postchain.eif.web3j.Web3jRequestHandler
+import net.postchain.gtv.GtvBigInteger
 import net.postchain.gtv.GtvFactory.gtv
+import net.postchain.gtv.GtvInteger
+import net.postchain.gtv.GtvNull
 import org.web3j.abi.EventEncoder
 import org.web3j.abi.datatypes.Event
 import org.web3j.protocol.core.DefaultBlockParameter
@@ -37,23 +40,26 @@ import java.math.BigInteger
  */
 class EvmEventFetcher(
         private val networkId: Long,
-        private val staticContracts: List<String>,
+        private val staticContracts: List<Pair<WrappedByteArray, Long>>,
+        private val hasLegacyDynamicContracts: Boolean,
         private val hasDynamicContacts: Boolean,
         private val staticEvents: List<Event>,
         private val hasDynamicEvents: Boolean,
         private val evmReadOffset: BigInteger,
         private val maxReadAhead: Long,
-        private val skipToHeight: BigInteger,
-        private val lastEvmBlockHeight: BigInteger,
+        private val networkSkipToHeight: Long,
         private val blockchainEngine: BlockchainEngine,
         private val web3jRequestHandler: Web3jRequestHandler,
         private val delayWhenNoNewBlocks: Long,
+        private val hasLastEvmEventHeightQuery: Boolean,
         private val evmEventProcessor: EvmEventProcessor
 ) : EventFetcher {
     companion object : KLogging()
 
     private var job: Job
-    private var hasInitiatedHeights = false
+
+    @Volatile
+    private var previousContracts = setOf<WrappedByteArray>()
 
     init {
         job = launchEventFetching()
@@ -63,15 +69,6 @@ class EvmEventFetcher(
             CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-event-processor") + MDCContext()) {
                 while (isActive) {
                     try {
-                        if (!hasInitiatedHeights) {
-                            evmEventProcessor.lastReadLogBlockHeight = evmEventProcessor.getLastCommittedEvmBlockHeight(networkId)
-                                    ?: getSkipToHeight(skipToHeight)
-                            if (lastEvmBlockHeight > evmEventProcessor.lastReadLogBlockHeight) {
-                                evmEventProcessor.lastReadLogBlockHeight = lastEvmBlockHeight
-                            }
-                            hasInitiatedHeights = true
-                        }
-
                         fetchEvents()
                     } catch (_: CancellationException) {
                         break
@@ -86,6 +83,64 @@ class EvmEventFetcher(
      * Producer thread will read events from ethereum ond add to queue in this action. Main thread will consume them.
      */
     private suspend fun fetchEvents() {
+        val dynamicContracts = (if (hasLegacyDynamicContracts) {
+            try {
+                blockchainEngine.getBlockQueries().query(
+                        EIF_CONFIG_CONTRACTS_QUERY, gtv(mapOf("network_id" to gtv(networkId)))).get().asArray()
+                        .map { it.asByteArray().wrap() to 0L }
+            } catch (e: Exception) {
+                logger.warn(e) { "Unable to fetch legacy dynamic contracts with query $EIF_CONFIG_CONTRACTS_QUERY: $e" }
+                listOf()
+            }
+        } else {
+            listOf()
+        }).union(if (hasDynamicContacts) {
+            try {
+                blockchainEngine.getBlockQueries().query(
+                        EIF_CONFIG_CONTRACTS_TO_FETCH_QUERY, gtv(mapOf("network_id" to gtv(networkId)))).get().asArray()
+                        .map {
+                            it["address"]!!.asByteArray().wrap() to (it["skip_to_height"]?.asInteger() ?: 0L)
+                        }
+            } catch (e: Exception) {
+                logger.warn(e) { "Unable to fetch dynamic contracts with query $EIF_CONFIG_CONTRACTS_TO_FETCH_QUERY: $e" }
+                listOf()
+            }
+        } else {
+            listOf()
+        })
+        val contractsConfig = dynamicContracts.union(staticContracts)
+        val contracts = contractsConfig.mapNotNull { (address, configuredSkipToHeight) ->
+            val skipToHeight = if (configuredSkipToHeight == 0L) networkSkipToHeight else configuredSkipToHeight
+            if (configuredSkipToHeight < 0) {
+                logger.warn { "skip-to-height for contract $address is negative, skipping it" }
+                null
+            } else if (skipToHeight < networkSkipToHeight) {
+                logger.warn { "skip-to-height for contract $address is lower than skip-to-height for EVM network: $networkId, skipping it" }
+                null
+            } else {
+                address to skipToHeight
+            }
+        }
+
+        logger.debug { "Contracts: $contracts" }
+        if (contracts.isEmpty()) {
+            logger.warn { "No contracts configured, trying again later" }
+            delay(delayWhenNoNewBlocks)
+            return
+        }
+
+        val newContracts = contracts.filter { !previousContracts.contains(it.first) }
+        if (newContracts.isNotEmpty()) {
+            val newHeightToReadFrom = newContracts.minOf {
+                getLastCommittedEvmEventHeight(networkId, it.first.data) ?: it.second.toBigInteger()
+            }
+            if (newHeightToReadFrom < evmEventProcessor.lastReadLogBlockHeight || evmEventProcessor.lastReadLogBlockHeight == BigInteger.ZERO) {
+                logger.info { "New contracts detected, reading from height $newHeightToReadFrom" }
+                evmEventProcessor.flushEvents(newHeightToReadFrom)
+            }
+        }
+        previousContracts = contracts.map { it.first }.toSet()
+
         val from = evmEventProcessor.lastReadLogBlockHeight + BigInteger.ONE
 
         val blockNumberReply = web3jRequestHandler.sendWeb3jRequestWithRetry { it.ethBlockNumber() }
@@ -96,26 +151,6 @@ class EvmEventFetcher(
         if (to < from) {
             logger.debug { "No new blocks to read. We are at height: $to" }
             // Sleep a bit until next attempt
-            delay(delayWhenNoNewBlocks)
-            return
-        }
-
-        val contracts = if (hasDynamicContacts) {
-            try {
-                val dynamicContracts = blockchainEngine.getBlockQueries().query(
-                        EIF_CONFIG_CONTRACTS_QUERY, gtv(mapOf("network_id" to gtv(networkId)))).get().asArray()
-                        .map { "0x${it.asByteArray().toHex()}" }
-                staticContracts.union(dynamicContracts)
-            } catch (e: Exception) {
-                logger.warn(e) { "Unable to fetch dynamic contracts: $e" }
-                staticContracts
-            }
-        } else {
-            staticContracts
-        }
-        logger.debug { "Contracts: $contracts" }
-        if (contracts.isEmpty()) {
-            logger.warn { "No contracts configured, trying again later" }
             delay(delayWhenNoNewBlocks)
             return
         }
@@ -142,7 +177,7 @@ class EvmEventFetcher(
         val filter = EthFilter(
                 DefaultBlockParameter.valueOf(from),
                 DefaultBlockParameter.valueOf(to),
-                contracts.toList()
+                contracts.map { "0x${it.first.toHex()}" }.toList()
         )
         filter.addOptionalTopics(*eventMap.keys.toTypedArray())
 
@@ -153,7 +188,17 @@ class EvmEventFetcher(
                 .map { (it as EthLog.LogObject).get() }
                 .groupBy { EvmBlock(it.blockNumber, it.blockHash) }
                 .mapValues { it.value.sortedWith(compareBy({ event -> event.transactionIndex }, { event -> event.logIndex })) }
+                .mapValues {
+                    it.value.filter { event ->
+                        val contractAddress = parseEvmAddress(event.address)
+                        val skipToHeight = getLastCommittedEvmEventHeight(networkId, contractAddress.data)
+                                ?: BigInteger.valueOf(contracts.find { contract -> contract.first == contractAddress }?.second
+                                        ?: networkSkipToHeight)
+                        event.blockNumber >= skipToHeight
+                    }
+                }
                 .toList()
+                .filter { it.second.isNotEmpty() }
                 .sortedBy { it.first.number }
                 .map { eventBlockToOp(eventMap, it) }
         evmEventProcessor.processLogEventsAndUpdateOffsets(sortedEncodedLogs, to)
@@ -191,16 +236,6 @@ class EvmEventFetcher(
         )
     }
 
-    private fun getSkipToHeight(skipToHeight: BigInteger): BigInteger {
-        if (skipToHeight < BigInteger.ZERO) {
-
-            val blockNumberReply = web3jRequestHandler.ethBlockNumber()
-            return blockNumberReply.blockNumber.plus(skipToHeight)
-        }
-
-        return skipToHeight
-    }
-
     override fun flushEvents(resetToHeight: BigInteger) {
         // We first need to stop the ongoing fetching to avoid conflicts
         runBlocking {
@@ -216,4 +251,52 @@ class EvmEventFetcher(
         web3jRequestHandler.close()
     }
 
+    fun getLastCommittedEvmEventHeight(networkId: Long, contractAddress: ByteArray): BigInteger? = if (hasLastEvmEventHeightQuery)
+        getLastCommittedEvmEventHeightQuery(networkId, contractAddress)
+    else
+        getLastCommittedEvmBlockHeightQuery(networkId)
+
+    fun getLastCommittedEvmEventHeightQuery(networkId: Long, contractAddress: ByteArray): BigInteger? {
+        val eventHeight = blockchainEngine.getBlockQueries().query("get_last_evm_event_height",
+                gtv("network_id" to gtv(networkId), "contract_address" to gtv(contractAddress))).get()
+        if (eventHeight == GtvNull) {
+            return null
+        }
+
+        // Trying to be flexible here, don't care what the query gives us as long as it's a number
+        return when (eventHeight) {
+            is GtvBigInteger -> {
+                eventHeight.asBigInteger()
+            }
+
+            is GtvInteger -> {
+                BigInteger.valueOf(eventHeight.asInteger())
+            }
+
+            else -> throw ProgrammerMistake("Unexpected block height type: ${eventHeight.type}")
+        }
+    }
+
+    fun getLastCommittedEvmBlockHeightQuery(networkId: Long): BigInteger? {
+        val block = blockchainEngine.getBlockQueries().query("get_last_evm_block", gtv("network_id" to gtv(networkId))).get()
+        if (block == GtvNull) {
+            return null
+        }
+
+        val blockHeight = block.asDict()["evm_block_height"]
+                ?: throw ProgrammerMistake("Last evm block has no height stored")
+
+        // Trying to be flexible here, don't care what the query gives us as long as it's a number
+        return when (blockHeight) {
+            is GtvBigInteger -> {
+                blockHeight.asBigInteger()
+            }
+
+            is GtvInteger -> {
+                BigInteger.valueOf(blockHeight.asInteger())
+            }
+
+            else -> throw ProgrammerMistake("Unexpected block height type: ${blockHeight.type}")
+        }
+    }
 }

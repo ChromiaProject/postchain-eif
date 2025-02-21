@@ -121,8 +121,8 @@ class HBridgeMultipleBridgesIT : HBridgeBaseIntegrationTest() {
         bridge2.setBlockchainRid(Bytes32(bcRid.data)).send()
 
         // Configure dynamic bridges
-        enqueueTx(configureEventReceiverContract(bridge1Address, bcRid, adminKeyPair))
-        enqueueTx(configureEventReceiverContract(bridge2Address, bcRid, adminKeyPair))
+        enqueueTx(configureEventReceiverContract(bridge1Address, 0, bcRid, adminKeyPair))
+        enqueueTx(configureEventReceiverContract(bridge2Address, 0, bcRid, adminKeyPair))
         sealBlock()
     }
 

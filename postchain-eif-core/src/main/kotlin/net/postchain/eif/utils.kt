@@ -4,6 +4,9 @@ import com.google.common.primitives.Longs
 import net.postchain.base.extension.getMerkleHashVersion
 import net.postchain.base.gtv.BlockHeaderData
 import net.postchain.common.BlockchainRid
+import net.postchain.common.hexStringToByteArray
+import net.postchain.common.types.WrappedByteArray
+import net.postchain.common.wrap
 import net.postchain.core.BlockRid
 import net.postchain.crypto.sha256Digest
 import net.postchain.gtv.GtvFactory.gtv
@@ -101,4 +104,10 @@ fun String.normalizeContractAddress(): String {
         return this.substring(2).uppercase()
     }
     return this.uppercase()
+}
+
+fun parseEvmAddress(address: String): WrappedByteArray = if (address.startsWith("0x", ignoreCase = true)) {
+    address.substring(2).hexStringToByteArray().wrap()
+} else {
+    address.hexStringToByteArray().wrap()
 }

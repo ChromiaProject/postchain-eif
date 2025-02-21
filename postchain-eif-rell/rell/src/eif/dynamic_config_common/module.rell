@@ -1,6 +1,7 @@
 module;
 
 val eif_event_receiver_dynamic_config_topic = "L_eif_event_receiver_dynamic_config";
+val eif_event_receiver_dynamic_config_topic_v2 = "L_eif_event_receiver_dynamic_config_v2";
 
 struct event_def {
     name: text;
@@ -14,5 +15,15 @@ struct event_input {
 
 struct eif_event_receiver_dynamic_config_message {
     contracts: list<byte_array>;
+    events: list<event_def>;
+}
+
+struct contract_to_fetch {
+    address: byte_array;
+    skip_to_height: integer;
+}
+
+struct eif_event_receiver_dynamic_config_message_v2 {
+    contracts: list<contract_to_fetch>;
     events: list<event_def>;
 }

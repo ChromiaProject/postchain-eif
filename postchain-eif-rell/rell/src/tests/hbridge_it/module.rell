@@ -27,10 +27,10 @@ operation register_erc20_asset(
     );
 }
 
-operation add_contract_config(network_id: integer, contract: byte_array) {
+operation add_contract_config(network_id: integer, contract: byte_array, skip_to_height: integer) {
     admin.require_admin();
 
-    create contract_config(network_id, contract);
+    create contract_config(network_id, contract, skip_to_height);
 }
 
 operation register_bridge_with_erc20_assets(network_id: integer, bridge_address: byte_array) {

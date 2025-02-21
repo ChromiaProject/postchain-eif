@@ -12,17 +12,26 @@ EVM Event Receiver blockchain configuration has the following configuration prop
 
 Each entry in `chains` has the following configuration properties:
 
-| Name              | Description                                                                                                                                                                                                                                                                                                                        | Type          | Required           | Default |
-|-------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|--------------------|---------|
-| `network_id`      | EVM network ID                                                                                                                                                                                                                                                                                                                     | int           | :white_check_mark: |         |
-| `contracts`       | List of smart contracts whose events Event Receiver will listen to                                                                                                                                                                                                                                                                 | array<string> | :white_check_mark: |         |
-| `events`          | List of smart contract events that Event Receiver will listen to                                                                                                                                                                                                                                                                   | gtv           | :white_check_mark: |         |
-| `skip_to_height`  | The block number from which the Event Receiver will start querying events (usually equals block height at which the smart contract was deployed). **Development only**: if set to negative it will start at the given number from the latest block number, for example -1000 will start 1000 blocks behind the latest built block. | int           |                    | 0       |
-| `evm_read_offset` | The number of block confirmations required on the EVM network side to be considered final on the Chromia network side. This offset is used to avoid issues caused by potential EVM chain reorganization.                                                                                                                           | int           |                    | 100     |
-| `read_offset`     | The processing delay for blocks that have been read. Enables slower nodes to validate blocks.                                                                                                                                                                                                                                      | int           |                    | 2       |
-| `max_queue_size`  | The size of the internal queue for blocks that have been fetched but not yet processed                                                                                                                                                                                                                                             | int           |                    | 2000    |
+| Name                 | Description                                                                                                                                                                                              | Type          | Required           | Default |
+|----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|--------------------|---------|
+| `network_id`         | EVM network ID                                                                                                                                                                                           | int           | :white_check_mark: |         |
+| `contracts`          | List of smart contracts whose events Event Receiver will listen to. **Deprecated:** use `contracts_to_fetch` instead                                                                                     | array<string> |                    | empty   |
+| `contracts_to_fetch` | List of smart contracts whose events Event Receiver will listen to                                                                                                                                       | array         | :white_check_mark: |         |
+| `events`             | List of smart contract events that Event Receiver will listen to                                                                                                                                         | gtv           | :white_check_mark: |         |
+| `skip_to_height`     | The block number from which the Event Receiver will start querying events. This will be the lower bound for any contract.                                                                                | int           |                    | 0       |
+| `evm_read_offset`    | The number of block confirmations required on the EVM network side to be considered final on the Chromia network side. This offset is used to avoid issues caused by potential EVM chain reorganization. | int           |                    | 100     |
+| `read_offset`        | The processing delay for blocks that have been read. Enables slower nodes to validate blocks.                                                                                                            | int           |                    | 2       |
+| `max_queue_size`     | The size of the internal queue for blocks that have been fetched but not yet processed                                                                                                                   | int           |                    | 2000    |
 
-In addition, the EVM Event Receiver blockchain configuration uses the `EifGTXModule` and `IcmfSenderGTXModule` GTX modules and the `EifSynchronizationInfrastructureExtension` synchronization extension. It also depends on the ICMF rell library.
+Each entry in `contracts_to_fetch` has the following configuration properties:
+
+| Name             | Description                                                                                                                                                                                                                                                                                           | Type   | Required           | Default |
+|------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------|--------------------|---------|
+| `address`        | Contract address                                                                                                                                                                                                                                                                                      | string | :white_check_mark: |         |
+| `skip_to_height` | The block number from which the Event Receiver will start querying events for this contract (usually equals block height at which the smart contract was deployed). Cannot be lower than the `skip_to_height` for the network. If unspecified or zero, `skip_to_height` for the network will be used. | int    |                    | 0       |
+
+
+In addition, the EVM Event Receiver blockchain configuration uses the `EifGTXModule` and `IcmfSenderGTXModule` GTX modules and the `EifSynchronizationInfrastructureExtension` synchronization extension. It also depends on the ICMF Rell library.
 
 Example:
 ```yaml
@@ -36,9 +45,12 @@ blockchains:
         chains:
           sepolia:
             network_id: 11155111
-            contracts:
-              - '0x123456ca780E5E6213C1400D7D2bD206a589ea08'
-            skip_to_height: 5612785
+            contracts_to_fetch:
+              - address: '0x123456ca780E5E6213C1400D7D2bD206a589ea08'
+                skip_to_height: 5612785
+              - address: '0x2Cf48D2891CC286d18596Df1261D011d1B78E03E'
+                skip_to_height: 7745345
+            skip_to_height: 100000
             evm_read_offset: 100
             read_offset: 2
             events: !include events.yaml
@@ -132,7 +144,6 @@ EVM Event Receiver node configuration has the following properties.
 | Name                          | Description                                                                                                                                                                                                                                                                                                                | Type         | Default | Environment Variable                           |
 |-------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|---------|------------------------------------------------|
 | `${chain}.urls`               | CSV list of URLs for connecting to EVM nodes (HTTP URLs or IPC socket paths). Can be set to special value `ignore` to run in disconnected mode for testing purposes.                                                                                                                                                       | list<string> |         | `POSTCHAIN_EIF_${CHAIN}_URLS`                  |
-| `${chain}.lastEvmBlockHeight` | The EVM block height from which the Chromia node will start reading block events. This applies only when this value is higher than the last committed EVM block height on the Chromia node. Typically, this is used when restarting the Chromia node after a long offline period to avoid querying unnecessary EVM blocks. | int          | 0       | `POSTCHAIN_EIF_${CHAIN}_LAST_EVM_BLOCK_HEIGHT` |
 | `${chain}.maxReadAhead`       | The maximum number of blocks per request whose events will be requested ahead of the current block height                                                                                                                                                                                                                  | int          | 2000    | `POSTCHAIN_EIF_${CHAIN}_MAX_READ_AHEAD`        |
 
 

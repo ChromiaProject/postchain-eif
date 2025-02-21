@@ -192,6 +192,7 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
 
     fun configureEventReceiverContract(
             contractAddress: ByteArray,
+            skipToHeight: Long,
             bcRid: BlockchainRid,
             keyPair: KeyPair
     ): ByteArray = GtxBuilder(bcRid, listOf(keyPair.pubKey.data), myCS, merkleHashCalculator)
@@ -199,6 +200,7 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
                     "eif.hbridge.add_contract_config",
                     gtv(networkId),
                     gtv(contractAddress),
+                    gtv(skipToHeight),
             )
             .finish()
             .sign(cryptoSystem.buildSigMaker(keyPair))

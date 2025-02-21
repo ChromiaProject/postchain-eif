@@ -33,7 +33,7 @@ class EifTestSynchronizationInfrastructureExtension(
         val disableStubbing = engine.getConfiguration().rawConfig["eif"]?.get("disable_event_stubbing")?.asBoolean()
                 ?: false
 
-        return if (disableStubbing) EvmEventProcessor(BigInteger.ZERO, 200, engine) else StubEventProcessor()
+        return if (disableStubbing) EvmEventProcessor(BigInteger.ZERO, 200) else StubEventProcessor()
     }
 
     override fun disconnectProcess(process: BlockchainProcess) {}

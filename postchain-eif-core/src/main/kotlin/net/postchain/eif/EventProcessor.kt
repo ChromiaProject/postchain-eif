@@ -82,7 +82,6 @@ class NoOpEventProcessor : EventProcessor {
 class EvmEventProcessor(
         private val readOffset: BigInteger,
         private val maxQueueSize: Long,
-        private val blockchainEngine: BlockchainEngine,
 ) : EventProcessor {
 
     companion object : KLogging()
@@ -146,29 +145,6 @@ class EvmEventProcessor(
     override fun getEventData(): List<EvmBlockOp> = eventBlocks.stream()
             .takeWhile { it.evmBlockHeight <= lastReadLogBlockHeight - readOffset }
             .toList()
-
-    fun getLastCommittedEvmBlockHeight(networkId: Long): BigInteger? {
-        val block = blockchainEngine.getBlockQueries().query("get_last_evm_block", gtv("network_id" to gtv(networkId))).get()
-        if (block == GtvNull) {
-            return null
-        }
-
-        val blockHeight = block.asDict()["evm_block_height"]
-                ?: throw ProgrammerMistake("Last evm block has no height stored")
-
-        // Trying to be flexible here, don't care what the query gives us as long as it's a number
-        return when (blockHeight) {
-            is GtvBigInteger -> {
-                blockHeight.asBigInteger()
-            }
-
-            is GtvInteger -> {
-                BigInteger.valueOf(blockHeight.asInteger())
-            }
-
-            else -> throw ProgrammerMistake("Unexpected block height type: ${blockHeight.type}")
-        }
-    }
 
     @Synchronized
     fun processLogEventsAndUpdateOffsets(

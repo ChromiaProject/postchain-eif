@@ -5,6 +5,7 @@ import assertk.assertions.containsExactly
 import assertk.assertions.isEqualTo
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
+import net.postchain.common.wrap
 import net.postchain.core.BlockchainEngine
 import net.postchain.core.block.BlockQueries
 import net.postchain.eif.contracts.TestToken
@@ -22,6 +23,7 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.generated.Uint256
@@ -61,6 +63,7 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
         // Mock query for last evm block in this test
         val blockQueriesMock: BlockQueries = mock {
             on { query(eq("get_last_evm_block"), any()) } doReturn CompletableFuture.completedFuture(GtvNull)
+            on { query(eq("get_last_evm_event_height"), any()) } doReturn CompletableFuture.completedFuture(GtvNull)
         }
         val engineMock: BlockchainEngine = mock {
             on { getBlockQueries() } doReturn blockQueriesMock
@@ -74,21 +77,21 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
         val evmEventProcessor = EvmEventProcessor(
                 BigInteger.ONE,
                 100L,
-                engineMock,
         )
         val evmEventFetcher = EvmEventFetcher(
                 1L,
-                listOf(bridge.contractAddress),
+                listOf(parseEvmAddress(bridge.contractAddress) to 0),
+                hasLegacyDynamicContracts = false,
                 hasDynamicContacts = false,
                 eventsToRead,
                 hasDynamicEvents = false,
                 BigInteger.ZERO,
                 200L,
-                contractDeployBlockNumber,
-                BigInteger.ZERO,
+                networkSkipToHeight = contractDeployBlockNumber.toLong(),
                 engineMock,
                 Web3jRequestHandler(500, 60_000, 2, mutableListOf(url), web3jServices),
                 500,
+                hasLastEvmEventHeightQuery = true,
                 evmEventProcessor
         )
 
@@ -171,21 +174,35 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
     @Test
     fun `Multiple events can be received from multiple contracts which are statically and dynamically configured`() {
         val networkId = 1L
-        val initialMint = 20L
+        val initialMint = 30L
         // Deploy two token bridge contracts
         val bridgeFirst = deployRemoteCall(TokenBridge::class.java, web3jServices[0], transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
             initialize(validatorContract, Uint256(2)).send()
         }
+        val firstContractDeployBlockNumber = web3jServices[0].ethGetTransactionByHash(bridgeFirst.transactionReceipt.get().transactionHash)
+                .send().result.blockNumber
         val bridgeSecond = deployRemoteCall(TokenBridge::class.java, web3jServices[0], transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
             initialize(validatorContract, Uint256(2)).send()
         }
+        val secondContractDeployBlockNumber = web3jServices[0].ethGetTransactionByHash(bridgeSecond.transactionReceipt.get().transactionHash)
+                .send().result.blockNumber
+        val bridgeThird = deployRemoteCall(TokenBridge::class.java, web3jServices[0], transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
+            initialize(validatorContract, Uint256(2)).send()
+        }
+        val thirdContractDeployBlockNumber = web3jServices[0].ethGetTransactionByHash(bridgeThird.transactionReceipt.get().transactionHash)
+                .send().result.blockNumber
 
         // Mock queries in this test
         val blockQueriesMock: BlockQueries = mock {
             on { query(eq("get_last_evm_block"), any()) } doReturn CompletableFuture.completedFuture(GtvNull)
+            on { query(eq("get_last_evm_event_height"), any()) } doReturn CompletableFuture.completedFuture(GtvNull)
 
-            on { query(eq(EIF_CONFIG_CONTRACTS_QUERY), eq(gtv(mapOf("network_id" to gtv(networkId))))) } doReturn
-                    CompletableFuture.completedFuture(gtv(listOf(gtv(bridgeSecond.contractAddress.substring(2).hexStringToByteArray()))))
+            on { query(eq(EIF_CONFIG_CONTRACTS_TO_FETCH_QUERY), eq(gtv(mapOf("network_id" to gtv(networkId))))) } doReturn
+                    CompletableFuture.completedFuture(gtv(listOf(gtv(
+                            mapOf(
+                                    "address" to gtv(bridgeSecond.contractAddress.substring(2).hexStringToByteArray()),
+                                    "skip_to_height" to gtv(secondContractDeployBlockNumber.toLong()),
+                            )))))
 
             on { query(eq(EIF_CONFIG_EVENTS_QUERY), eq(gtv(mapOf("network_id" to gtv(networkId))))) } doReturn
                     CompletableFuture.completedFuture(gtv(listOf(gtv(mapOf(
@@ -201,28 +218,24 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
             on { getBlockQueries() } doReturn blockQueriesMock
         }
 
-        val contractDeployTransactionHash = bridgeFirst.transactionReceipt.get().transactionHash
-        val contractDeployBlockNumber = web3jServices[0].ethGetTransactionByHash(contractDeployTransactionHash)
-                .send().result.blockNumber
-
         val evmEventProcessor = EvmEventProcessor(
                 BigInteger.ONE,
                 100L,
-                engineMock,
         )
         val evmEventFetcher = EvmEventFetcher(
                 networkId,
-                listOf(bridgeFirst.contractAddress),
+                listOf(parseEvmAddress(bridgeFirst.contractAddress) to firstContractDeployBlockNumber.toLong()),
+                hasLegacyDynamicContracts = false,
                 hasDynamicContacts = true,
                 listOf(TokenBridge.ALLOWTOKEN_EVENT),
                 hasDynamicEvents = true,
                 BigInteger.ZERO,
                 200L,
-                contractDeployBlockNumber,
-                BigInteger.ZERO,
+                networkSkipToHeight = 0L,
                 engineMock,
                 Web3jRequestHandler(500, 60_000, 2, mutableListOf(url), web3jServices), 500,
-                evmEventProcessor
+                hasLastEvmEventHeightQuery = true,
+                evmEventProcessor,
         )
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contracts
@@ -230,15 +243,18 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
             mint(Address(transactionManager.fromAddress), Uint256(BigInteger.valueOf(initialMint))).send()
             approve(Address(bridgeFirst.contractAddress), Uint256(BigInteger.TEN)).send()
             approve(Address(bridgeSecond.contractAddress), Uint256(BigInteger.TEN)).send()
+            approve(Address(bridgeThird.contractAddress), Uint256(BigInteger.TEN)).send()
         }
 
         // Allow token
         bridgeFirst.allowToken(Address(testToken.contractAddress)).send()
         bridgeSecond.allowToken(Address(testToken.contractAddress)).send()
+        bridgeThird.allowToken(Address(testToken.contractAddress)).send()
 
         // Deposit to postchain
         bridgeFirst.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN)).send()
         bridgeSecond.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN)).send()
+        bridgeThird.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN)).send()
 
         // Verify we got both events from the different contracts
         Awaitility.await()
@@ -255,6 +271,37 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
                             bridgeSecond.contractAddress.lowercase() to TokenBridge.ALLOWTOKEN_EVENT.name,
                             bridgeFirst.contractAddress.lowercase() to TokenBridge.DEPOSITEDERC20_EVENT.name,
                             bridgeSecond.contractAddress.lowercase() to TokenBridge.DEPOSITEDERC20_EVENT.name,
+                    )
+                }
+
+        whenever(blockQueriesMock.query(eq(EIF_CONFIG_CONTRACTS_TO_FETCH_QUERY), eq(gtv(mapOf("network_id" to gtv(networkId)))))) doReturn
+                CompletableFuture.completedFuture(gtv(listOf(
+                        gtv(mapOf(
+                                "address" to gtv(bridgeSecond.contractAddress.substring(2).hexStringToByteArray()),
+                                "skip_to_height" to gtv(secondContractDeployBlockNumber.toLong()),
+                        )),
+                        gtv(mapOf(
+                                "address" to gtv(bridgeThird.contractAddress.substring(2).hexStringToByteArray()),
+                                "skip_to_height" to gtv(thirdContractDeployBlockNumber.toLong()),
+                        )))))
+
+        // Verify we got the event from third contract also
+        Awaitility.await()
+                .atMost(Duration.ONE_MINUTE)
+                .untilAsserted {
+                    val eventBlocks = evmEventProcessor.getEventData()
+                    val events = eventBlocks.flatMap { it.events }
+                    assertThat(events.size).isEqualTo(6)
+                    val eventContractAddresses = events.map {
+                        "0x${it[EncodedEvent.CONTRACT.index].asByteArray().toHex()}".lowercase() to it[EncodedEvent.NAME.index].asString()
+                    }
+                    assertThat(eventContractAddresses).containsExactly(
+                            bridgeFirst.contractAddress.lowercase() to TokenBridge.ALLOWTOKEN_EVENT.name,
+                            bridgeSecond.contractAddress.lowercase() to TokenBridge.ALLOWTOKEN_EVENT.name,
+                            bridgeThird.contractAddress.lowercase() to TokenBridge.ALLOWTOKEN_EVENT.name,
+                            bridgeFirst.contractAddress.lowercase() to TokenBridge.DEPOSITEDERC20_EVENT.name,
+                            bridgeSecond.contractAddress.lowercase() to TokenBridge.DEPOSITEDERC20_EVENT.name,
+                            bridgeThird.contractAddress.lowercase() to TokenBridge.DEPOSITEDERC20_EVENT.name,
                     )
                 }
 

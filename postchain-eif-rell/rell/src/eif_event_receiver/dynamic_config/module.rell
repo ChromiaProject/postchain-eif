@@ -5,6 +5,7 @@ import ^^.eif.dynamic_config_common;
 
 entity contract_config {
     key network_id: integer, address: byte_array;
+    skip_to_height: integer = 0;
 }
 
 entity event_config {
@@ -15,11 +16,11 @@ entity event_config {
  * This is called by EIF to fetch smart contracts whose events Event Receiver will listen to.
  * The return value of this query will be merged with any contracts specified in blockchain configuration.
  *
- * @param networkId  EVM network ID
- * @returns  EVM addresses of the smart contracts
+ * @param network_id  EVM network ID
+ * @return EVM addresses of the smart contracts
  */
-query get_contracts(network_id: integer): list<byte_array> =
-    contract_config @* { network_id } (.address);
+query get_contracts_to_fetch(network_id: integer): list<dynamic_config_common.contract_to_fetch> =
+    contract_config @* { network_id } (dynamic_config_common.contract_to_fetch(.address, .skip_to_height));
 
 /**
  * This is called by EIF to fetch the smart contract events Event Receiver will listen to.
