@@ -142,7 +142,7 @@ Note: If you want to inspect the bridge contract, you can use the following comm
 For Chromia token bridge:
 
 ```sh
-$ yarn inspect:chromiabridge --network sepolia --chromia-network {BRIDGE_CONTRACT_ADDRESS}
+$ yarn inspect:chromiabridge --network sepolia --chromia-network {CHROMIA_NETWORK}
 ```
 
 For your token bridge:
