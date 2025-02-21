@@ -28,8 +28,9 @@ task("deploy:directoryValidator", "Deploy directory chain validator contract")
 task("deploy:validator")
     .addOptionalParam("validators", "List of validators, not needed for managed validators")
     .addOptionalParam("directoryValidator", "Contract address of directory chain validator, supply this to use managed validator contract")
+    .addOptionalParam("blockchainRid", "Blockchain RID of the chain connected to the validator, only for managed validators")
     .addFlag('verify', 'Verify contracts at Etherscan')
-    .setAction(async ({ validators, directoryValidator, verify }, hre) => {
+    .setAction(async ({ validators, directoryValidator, blockchainRid, verify }, hre) => {
         let validator;
         if (directoryValidator === undefined) {
             const validatorFactory = await hre.ethers.getContractFactory("Validator") as Validator__factory;
@@ -41,6 +42,11 @@ task("deploy:validator")
         await validator.waitForDeployment();
         const validatorAddress = await validator.getAddress();
         console.log("Validator deployed to: ", validatorAddress);
+
+        if (directoryValidator !== undefined && blockchainRid !== undefined) {
+            console.log("Setting brid for managed validator");
+            console.log(await (validator as ManagedValidator).setBlockchainRid(blockchainRid));
+        }
 
         if (verify) {
             // When redeploy new smart contracts, etherscan can automatically verify the smart contract
@@ -69,7 +75,7 @@ task("inspect:managedValidator", "Inspect ManagedValidator contract")
         if (validatorAddress === undefined) {
             throw new Error("Validator contract address is required");
         }
-        await inspectManagedValidatorContract(validatorAddress, hre);       
+        await inspectManagedValidatorContract(validatorAddress, hre);
     });
 
 export async function inspectManagedValidatorContract(validatorAddress: string, hre: HardhatRuntimeEnvironment) {
@@ -89,7 +95,7 @@ export async function inspectManagedValidatorContract(validatorAddress: string, 
     } else {
         console.log(`Validators (${count}):`);
         console.log(`  No validators`);
-    }       
+    }
 
     // Log directory chain validator
     let directoryValidatorAddress = "";
@@ -136,7 +142,7 @@ task("inspect:directoryValidator", "Inspect DirectoryChainValidator contract")
 
         const directoryValidatorFactory = await hre.ethers.getContractFactory("DirectoryChainValidator") as DirectoryChainValidator__factory;
         const directoryValidator = directoryValidatorFactory.attach(validatorAddress) as DirectoryChainValidator;
-    
+
         // Log directory chain validators
         const directoryValidatorCount = await directoryValidator.getValidatorCount();
         console.log(`Directory Chain validators (${directoryValidatorCount}):`);
@@ -159,7 +165,7 @@ task("inspect:validator", "Inspect Validator contract")
 
         const validatorFactory = await hre.ethers.getContractFactory("Validator") as Validator__factory;
         const validator = validatorFactory.attach(validatorAddress) as Validator;
-    
+
         // Log directory chain validators
         const validatorCount = await validator.getValidatorCount();
         console.log(`Validators (${validatorCount}):`);
