@@ -12,7 +12,6 @@ import net.postchain.crypto.CryptoSystem
 import net.postchain.crypto.KeyPair
 import net.postchain.crypto.SigMaker
 import net.postchain.crypto.Signature
-import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvNull
@@ -23,6 +22,7 @@ import net.postchain.gtx.GTXModule
 import net.postchain.gtx.data.OpData
 import net.postchain.gtx.special.GTXBlockBuildingAffectingSpecialTxExtension
 import java.math.BigInteger
+import java.util.concurrent.atomic.AtomicBoolean
 
 class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialTxExtension {
     companion object : KLogging() {
@@ -46,6 +46,7 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
     private var pollEvmReceipts = false
     private var startupJobsRun = false
     private lateinit var blockQueries: BlockQueries
+    private val hasQueuedTxs = AtomicBoolean(false)
 
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
 
@@ -213,6 +214,12 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
             }
         }
 
+        bctx.addAfterCommitHook {
+            hasQueuedTxs.set(
+                    blockQueries.query(FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT, gtv("exclude_taken_by_key" to gtv(pubKey))).get()
+                            .asArray().isNotEmpty()
+            )
+        }
         return true
     }
 
@@ -502,13 +509,8 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
 
     override fun blockCommitted(blockData: BlockData) {}
 
-    override fun shouldBuildBlock(): Boolean {
-        if (!::blockQueries.isInitialized) return false
-
-        return blockQueries.query(FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT, gtv("exclude_taken_by_key" to gtv(pubKey))).get<Gtv>().asArray().isNotEmpty()
-                ||
-                transactionSubmitters.values.any<TransactionSubmitter> { txSubmitter ->
-                    txSubmitter.getSubmitTxUpdates().isNotEmpty<EvmSubmitTransactionResult>() || txSubmitter.getVerifiedTransactions().isNotEmpty<EvmPendingTx>()
-                }
-    }
+    override fun shouldBuildBlock(): Boolean = hasQueuedTxs.get() ||
+            transactionSubmitters.values.any { txSubmitter ->
+                txSubmitter.getSubmitTxUpdates().isNotEmpty() || txSubmitter.getVerifiedTransactions().isNotEmpty()
+            }
 }
