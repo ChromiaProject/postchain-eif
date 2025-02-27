@@ -5,6 +5,17 @@ pragma solidity 0.8.24;
 import "../Postchain.sol";
 import "../IValidator.sol";
 
+/**
+ * @title Anchoring Contract
+ * @dev This contract enables anchoring of Chromia blockchain blocks to EVM chains.
+ * It stores and validates block headers from a specific Chromia blockchain (identified by systemAnchoringBlockchainRid).
+ * The contract ensures blocks are anchored in sequence and validates signatures using a validator contract.
+ * Key features:
+ * - Stores the latest anchored block height and hash
+ * - Validates block signatures through a validator contract
+ * - Ensures blocks are from the correct chain and in ascending height order
+ * - Emits events when new blocks are anchored
+ */
 contract Anchoring {
     IValidator public validator;
 
