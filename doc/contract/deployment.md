@@ -12,7 +12,7 @@ The [TokenBridgeWithSnapshotWithdraw](./contracts/TokenBridgeWithSnapshotWithdra
 
 The [ChromiaTokenBridge](./contracts/ChromiaTokenBridge.sol) is meant to be used for tokens that are native to Chromia. This contract overrides the deposit/withdraw functions to burn the ERC20 tokens on deposit and mint them on withdraw. This is done since the total available supply of tokens should be handled on the Chromia side, and to enable users to directly withdraw FT4 tokens to EVM without the need for tokens already being held in the contract.
 
-Each version of the bridge contract requires a validator contract to be deployed first. The are three types of validator contracts:
+Each version of the bridge contract requires a validator contract to be deployed first. There are three types of validator contracts:
 
 1. Manually updated validator
 2. Managed validator
@@ -108,14 +108,14 @@ $ yarn setBlockchainRid:bridge --network sepolia --address {BRIDGE_CONTRACT_ADDR
 Run the following tasks to upgrade token bridge smart contract:
 
 ```sh
-yarn prepare:bridge --network sepolia --address {PROXY_ADDRESS}
-yarn upgrade:bridge --network sepolia --verify --address {PROXY_ADDRESS}
+$ yarn prepare:bridge --network sepolia --address {PROXY_ADDRESS}
+$ yarn upgrade:bridge --network sepolia --verify --address {PROXY_ADDRESS}
 ```
 
 To force import the token bridge contract:
 
 ```sh
-yarn import:bridge --network sepolia --address {PROXY_ADDRESS}
+$ yarn import:bridge --network sepolia --address {PROXY_ADDRESS}
 ```
 
 # Deploying anchoring contract
@@ -125,4 +125,3 @@ The anchoring contract is used to anchor blocks from Chromia (system) chains to 
 ```sh
 $ yarn deploy:anchoring --network sepolia --verify --blockchain-rid {SYSTEM_ANCHORING_CHAIN_RID} --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS}
 ```
-
