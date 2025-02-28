@@ -1,4 +1,3 @@
-import { hexlify } from "ethers";
 import { task } from "hardhat/config";
 import {
     Anchoring,
@@ -16,12 +15,12 @@ task("transaction:resubmitSignerUpdate", "Resubmit signer update")
 
         const parameters = resubmission.parameter_values;
         console.log(await validator.updateValidators(
-            hexlify(parameters[0]),
-            hexlify(parameters[1]),
-            (parameters[2] as string[]).map(hex => hexlify(hex)),
-            parameters[3],
-            hexlify(parameters[4]),
-            hexlify(parameters[5]),
+            toHex(parameters[0]),
+            toHex(parameters[1]),
+            (parameters[2] as string[]).map(hex => toHex(hex)),
+            (parameters[3] as string[]).map(hex => toHex(hex)),
+            toHex(parameters[4]),
+            toHex(parameters[5]),
         ));
 
     });
@@ -37,9 +36,13 @@ task("transaction:resubmitAnchoring", "Resubmit anchoring")
 
         const parameters = resubmission.parameter_values;
         console.log(await anchoring.anchorBlock(
-            hexlify(parameters[0]),
-            (parameters[1] as string[]).map(hex => hexlify(hex)),
-            parameters[2],
+            toHex(parameters[0]),
+            (parameters[1] as string[]).map(hex => toHex(hex)),
+            (parameters[2] as string[]).map(hex => toHex(hex)),
         ))
 
     });
+
+function toHex(str: string): string {
+    return str.startsWith("0x") ? str : "0x" + str;
+}
