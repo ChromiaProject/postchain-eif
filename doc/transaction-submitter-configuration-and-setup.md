@@ -225,7 +225,7 @@ Manual admins can reset failed signer updates on system chains.
    query `latest_signer_list_update_txs(blockchain_rid: byte_array)`
 2. Use script to in `postchain-eif-contracts` to resubmit each individual element in the returned query array (use JSON
    query output format):
-   `yarn transaction:resubmitSignerUpdate --network {NETWORK MATCHING ELEMENT IN QUERY RESULT} --data {query_result[index]}`
+   `yarn transaction:resubmitSignerUpdate --network {NETWORK MATCHING ELEMENT IN QUERY RESULT} --data '{query_result.transactions[index]}'`
 3. Reset the failed state by invoking operation `manually_resolve_failed_signer_update(blockchain_rid: byte_array)`
 
 ### Manually resubmit failed anchorings
