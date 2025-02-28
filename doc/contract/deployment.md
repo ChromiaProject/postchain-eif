@@ -1,135 +1,127 @@
-### Deploy token bridge contract to a network (requires mnemonic, infura API and Etherscan API key)
+# Token Bridge Contract Deployment Guide
 
-Create `.env` file by running `cp .env.example .env` and fill in the required environment variables with your own values.
+There are three types of bridge contracts:
 
-```properties
-MNEMONIC="..."
-INFURA_API_KEY="..."
-ETHERSCAN_API_KEY="..."
-```
+1. Standard token bridge
+2. Token bridge with snapshots
+3. Chromia token bridge
 
-There are two versions of the Bridge contract, [TokenBridge](./tasks/deployers/bridge.ts) and [ChromiaTokenBridge](./tasks/deployers/chromiabridge.ts). The TokenBridge contract is the standard bridge contract that handles depositing and withdrawing ERC20 tokens. When tokens are deposited to the TokenBridge, they are held in custody in the contract, and transfered back when the user withdraws the tokens from Chromia back to EVM. The [TokenBridgeWithSnapshotWithdraw](./tasks/deployers/bridgeWithSnapshots.ts) extends the TokenBridge contract by adding support for mass exits using snapshots. This allows users to withdraw their tokens even if the chromia validators become unavailable, by using a snapshot of token balances that was recorded on-chain.
+The standard [TokenBridge](./contracts/TokenBridge.sol) is the most basic bridge contract, and is used for depositing and withdrawing ERC20 tokens. When tokens are deposited to the TokenBridge, they are locked in the contract and minted on the Chromia side. When the user withdraws the tokens from Chromia back to EVM, the tokens are burned on the Chromia side and unlocked / transfered back to the user on the EVM side. 
 
-The ChromiaTokenBridge is meant to be used for tokens that are native to Chromia. This contract overrides the deposit/withdraw functions to burn the ERC20 tokens on deposit and mint them on withdraw. This is done since the total avaliable supply of tokens should be handled on the Chromia side, and to enable users to directly withdraw FT4 tokens to EVM without the need for tokens already being held in the contract.
+The [TokenBridgeWithSnapshotWithdraw](./contracts/TokenBridgeWithSnapshotWithdraw.sol) extends the TokenBridge contract by adding support for mass exits using snapshots. This allows users to withdraw their tokens even if the Chromia validators become unavailable or considered compromised, by using a snapshot of token balances that was recorded on-chain.
 
-#### To deploy the standard token bridge, follow the steps below:
+The [ChromiaTokenBridge](./contracts/ChromiaTokenBridge.sol) is meant to be used for tokens that are native to Chromia. This contract overrides the deposit/withdraw functions to burn the ERC20 tokens on deposit and mint them on withdraw. This is done since the total available supply of tokens should be handled on the Chromia side, and to enable users to directly withdraw FT4 tokens to EVM without the need for tokens already being held in the contract.
 
-##### Deploy validator contract
+Each version of the bridge contract requires a validator contract to be deployed first. There are three types of validator contracts:
 
-With manually updated validator contract:
+1. Manually updated validator
+2. Managed validator
+3. Directory chain validator
+
+The manually updated [Validator](./contracts/Validator.sol) is a validator contract that allows the contract owner to manually update the validator set. It might be used for testing purposes or in cases where the Chromia validator set is fixed and not supposed to change.
+
+The [ManagedValidator](./contracts/validatorupdate/ManagedValidator.sol) is a validator contract that is automatically managed by the Chromia network. More specifically, there is a special system chain called *Transaction Submitter*, which submits transactions to the managed validator contract to update the validator set if the Chromia validators are updated. This type of validator contract should be deployed by dapp developers when building a bridge dapp.
+
+The [DirectoryChainValidator](./contracts/validatorupdate/DirectoryChainValidator.sol) is a managed validator contract intended to track the validator set of the system cluster. It is not supposed to be deployed or upgraded by dapp developers. However, the DirectoryChainValidator is used as an argument when deploying ManagedValidator contracts. The DirectoryChainValidator is fixed for each supported EVM chain and can be shown using the script below.
+
+
+# Deploying Validator Contract
+
+Use the following commands to deploy the validator contracts.
+
+For manually updated validator contract:
 ```sh
-$ yarn deploy:validator --network sepolia --verify --validators 0xCaf200436270A60Cda6543602F2Ea4224E31351d,0x9F4daAfc3F52C1c92e4583413824523679ABc9a3,0x4cBe97487b517b66B43943AD97Ad8394b9DEa7dC
+$ yarn deploy:validator --network sepolia --verify --validators {VALIDATOR_0_ADDRESS},{VALIDATOR_1_ADDRESS},{VALIDATOR_2_ADDRESS}
 ```
 
-With managed validator contract:
-
-In case directory chain validator contract is not deployed:
+Here, `{VALIDATOR_i_ADDRESS}` represents the EVM address (with `0x` prefix) corresponding to the Chromia public key of `node_i`, and can be calculated using the following command:
 
 ```sh
-$ yarn deploy:directoryValidator --network sepolia --verify --blockchain-rid {DIRECTORY_CHAIN_RID}
+$ chr repl -c 'crypto.eth_pubkey_to_address(x"0338BB1915D6DD2E343524CF48CFBD2B53DB2A099D44FAD1D1206F516872754542")'
+x"1B3821093FDCC3EFE225EF0835FE34DABABC60D3"
 ```
 
-Then (if you already know the blockchain RID of your chain you can supply it with --blockchain-rid flag):
+For managed validator contract (if you already know the blockchain RID of your chain you can supply it with --blockchain-rid flag, which should be 0x-prefixed):
 
 ```sh
 $ yarn deploy:validator --network sepolia --verify --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS}
 ```
 
-Note: If you want to inspect the validator contract, you can use the following command:
+For directory chain validator:
 
-For manually updated validators:
 ```sh
+$ yarn deploy:directoryValidator --network sepolia --verify --blockchain-rid {DIRECTORY_CHAIN_RID}
+```
+
+Note: If you want to inspect the validator contract, you can use the following commands:
+
+```sh
+# For manually updated validators
 $ yarn inspect:validator --network sepolia --validator-address {VALIDATOR_CONTRACT_ADDRESS}
-```
-
-For managed validators:
-```sh
+# For managed validators
 $ yarn inspect:managedValidator --network sepolia --validator-address {VALIDATOR_CONTRACT_ADDRESS}
-```
-
-For directory chain validators:
-```sh
+# For directory chain validators
 $ yarn inspect:directoryValidator --network sepolia --validator-address {VALIDATOR_CONTRACT_ADDRESS}
 ```
 
+# Deploying Token Bridge Contract
 
-##### Deploy token bridge contract
+Use the following commands to deploy the token bridge contracts (`VALIDATOR_CONTRACT_ADDRESS` is obtained from the previous step).
 
-To deploy the standard TokenBridge contract (`VALIDATOR_CONTRACT_ADDRESS` is obtained from the previous step):
+For standard `TokenBridge` contract:
 
 ```sh
 $ yarn deploy --network sepolia --verify --validator-address {VALIDATOR_CONTRACT_ADDRESS} --offset 2
 ```
 
-To deploy the TokenBridgeWithSnapshotWithdraw contract:
+For `TokenBridgeWithSnapshotWithdraw` contract:
 
 ```sh
 $ yarn deploy:snapshots --network sepolia --verify --validator-address {VALIDATOR_CONTRACT_ADDRESS} --offset 2
 ```
 
-To deploy the ChromiaTokenBridge contract:
+For `ChromiaTokenBridge` contract:
 
 ```sh
 $ yarn deploy:native --network sepolia --verify --validator-address {VALIDATOR_CONTRACT_ADDRESS} --offset 2
 ```
 
-##### Configure token bridge
+Note: If you want to inspect the bridge contract, you can use the following commands:
 
-After deploying bridge chain on Chromia retrieve the blockchain RID of that chain and run (omit --managed-validator if
-you have a manually updated validator contract or already set it when deploying the validator contract):
+```sh
+# For standard token bridge
+$ yarn inspect:bridge --network sepolia --bridge-address {BRIDGE_CONTRACT_ADDRESS}
+# For Chromia token bridge
+$ yarn inspect:chromiabridge --network sepolia --chromia-network {CHROMIA_NETWORK}
+```
+
+# Configuring token bridge
+
+After deploying bridge chain on Chromia retrieve the blockchain RID of that chain and run the following command (omit `--managed-validator` if you have a manually updated validator contract or already set it when deploying the managed validator contract):
 
 ```sh
 $ yarn setBlockchainRid:bridge --network sepolia --address {BRIDGE_CONTRACT_ADDRESS} --blockchain-rid {BRIDGE_BLOCKCHAIN_RID} --managed-validator {MANAGED_VALIDATOR_CONTRACT_ADDRESS}
 ```
 
-Note: If you want to inspect the bridge contract, you can use the following command:
+# Upgrading token bridge contract
 
-For Chromia token bridge:
-
-```sh
-$ yarn inspect:chromiabridge --network sepolia --chromia-network {CHROMIA_NETWORK}
-```
-
-For your token bridge:
+Run the following tasks to upgrade token bridge smart contract:
 
 ```sh
-$ yarn inspect:bridge --network sepolia --bridge-address {BRIDGE_CONTRACT_ADDRESS}
+$ yarn prepare:bridge --network sepolia --address {PROXY_ADDRESS}
+$ yarn upgrade:bridge --network sepolia --verify --address {PROXY_ADDRESS}
 ```
 
-#### To deploy ALICE token for test
+To force import the token bridge contract:
 
 ```sh
-$ yarn deploy:alice --network sepolia --verify
+$ yarn import:bridge --network sepolia --address {PROXY_ADDRESS}
 ```
 
-#### Deploying anchoring contract
+# Deploying anchoring contract
+
+The anchoring contract is used to anchor blocks from Chromia (system) chains to the EVM chain.
 
 ```sh
 $ yarn deploy:anchoring --network sepolia --verify --blockchain-rid {SYSTEM_ANCHORING_CHAIN_RID} --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS}
 ```
-
-## Upgrade token bridge contracts
-
-### Prepare
-
-Run below task to prepare upgrade token bridge smart contracts
-
-```sh
-yarn prepare:bridge --network sepolia --address PROXY_ADDRESS
-yarn prepare:nft --network sepolia --address PROXY_ADDRESS
-```
-
-### Upgrade
-
-```sh
-yarn upgrade:bridge --network sepolia --verify --address PROXY_ADDRESS
-yarn upgrade:nft --network sepolia --verify --address PROXY_ADDRESS
-```
-
-### Force import
-
-```sh
-yarn import:bridge --network sepolia --address PROXY_ADDRESS
-```
-
-
