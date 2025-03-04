@@ -142,3 +142,30 @@ async function inspectTokenBridgeContract(bridgeAddress: string, hre: HardhatRun
     await inspectManagedValidatorContract(validatorAddress, hre);
 }
 
+task("pause:bridge")
+    .addParam("address", "Bridge contract address")
+    .setAction(async ({address}, hre) => {
+        const factory = await hre.ethers.getContractFactory("TokenBridge") as TokenBridge__factory;
+        const bridge = factory.attach(address) as TokenBridge;
+        const paused = await bridge.paused();
+        if (paused) {
+            console.log("Bridge already paused!");
+        } else {
+            console.log("Pause bridge");
+            console.log(await bridge.pause());
+        }
+    });
+
+task("unpause:bridge")
+    .addParam("address", "Bridge contract address")
+    .setAction(async ({address}, hre) => {
+        const factory = await hre.ethers.getContractFactory("TokenBridge") as TokenBridge__factory;
+        const bridge = factory.attach(address) as TokenBridge;
+        const paused = await bridge.paused();
+        if (paused) {
+            console.log("Unpause bridge");
+            console.log(await bridge.unpause());
+        } else {
+            console.log("Bridge not paused!");
+        }
+    });
