@@ -57,6 +57,8 @@ deficit as some users might have withdrawn their funds already.
 
 > **Note:** To prevent the replaying of withdrawals — whether by events or snapshots — across all bridge contracts within a single EVM network connected to a specific Chromia chain, we recommend deploying only **one ERC20 bridge contract** per EVM network for each Chromia chain. If multiple contracts must be deployed, ensure that the sets of tokens they support **do not overlap**.
 
+> **Note:** For `hbridge_v1` contracts currently deployed on the mainnet, the `triggerMassExit` and `postponeMassExit` functions should not be called. These functions are not relevant for the old contracts, and while they may set a flag, they do not enforce the expected behavior.
+
 ### Emergency withdraw
 
 Users have 90 days to withdraw their funds after mass exit is triggered.
