@@ -212,6 +212,10 @@ query get_state_slot_ids_for_address(recipient_address: byte_array): list<intege
     return state_slot @* { recipient_address } (.id);
 }
 
+query get_recovery_contract(blockchain_rid: byte_array, network_id: integer): byte_array? {
+    return recovery_contract @? { blockchain_rid, network_id } .contract_address;
+}
+
 /**
  * Retrieves a list of bridge contracts associated with the specified EVM network ID,
  * including ERC20 assets associated with each bridge contract.

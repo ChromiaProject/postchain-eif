@@ -178,3 +178,21 @@ operation recall_pending_deposit(sender_address: byte_array) {
         update_deposit_state(deposit, deposit_state.recalled);
     }
 }
+
+operation register_recovery_contract(blockchain_rid: byte_array, network_id: integer, contract_address: byte_array) {
+    require(
+        empty(recovery_contract @? { blockchain_rid }),
+        "Recovery contract for blockchain %s is already registered".format(blockchain_rid)
+    );
+
+    create recovery_contract(blockchain_rid, network_id, contract_address);
+    _link_evm_sc_account(contract_address, network_id, ft4.crosschain.ensure_blockchain_account(blockchain_rid));
+}
+
+operation unregister_recovery_contract(blockchain_rid: byte_array, network_id: integer) {
+    val recovery_contract = recovery_contract @? { blockchain_rid, network_id };
+    if (exists(recovery_contract)) {
+        _unlink_evm_sc_account(recovery_contract.contract_address, network_id, ft4.crosschain.ensure_blockchain_account(blockchain_rid));
+        delete recovery_contract;
+    }
+}

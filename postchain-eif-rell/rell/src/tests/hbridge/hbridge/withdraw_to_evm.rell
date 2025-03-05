@@ -297,7 +297,7 @@ function _register_ft_account_and_link_evm_address(link_evm_account: boolean = t
     val evm_address = crypto.eth_pubkey_to_address(evm_keypair.pub);
 
     // Register FT account
-    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val auth_descriptor = ft4_test.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
     val account_id = rell.test.pubkeys.alice.hash();
     rell.test.tx().op(
         admin.external.register_account(auth_descriptor)

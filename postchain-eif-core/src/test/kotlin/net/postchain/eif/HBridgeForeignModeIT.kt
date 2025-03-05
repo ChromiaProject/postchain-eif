@@ -500,7 +500,6 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
 
     }
 
-
     private fun indexOfSubsequence(data: ByteArray, subsequence: ByteArray): Int {
         if (subsequence.isEmpty() || data.size < subsequence.size) return -1
 

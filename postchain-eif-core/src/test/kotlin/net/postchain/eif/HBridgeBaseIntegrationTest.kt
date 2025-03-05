@@ -270,7 +270,8 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
         )).merkleHash(hashCalculator)
 
         val message = blockQuery.query("ft4.get_auth_message_template",
-                gtv(mapOf("op_name" to opName, "op_args" to opArgs))).get().asString()
+                gtv(mapOf("op_name" to opName, "op_args" to opArgs))
+        ).get().asString()
                 .replace("{blockchain_rid}", bcRid.toHex().uppercase())
                 .replace("{nonce}", nonce.toHex().uppercase())
                 .replace("{account_id}", userAccount.accountId.toHex().uppercase())

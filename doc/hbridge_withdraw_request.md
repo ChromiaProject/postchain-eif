@@ -85,7 +85,7 @@ require(Hash.hashGtvBytes64Leaf(extraProof.leaf) == extraProof.hashedLeaf, "Post
 (uint height, bytes32 blockRid) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof);
 
 // extract eventRoot
-bytes32 eventRoot = _bytesToBytes32(extraProof.leaf, 0);
+bytes32 eventRoot = MerkleProof.bytesToBytes32(extraProof.leaf, 0);
 
 // withdrawals after mass exit block are not considered valid
 if (isMassExit) {

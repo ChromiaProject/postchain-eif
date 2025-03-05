@@ -1,5 +1,5 @@
 function test_deposit_foreign_token_from_evm_when_account_is_registered_and_erc20_token_is_not_registered() {
-    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val auth_descriptor = ft4_test.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
     val account_id = rell.test.pubkeys.alice.hash();
 
     // Register ft4 account
@@ -20,7 +20,7 @@ function test_deposit_foreign_token_from_evm_when_account_is_registered_and_erc2
 }
 
 function test_deposit_foreign_token_from_evm_when_both_account_and_erc20_token_are_not_registered() {
-    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val auth_descriptor = ft4_test.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
     val account_id = rell.test.pubkeys.alice.hash();
 
     // Build the first block
@@ -86,7 +86,7 @@ function test_deposit_native_token_from_evm_eoa_with_already_created_and_linked_
 
 function _deposit_token_from_evm_eoa_with_already_created_and_linked_account(ft_asset: ft4.assets.asset): big_integer {
     // Account
-    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val auth_descriptor = ft4_test.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
     val account_id = rell.test.pubkeys.alice.hash();
     val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
 
@@ -125,7 +125,7 @@ function test_deposit_native_token_from_evm_eoa_is_not_allowed_when_there_is_ins
     val ft_asset = register_native_asset().asset;
 
     // Account
-    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val auth_descriptor = ft4_test.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
     val account_id = rell.test.pubkeys.alice.hash();
     val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
 
@@ -173,7 +173,7 @@ function test_deposit_native_token_from_evm_sc_with_already_created_and_linked_a
 
 function _deposit_token_from_evm_sc_with_already_created_and_linked_account(ft_asset: ft4.assets.asset): big_integer {
     // Account
-    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val auth_descriptor = ft4_test.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
     val account_id = rell.test.pubkeys.alice.hash();
     val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
 
@@ -203,7 +203,7 @@ function test_deposit_native_token_from_evm_sc_is_not_allowed_when_there_is_insu
     val ft_asset = register_native_asset().asset;
 
     // Account
-    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val auth_descriptor = ft4_test.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
     val account_id = rell.test.pubkeys.alice.hash();
     val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
 
@@ -248,7 +248,7 @@ function test_deposit_native_token_from_evm_before_account_creation_deducs_from_
 
 function _deposit_token_from_evm_before_account_creation(ft_asset: ft4.assets.asset): big_integer {
     // Account
-    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val auth_descriptor = ft4_test.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
     val account_id = rell.test.pubkeys.alice.hash();
     val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
 
@@ -317,7 +317,7 @@ function _deposit_token_from_evm_before_account_creation(ft_asset: ft4.assets.as
     );
 
     // Trying to link Alice's EVM account to Bob's FT4 account
-    val auth_descriptor2 = test_utils.create_auth_descriptor(rell.test.pubkeys.bob, ["A", "T"]);
+    val auth_descriptor2 = ft4_test.create_auth_descriptor(rell.test.pubkeys.bob, ["A", "T"]);
     val account_id2 = rell.test.pubkeys.bob.hash();
     rell.test.tx().op(
         admin.external.register_account(auth_descriptor2)
@@ -339,7 +339,7 @@ function test_deposit_native_token_from_evm_before_account_creation_is_not_allow
     val ft_asset = register_native_asset().asset;
 
     // Account
-    val auth_descriptor = test_utils.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val auth_descriptor = ft4_test.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
     val account_id = rell.test.pubkeys.alice.hash();
     val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
 
@@ -359,7 +359,7 @@ function test_deposit_foreign_token_from_evm_will_collect_pending_deposits_when_
     // Account
     val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
     val recipient_id = evm_address.hash();
-    val auth_descriptor = test_utils.create_auth_descriptor(evm_address, ["A", "T"]);
+    val auth_descriptor = ft4_test.create_auth_descriptor(evm_address, ["A", "T"]);
 
     val amount1 = 10000000L;
     val amount2 = 20000000L;
@@ -400,7 +400,7 @@ function test_deposit_foreign_token_from_evm_will_collect_pending_deposits_when_
         op1.to_gtx_operation(),
         op2.to_gtx_operation()
     );
-    val signature = test_utils.evm_sign(message, rell.test.privkeys.eve);
+    val signature = ft4_test.evm_sign(message, rell.test.privkeys.eve);
     rell.test.tx()
         .op(auth.evm_signatures([evm_address], [signature]))
         .op(op1)
@@ -422,10 +422,10 @@ function test_deposit_foreign_token_from_evm_will_collect_pending_deposits_when_
 
     // Explicit account linking will fail
     val op = hbridge.link_evm_eoa_account(evm_address);
-    val message2 = test_utils.create_evm_auth_message(op)
+    val message2 = ft4_test.create_evm_auth_message(op)
         .replace(auth.ACCOUNT_ID_PLACEHOLDER, recipient_id.to_hex().upper_case())
         .replace(auth.AUTH_DESCRIPTOR_ID_PLACEHOLDER, auth_descriptor.hash().to_hex().upper_case());
-    val signature2 = test_utils.evm_sign(message2, rell.test.privkeys.eve);
+    val signature2 = ft4_test.evm_sign(message2, rell.test.privkeys.eve);
     rell.test.tx()
         .op(auth.evm_signatures([evm_address], [signature2]))
         .op(auth.external.evm_auth(recipient_id, auth_descriptor.hash(), [signature2]))

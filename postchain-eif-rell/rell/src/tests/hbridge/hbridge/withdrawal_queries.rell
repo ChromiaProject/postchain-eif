@@ -35,7 +35,7 @@ function test_get_erc20_withdrawals() {
 
     // Asserting that there are no withdrawals
     val res0 = get_erc20_withdrawals(withdrawal_filter(), null, null);
-    assert_equals(res0, utils.null_page());
+    assert_equals(res0, ft4_utils.null_page());
 
     // Withdrawing some to EVM
     withdraw(rell.test.keypairs.alice, alice_account, alice_auth_descriptor, network_id1, chr_asset.id, 100, alice_evm_address);

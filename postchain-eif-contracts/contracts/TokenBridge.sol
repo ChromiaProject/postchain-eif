@@ -18,9 +18,6 @@ import "./IValidator.sol";
 // Note: To enhance the security & decentralization, we should call transferOwnership() to external multi-sig owner after deploy the smart contract
 contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeable, ReentrancyGuardUpgradeable {
 
-    // Merkle hash of GTV String "eif"
-    bytes32 constant EIF_KEY_MERKLE_HASH = 0x1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797;
-
     using Postchain for bytes32;
     using MerkleProof for bytes32[];
     using SafeERC20 for IERC20;
@@ -30,11 +27,11 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     IValidator public validator;
     uint256 public networkId;
     bool public isMassExit;
-    PostchainBlock public massExitBlock;
+    Postchain.PostchainBlock public massExitBlock;
     uint256 public withdrawOffset;
 
-    bytes32 internal blockchainRid; // Postchain/Chromia blockchain RID
-    bool public isBlockchainRidFinalized;  // Flag to track if blockchain RID is finalized
+    bytes32 internal blockchainRid;         // @dev Postchain/Chromia blockchain RID
+    bool public isBlockchainRidFinalized;   // @dev Flag to track if blockchain RID is finalized
 
     // Each postchain event will be used to claim only one time.
     mapping(bytes32 => bool) internal _events;
@@ -54,12 +51,6 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         uint256 block_number;
         uint postchain_height;
         Status status;
-    }
-
-    struct PostchainBlock {
-        uint height;
-        bytes32 blockRid;
-        bytes32 extraDataHashedLeaf;
     }
 
     event Initialize(IValidator indexed _validator, uint256 _withdrawOffset);
@@ -243,8 +234,8 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         require(_events[eventProof.leaf] == false, "TokenBridge: event hash was already used");
 
         require(Hash.hashGtvBytes64Leaf(extraProof.leaf) == extraProof.hashedLeaf, "Postchain: invalid EIF extra data");
-        (uint height, bytes32 blockRid) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof, EIF_KEY_MERKLE_HASH);
-        bytes32 eventRoot = _bytesToBytes32(extraProof.leaf, 0);
+        (uint height, bytes32 blockRid) = Postchain.verifyBlockHeader(blockchainRid, blockHeader, extraProof, Postchain.EIF_KEY_MERKLE_HASH);
+        bytes32 eventRoot = MerkleProof.bytesToBytes32(extraProof.leaf, 0);
         if (!validator.isValidSignatures(blockRid, sigs, signers)) revert("TokenBridge: block signature is invalid");
         if (!MerkleProof.verify(eventProof.merkleProofs, eventProof.leaf, eventProof.position, eventRoot)) revert("TokenBridge: invalid merkle proof");
 
@@ -255,7 +246,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         Withdraw storage wd = _withdraw[hash];
         {
             (IERC20 token, address beneficiary, uint256 amount, uint256 discriminator) = hash.verifyEvent(_event);
-            _verifyDiscriminator(discriminator);
+            Postchain.verifyDiscriminator(networkId, address(this), discriminator);
             require(_allowedToken[token], "TokenBridge: not allow token");
             require(amount > 0, "TokenBridge: invalid amount to make request withdraw");
             wd.token = token;
@@ -302,24 +293,5 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         wd.amount = 0;
         emit DepositedERC20(msg.sender, wd.token, amount, 0x0); // accountID will be determined from sender
         emit WithdrawalToPostchain(_hash);
-    }
-
-    function _bytesToBytes32(bytes memory b, uint offset) internal pure returns (bytes32) {
-        bytes32 out;
-
-        for (uint i = 0; i < 32; i++) {
-            out |= bytes32(b[offset + i] & 0xFF) >> (i * 8);
-        }
-        return out;
-    }
-
-    function _verifyDiscriminator(uint256 discriminator) internal view {
-        uint256 networkDiscriminator = networkId << 160;
-        uint256 networkContractDiscriminator = networkDiscriminator + uint160(address(this));
-
-        bool isValidDiscriminator = (discriminator == networkDiscriminator)
-            || (discriminator == networkContractDiscriminator);
-
-        require(isValidDiscriminator, "TokenBridge: invalid network ID or bridge contract");
     }
 }

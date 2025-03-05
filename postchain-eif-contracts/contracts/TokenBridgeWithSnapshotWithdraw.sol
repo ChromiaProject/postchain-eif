@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.24;
 
+import "./Postchain.sol";
 import "./TokenBridge.sol";
 import {IManagedValidator} from "./validatorupdate/IManagedValidator.sol";
 
@@ -21,27 +22,16 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
     bytes32 constant ERC20_WITHDRAWAL_TAG_V1 = 0x686272696467653a65726332305f77697468647261773a763101010101010101;
 
     bytes32 public massExitStateRoot;
-
-    struct ERC20StateHeader {
-        bytes32 tag;
-        address beneficiary;
-        uint256 discriminator;
-    }
-
-    struct ERC20BalanceRecord {
-        IERC20 token;
-        uint amount;
-    }
-
-    // Each account state snapshot will be used to claim only one time.
+    // @dev each account state snapshot will be used to claim only one time.
     mapping(bytes32 => bool) internal _snapshots;
 
+    // Events
     event WithdrawalBySnapshot(address indexed beneficiary);
 
     // Check that state header has correct discriminator and tag
-    function requireERC20StateHeader(ERC20StateHeader memory header, bytes32 expectedTag) internal view {
+    function requireERC20StateHeader(Postchain.ERC20StateHeader memory header, bytes32 expectedTag) internal view {
         require(header.tag == expectedTag, "TokenBridge: invalid snapshot tag");
-        _verifyDiscriminator(header.discriminator);
+        Postchain.verifyDiscriminator(networkId, address(this), header.discriminator);
     }
 
     /**
@@ -67,7 +57,7 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
         if (!MerkleProof.verify(stateProof.merkleProofs, stateProof.leaf, stateProof.position, stateRoot))
             revert("TokenBridge: invalid merkle proof");
 
-        ERC20StateHeader memory header = abi.decode(_stateRecord[: ERC20_STATE_HEADER_BYTE_SIZE], (ERC20StateHeader));
+        Postchain.ERC20StateHeader memory header = abi.decode(_stateRecord[: ERC20_STATE_HEADER_BYTE_SIZE], (Postchain.ERC20StateHeader));
         requireERC20StateHeader(header, ERC20_WITHDRAWAL_TAG_V1);
 
         address beneficiary = header.beneficiary;
@@ -89,7 +79,7 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
 
         if (!withdrawalRequestProcessed) {
             // here we essentially replicate the logic of _updateWithdraw which is triggered by withdrawRequest
-            _verifyDiscriminator(discriminator);
+            Postchain.verifyDiscriminator(networkId, address(this), discriminator);
             require(_allowedToken[token], "TokenBridge: not allow token");
             require(amount > 0, "TokenBridge: invalid amount to make request withdraw");
             // We don't need to fill the record with real data, just mark it as withdrawn
@@ -124,7 +114,7 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
         if (!MerkleProof.verify(stateProof.merkleProofs, stateProof.leaf, stateProof.position, stateRoot))
             revert("TokenBridge: invalid merkle proof");
 
-        ERC20StateHeader memory header = abi.decode(snapshot[: ERC20_STATE_HEADER_BYTE_SIZE], (ERC20StateHeader));
+        Postchain.ERC20StateHeader memory header = abi.decode(snapshot[: ERC20_STATE_HEADER_BYTE_SIZE], (Postchain.ERC20StateHeader));
         requireERC20StateHeader(header, ERC20_STATE_TAG_V1);
 
         address beneficiary = header.beneficiary;
@@ -134,9 +124,9 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
         _snapshots[stateProof.leaf] = true;
 
         for (uint i = offset; i < endOffset; i += ERC20_BALANCE_RECORD_BYTE_SIZE) {
-            ERC20BalanceRecord memory balanceRecord = abi.decode(
+            Postchain.ERC20BalanceRecord memory balanceRecord = abi.decode(
                 snapshot[i : i + ERC20_BALANCE_RECORD_BYTE_SIZE],
-                (ERC20BalanceRecord)
+                (Postchain.ERC20BalanceRecord)
             );
             if (balanceRecord.amount > 0 && _allowedToken[balanceRecord.token]) {
                 transferWithdraw(balanceRecord.token, beneficiary, balanceRecord.amount);
@@ -183,17 +173,17 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
         if (!MerkleProof.verifySHA256(extraProof.extraMerkleProofs, extraProof.hashedLeaf, extraProof.position, extraProof.extraRoot)) {
             revert("Postchain: invalid extra merkle proof");
         }
-        if (extraProof.extraMerkleProofs[0] != EIF_KEY_MERKLE_HASH) {
+        if (extraProof.extraMerkleProofs[0] != Postchain.EIF_KEY_MERKLE_HASH) {
             revert("Postchain: proof does not originate from EIF");
         }
 
-        massExitStateRoot = _bytesToBytes32(extraProof.leaf, 32);
+        massExitStateRoot = MerkleProof.bytesToBytes32(extraProof.leaf, 32);
 
         isMassExit = true;
         if (paused()) {
             _unpause();
         }
-        massExitBlock = PostchainBlock(header.height, header.blockRid, header.extraDataHashedLeaf);
+        massExitBlock = Postchain.PostchainBlock(header.height, header.blockRid, header.extraDataHashedLeaf);
         emergencyTimestamp = block.timestamp + EMERGENCY_DURATION;
         emit TriggerMassExit(header.height, header.blockRid);
     }

@@ -238,7 +238,7 @@ class HBridgeMultipleBridgesIT : HBridgeBaseIntegrationTest() {
                     eventProof1.web3ExtraProofData()
             ).send()
         }
-        assertThat(exception.message!!).contains("TokenBridge: invalid network ID or bridge contract")
+        assertThat(exception.message!!).contains("Postchain: Invalid discriminator. Please verify the network ID and bridge contract.")
         buildEvmBlocks()
 
         // Verifying that the withdrawal is still completed

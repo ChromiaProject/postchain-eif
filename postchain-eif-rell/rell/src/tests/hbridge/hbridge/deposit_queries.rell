@@ -25,7 +25,7 @@ function test_get_erc20_deposits() {
         deposit_filter(network_id = network_id1, token_address = CHR.token_address, recipient_id = alice_evm_deposit_recipient_id),
         null, null
     );
-    assert_equals(res1, utils.null_page());
+    assert_equals(res1, ft4_utils.null_page());
 
     // Alice is making a deposit
     val amount = 10000000L;
@@ -33,11 +33,11 @@ function test_get_erc20_deposits() {
     // Asserting that there are no deposits in `completed` or `recalled` states
     assert_equals(
         get_erc20_deposits(deposit_filter(state = deposit_state.completed), null, null),
-        utils.null_page()
+        ft4_utils.null_page()
     );
     assert_equals(
         get_erc20_deposits(deposit_filter(state = deposit_state.recalled), null, null),
-        utils.null_page()
+        ft4_utils.null_page()
     );
     // Asserting that the new pending deposit added in a `pending` state
     val res2 = get_erc20_deposits(deposit_filter(
@@ -97,11 +97,11 @@ function test_get_erc20_deposits() {
     // Asserting that there are no deposits in `pending` or `recalled` states
     assert_equals(
         get_erc20_deposits(deposit_filter(state = deposit_state.pending), null, null),
-        utils.null_page()
+        ft4_utils.null_page()
     );
     assert_equals(
         get_erc20_deposits(deposit_filter(state = deposit_state.recalled), null, null),
-        utils.null_page()
+        ft4_utils.null_page()
     );
 
     // Asserting that the deposit is completed

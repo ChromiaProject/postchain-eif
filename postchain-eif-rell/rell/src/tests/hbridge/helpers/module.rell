@@ -37,3 +37,31 @@ operation get_or_create_bridge_op(
 operation create_bridge_account_op(blockchain_rid: byte_array) {
     hbridge.ensure_bridge_account(blockchain_rid);
 }
+
+// ICCF proof mock operation to use in cross-chain tests
+operation iccf_proof(
+    blockchain_rid: byte_array,
+    tx_hash: byte_array,
+    tx_proof: byte_array,
+    tx_data: byte_array,
+    tx_index: integer,
+    anchoring_proof: byte_array
+) {}
+
+// NOTE: Non-camel case is necessary to decode properly
+struct confirmation_proof {
+    hash: byte_array;
+    blockHeader: byte_array;
+    witness: byte_array;
+    merkleProofTree: list<gtv>;
+    txIndex: integer;
+}
+
+function mock_confirmation_proof_bytes() = confirmation_proof(
+    hash = x"",
+    blockHeader = x"",
+    witness = x"",
+    merkleProofTree = list<gtv>(),
+    txIndex = 0
+).to_gtv_pretty().to_bytes();
+

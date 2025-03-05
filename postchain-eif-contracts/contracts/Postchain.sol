@@ -10,6 +10,10 @@ import "./utils/cryptography/MerkleProof.sol";
 import "./Data.sol";
 
 library Postchain {
+
+    // Merkle hash of GTV String "eif"
+    bytes32 constant EIF_KEY_MERKLE_HASH = 0x1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797;
+
     using MerkleProof for bytes32[];
 
     struct Event {
@@ -29,6 +33,23 @@ library Postchain {
         uint height;
         bytes32 dependenciesHashedLeaf;
         bytes32 extraDataHashedLeaf;
+    }
+
+    struct PostchainBlock {
+        uint height;
+        bytes32 blockRid;
+        bytes32 extraDataHashedLeaf;
+    }
+
+    struct ERC20StateHeader {
+        bytes32 tag;
+        address beneficiary;
+        uint256 discriminator;
+    }
+
+    struct ERC20BalanceRecord {
+        IERC20 token;
+        uint amount;
     }
 
     function verifyEvent(bytes32 _hash, bytes memory _event) internal pure returns (IERC20, address, uint256, uint256) {
@@ -57,7 +78,6 @@ library Postchain {
         }
         return (header.height, header.blockRid);
     }
-
 
     function decodeBlockHeader(
         bytes memory blockHeader
@@ -96,4 +116,13 @@ library Postchain {
         return header;
     }
 
+    function verifyDiscriminator(uint256 networkId, address contractAddress, uint256 discriminator) internal pure {
+        uint256 networkDiscriminator = networkId << 160;
+        uint256 networkContractDiscriminator = networkDiscriminator + uint160(contractAddress);
+
+        bool isValid = (discriminator == networkDiscriminator)
+            || (discriminator == networkContractDiscriminator);
+
+        require(isValid, "Postchain: Invalid discriminator. Please verify the network ID and bridge contract.");
+    }
 }

@@ -91,6 +91,14 @@ function _link_evm_sc_account(address: byte_array, network_id: integer, account:
     after_evm_account_linked(address, account, network_id, true);
 }
 
+function _unlink_evm_sc_account(address: byte_array, network_id: integer, account: ft4.accounts.account) {
+    val link = require(
+        evm_sc_account_link @? { address, network_id, account },
+        "EVM address %s on EVM chain ID %d is not linked to FT4 account %s".format(address, network_id, account.id)
+    );
+    delete link;
+}
+
 // function which deducts balance from the account in a smart way:
 //  * burn when bridge is in foreign mode
 //  * transfer to pool account when bridge is in native mode
