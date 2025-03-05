@@ -1,0 +1,224 @@
+/**
+ * Test flows:
+ *  1. Alice initiates the transfer of 300 CHR to Bob but then cancels it at the final step: Token Chain <--> Hub Chain <-- Island 1 Chain
+ *
+ *  Token Chain
+ *      │
+ *      ▼
+ *  Hub Chain
+ *      │
+ *      ├───────► Island 1 Chain
+ *      │
+ *      └───────► Island 2 Chain
+ */
+
+
+// test_multi_hop_cross_xfer__state_slots_emitted_on_apply_transfer_to_destination_chain
+function test_multi_hop_cross_xfer__state_slots_emitted_on_cancel_transfer_to_destination_chain() {
+    // create accounts
+    val alice = create_and_link_account(rell.test.keypairs.alice, rell.test.keypairs.eve);
+    val bob = create_and_link_account(rell.test.keypairs.bob, rell.test.keypairs.dave);
+
+    // create a crosschain asset issued on the token_chain, and register erc20 asset
+    val chr_asset = register_crosschain_asset(CHR, issuing_blockchain_rid = token_chain_rid, origin_blockchain_rid = hub_chain_rid).asset;
+    register_erc20_asset(chr_asset, CHR, network_id1, enable_snapshots = true, bridge_mode = hbridge.bridge_mode.foreign);
+
+    // build init tx
+    val init_tx = _build_init_tx(
+        token_chain_rid, alice.account.id, alice.auth_descriptor_id, bob.account.id,
+        chr_asset.id, 300L,
+        // do not delete this commented code, it cannot be uncommented due to limitations in the Rell Test Framework
+        [hub_chain_rid, chain_context.blockchain_rid /*island1_chain_rid*/],
+        alice.keypair.pub,
+        deadline = rell.test.DEFAULT_FIRST_BLOCK_TIME + rell.test.DEFAULT_BLOCK_INTERVAL * 2
+    );
+
+    // build apply tx
+    val apply_on_hub_tx = _build_apply_tx(
+        hub_chain_rid, init_tx, init_tx, token_chain_rid, alice.keypair.pub
+    );
+
+    // cancel transfer on the island1_chain
+    rell.test.tx()
+        .op(helpers.iccf_proof(hub_chain_rid, apply_on_hub_tx.to_gtv().hash(), helpers.mock_confirmation_proof_bytes(), x"", 0, x""))
+        .op(crosschain.external.cancel_transfer(init_tx, 1, apply_on_hub_tx, 1, 1))
+        .nop()
+        .run();
+
+    // no slots created, no events emitted
+    assert_true(empty(state_slot @* {}));
+    assert_true(rell.test.get_events().empty());
+}
+
+// test_multi_hop_cross_xfer__state_slots_emitted_on_apply_transfer_to_intermediate_chain
+function test_multi_hop_cross_xfer__state_slots_emitted_on_unapply_transfer_to_intermediate_chain() {
+    // the intermediate hub_chain does not have accounts for alice and bob
+    val (alice_account_id, alice_auth_descriptor_id) = get_account_id_and_auth_descriptor_id(rell.test.keypairs.alice);
+    val (bob_account_id, bob_auth_descriptor_id) = get_account_id_and_auth_descriptor_id(rell.test.keypairs.bob);
+
+    // create a crosschain asset issued on the token_chain, and register erc20 asset
+    val chr_asset = register_crosschain_asset(CHR, issuing_blockchain_rid = token_chain_rid, origin_blockchain_rid = token_chain_rid).asset;
+    register_erc20_asset(chr_asset, CHR, network_id1, enable_snapshots = true, bridge_mode = hbridge.bridge_mode.foreign);
+
+    // register recovery contract for the island1_chain
+    rell.test.tx()
+        .op(register_recovery_contract(island1_chain_rid, network_id1, island1_chain_recovery_contract))
+        .run();
+
+    // to get the needed state we repeat steps from the `test_multi_hop_cross_xfer__state_slots_emitted_on_apply_transfer_to_intermediate_chain`
+    val deadline = rell.test.DEFAULT_FIRST_BLOCK_TIME + rell.test.DEFAULT_BLOCK_INTERVAL * 2;
+    _apply_transfer_of_300_chr_on_hub_chain(alice_account_id, alice_auth_descriptor_id, bob_account_id, chr_asset, deadline);
+
+    // unapply transfer on the hub_chain
+    // build init tx
+    val init_tx = _build_init_tx(
+        token_chain_rid, alice_account_id, alice_auth_descriptor_id, bob_account_id,
+        chr_asset.id, 300L,
+        // do not delete this commented code, it cannot be uncommented due to limitations in the Rell Test Framework
+        [chain_context.blockchain_rid /*hub_chain_rid*/, island1_chain_rid],
+        rell.test.keypairs.alice.pub,
+        deadline
+    );
+    // build apply tx
+    val apply_on_hub_tx = _build_apply_tx(
+        chain_context.blockchain_rid /*hub_chain_rid*/, init_tx, init_tx, token_chain_rid, rell.test.keypairs.alice.pub, false
+    );
+
+    // build cancel tx
+    val cancel_tx = _build_cancel_tx(island1_chain_rid, init_tx, hub_chain_rid, apply_on_hub_tx);
+
+    // unapply transfer
+    rell.test.tx()
+        .op(helpers.iccf_proof(island1_chain_rid, cancel_tx.to_gtv().hash(), helpers.mock_confirmation_proof_bytes(), x"", 0, x""))
+        .op(crosschain.external.unapply_transfer(init_tx, 1, cancel_tx, 1, 0))
+        .nop()
+        .run();
+
+    // verify account balances
+    assert_equals(assets.get_asset_balance(crosschain.ensure_blockchain_account(token_chain_rid), chr_asset), 0L);
+    // FT4 lib tracks the balance of the destination island1_chain
+    assert_equals(assets.get_asset_balance(crosschain.ensure_blockchain_account(island1_chain_rid), chr_asset), 0L);
+
+    // verify the island1_chain account state slot
+    val island1_slots = state_slot @* { .network_id == network_id1, .recipient_address == island1_chain_recovery_contract, state_slot_type.erc20 };
+    assert_equals(island1_slots.size(), 1);
+    // there are no other slots
+    assert_true(empty(state_slot @* { .recipient_address != island1_chain_recovery_contract }));
+
+    // verify eif states
+    assert_events(
+        // island1_slots account state
+        ("eif_state", [
+            island1_slots[0].id.to_gtv(),
+            [
+                ERC20_STATE_TAG.to_gtv(),
+                utils.evm_address_to_32_byte_array(island1_chain_recovery_contract).to_gtv(),
+                island1_slots[0].discriminator.to_gtv(),
+                utils.evm_address_to_32_byte_array(CHR.token_address).to_gtv(),
+                (0L).to_gtv()
+            ].to_gtv()
+        ].to_gtv()),
+    );
+}
+
+// test_multi_hop_cross_xfer__state_slots_emitted_on_init_transfer_to_origin_chain
+function test_multi_hop_cross_xfer__state_slots_emitted_on_revert_transfer_to_origin_chain() {
+    // create accounts
+    val alice = create_and_link_account(rell.test.keypairs.alice, rell.test.keypairs.eve);
+    val bob = create_and_link_account(rell.test.keypairs.bob, rell.test.keypairs.dave);
+
+    // create an asset
+    val chr_asset = register_foreign_asset(CHR, network_id1);
+
+    // deposit tokens from evm
+    deposit_from_evm(alice.evm_address, 1000, asset = CHR, network_id = network_id1);
+
+    // register recovery contracts for the hub_chain and the island1_chain
+    rell.test.tx()
+        .op(register_recovery_contract(hub_chain_rid, network_id1, hub_chain_recovery_contract))
+        .run();
+
+    // repeat init step from the test `test_multi_hop_cross_xfer__state_slots_emitted_on_init_transfer_to_origin_chain`
+    val deadline = rell.test.DEFAULT_FIRST_BLOCK_TIME + rell.test.DEFAULT_BLOCK_INTERVAL * 7 + 1;
+    rell.test.tx()
+        .op(auth.external.ft_auth(alice.account.id, alice.auth_descriptor_id))
+        .op(crosschain.external.init_transfer(bob.account.id, chr_asset.id, 300L, [hub_chain_rid, island1_chain_rid], deadline))
+        .sign(alice.keypair)
+        .run();
+    // verify alice balance
+    assert_equals(assets.get_asset_balance(alice.account, chr_asset), 700L);
+
+    // revert transfer on the token_chain
+    // retrieve the signed init tx
+    val init_tx = gtx_transaction.from_bytes(transaction @ {} (@omit @sort_desc .rowid, .tx_data) limit 1);
+
+    // build apply tx
+    val apply_on_hub_tx = _build_apply_tx(
+        hub_chain_rid, init_tx, init_tx, token_chain_rid, rell.test.keypairs.alice.pub, false
+    );
+
+    // build cancel tx
+    val cancel_tx = _build_cancel_tx(island1_chain_rid, init_tx, hub_chain_rid, apply_on_hub_tx);
+
+    // build unapply tx
+    val unapply_tx = gtx_transaction(
+        body = gtx_transaction_body(
+            blockchain_rid = hub_chain_rid,
+            operations = [
+                helpers.iccf_proof(
+                    island1_chain_rid, cancel_tx.to_gtv().hash(), helpers.mock_confirmation_proof_bytes(), x"", 0, x""
+                ).to_gtx_operation(),
+                crosschain.external.unapply_transfer(
+                    init_tx, 1, cancel_tx, 1, 0
+                ).to_gtx_operation(),
+            ],
+            signers = [rell.test.keypairs.alice.pub.to_gtv()]
+        ),
+        signatures = []
+    );
+
+    // revert transfer
+    rell.test.tx()
+        .op(helpers.iccf_proof(hub_chain_rid, unapply_tx.to_gtv().hash(), helpers.mock_confirmation_proof_bytes(), x"", 0, x""))
+        .op(crosschain.external.revert_transfer(init_tx, 1, unapply_tx, 1))
+        .nop()
+        .run();
+
+    // verify alice balance
+    assert_equals(assets.get_asset_balance(alice.account, chr_asset), 1000L);
+
+    // verify alice account state slot balance
+    val alice_slots = state_slot @* { .network_id == network_id1, .recipient_address == alice.evm_address, state_slot_type.erc20 };
+    assert_equals(alice_slots.size(), 1);
+    // verify the hub_chain account state slot
+    val hub_slots = state_slot @* { .network_id == network_id1, .recipient_address == hub_chain_recovery_contract, state_slot_type.erc20 };
+    assert_equals(hub_slots.size(), 1);
+    // there are no other slots
+    assert_equals((state_slot @* {}).size(), 2);
+
+    // verify eif states
+    assert_events(
+        // hub_chain account state
+        ("eif_state", [
+            hub_slots[0].id.to_gtv(),
+            [
+                ERC20_STATE_TAG.to_gtv(),
+                utils.evm_address_to_32_byte_array(hub_chain_recovery_contract).to_gtv(),
+                hub_slots[0].discriminator.to_gtv(),
+                utils.evm_address_to_32_byte_array(CHR.token_address).to_gtv(),
+                (0L).to_gtv()
+            ].to_gtv()
+        ].to_gtv()),
+        // alice account state
+        ("eif_state", [
+            alice_slots[0].id.to_gtv(),
+            [
+                ERC20_STATE_TAG.to_gtv(),
+                utils.evm_address_to_32_byte_array(alice.evm_address).to_gtv(),
+                alice_slots[0].discriminator.to_gtv(),
+                utils.evm_address_to_32_byte_array(CHR.token_address).to_gtv(),
+                (1000L).to_gtv()
+            ].to_gtv()
+        ].to_gtv()),
+    );
+}

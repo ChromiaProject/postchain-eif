@@ -1,0 +1,82 @@
+// Constants
+
+val token_chain_rid = x"aa".repeat(32);
+val hub_chain_rid = x"bb".repeat(32);
+val island1_chain_rid = x"cc".repeat(32);
+val island2_chain_rid = x"dd".repeat(32);
+
+val hub_chain_recovery_contract = x"01".repeat(20);
+val island1_chain_recovery_contract = x"02".repeat(20);
+val island2_chain_recovery_contract = x"03".repeat(20);
+
+function _build_init_tx(
+    sender_blockchain_rid: byte_array,
+    sender_account_id: byte_array,
+    sender_auth_descriptor_id: byte_array,
+    recipient_id: byte_array,
+    asset_id: byte_array,
+    amount: big_integer,
+    hops: list<byte_array>,
+    signer_pub_key: byte_array,
+    deadline: integer = integer.MAX_VALUE
+) = gtx_transaction(
+    body = gtx_transaction_body(
+        blockchain_rid = sender_blockchain_rid,
+        operations = [
+            auth.external.ft_auth(sender_account_id, sender_auth_descriptor_id).to_gtx_operation(),
+            crosschain.external.init_transfer(
+                recipient_id = recipient_id,
+                asset_id = asset_id,
+                amount = amount,
+                hops = hops,
+                deadline = deadline
+            ).to_gtx_operation()
+        ],
+        signers = [signer_pub_key.to_gtv()]
+    ),
+    signatures = []
+);
+
+function _build_apply_tx(
+    prev_hop_brid: byte_array,
+    init_tx: gtx_transaction,
+    prev_hop_apply_tx: gtx_transaction,
+    prev_hop_apply_tx_brid: byte_array,
+    signer_pub_key: byte_array,
+    signers: boolean = true
+) = gtx_transaction(
+    body = gtx_transaction_body(
+        blockchain_rid = prev_hop_brid,
+        operations = [
+            helpers.iccf_proof(
+                prev_hop_apply_tx_brid, prev_hop_apply_tx.to_gtv().hash(), helpers.mock_confirmation_proof_bytes(), x"", 0, x""
+            ).to_gtx_operation(),
+            crosschain.external.apply_transfer(
+                init_tx, 1, prev_hop_apply_tx, 1, 0
+            ).to_gtx_operation(),
+        ],
+        signers = if (signers) [signer_pub_key.to_gtv()] else []
+    ),
+    signatures = []
+);
+
+function _build_cancel_tx(
+    blockchain_rid: byte_array,
+    init_tx: gtx_transaction,
+    prev_hop_brid: byte_array,
+    prev_hop_apply_tx: gtx_transaction,
+) = gtx_transaction(
+    body = gtx_transaction_body(
+        blockchain_rid = blockchain_rid,
+        operations = [
+            helpers.iccf_proof(
+                prev_hop_brid, prev_hop_apply_tx.to_gtv().hash(), helpers.mock_confirmation_proof_bytes(), x"", 0, x""
+            ).to_gtx_operation(),
+            crosschain.external.cancel_transfer(
+                init_tx, 1, prev_hop_apply_tx, 1, 1
+            ).to_gtx_operation(),
+        ],
+        signers = [rell.test.keypairs.alice.pub.to_gtv()]
+    ),
+    signatures = []
+);

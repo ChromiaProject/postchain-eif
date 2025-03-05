@@ -446,11 +446,11 @@ describe("Token Bridge Test", () => {
 
             await expect(bridge.withdrawRequest(
                 wrongNetworkIdData, wrongNetworkIdEventProof, wrongNetworkIdBlockHeader, wrongNetworkIdSigs, validators, wrongNetworkIdExtraProof
-            )).to.rejectedWith('TokenBridge: invalid network ID or bridge contract');
+            )).to.rejectedWith('Postchain: Invalid discriminator. Please verify the network ID and bridge contract.');
 
             await expect(bridge.withdrawRequest(
                 wrongTargetBridgeData, wrongTargetBridgeEventProof, wrongTargetBridgeBlockHeader, wrongTargetBridgeSigs, validators, wrongTargetBridgeExtraProof
-            )).to.rejectedWith('TokenBridge: invalid network ID or bridge contract');
+            )).to.rejectedWith('Postchain: Invalid discriminator. Please verify the network ID and bridge contract.');
 
             await expect(bridge.withdrawRequest(
                 data, eventProof, wrongExtraDataKeyBlockHeader, wrongExtraDataKeySigs, validators, wrongExtraDataKeyExtraProof

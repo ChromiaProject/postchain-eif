@@ -5,13 +5,16 @@ import lib.ft4.auth;
 import lib.ft4.admin;
 import lib.ft4.accounts;
 import lib.ft4.assets;
-import lib.ft4.utils;
+import ft4_utils: lib.ft4.utils;
 import lib.ft4.accounts.strategies;
 import create_on_transfer: lib.ft4.accounts.strategies.transfer;
 import lib.ft4.accounts.strategies.transfer.open;
-import test_utils: lib.ft4.test.utils;
+import lib.ft4.crosschain;
+import admin_crosschain: lib.ft4.external.admin.crosschain;
+import ft4_test: lib.ft4.test.core;
 
 // event_receiver
+import eif.utils;
 import eif_event_receiver.*;
 import eif_event_receiver.test.helpers.*;
 import eif_event_connector.*;
@@ -127,6 +130,26 @@ function register_erc20_asset(
     return erc20_asset @ { network_id, .token_address == asset_info.token_address };
 }
 
+function register_crosschain_asset(asset_info, issuing_blockchain_rid: byte_array, origin_blockchain_rid: byte_array): ft4.crosschain.asset_origin {
+    val asset_id = (asset_info.token_name, issuing_blockchain_rid).hash();
+
+    rell.test.tx().op(
+        admin_crosschain.register_crosschain_asset(
+            id = asset_id,
+            name = asset_info.token_name,
+            symbol = asset_info.token_symbol,
+            decimals = asset_info.token_decimal,
+            issuing_blockchain_rid = issuing_blockchain_rid,
+            icon_url = asset_info.token_icon_url,
+            type = assets.ASSET_TYPE_FT4,
+            uniqueness_resolver = x"",
+            origin_blockchain_rid = origin_blockchain_rid
+        )
+    ).sign(admin_privkey).run();
+
+    return ft4.crosschain.asset_origin @ { .asset.id == asset_id };
+}
+
 function register_bridge_and_foreign_asset(asset: asset_info, network_id: integer, bridge_address: byte_array): assets.asset {
     val ft4_asset = register_ft4_asset(asset);
     val erc20_asset = register_erc20_asset(ft4_asset, asset, network_id, enable_snapshots = true, bridge_mode = hbridge.bridge_mode.foreign);
@@ -160,10 +183,10 @@ function link_eoa_account(
 ) {
     val evm_address = crypto.eth_pubkey_to_address(evm_keypair.pub);
     val op = hbridge.link_evm_eoa_account(evm_address);
-    val message = test_utils.create_evm_auth_message(op)
+    val message = ft4_test.create_evm_auth_message(op)
         .replace(auth.ACCOUNT_ID_PLACEHOLDER, account_id.to_hex().upper_case())
         .replace(auth.AUTH_DESCRIPTOR_ID_PLACEHOLDER, auth_descriptor_id.to_hex().upper_case());
-    val signature = test_utils.evm_sign(message, evm_keypair.priv);
+    val signature = ft4_test.evm_sign(message, evm_keypair.priv);
     rell.test.tx()
         .op(auth.evm_signatures([evm_address], [signature]))
         .op(auth.external.ft_auth(account_id, auth_descriptor_id))
@@ -208,10 +231,10 @@ function link_sc_account(
 ) {
     val evm_address = crypto.eth_pubkey_to_address(evm_keypair.pub);
     val op = hbridge.link_evm_sc_account(evm_address, network_id);
-    val message = test_utils.create_evm_auth_message(op)
+    val message = ft4_test.create_evm_auth_message(op)
         .replace(auth.ACCOUNT_ID_PLACEHOLDER, account_id.to_hex().upper_case())
         .replace(auth.AUTH_DESCRIPTOR_ID_PLACEHOLDER, auth_descriptor_id.to_hex().upper_case());
-    val signature = test_utils.evm_sign(message, evm_keypair.priv);
+    val signature = ft4_test.evm_sign(message, evm_keypair.priv);
     rell.test.tx()
         .op(auth.external.ft_auth(account_id, auth_descriptor_id))
         .op(op)
@@ -273,7 +296,7 @@ function trigger_withdrawal_status_on_evm(
 }
 
 function run_block_after_timeout() {
-    rell.test.set_next_block_time(rell.test.last_block_time + (utils.MILLISECONDS_PER_DAY * 10) + 1);
+    rell.test.set_next_block_time(rell.test.last_block_time + (ft4_utils.MILLISECONDS_PER_DAY * 10) + 1);
     rell.test.block().run();
 }
 
@@ -312,7 +335,7 @@ function assert_withdraw(
 }
 
 function create_ft4_account(pubkey: byte_array) {
-    val auth_descriptor = test_utils.create_auth_descriptor(pubkey, ["A", "T"]);
+    val auth_descriptor = ft4_test.create_auth_descriptor(pubkey, ["A", "T"]);
 
     rell.test.tx().op(
         admin.external.register_account(auth_descriptor)
@@ -326,12 +349,53 @@ function create_ft4_account(pubkey: byte_array) {
     );
 }
 
-function _mint(accounts.account, assets.asset) {
-    val amount = 10000000000000000000L;
-
+function _mint(accounts.account, assets.asset, amount: big_integer = 10000000000000000000L): big_integer {
     rell.test.tx().op(
         admin.external.mint(account.id, asset.id, amount)
     ).sign(admin_privkey).run();
-
     return amount;
+}
+
+struct account_data {
+    accounts.account;
+    auth_descriptor_id: byte_array;
+    rell.test.keypair;
+    evm_address: byte_array;
+    ft_auth: () -> rell.test.op;
+}
+
+function create_and_link_account(ft_keypair: rell.test.keypair, evm_keypair: rell.test.keypair): account_data {
+    // Auth descriptor
+    val account_id = ft_keypair.pub.hash();
+    val auth_descriptor = ft4_test.create_auth_descriptor(ft_keypair.pub, ["A", "T"]);
+    val auth_descriptor_id = auth_descriptor.hash();
+
+    // Register account
+    rell.test.tx().op(
+        admin.external.register_account(auth_descriptor)
+    ).sign(admin_privkey).run();
+    val ft_account = accounts.Account(account_id);
+
+    // Link account
+    link_eoa_account(
+        evm_keypair,
+        ft_keypair,
+        account_id,
+        auth_descriptor_id
+    );
+
+    return account_data(
+        account = accounts.account @ { .id == account_id },
+        auth_descriptor_id = auth_descriptor_id,
+        keypair = ft_keypair,
+        evm_address = crypto.eth_pubkey_to_address(evm_keypair.pub),
+        ft_auth = auth.external.ft_auth(account_id, auth_descriptor_id, *),
+    );
+}
+
+function get_account_id_and_auth_descriptor_id(ft_keypair: rell.test.keypair): (byte_array, byte_array) {
+    val account_id = ft_keypair.pub.hash();
+    val auth_descriptor = ft4_test.create_auth_descriptor(ft_keypair.pub, ["A", "T"]);
+    val auth_descriptor_id = auth_descriptor.hash();
+    return (account_id, auth_descriptor_id);
 }
