@@ -137,7 +137,7 @@ class EifSynchronizationInfrastructureExtension(
             val staticContracts = staticContractConfig.map { contractConfig: EifEvmContractConfig ->
                 if (contractConfig.skipToHeight < 0) throw UserMistake("skip-to-height for contract ${contractConfig.address} is negative")
                 val skipToHeight = if (contractConfig.skipToHeight == 0L) evmBlockchainConfig.skipToHeight else contractConfig.skipToHeight
-                if (contractConfig.skipToHeight < evmBlockchainConfig.skipToHeight) {
+                if (skipToHeight < evmBlockchainConfig.skipToHeight) {
                     throw UserMistake("skip-to-height for contract ${contractConfig.address} is lower than skip-to-height for EVM network: $evmBlockchainName")
                 }
                 parseEvmAddress(contractConfig.address) to skipToHeight
