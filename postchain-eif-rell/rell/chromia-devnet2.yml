@@ -1,0 +1,32 @@
+definitions:
+  - &chain_version
+    release_version: ${RELEASE_VERSION:-dev}
+    release_commit: ${RELEASE_COMMIT:-dev}
+
+blockchains:
+  eif_event_receiver_devnet2:
+    module: eif_event_receiver_chain_common
+    config:
+      gtx:
+        modules:
+          - "net.postchain.eif.EifGTXModule"
+          - "net.postchain.d1.icmf.IcmfSenderGTXModule"
+      sync_ext:
+        - "net.postchain.eif.EifSynchronizationInfrastructureExtension"
+      eif:
+        chains:
+          bsc:
+            network_id: 97
+            contracts:
+              - "0x753218363422002DF74F3D0D8d67f6CB38bE32D0" # TwoWeeksNotice / staking contract
+              - "0x2Cf48D2891CC286d18596Df1261D011d1B78E03E" # TransparentUpgradeableProxy / bridge contract
+            evm_read_offset: 10
+            skip_to_height: 5801241
+            events: !include configs/events.yml
+    moduleArgs:
+      chain_version: *chain_version
+
+compile:
+  source: src
+  target: target
+  rellVersion: 0.13.13
