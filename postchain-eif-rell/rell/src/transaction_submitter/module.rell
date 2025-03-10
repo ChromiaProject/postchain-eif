@@ -58,6 +58,19 @@ function update_evm_transaction_status(row_id: integer, status: transaction_stat
     update_transaction_status(row_id, status, tx_hash, signer);
 }
 
+operation __set_node_failure_reason(row_id: integer, failure_reason: text, signer: pubkey, signed_data: byte_array) {
+    set_node_failure_reason(row_id, signer, failure_reason);
+}
+
+function set_node_failure_reason(row_id: integer, signer: pubkey, failure_reason: text) {
+    val transaction = evm_submit_transaction @ { rowid(row_id) };
+
+    require(transaction_node_failure @ { transaction, signer } ( @sum 1 ) == 0,
+        "A node can only set one failure reason per transaction");
+
+    create transaction_node_failure(transaction, signer, failure_reason);
+}
+
 function require_correct_signer_for_update(row_id: integer, status: transaction_status, signer: pubkey) {
 
     val transaction = evm_submit_transaction @ { rowid(row_id) };
@@ -70,7 +83,6 @@ function require_correct_signer_for_update(row_id: integer, status: transaction_
     } else if (status == transaction_status.QUEUED) {
 
         require(transaction.processed_by == signer, "Only the node currently processing the transaction can change the status back to QUEUE");
-
     }
 }
 
@@ -301,6 +313,18 @@ query get_pending_transactions(): list<evm_submit_transaction_data> {
  */
 query get_evm_transaction_status(row_id: integer): transaction_status? {
     return evm_submit_transaction @? { rowid(row_id) }.status;
+}
+
+/**
+ * Returns any failures reported by nodes while attempting to submit a transaction.
+ *
+ * @param row_id The transaction row id.
+ * @return A list of reasons for failure per node.
+ */
+query get_evm_submit_transaction_node_failures(row_id: integer) {
+    return transaction_node_failure @* { .transaction.rowid == rowid(row_id) } (
+        transaction_node_failure_data(.node_pubkey, .reason)
+    );
 }
 
 function fail_transactions_with_enough_retries(strategy: node_retry_strategy) {

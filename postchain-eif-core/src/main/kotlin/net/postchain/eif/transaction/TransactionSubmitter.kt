@@ -115,8 +115,10 @@ open class TransactionSubmitter(
                             try {
                                 submitTransaction(txToSubmit)
                             } catch (e: Exception) {
-                                logger.error("Failed to submit EVM transaction ${txToSubmit.rowId}: ${e.message}", e)
-                                submitTxUpdates.add(EvmSubmitTransactionResult(txToSubmit.rowId, RellTransactionStatus.QUEUED))
+                                val errorMessage = "Failed to submit EVM transaction ${txToSubmit.rowId}: ${e.message}"
+                                logger.error(errorMessage, e)
+                                submitTxUpdates.add(EvmSubmitTransactionResult(txToSubmit.rowId,
+                                        RellTransactionStatus.QUEUED, failureReason = errorMessage))
                             }
                         } catch (e: CancellationException) {
                             break
@@ -205,7 +207,7 @@ open class TransactionSubmitter(
             val currentBlockHeight = try {
                 web3jRequestHandler.ethBlockNumber().blockNumber
             } catch (e: Exception) {
-                logger.error("Unable to query for current EVM block number. Will retry next poll.", e)
+                logger.error("Unable to query for current EVM block number. Will retry next poll: ${e.message}", e)
                 return
             }
 
@@ -213,7 +215,7 @@ open class TransactionSubmitter(
                 try {
                     pollPendingTransaction(txPending, currentBlockHeight)
                 } catch (e: Exception) {
-                    logger.error(e) { "Failed to process pending transaction ${txPending.rowId}" }
+                    logger.error(e) { "Failed to process pending transaction ${txPending.rowId}: ${e.message}" }
                 }
             }
         }
