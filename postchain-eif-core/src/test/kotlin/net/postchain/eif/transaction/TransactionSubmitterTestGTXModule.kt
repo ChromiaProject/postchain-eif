@@ -9,6 +9,7 @@ import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Comp
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.GET_PENDING_TRANSACTIONS
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.GET_TRANSACTION
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.GET_TRANSACTION_STATUS
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.SET_NODE_FAILURE_REASON
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_RECEIPT
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_STATUS
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension
@@ -106,13 +107,19 @@ open class TransactionSubmitterTestGTXModule(
         queryOverrides: Map<String, (TransactionSubmitterTestContext, EContext, Gtv) -> Gtv> = mapOf()
 ) : SimpleGTXModule<TransactionSubmitterTestContext>(
         TransactionSubmitterTestContext(mutableListOf(), mutableListOf(), mutableSetOf(), mutableSetOf(), mutableSetOf(), mutableSetOf(), mutableListOf(), mutableListOf()),
-        mapOf(UPDATE_EVM_TRANSACTION_STATUS to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
-            ModifyTxStatusOperation(conf, opData, this.updateTxStatus)
-        }, UPDATE_EVM_TRANSACTION_RECEIPT to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
-            CaptureTxOperation(conf, opData)
-        }, EVM_TX_NO_OP to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
-            CaptureTxOperation(conf, opData)
-        }) + opOverrides,
+        mapOf(
+                UPDATE_EVM_TRANSACTION_STATUS to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
+                    ModifyTxStatusOperation(conf, opData, this.updateTxStatus)
+                },
+                SET_NODE_FAILURE_REASON to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
+                    CaptureTxOperation(conf, opData)
+                },
+                UPDATE_EVM_TRANSACTION_RECEIPT to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
+                    CaptureTxOperation(conf, opData)
+                },
+                EVM_TX_NO_OP to { conf: TransactionSubmitterTestContext, opData: ExtOpData ->
+                    CaptureTxOperation(conf, opData)
+                }) + opOverrides,
         mapOf(
                 FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT to { conf: TransactionSubmitterTestContext, _: EContext, _: Gtv ->
                     gtv(conf.transactionsAvailableToTake.map { GtvObjectMapper.toGtvDictionary(it) })

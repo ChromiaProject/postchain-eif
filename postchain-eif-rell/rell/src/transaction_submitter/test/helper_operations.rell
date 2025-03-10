@@ -88,3 +88,6 @@ operation update_transaction_status_op(row_id: integer, status: transaction_stat
     update_transaction_status(row_id, status, tx_hash, signer);
 }
 
+operation set_node_failure_reason_op(row_id: integer, signer: pubkey, failure_reason: text) {
+    set_node_failure_reason(row_id, signer, failure_reason);
+}

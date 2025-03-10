@@ -27,6 +27,8 @@ class TransactionSubmitterSubmitRetryIT : EifBaseIntegrationTest(
         with(configOverrides) {
             setProperty("ethereum.privateKey", "0x53914554952e5473a54b211a31303078abde83b8128995785901eed28df3f610")
             setProperty("evm.txPollInterval", 1000)
+            setProperty("api.port", -1)
+            setProperty("messaging.port", 0)
         }
     }
 
@@ -54,13 +56,13 @@ class TransactionSubmitterSubmitRetryIT : EifBaseIntegrationTest(
         val evmSubmitTxRellRequest = mkEvmSubmitTxRellRequest(0, contractAddress)
         txSubmitterTestModule.addTransactionsAvailableToTake(evmSubmitTxRellRequest)
 
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertNoQueuedTxs(txSubmitterTestModule)
             assertStatusOperation(txSubmitterTestModule, 0, RellTransactionStatus.TAKEN)
         }
 
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertTrue(txSubmitterTestModule.conf.successfulTxs.contains(0))
         }

@@ -27,10 +27,6 @@ entity evm_submit_transaction {
     payer_chain: pubkey = x"";
 }
 
-entity evm_submit_transaction_taken_by {
-    key transaction: evm_submit_transaction, provider: pubkey;
-}
-
 struct evm_submit_transaction_data {
     row_id: integer;
     contract_address: text;
@@ -45,6 +41,30 @@ struct evm_submit_transaction_data {
     created: timestamp;
     tx_hash: text? = null;
     processed_by: pubkey;
+}
+
+entity evm_submit_transaction_taken_by {
+    key transaction: evm_submit_transaction, provider: pubkey; // This is actually the node key, not the provider
+}
+
+/**
+ * Node failure reasons from processing a transaction. Each node can currently set one
+ * per transaction and currently we only collect them during the submission phase.
+ */
+entity transaction_node_failure {
+    index transaction: evm_submit_transaction;
+    index node_pubkey: pubkey;
+
+    /** Reason for the transaction to fail */
+    reason: text;
+}
+
+/**
+ * Represents a failure reason for each node attempting to submit the transaction.
+ */
+struct transaction_node_failure_data {
+    node_pubkey: pubkey;
+    reason: text;
 }
 
 enum transaction_status {
