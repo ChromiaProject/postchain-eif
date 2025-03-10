@@ -11,7 +11,7 @@ import net.postchain.common.toHex
 import net.postchain.devtools.PostchainTestNode
 import net.postchain.devtools.PostchainTestNode.Companion.DEFAULT_CHAIN_IID
 import net.postchain.eif.transaction.TransactionSubmitterDatabaseOperationsImpl.Companion.EVM_TX_SUBMIT_COLUMN_REQUEST_ID
-import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.SET_EVM_TRANSACTION_NODE_FAILURE_REASON
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.SET_NODE_FAILURE_REASON
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_RECEIPT
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_STATUS
 import net.postchain.gtv.GtvFactory
@@ -91,7 +91,7 @@ fun assertNodeFailureOperation(
 ) {
     withTxOperations(
             txSubmitterTestModule,
-            SET_EVM_TRANSACTION_NODE_FAILURE_REASON
+            SET_NODE_FAILURE_REASON
     ) { operations ->
         val requestOps = operations
                 .filter { it.args[0].asInteger() == rowId }

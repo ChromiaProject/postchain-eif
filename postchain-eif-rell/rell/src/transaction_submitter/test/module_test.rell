@@ -504,15 +504,18 @@ function test_set_node_failure_reason() {
         create_test_evm_submit_transaction(x"01", "contract01", "myFunction-1", transaction_status.PENDING, 1),
     ).sign(rell.test.keypairs.alice).run();
 
-    val tx0 = evm_submit_transaction @ { .id == x"00" };
-    val tx1 = evm_submit_transaction @ { .id == x"01" };
+    val tx0 = evm_submit_transaction @ { .id == x"00" } ( .rowid.to_integer() );
+    val tx1 = evm_submit_transaction @ { .id == x"01" } ( .rowid.to_integer() );
 
     rell.test.tx().op(
-        set_node_failure_reason_op(tx0.rowid.to_integer(), x"AA", "failure 1"),
-        set_node_failure_reason_op(tx1.rowid.to_integer(), x"BB", "failure 2"),
+        set_node_failure_reason_op(tx0, x"AA", "failure 1"),
+        set_node_failure_reason_op(tx1, x"BB", "failure 2"),
     ).run();
 
     rell.test.tx().op(
-        set_node_failure_reason_op(tx0.rowid.to_integer(), x"AA", "failure 1"),
+        set_node_failure_reason_op(tx0, x"AA", "failure 1"),
     ).run_must_fail("A node can only set one failure reason per transaction");
+
+    assert_equals(get_evm_submit_transaction_node_failures(tx0), [transaction_node_failure_data(x"AA", "failure 1")]);
+    assert_equals(get_evm_submit_transaction_node_failures(tx1), [transaction_node_failure_data(x"BB", "failure 2")]);
 }

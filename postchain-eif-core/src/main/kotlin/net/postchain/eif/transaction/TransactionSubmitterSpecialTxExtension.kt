@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialTxExtension {
     companion object : KLogging() {
         const val UPDATE_EVM_TRANSACTION_STATUS = "__update_evm_transaction_status"
-        const val SET_EVM_TRANSACTION_NODE_FAILURE_REASON = "__set_node_failure_reason"
+        const val SET_NODE_FAILURE_REASON = "__set_node_failure_reason"
         const val UPDATE_EVM_TRANSACTION_RECEIPT = "__update_evm_transaction_receipt"
         const val EVM_TX_NO_OP = "__evm_tx_no_op"
 
@@ -50,6 +50,7 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
     private var startupJobsRun = false
     private lateinit var blockQueries: BlockQueries
     private val hasQueuedTxs = AtomicBoolean(false)
+    private var hasSetNodeFailureOp: Boolean = false
 
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
 
@@ -214,7 +215,7 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
                     logger.warn { "Validation failed. Receipt for transaction $requestId set without any ${RellTransactionStatus.SUCCESS.name} status update op" }
                     return false
                 }
-            } else if (op.opName == SET_EVM_TRANSACTION_NODE_FAILURE_REASON) {
+            } else if (op.opName == SET_NODE_FAILURE_REASON) {
 
                 val requestId = op.args[0].asInteger()
                 val failureReason = op.args[1].asString()
@@ -222,7 +223,7 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
                 val signedData = op.args[3].asByteArray()
 
                 if (!cryptoSystem.verifyDigest(txIdHeightSignatureDataHash(requestId, bctx.height), Signature(signer, signedData))) {
-                    logger.warn { "Validation failed. Invalid signature for transaction $requestId and op $SET_EVM_TRANSACTION_NODE_FAILURE_REASON" }
+                    logger.warn { "Validation failed. Invalid signature for transaction $requestId and op $SET_NODE_FAILURE_REASON" }
                     return false
                 }
 
@@ -343,11 +344,14 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
     private fun maybeAddNodeFailureOp(height: Long, result: EvmSubmitTransactionResult, operations: MutableList<OpData>) {
 
         // On failure the node sets the status to QUEUED
-        if (result.failureReason != null && result.status == RellTransactionStatus.QUEUED) {
+        if (hasSetNodeFailureOp &&
+                result.failureReason != null &&
+                result.status == RellTransactionStatus.QUEUED
+        ) {
             val signature = createTxIdHeightSignature(result.requestId, height)
 
             operations.add(OpData(
-                    SET_EVM_TRANSACTION_NODE_FAILURE_REASON,
+                    SET_NODE_FAILURE_REASON,
                     arrayOf(
                             gtv(result.requestId),
                             gtv(result.failureReason.take(TRANSACTION_FAILURE_REASON_LENGTH_LIMIT)),
@@ -426,12 +430,13 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
     }
 
     override fun getRelevantOps(): Set<String> {
-        return setOf(UPDATE_EVM_TRANSACTION_STATUS, SET_EVM_TRANSACTION_NODE_FAILURE_REASON, UPDATE_EVM_TRANSACTION_RECEIPT, EVM_TX_NO_OP)
+        return setOf(UPDATE_EVM_TRANSACTION_STATUS, SET_NODE_FAILURE_REASON, UPDATE_EVM_TRANSACTION_RECEIPT, EVM_TX_NO_OP)
     }
 
     override fun init(module: GTXModule, chainID: Long, blockchainRID: BlockchainRid, cs: CryptoSystem) {
         this.module = module
         this.cryptoSystem = cs
+        this.hasSetNodeFailureOp = module.getOperations().contains(SET_NODE_FAILURE_REASON)
     }
 
     override fun needsSpecialTransaction(position: SpecialTransactionPosition): Boolean {
