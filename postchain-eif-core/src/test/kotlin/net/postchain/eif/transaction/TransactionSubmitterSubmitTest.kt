@@ -39,8 +39,9 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
                     mkEvmSubmitTxRequest()
             )
         }
-        assertThat(exception.message).isEqualTo("Failed to get balance for request: Failed to get wallet balance")
-        testLogAppender.assertError("Failed to get wallet balance")
+        assertThat((exception as TransactionSubmitterException).chainMessage).isEqualTo("Failed to get wallet balance")
+        assertThat(exception.message).isEqualTo("Failed to get wallet balance: Failed to get wallet balance")
+        testLogAppender.assertError("Failed to get wallet balance: Failed to get wallet balance")
     }
 
     @Test
@@ -63,7 +64,8 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
                     mkEvmSubmitTxRequest()
             )
         }
-        assertThat(exception.message).isEqualTo("Failed to estimate gas usage: Failed to get gas estimate")
+        assertThat((exception as TransactionSubmitterException).chainMessage).isEqualTo("Failed to get gas estimate")
+        assertThat(exception.message).isEqualTo("Failed to get gas estimate: Failed to get gas estimate")
 
         verify(databaseOperations).recordTransactionGas(
                 any(),
@@ -71,7 +73,7 @@ class TransactionSubmitterSubmitTest : MockedTestBaseTransactionSubmitter() {
                 eq(BigInteger.valueOf(5)),
                 eq(BigInteger.valueOf(10))
         )
-        testLogAppender.assertError("Failed to estimate gas usage: Failed to get gas estimate")
+        testLogAppender.assertError("Failed to get gas estimate: Failed to get gas estimate")
     }
 
     @Test

@@ -48,7 +48,7 @@ class TransactionSubmitterStartupIT : EifBaseIntegrationTest() {
 
         txSubmitterTestModule.addTransaction(mkEvmSubmitTxRellRequest(0, contractAddress, RellTransactionStatus.TAKEN))
 
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertTransactionsByStatus(txSubmitterTestModule, RellTransactionStatus.QUEUED, 1)
             assertStatusOperation(txSubmitterTestModule, 0, RellTransactionStatus.QUEUED)
@@ -64,7 +64,7 @@ class TransactionSubmitterStartupIT : EifBaseIntegrationTest() {
 
         txSubmitterTestModule.addTransaction(mkEvmSubmitTxRellRequest(0, contractAddress, RellTransactionStatus.TAKEN))
 
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             // Make sure the tx is no longer in db
             withDbTransactions(node, 0) {
@@ -87,7 +87,7 @@ class TransactionSubmitterStartupIT : EifBaseIntegrationTest() {
 
         createNodes(1, "/net/postchain/eif/transaction/blockchain_config_pending.xml")[0]
 
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
 
             // It will fail since the transaction is not actually submitted

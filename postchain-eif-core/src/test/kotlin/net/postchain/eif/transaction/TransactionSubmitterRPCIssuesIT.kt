@@ -34,11 +34,11 @@ class TransactionSubmitterRPCIssuesIT : ManagedModeTest() {
         val evmSubmitTxRellRequest = mkEvmSubmitTxRellRequest(0, "0x8A2279d4A90B6fe1C4B30fa660cC9f926797bAA2")
         txSubmitterTestModule.addTransactionsAvailableToTake(evmSubmitTxRellRequest)
 
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertStatusOperation(txSubmitterTestModule, 0, RellTransactionStatus.QUEUED)
             assertNodeFailureOperation(txSubmitterTestModule, evmSubmitTxRellRequest.rowId,
-                    "Failed to submit EVM transaction 0: Failed to estimate gas usage: Failed to send web3j request to all 1 nodes")
+"Failed to get gas estimate")
         }
     }
 }

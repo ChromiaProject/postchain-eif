@@ -56,13 +56,13 @@ class TransactionSubmitterSubmitRetryIT : EifBaseIntegrationTest(
         val evmSubmitTxRellRequest = mkEvmSubmitTxRellRequest(0, contractAddress)
         txSubmitterTestModule.addTransactionsAvailableToTake(evmSubmitTxRellRequest)
 
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertNoQueuedTxs(txSubmitterTestModule)
             assertStatusOperation(txSubmitterTestModule, 0, RellTransactionStatus.TAKEN)
         }
 
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertTrue(txSubmitterTestModule.conf.successfulTxs.contains(0))
         }

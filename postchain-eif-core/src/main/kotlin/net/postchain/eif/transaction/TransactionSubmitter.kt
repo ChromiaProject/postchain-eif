@@ -11,7 +11,6 @@ import kotlinx.coroutines.slf4j.MDCContext
 import mu.KLogging
 import net.postchain.base.withReadWriteConnection
 import net.postchain.base.withWriteConnection
-import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.core.BlockEContext
 import net.postchain.core.EContext
 import net.postchain.core.Shutdownable
@@ -117,8 +116,10 @@ open class TransactionSubmitter(
                             } catch (e: Exception) {
                                 val errorMessage = "Failed to submit EVM transaction ${txToSubmit.rowId}: ${e.message}"
                                 logger.error(errorMessage, e)
-                                submitTxUpdates.add(EvmSubmitTransactionResult(txToSubmit.rowId,
-                                        RellTransactionStatus.QUEUED, failureReason = errorMessage))
+                                submitTxUpdates.add(EvmSubmitTransactionResult(
+                                        txToSubmit.rowId,
+                                        RellTransactionStatus.QUEUED,
+                                        failureReason = if (e is TransactionSubmitterException) e.chainMessage else null))
                             }
                         } catch (e: CancellationException) {
                             break
@@ -338,9 +339,9 @@ open class TransactionSubmitter(
             try {
                 web3jRequestHandler.ethGetTransactionReceipt(txHash)
             } catch (e: Exception) {
-                val errorMessage = "Failed to poll for receipt for request id $rowId on network $networkId: ${e.message}"
-                logger.error(e) { errorMessage }
-                throw ProgrammerMistake(errorMessage, e)
+                val tse = TransactionSubmitterException.createChainAndLogException("Failed to poll for receipt for request id $rowId on network $networkId", e)
+                logger.error(e) { tse.message }
+                throw tse
             }
 
     internal fun submitTransaction(txRequest: EvmSubmitTxRequest) {
@@ -394,12 +395,12 @@ open class TransactionSubmitter(
 
         val evmTransaction = web3jRequestHandler.sendWeb3jRequest { it.ethGetTransactionByHash(txPending.txHash) }
         if (evmTransaction.transaction.isEmpty) {
-            throw ProgrammerMistake("Transaction ${txPending.rowId} / ${txPending.txHash} not found")
+            throw TransactionSubmitterException("Transaction ${txPending.rowId} / ${txPending.txHash} not found")
         }
 
         val transaction = evmTransaction.transaction.get()
         if (transaction.blockNumberRaw != null) {
-            throw ProgrammerMistake("Transaction ${txPending.rowId} / ${txPending.txHash} confirmed in block ${transaction.blockNumber} and can't be cancelled")
+            throw TransactionSubmitterException("Transaction ${txPending.rowId} / ${txPending.txHash} confirmed in block ${transaction.blockNumber} and can't be cancelled")
         }
 
         //  We need to increase gas fees by 10% for the network to accept the replacement

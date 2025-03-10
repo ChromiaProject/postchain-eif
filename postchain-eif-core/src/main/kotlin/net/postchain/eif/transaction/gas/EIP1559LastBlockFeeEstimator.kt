@@ -1,10 +1,9 @@
 package net.postchain.eif.transaction.gas
 
-import net.postchain.common.exception.ProgrammerMistake
-import net.postchain.common.exception.UserMistake
 import net.postchain.eif.web3j.Web3jRequestHandler
 import net.postchain.eif.transaction.EvmSubmitTxRequest
 import net.postchain.eif.transaction.TransactionSubmitter.Companion.logger
+import net.postchain.eif.transaction.TransactionSubmitterException
 import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.methods.request.Transaction
 import java.math.BigDecimal
@@ -42,9 +41,9 @@ class EIP1559LastBlockFeeEstimator(
             web3jRequestHandler.ethGetBlockByNumber(DefaultBlockParameterName.LATEST, false)
                     .block
         } catch (e: Exception) {
-            val errorMessage = "Failed to get latest evm block: ${e.message}"
-            logger.error(e) { errorMessage }
-            throw ProgrammerMistake(errorMessage, e)
+            val tse = TransactionSubmitterException.createChainAndLogException("Failed to get latest EVM block:", e)
+            logger.error(e) { tse.message }
+            throw tse
         }
         blockNumber = block.number
         baseFeePerGas = getBaseFeePerGas(block.baseFeePerGas)
@@ -56,19 +55,19 @@ class EIP1559LastBlockFeeEstimator(
     override fun validateRequestFees(txRequest: EvmSubmitTxRequest) {
 
         if (estimatedGasUsage > gasLimit) {
-            throw UserMistake("Estimated gas usage $estimatedGasUsage for tx ${txRequest.rowId} exceeds configured limit of $gasLimit")
+            throw TransactionSubmitterException("Estimated gas usage $estimatedGasUsage for tx ${txRequest.rowId} exceeds configured limit of $gasLimit")
         }
 
         if (estimatedTotalGasFee > maxGasPrice) {
-            throw UserMistake("Estimated total gas fee $estimatedTotalGasFee for tx exceeds configured limit of $maxGasPrice")
+            throw TransactionSubmitterException("Estimated total gas fee $estimatedTotalGasFee for tx exceeds configured limit of $maxGasPrice")
         }
 
         if (walletBalance < estimatedTotalGasFee) {
-            throw UserMistake("Insufficient wallet balance (estimatedTotalGasFee: $estimatedTotalGasFee, wallet balance: $walletBalance")
+            throw TransactionSubmitterException("Insufficient wallet balance (estimatedTotalGasFee: $estimatedTotalGasFee, wallet balance: $walletBalance)")
         }
 
         if (estimatedGasLimit > gasLimit) {
-            throw UserMistake("Estimated gas limit $estimatedGasLimit exceeds configured gas limit $gasLimit")
+            throw TransactionSubmitterException("Estimated gas limit $estimatedGasLimit exceeds configured gas limit $gasLimit")
         }
     }
 
@@ -94,9 +93,9 @@ class EIP1559LastBlockFeeEstimator(
         return try {
             web3jRequestHandler.ethEstimateGas(transaction).amountUsed
         } catch (e: Exception) {
-            val errorMessage = "Failed to estimate gas usage: ${e.message}"
-            logger.error(e) { errorMessage }
-            throw ProgrammerMistake(errorMessage, e)
+            val tse = TransactionSubmitterException.createChainAndLogException("Failed to get gas estimate", e)
+            logger.error(e) { tse.message }
+            throw tse
         }
     }
 
@@ -105,9 +104,9 @@ class EIP1559LastBlockFeeEstimator(
             web3jRequestHandler.ethGetBalance(fromAddress, DefaultBlockParameterName.LATEST)
                     .balance
         } catch (e: Exception) {
-            val errorMessage = "Failed to get balance for request: ${e.message}"
-            logger.error(e) { errorMessage }
-            throw ProgrammerMistake(errorMessage, e)
+            val tse = TransactionSubmitterException.createChainAndLogException("Failed to get wallet balance", e)
+            logger.error(e) { tse.message }
+            throw tse
         }
     }
 
@@ -121,9 +120,9 @@ class EIP1559LastBlockFeeEstimator(
                     .add(maxPriorityFeePerGas.toBigDecimal().times(priorityFeePerGasMargin).toBigInteger())
             return maxPriorityFeePerGasWithMargin.min(txMaxPriorityFeePerGas)
         } catch (e: Exception) {
-            val errorMessage = "Failed to get max priority fee per gas: ${e.message}"
-            logger.error(e) { errorMessage }
-            throw ProgrammerMistake(errorMessage, e)
+            val tse = TransactionSubmitterException.createChainAndLogException("Failed to get max priority fee per gas", e)
+            logger.error(e) { tse.message }
+            throw tse
         }
     }
 

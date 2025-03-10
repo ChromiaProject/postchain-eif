@@ -66,14 +66,14 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
         val txSubmit = mkEvmSubmitTxRellRequest(0, contractAddress)
         txSubmitterTestModule.addTransactionsAvailableToTake(txSubmit)
 
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertNoQueuedTxs(txSubmitterTestModule)
             assertTrue(txSubmitterTestModule.conf.taken.contains(0))
             assertStatusOperation(txSubmitterTestModule, txSubmit.rowId, RellTransactionStatus.TAKEN)
         }
 
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertStatusOperation(
                     txSubmitterTestModule,
@@ -108,14 +108,14 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
         val txSubmit = mkEvmSubmitTxRellRequest(0, contractAddress)
         txSubmitterTestModule.addTransactionsAvailableToTake(txSubmit)
 
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertNoQueuedTxs(txSubmitterTestModule)
             assertTrue(txSubmitterTestModule.conf.taken.contains(0))
             assertStatusOperation(txSubmitterTestModule, txSubmit.rowId, RellTransactionStatus.TAKEN)
         }
 
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertStatusOperation(
                     txSubmitterTestModule,
@@ -125,7 +125,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
         }
 
         // Exists and might have the first receipt - but we don't know since it is asynchronous
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
 
             val txExistsAsPending: Boolean? = withTxSubmitter(txSubmitterTestModule, 0) { _, _ ->
@@ -135,7 +135,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
         }
 
         // Write validation result to BC after consensus is reached
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertStatusOperation(
                     txSubmitterTestModule,
@@ -161,17 +161,18 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
         val evmSubmitTxRellRequest = mkEvmSubmitTxRellRequest(0, contractAddress)
         txSubmitterTestModule.addTransactionsAvailableToTake(evmSubmitTxRellRequest)
 
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertNoQueuedTxs(txSubmitterTestModule)
         }
 
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertTrue(txSubmitterTestModule.conf.queuedTxs.contains(0))
             assertStatusOperation(txSubmitterTestModule, evmSubmitTxRellRequest.rowId, RellTransactionStatus.QUEUED) // QUEUED is failed here, since it will let another node retry
             assertNodeFailureOperation(txSubmitterTestModule, evmSubmitTxRellRequest.rowId,
-                    "Failed to submit EVM transaction 0: Estimated gas usage 63244 for tx 0 exceeds configured limit of 1")
+                    "Estimated gas usage 63244 for tx 0 exceeds configured limit of 1")
+            testLogAppender.assertError("Failed to submit EVM transaction 0: Estimated gas usage 63244 for tx 0 exceeds configured limit of 1")
         }
     }
 
@@ -192,14 +193,14 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
         allTxSubmitterTestModules[0].addTransactionsAvailableToTake(txSubmit)
 
         // node[0] will give it a try and succeed
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertNoQueuedTxs(allTxSubmitterTestModules[0])
             assertStatusOperation(allTxSubmitterTestModules[0], txSubmit.rowId, RellTransactionStatus.TAKEN)
         }
 
         // Let node[0] submit it and verify it is set to PENDING with receipt
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertStatusOperation(allTxSubmitterTestModules[0], txSubmit.rowId, RellTransactionStatus.PENDING)
         }
@@ -222,7 +223,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
         }
 
         // One node got to set the status SUCCESS and receipt
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(nodes.toList(), 1L)
             assertTrue(allTxSubmitterTestModules.any { it.conf.successfulTxs.contains(0) })
         }
@@ -262,13 +263,13 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
         txSubmitterTestModule0.addTransactionsAvailableToTake(txSubmit)
 
         // node[0] will give it a try but fail
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertStatusOperation(txSubmitterTestModule0, txSubmit.rowId, RellTransactionStatus.TAKEN)
         }
 
         // Let the node fail
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertStatusOperation(txSubmitterTestModule0, txSubmit.rowId, RellTransactionStatus.QUEUED)
             testLogAppender.assertError("Failed to send web3j request to all 1 nodes")
@@ -281,7 +282,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
         txSubmitterTestModule1.addTransactionsAvailableToTake(txSubmit)
 
         // node[1] will give it a try and succeed
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertStatusOperation(txSubmitterTestModule1, txSubmit.rowId, RellTransactionStatus.TAKEN)
         }
@@ -290,7 +291,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
         allTxSubmitterTestModules.forEach { it.addTransaction(mkEvmSubmitTxRellRequest(txSubmit.rowId, "", RellTransactionStatus.TAKEN, processedByNode = nodes[0])) }
 
         // node[1] successfully submits it
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertStatusOperation(txSubmitterTestModule0, txSubmit.rowId, RellTransactionStatus.PENDING)
         }
@@ -313,7 +314,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
         }
 
         // One node got to set the status SUCCESS
-        Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
+        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(nodesExceptFirst, 1L)
             assertTrue(allTxSubmitterTestModulesExceptFirst.any { it.conf.successfulTxs.contains(0) })
         }
