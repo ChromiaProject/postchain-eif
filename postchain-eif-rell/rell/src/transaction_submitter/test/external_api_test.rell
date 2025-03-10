@@ -99,3 +99,44 @@ function test_get_blockchains_with_bridge_and_anomaly_detection() {
         bridge_contract = bridge_contract
     )]);
 }
+
+function test_get_all_bridges() {
+    // Add mapping
+    val test_brid = x"01";
+    val test_network = 11137;
+
+    rell.test.tx().op(
+        bridge_mapping_message_op(
+            bridge_mapping_message(
+                blockchain_rid = x"00",
+                validator_contract = "validator_contract_0",
+                bridge_contract = "bridge_contract_0",
+                evm_network_id = 0,
+                deleted = false
+            )
+        ),
+        bridge_mapping_message_op(
+            bridge_mapping_message(
+                blockchain_rid = x"01",
+                validator_contract = "validator_contract_1",
+                bridge_contract = "bridge_contract_1",
+                evm_network_id = 1,
+                deleted = false
+            )
+        ),
+    ).run();
+
+    val expected = [
+        blockchain_bridge_data(
+            x"00", 0,
+            bridge_address = "bridge_contract_0",
+            validator_address = "validator_contract_0",
+        ),
+        blockchain_bridge_data(
+            x"01", 1,
+            bridge_address = "bridge_contract_1",
+            validator_address = "validator_contract_1",
+        )
+    ];
+    assert_equals(get_all_bridges(), expected);
+}
