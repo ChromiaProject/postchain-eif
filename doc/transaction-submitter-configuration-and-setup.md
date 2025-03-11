@@ -219,20 +219,35 @@ Deploy tx submitter chain via PMC
 
 ### Manual reset of failed signer updates
 
-Manual admins can reset failed signer updates on system chains.
+Users can manually resubmit failed signer updates. Then, manual admins can reset failed signer updates state on the Transaction Submitter chain.
 
-1. Submit the failed transaction manually. You can see details with
-   query `latest_signer_list_update_txs(blockchain_rid: byte_array)`
-2. Use script to in `postchain-eif-contracts` to resubmit each individual element in the returned query array (use JSON
-   query output format):
-   `yarn transaction:resubmitSignerUpdate --network {NETWORK MATCHING ELEMENT IN QUERY RESULT} --data '{query_result.transactions[index]}'`
-3. Reset the failed state by invoking operation `manually_resolve_failed_signer_update(blockchain_rid: byte_array)`
+1. Check whether the bridge contract is registered:
+   ```bash
+   chr query --api-url $NODE -brid $TXS get_all_bridges -- include_system_bridges=false
+   ```
+
+2. Retrieve the failed transaction data using the following query (with the `json` query output format):
+   ```bash
+   chr query -f json --api-url $NODE -brid $TXS latest_signer_list_update_txs -- blockchain_rid='x"'$BRIDGE'"'
+   ```
+
+3. Resubmit each individual element in the returned query array using the `transaction:resubmitSignerUpdate` script from `postchain-eif-contracts`:
+   ```bash
+   yarn transaction:resubmitSignerUpdate --network {NETWORK_MATCHING_ELEMENT_IN_QUERY_RESULT} --data '{query_result.transactions[index]}'
+   ```
+
+4. Reset the failed state by invoking the admin operation `manually_resolve_failed_signer_update(blockchain_rid: byte_array)`:
+   ```bash
+   chr tx --api-url $NODE -brid $TXS --secret {ADMIN_SECRET} manually_resolve_failed_signer_update x"'$BRIDGE'"
+   ```
+
 
 ### Manually resubmit failed anchorings
 
 Please run:
 
-1. Fetch the failed transaction with query `get_transactions`
-2. Use script to in `postchain-eif-contracts` to resubmit each individual element in the returned query array (use JSON
-   query output format):
-   `yarn transaction:resubmitAnchoring --network ethereum --data {query_result[index]}`
+1. Fetch the failed transaction with query `get_transactions` (with the `json` query output format).
+2. Resubmit each individual element in the returned query array using the `transaction:resubmitAnchoring` script from `postchain-eif-contracts`:
+   ```bash
+   yarn transaction:resubmitAnchoring --network {NETWORK_MATCHING_ELEMENT_IN_QUERY_RESULT} --data {query_result.transactions[index]}
+   ```
