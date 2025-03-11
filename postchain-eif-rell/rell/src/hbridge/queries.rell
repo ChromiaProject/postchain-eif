@@ -70,7 +70,7 @@ query get_erc20_withdrawal_by_id(withdrawal_id: rowid): erc20_withdrawal_info? =
 query get_account_for_eoa_address(evm_address: byte_array): byte_array? =
         evm_eoa_account_link @? { .address == evm_address } (.account.id);
 
-query get_account_for_sc_address (evm_address: byte_array, network_id: integer): byte_array? =
+query get_account_for_sc_address(evm_address: byte_array, network_id: integer): byte_array? =
         evm_sc_account_link @? { .address == evm_address, network_id } (.account.id);
 
 query get_eoa_addresses_for_account(account_id: byte_array): list<byte_array> {
