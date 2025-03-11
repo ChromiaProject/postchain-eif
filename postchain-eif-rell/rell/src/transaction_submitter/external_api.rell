@@ -4,6 +4,20 @@ struct bridge_anomaly_detector_data {
     bridge_contract: text;
 }
 
+struct blockchain_bridge_data {
+    /** The bridge blockchain */
+    blockchain_rid: byte_array;
+
+    /** EVM network id */
+    network_id: integer;
+
+    /** EMV bridge contract address */
+    bridge_address: text;
+
+    /** EVM validator contract address */
+    validator_address: text;
+}
+
 query get_transaction_status(evm_transaction_id: byte_array) =
     evm_submit_transaction @? { .id == evm_transaction_id }.status;
 
@@ -47,3 +61,31 @@ query get_blockchains_with_bridge_and_anomaly_detection() = blockchain_bridge_co
         bridge_contract = .address
     )
 );
+
+/**
+ * Return all existing bridges.
+ *
+ * @param include_system_bridges Include or exclude system bridges.
+ */
+query get_all_bridges(include_system_bridges: boolean = true) {
+    val bridges = blockchain_bridge_contract @* {} (blockchain_bridge_data(
+        .blockchain_rid,
+        .network_id,
+        bridge_address = .address,
+        validator_address = .validator_contract,
+    ));
+    if (include_system_bridges) {
+        val system_bridges = get_system_chains_with_bridges();
+        for (system_bridge in system_bridges) {
+            for (sbc in system_bridge.bridge_contracts) {
+                bridges.add(blockchain_bridge_data(
+                    system_bridge.blockchain_rid,
+                    sbc.network_id,
+                    bridge_address = sbc.address,
+                    validator_address = sbc.validator_contract
+                ));
+            }
+        }
+    }
+    return bridges;
+}
