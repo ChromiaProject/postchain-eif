@@ -136,6 +136,21 @@ function test_get_all_bridges() {
             x"01", 1,
             bridge_address = "bridge_contract_1",
             validator_address = "validator_contract_1",
+        ),
+        blockchain_bridge_data(
+            x"22222222222222222222222222222222", 1,
+            bridge_address = "system_bridge_address",
+            validator_address = "system_bridge_validator",
+        ),
+        blockchain_bridge_data(
+            x"22222222222222222222222222222222", 11155111,
+            bridge_address = "system_bridge_address1",
+            validator_address = "system_bridge_validator1",
+        ),
+        blockchain_bridge_data(
+            x"22222222222222222222222222222222", 56,
+            bridge_address = "system_bridge_address",
+            validator_address = "system_bridge_validator",
         )
     ];
     assert_equals(get_all_bridges(), expected);
