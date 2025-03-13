@@ -25,13 +25,13 @@
     <properties>
         <revision>dev</revision>
         <postchain.version>3.27.6</postchain.version>
-        <rell.version>0.14.4</rell.version>
+        <rell.version>0.14.6</rell.version>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <kotlin.compiler.jvmTarget>21</kotlin.compiler.jvmTarget>
         <testcontainers.version>1.20.3</testcontainers.version>
         <junit.pioneer.version>2.2.0</junit.pioneer.version>
-        <rell.maven.plugin.version>0.12.5</rell.maven.plugin.version>
+        <rell.maven.plugin.version>0.14.0</rell.maven.plugin.version>
         <web3j.version>4.12.0</web3j.version>
     </properties>
 

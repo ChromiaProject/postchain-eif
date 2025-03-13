@@ -61,9 +61,7 @@ function test_multi_hop_cross_xfer__state_slots_emitted_on_unapply_transfer_to_i
     register_erc20_asset(chr_asset, CHR, network_id1, enable_snapshots = true, bridge_mode = hbridge.bridge_mode.foreign);
 
     // register recovery contract for the island1_chain
-    rell.test.tx()
-        .op(register_recovery_contract(island1_chain_rid, network_id1, island1_chain_recovery_contract))
-        .run();
+    _register_recovery_contract(island1_chain_rid, network_id1, island1_chain_recovery_contract);
 
     // to get the needed state we repeat steps from the `test_multi_hop_cross_xfer__state_slots_emitted_on_apply_transfer_to_intermediate_chain`
     val deadline = rell.test.DEFAULT_FIRST_BLOCK_TIME + rell.test.DEFAULT_BLOCK_INTERVAL * 2;
@@ -134,9 +132,7 @@ function test_multi_hop_cross_xfer__state_slots_emitted_on_revert_transfer_to_or
     deposit_from_evm(alice.evm_address, 1000, asset = CHR, network_id = network_id1);
 
     // register recovery contracts for the hub_chain and the island1_chain
-    rell.test.tx()
-        .op(register_recovery_contract(hub_chain_rid, network_id1, hub_chain_recovery_contract))
-        .run();
+    _register_recovery_contract(hub_chain_rid, network_id1, hub_chain_recovery_contract);
 
     // repeat init step from the test `test_multi_hop_cross_xfer__state_slots_emitted_on_init_transfer_to_origin_chain`
     val deadline = rell.test.DEFAULT_FIRST_BLOCK_TIME + rell.test.DEFAULT_BLOCK_INTERVAL * 7 + 1;

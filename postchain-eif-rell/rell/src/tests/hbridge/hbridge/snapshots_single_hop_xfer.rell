@@ -15,9 +15,7 @@ function test_single_hop_cross_xfer__state_slots_emitted_on_init_transfer_to_ori
     deposit_from_evm(alice.evm_address, 1000, asset = CHR, network_id = network_id1);
 
     // register recovery contract for the hub_chain
-    rell.test.tx()
-        .op(register_recovery_contract(hub_chain_rid, network_id1, hub_chain_recovery_contract))
-        .run();
+    _register_recovery_contract(hub_chain_rid, network_id1, hub_chain_recovery_contract);
 
     // init transfer on the token_chain
     rell.test.tx()

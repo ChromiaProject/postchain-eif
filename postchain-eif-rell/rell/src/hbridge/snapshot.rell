@@ -337,22 +337,16 @@ entity recovery_contract {
     has_changed_sender: boolean,
     has_changed_recipient: boolean
 ) {
-    log("after_crosschain_balance_change");
-    log("has_changed_sender: " + has_changed_sender);
-    log("has_changed_recipient: " + has_changed_recipient);
-
     val erc20_asset = erc20_asset_snapshots_enabled @? { asset } .erc20_asset;
     if (empty(erc20_asset)) return;
 
     if (has_changed_sender) {
         val sender_slot = get_or_create_local_erc20_state_slot(sender, erc20_asset);
-        log("sender_slot: " + sender_slot);
         if (exists(sender_slot)) emit_local_erc20_state_slot(sender_slot);
     }
 
     if (has_changed_recipient) {
         val recipient_slot = get_or_create_local_erc20_state_slot(recipient, erc20_asset);
-        log("recipient_slot: " + recipient_slot);
         if (exists(recipient_slot)) emit_local_erc20_state_slot(recipient_slot);
     }
 }

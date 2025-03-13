@@ -179,17 +179,68 @@ operation recall_pending_deposit(sender_address: byte_array) {
     }
 }
 
-operation register_recovery_contract(blockchain_rid: byte_array, network_id: integer, contract_address: byte_array) {
+/**
+ * Registers an EVM recovery contract for a specific blockchain.
+ * 
+ * This operation requires ICCF proof from the source blockchain and validates that:
+ * - The operation name matches "register_recovery_contract"
+ * - The operation has exactly 2 arguments: network_id: integer and contract_address: byte_array
+ * - No recovery contract is already registered for the blockchain
+ * 
+ * After validation, it:
+ * 1. Creates a recovery contract record linking the blockchain RID, network ID and contract address
+ * 2. Links the contract address to the source blockchain FT4 account
+ * 
+ * @param tx_to_prove       The transaction containing the registration operation to be proven
+ * @param op_index          Index of the registration operation within the transaction
+ * 
+ * Expected operation signature in tx_to_prove:
+ *      operation register_recovery_contract(network_id: integer, contract_address: byte_array)
+ */
+operation register_recovery_contract(tx_to_prove: gtx_transaction, op_index: integer) {
+    val iccf_auth_data = require_iccf_auth(tx_to_prove, op_index, rell.meta(register_recovery_contract).simple_name, 2);
+    val blockchain_rid = iccf_auth_data.blockchain_rid;
+    val network_id = integer.from_gtv(iccf_auth_data.op_args[0]);
+    val contract_address = byte_array.from_gtv(iccf_auth_data.op_args[1]);
+
+    validate_evm_network_and_address(network_id, contract_address);
+
     require(
-        empty(recovery_contract @? { blockchain_rid }),
-        "Recovery contract for blockchain %s is already registered".format(blockchain_rid)
+        empty(recovery_contract @? { blockchain_rid, network_id }),
+        "Recovery contract for blockchain %s and network ID %d is already registered".format(blockchain_rid, network_id)
     );
 
+    // Create recovery contract record
     create recovery_contract(blockchain_rid, network_id, contract_address);
     _link_evm_sc_account(contract_address, network_id, ft4.crosschain.ensure_blockchain_account(blockchain_rid));
 }
 
-operation unregister_recovery_contract(blockchain_rid: byte_array, network_id: integer) {
+/**
+ * Unregisters an EVM recovery contract for a specific blockchain.
+ * 
+ * This operation requires ICCF proof from the source blockchain and validates that:
+ * - The operation name matches "unregister_recovery_contract"
+ * - The operation has exactly 2 arguments: network_id: integer and contract_address: byte_array
+ * - A recovery contract is registered for the given blockchain and network
+ * 
+ * After validation, it:
+ * 1. Unlinks the contract address from the source blockchain FT4 account
+ * 2. Deletes the recovery contract record
+ * 
+ * @param tx_to_prove       The transaction containing the unregistration operation to be proven
+ * @param op_index          Index of the unregistration operation within the transaction
+ * 
+ * Expected operation signature in tx_to_prove:
+ *      operation unregister_recovery_contract(network_id: integer, contract_address: byte_array)
+ */
+operation unregister_recovery_contract(tx_to_prove: gtx_transaction, op_index: integer) {
+    val iccf_auth_data = require_iccf_auth(tx_to_prove, op_index, rell.meta(unregister_recovery_contract).simple_name, 2);
+    val blockchain_rid = iccf_auth_data.blockchain_rid;
+    val network_id = integer.from_gtv(iccf_auth_data.op_args[0]);
+    val contract_address = byte_array.from_gtv(iccf_auth_data.op_args[1]);
+
+    validate_evm_network_and_address(network_id, contract_address);
+
     val recovery_contract = recovery_contract @? { blockchain_rid, network_id };
     if (exists(recovery_contract)) {
         _unlink_evm_sc_account(recovery_contract.contract_address, network_id, ft4.crosschain.ensure_blockchain_account(blockchain_rid));

@@ -29,10 +29,8 @@ function test_multi_hop_cross_xfer__state_slots_emitted_on_init_transfer_to_orig
     deposit_from_evm(alice.evm_address, 1000, asset = CHR, network_id = network_id1);
 
     // register recovery contracts for the hub_chain and the island1_chain
-    rell.test.tx()
-        .op(register_recovery_contract(hub_chain_rid, network_id1, hub_chain_recovery_contract))
-        .op(register_recovery_contract(island1_chain_rid, network_id1, island1_chain_recovery_contract))
-        .run();
+    _register_recovery_contract(hub_chain_rid, network_id1, hub_chain_recovery_contract);
+    _register_recovery_contract(island1_chain_rid, network_id1, island1_chain_recovery_contract);
 
     // init transfer on the token_chain
     rell.test.tx()
@@ -93,9 +91,7 @@ function test_multi_hop_cross_xfer__state_slots_emitted_on_apply_transfer_to_int
     register_erc20_asset(chr_asset, CHR, network_id1, enable_snapshots = true, bridge_mode = hbridge.bridge_mode.foreign);
 
     // register recovery contract for the island1_chain
-    rell.test.tx()
-        .op(register_recovery_contract(island1_chain_rid, network_id1, island1_chain_recovery_contract))
-        .run();
+    _register_recovery_contract(island1_chain_rid, network_id1, island1_chain_recovery_contract);
 
     // run transactions
     _apply_transfer_of_300_chr_on_hub_chain(alice_account_id, alice_auth_descriptor_id, bob_account_id, chr_asset);
@@ -232,10 +228,8 @@ function test_multi_hop_cross_xfer_via_upstream_chain__state_slots_emitted_on_in
     _apply_transfer_of_300_chr_on_island1_chain(alice, bob, chr_asset);
 
     // register recovery contracts for the hub_chain and the island2_chain
-    rell.test.tx()
-        .op(register_recovery_contract(hub_chain_rid, network_id1, hub_chain_recovery_contract))
-        .op(register_recovery_contract(island2_chain_rid, network_id1, island2_chain_recovery_contract))
-        .run();
+    _register_recovery_contract(hub_chain_rid, network_id1, hub_chain_recovery_contract);
+    _register_recovery_contract(island2_chain_rid, network_id1, island2_chain_recovery_contract);
 
     // init transfer on the island1_chain (to the island2_chain)
     rell.test.tx()
@@ -293,10 +287,8 @@ function test_multi_hop_cross_xfer_via_upstream_chain__state_slots_emitted_on_ap
     register_erc20_asset(chr_asset, CHR, network_id1, enable_snapshots = true, bridge_mode = hbridge.bridge_mode.foreign);
 
     // register recovery contracts for the island1_chain and the island2_chain
-    rell.test.tx()
-        .op(register_recovery_contract(island1_chain_rid, network_id1, island1_chain_recovery_contract))
-        .op(register_recovery_contract(island2_chain_rid, network_id1, island2_chain_recovery_contract))
-        .run();
+    _register_recovery_contract(island1_chain_rid, network_id1, island1_chain_recovery_contract);
+    _register_recovery_contract(island2_chain_rid, network_id1, island2_chain_recovery_contract);
 
     // to get the needed state we repeat steps from the `test_multi_hop_cross_xfer__state_slots_emitted_on_apply_transfer_to_intermediate_chain`
     _apply_transfer_of_300_chr_on_hub_chain(alice_account_id, alice_auth_descriptor_id, bob_account_id, chr_asset);
