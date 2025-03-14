@@ -4,7 +4,7 @@ import {
     Chromia__factory,
     ChromiaTokenBridge,
     ChromiaTokenBridge__factory,
-    TokenMinterBase,
+    TokenMinterBase, TokenMinterBSC__factory,
     TokenMinterETH__factory
 } from "../../typechain-types";
 import { verifyProxyContract } from "./utils";
@@ -12,6 +12,7 @@ import { verifyProxyContract } from "./utils";
 interface KnownArtifacts {
     multiSigOwner: string;
     chromiaTokenAddress: string;
+    networkType: string;
 }
 
 
@@ -19,30 +20,36 @@ const known_artifacts_by_network: { [key: string]: KnownArtifacts } = {
     "ethereum": {
         "multiSigOwner": "0x734eEdaD58606EfF1AAf6fF3699fa4ae4f36E8C1", // system.ops.wallets
         "chromiaTokenAddress": "0x8A2279d4A90B6fe1C4B30fa660cC9f926797bAA2", // chr.tokens
+        "networkType": "ETH"
     },
     "bsc": {
         "multiSigOwner": "0xe33D5C1DFDEde024f612c33C90B1D4a3d3504da0", // system.ops.wallets
         "chromiaTokenAddress": "0xf9CeC8d50f6c8ad3Fb6dcCEC577e05aA32B224FE", // chr.tokens
+        "networkType": "BSC"
     },
     "hardhat": {
         "multiSigOwner": "0x6e8187435d5140214552ef3989ddb1457f4a663a", // nonsense
         "chromiaTokenAddress": "0x8A22279d4A90B6fe1C4B30fa660cC9f926797bAA2", // nonsense
+        "networkType": "ETH"
     },
     "bsc_testnet": {
         "multiSigOwner": "0x6e8187435d5140214552ef3989ddb1457f4a663a", // nonsense
         "chromiaTokenAddress": "0x8e59d72e4DdA56F26963C6b8c77cA1959E9A74F0", // tCHR
+        "networkType": "BSC"
     },
     "base_sepolia": {
         "multiSigOwner": "0x6e8187435d5140214552ef3989ddb1457f4a663a", // nonsense
         "chromiaTokenAddress": "0x1F11F131E0866AaaBfcCaaF350A6c33Abb0308b8", // tCHR
+        "networkType": "ETH"
     },
 }
 
 task("deploy:chromiabridge")
     .addOptionalParam("validatorAddress", "Validator contract address")
     .addOptionalParam("offset", "withdraw offset")
+    .addOptionalParam("chromiaTokenAddress", "Chromia Token address")
     .addFlag("verify", "Verify contracts at Etherscan")
-    .setAction(async ({ validatorAddress, offset, verify }, hre) => {
+    .setAction(async ({ validatorAddress, offset, chromiaTokenAddress, verify }, hre) => {
         let multiSigOwner = known_artifacts_by_network[hre.network.name].multiSigOwner;
 
         const withdrawOffset = offset === undefined ? 0 : parseInt(offset);
@@ -54,7 +61,8 @@ task("deploy:chromiabridge")
         
         const proxyAdmin = await hre.upgrades.erc1967.getAdminAddress(bridgeAddress);
         console.log("Proxy admin address is: ", proxyAdmin);
-        await hre.upgrades.admin.transferProxyAdminOwnership(multiSigOwner);
+        await hre.upgrades.admin.transferProxyAdminOwnership(bridgeAddress, multiSigOwner);
+        console.log("Proxy admin ownership transferred to multisig owner:", multiSigOwner);
 
         const DAILY_LIMIT = 1000000 * 1000000; // agreed on weekly meeting 2024-06-19
 
@@ -63,14 +71,22 @@ task("deploy:chromiabridge")
 
         // Import the Chromia token contract
         const tokenFactory  = await hre.ethers.getContractFactory("Chromia") as Chromia__factory;
-        const token = tokenFactory.attach(known_artifacts_by_network[hre.network.name].chromiaTokenAddress) as Chromia;
+        const token = tokenFactory.attach(chromiaTokenAddress ?? known_artifacts_by_network[hre.network.name].chromiaTokenAddress) as Chromia;
         const tokenAddress = await token.getAddress();
 
-        const tokenMinterFactory = await hre.ethers.getContractFactory("TokenMinterETH") as TokenMinterETH__factory; // transferFromNative ETH mainnet
+        let tokenMinterFactory;
+        if (known_artifacts_by_network[hre.network.name].networkType === "ETH") {
+            tokenMinterFactory = await hre.ethers.getContractFactory("TokenMinterETH") as TokenMinterETH__factory; // transferFromNative ETH mainnet
+        } else {
+            tokenMinterFactory = await hre.ethers.getContractFactory("TokenMinterBSC") as TokenMinterBSC__factory;
+        }
         const tokenMinter = await tokenMinterFactory.deploy(DAILY_LIMIT, tokenAddress, bridgeAddress, multiSigOwner) as TokenMinterBase;
         await tokenMinter.waitForDeployment();
         const tokenMinterAddress = await tokenMinter.getAddress();
         console.log("Token Minter deployed to: ", tokenMinterAddress);
+
+        console.log('token.changeMinter');
+        console.log(await token.changeMinter(tokenMinterAddress));
 
         console.log('bridge.setTokenMinter');
         console.log(await bridge.setTokenMinter(tokenMinterAddress));
