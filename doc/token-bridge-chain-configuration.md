@@ -43,39 +43,39 @@ blockchains:
 
 libs:
   ft4:
-    registry: https://bitbucket.org/chromawallet/ft3-lib
+    registry: https://gitlab.com/chromaway/ft4-lib.git
     path: rell/src/lib/ft4
-    tagOrBranch: v0.7.0r
-    rid: x"F7C207AA595ABD25FDE5C2C2E32ECD3768B480AD03D1F2341548FF4F37D9B7AF"
+    tagOrBranch: v1.1.0r
+    rid: x"FEEB0633698E7650D29DCCFE2996AD57CDC70AA3BDF770365C3D442D9DFC2A5E"
     insecure: false
   iccf:
     registry: https://gitlab.com/chromaway/core/directory-chain
-    path: src/iccf
-    tagOrBranch: 1.45.0
-    rid: x"1D567580C717B91D2F188A4D786DB1D41501086B155A68303661D25364314A4D"
+    path: src/lib/iccf
+    tagOrBranch: 1.82.4
+    rid: x"9C359787B75927733034EA1CEE74EEC8829D2907E4FC94790B5E9ABE4396575D"
     insecure: false
   icmf:
     registry: https://gitlab.com/chromaway/core/directory-chain
-    path: src/messaging/icmf
-    tagOrBranch: 1.45.0
-    rid: x"19D6BC28D527E6D2239843608486A84F44EDCD244E253616F13D1C65893F35F6"
+    path: src/lib/icmf
+    tagOrBranch: 1.82.4
+    rid: x"1A4B3C3A1325DEF2C426C4F0F93F7444BB074373A24367DAA958C32F21B2EA1D"
     insecure: false
   eif:
     registry: https://gitlab.com/chromaway/postchain-eif
     path: postchain-eif-rell/rell/src/eif
-    tagOrBranch: 0.5.4
-    rid: x"73EEA09493338825235D685EC1E6D33BB882659AD4983929B66044E8B9E9B3CA"
+    tagOrBranch: 0.13.1
+    rid: x"AB40EDB0B534726B5F3AA288A5D31BE840B24BA670775E4F95C1B2512F5B8F22"
     insecure: false
   eif_event_connector:
     registry: https://gitlab.com/chromaway/postchain-eif
     path: postchain-eif-rell/rell/src/eif_event_connector
-    tagOrBranch: 0.5.4
+    tagOrBranch: 0.13.1
     rid: x"4A669C5F98AEE970FECD5B77116E737196C7D3C7C6217DFD7EAC2F9317FC9461"
     insecure: false
   hbridge:
     registry: https://gitlab.com/chromaway/postchain-eif
     path: postchain-eif-rell/rell/src/hbridge
-    tagOrBranch: 0.5.4
-    rid: x"8D18FB8274EB7653D5734AA07C569E9DC480828096D4CF81A2EE4C25C60DE324"
+    tagOrBranch: 0.13.1
+    rid: x"3DE398220EF81C16C4ACD8FE93DC39943FE253AEC79358D9231CC4D1968FEAA1"
     insecure: false
 ```
