@@ -116,9 +116,9 @@ Example:
   libs:
     icmf:
       registry: https://gitlab.com/chromaway/core/directory-chain
-      path: src/messaging/icmf
-      tagOrBranch: 1.37.0
-      rid: x"19D6BC28D527E6D2239843608486A84F44EDCD244E253616F13D1C65893F35F6"
+      path: src/lib/icmf
+      tagOrBranch: 1.82.4
+      rid: x"1A4B3C3A1325DEF2C426C4F0F93F7444BB074373A24367DAA958C32F21B2EA1D"
       insecure: false
 ```
 

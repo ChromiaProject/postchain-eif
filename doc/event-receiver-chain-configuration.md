@@ -63,21 +63,21 @@ blockchains:
 libs:
   icmf:
     registry: https://gitlab.com/chromaway/core/directory-chain
-    path: src/messaging/icmf
-    tagOrBranch: 1.45.0
-    rid: x"19D6BC28D527E6D2239843608486A84F44EDCD244E253616F13D1C65893F35F6"
+    path: src/lib/icmf
+    tagOrBranch: 1.82.4
+    rid: x"1A4B3C3A1325DEF2C426C4F0F93F7444BB074373A24367DAA958C32F21B2EA1D"
     insecure: false
   eif:
     registry: https://gitlab.com/chromaway/postchain-eif
     path: postchain-eif-rell/rell/src/eif
-    tagOrBranch: 0.5.4
-    rid: x"73EEA09493338825235D685EC1E6D33BB882659AD4983929B66044E8B9E9B3CA"
+    tagOrBranch: 0.13.1
+    rid: x"AB40EDB0B534726B5F3AA288A5D31BE840B24BA670775E4F95C1B2512F5B8F22"
     insecure: false
   eif_event_receiver:
     registry: https://gitlab.com/chromaway/postchain-eif
     path: postchain-eif-rell/rell/src/eif_event_receiver
-    tagOrBranch: 0.5.4
-    rid: x"4B509E09E33F36E1CD4642C1DF9C61931D88D4C50004664113898659E87BE489"
+    tagOrBranch: 0.13.1
+    rid: x"B20700DA8FE4FC7E5880BCCCB6FBE0B6A22CD6FAB61CDF9CE20E06B62D4902F4"
     insecure: false
 ```
 
