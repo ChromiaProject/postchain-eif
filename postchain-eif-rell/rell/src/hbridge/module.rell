@@ -5,6 +5,7 @@ import messaging: ^.eif.messaging;
 import common: ^.eif.common;
 import utils: ^.eif.utils;
 import version: ^.eif.version;
+import lib.iccf;
 
 namespace ft4 {
     import lib.ft4.accounts;
@@ -43,3 +44,40 @@ function deposit_check_access_list(account_id: byte_array): boolean = true;
 
 @extendable
 function withdraw_check_access_list(account_id: byte_array): boolean = true;
+
+struct iccf_auth_data {
+    blockchain_rid: byte_array;
+    op_args: list<gtv>;
+}
+
+/**
+ * Requires and validates ICCF proof for a cross-chain operation.
+ *
+ * Validates the operation's name, index, and number of arguments.
+ *
+ * @param tx_to_prove       The transaction to be proven and validated
+ * @param op_index          Index of the operation within the transaction
+ * @param op_name           Expected name of the operation
+ * @param op_arg_count      Expected number of operation arguments
+ *
+ * @return The blockchain rid and the operation arguments
+ */
+function require_iccf_auth(tx_to_prove: gtx_transaction, op_index: integer, op_name: text, op_arg_count: integer): iccf_auth_data {
+    val proof = iccf.require_and_return_valid_proof(tx_to_prove, require_anchored_proof = true, verify_signers = false);
+    val block_header = iccf.block_header.from_gtv(gtv.from_bytes(proof.blockHeader));
+
+    require(op_index in range(tx_to_prove.body.operations.size()), "op_index out of range");
+    val op = tx_to_prove.body.operations[op_index];
+    require(op.name == op_name, "Wrong operation name <%s>, expected <%s>".format(op.name, op_name));
+    require(op.args.size() >= op_arg_count, "Wrong number of operation arguments <%s>, expected <%s>".format(op.args.size(), op_arg_count));
+
+    return iccf_auth_data(
+        block_header.blockchain_rid,
+        op.args
+    );
+}
+
+function validate_evm_network_and_address(network_id: integer, address: byte_array) {
+    require(network_id > 0, "Network ID must be positive");
+    require(address.size() == 20, "Contract address must be 20 bytes");
+}

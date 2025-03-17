@@ -80,3 +80,32 @@ function _build_cancel_tx(
     ),
     signatures = []
 );
+
+function _build_register_recovery_contract_tx(
+    blockchain_rid: byte_array,
+    network_id: integer,
+    contract_address: byte_array
+) = gtx_transaction(
+    body = gtx_transaction_body(
+        blockchain_rid = blockchain_rid,
+        operations = [
+            helpers.register_recovery_contract_op(network_id, contract_address).to_gtx_operation()
+        ],
+        signers = []
+    ),
+    signatures = []
+);
+
+function _register_recovery_contract(brid: byte_array, network_id: integer, contract_address: byte_array) {
+    val reg_recovery_contract_tx = _build_register_recovery_contract_tx(brid, network_id, contract_address);
+
+    rell.test.tx()
+        .op(helpers.iccf_proof(
+            brid, 
+            reg_recovery_contract_tx.to_gtv().hash(), 
+            helpers.mock_confirmation_proof_bytes(brid), 
+            x"", 0, x""
+        ))
+        .op(register_recovery_contract(reg_recovery_contract_tx, 0))
+        .run();
+}
