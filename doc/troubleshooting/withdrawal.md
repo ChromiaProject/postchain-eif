@@ -42,7 +42,7 @@ This section covers the most common issues that might occur when a withdrawal re
 postchain-eif-contracts$ yarn inspect:bridge --network {NETWORK} --bridge-address {BRIDGE_ADDRESS}
 ```
 
-where `{NETWORK}` can be one of `ethereum`, `bsc`, `sepolia`, or `bsc_testnet`. If the validator set differs from the one in the *Directory Chain Validator* contract, it means that the validator set is not updated. The next step is to check the `updateValidators` EVM transaction on the *Transaction Submitter* chain and attempt to manually re-submit the failed transaction. See the "Manual reset of failed signer updates" section in the [transaction-submitter-configuration-and-setup.md](transaction-submitter-configuration-and-setup.md) guide for further instructions.
+where `{NETWORK}` can be one of `ethereum`, `bsc`, `sepolia`, or `bsc_testnet`. If the validator set differs from the one in the *Directory Chain Validator* contract, it means that the validator set is not updated. The next step is to check the `updateValidators` EVM transaction on the *Transaction Submitter* chain and attempt to manually re-submit the failed transaction. See the "Manual reset of failed signer updates" section in the [transaction-submitter-configuration-and-setup.md](../transaction-submitter-configuration-and-setup.md) guide for further instructions.
 
 
 #### 3. Complete Withdrawal on EVM side
