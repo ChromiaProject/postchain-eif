@@ -15,7 +15,7 @@ export function parseValidators(validators: string) {
     return validators.split(',');
 }
 
-export async function verifyProxyContract(hre: HardhatRuntimeEnvironment, proxyAddress: string, delayMs: number = 60000) {
+export async function verifyProxyContract(hre: HardhatRuntimeEnvironment, proxyAddress: string, delayMs: number = 30000) {
     const implementationAddress = await hre.upgrades.erc1967.getImplementationAddress(proxyAddress);
     console.log("Verifying logic contract deployed at: " + implementationAddress + ". This may take some time.");
     if (delayMs > 0) {
@@ -26,4 +26,3 @@ export async function verifyProxyContract(hre: HardhatRuntimeEnvironment, proxyA
         address: implementationAddress,
     });
 }
-

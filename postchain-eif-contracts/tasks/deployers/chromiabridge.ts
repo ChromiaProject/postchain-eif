@@ -7,7 +7,7 @@ import {
     TokenMinterBase, TokenMinterBSC__factory,
     TokenMinterETH__factory
 } from "../../typechain-types";
-import { verifyProxyContract } from "./utils";
+import { delay, verifyProxyContract } from "./utils";
 
 interface KnownArtifacts {
     multiSigOwner: string;
@@ -99,6 +99,7 @@ task("deploy:chromiabridge")
         // note: it needs to be accepted by the multisig
 
         if (verify) {
+            await delay(30000);
             // When redeploy new smart contracts, etherscan can automatically verify the smart contract
             // with the similar code, then calling verify will return error. 
             // We add try/catch to handle the error and continue to verify the main bridge smart contract.
@@ -116,7 +117,7 @@ task("deploy:chromiabridge")
             }
 
             try {
-                await verifyProxyContract(hre, bridgeAddress);
+                await verifyProxyContract(hre, bridgeAddress, 0);
             } catch (e) {
                 console.log(e);
             }
@@ -140,6 +141,7 @@ task("deploy:chromiatokenbsc")
         console.log("Owner/Minter set to:", deployerAddress);
 
         if (verify) {
+            await delay(30000);
             try {
                 await hre.run("verify:verify", {
                     address: tokenAddress,

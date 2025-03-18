@@ -5,6 +5,7 @@ import {
     ManagedValidator,
     ManagedValidator__factory
 } from "../../typechain-types";
+import { delay } from "./utils";
 
 task("deploy:anchoring", "Deploy anchoring contract")
     .addParam("blockchainRid", "Blockchain RID of system anchoring chain")
@@ -41,7 +42,3 @@ task("deploy:anchoring", "Deploy anchoring contract")
             });
         }
     });
-
-function delay(ms: number) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}

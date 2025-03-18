@@ -6,7 +6,7 @@ import {
     TokenBridge__factory
 } from "../../typechain-types";
 import fetch from 'node-fetch';
-import { ChromiaNetwork, delay, verifyProxyContract } from "./utils";
+import { ChromiaNetwork, verifyProxyContract } from "./utils";
 import { exit } from "process";
 import { inspectManagedValidatorContract } from "./validator";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
@@ -49,7 +49,6 @@ task("upgrade:bridge")
         const factory = await hre.ethers.getContractFactory("TokenBridge") as TokenBridge__factory;
         await hre.upgrades.upgradeProxy(address, factory);
         console.log("Token bridge has been upgraded");
-        await delay(60000);
 
         if (verify) {
             await verifyProxyContract(hre, address);

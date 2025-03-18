@@ -49,6 +49,7 @@ task("deploy:validator")
         }
 
         if (verify) {
+            await delay(30000);
             // When redeploy new smart contracts, etherscan can automatically verify the smart contract
             // with the similar code, then calling verify will return error. We add try/catch to handle the error.
             try {
