@@ -1,5 +1,6 @@
 import { task } from "hardhat/config";
 import { ALICE, ALICE__factory } from "../../typechain-types";
+import { delay } from "./utils";
 
 task("deploy:alice", "Deploy ALICE token")
     .addFlag("verify", "Verify contracts at Etherscan")
@@ -21,7 +22,3 @@ task("deploy:alice", "Deploy ALICE token")
             });
         }
     });
-
-function delay(ms: number) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}

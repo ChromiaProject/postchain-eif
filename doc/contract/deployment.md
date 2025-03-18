@@ -27,6 +27,8 @@ The [DirectoryChainValidator](./contracts/validatorupdate/DirectoryChainValidato
 
 # Deploying Validator Contract
 
+> **Prerequisites:** Before proceeding with deployment, ensure you have set up your environment properly by following the instructions in [prerequisites.md](./prerequisites.md).
+
 Use the following commands to deploy the validator contracts.
 
 For manually updated validator contract:

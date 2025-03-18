@@ -103,7 +103,15 @@ const config: HardhatUserConfig = {
     },
     etherscan: {
         apiKey: {
-            bscTestnet: process.env.BSCSCAN_API_KEY
+            // Ethereum
+            ethereum: process.env.ETHERSCAN_API_KEY,
+            sepolia: process.env.ETHERSCAN_API_KEY,
+            // BSC
+            bsc: process.env.BSCSCAN_API_KEY,
+            bscTestnet: process.env.BSCSCAN_API_KEY,
+            // BASE
+            base: process.env.BASESCAN_API_KEY,
+            baseSepolia: process.env.BASESCAN_API_KEY,
         }
     },
     paths: {
@@ -121,7 +129,7 @@ const config: HardhatUserConfig = {
                     // https://hardhat.org/hardhat-network/#solidity-optimizer-support
                     optimizer: {
                         enabled: true,
-                        runs: 100,
+                        runs: 200,
                     },
                 },
             },
@@ -132,7 +140,7 @@ const config: HardhatUserConfig = {
                     // https://hardhat.org/hardhat-network/#solidity-optimizer-support
                     optimizer: {
                         enabled: true,
-                        runs: 100,
+                        runs: 200,
                     },
                 },
             },
@@ -141,7 +149,7 @@ const config: HardhatUserConfig = {
                 settings: {
                     optimizer: {
                         enabled: true,
-                        runs: 100,
+                        runs: 200,
                     },
                 },
             },
@@ -150,7 +158,7 @@ const config: HardhatUserConfig = {
                 settings: {
                     optimizer: {
                         enabled: true,
-                        runs: 100,
+                        runs: 200,
                     },
                 },
             },
