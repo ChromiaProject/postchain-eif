@@ -22,7 +22,7 @@ The manually updated [Validator](./contracts/Validator.sol) is a validator contr
 
 The [ManagedValidator](./contracts/validatorupdate/ManagedValidator.sol) is a validator contract that is automatically managed by the Chromia network. More specifically, there is a special system chain called *Transaction Submitter*, which submits transactions to the managed validator contract to update the validator set if the Chromia validators are updated. This type of validator contract should be deployed by dapp developers when building a bridge dapp.
 
-The [DirectoryChainValidator](./contracts/validatorupdate/DirectoryChainValidator.sol) is a managed validator contract intended to track the validator set of the system cluster. It is not supposed to be deployed or upgraded by dapp developers. However, the DirectoryChainValidator is used as an argument when deploying ManagedValidator contracts. The DirectoryChainValidator is fixed for each supported EVM chain and can be shown using the script below.
+The [DirectoryChainValidator](./contracts/validatorupdate/DirectoryChainValidator.sol) is a managed validator contract intended to track the validator set of the system cluster. This is only required if you have deployed your own Chromia network and is not intended to be deployed or upgraded by dapp developers. However, the DirectoryChainValidator is used as an argument when deploying ManagedValidator contracts. The DirectoryChainValidator is fixed for each supported EVM chain and can be shown using the script below.
 
 
 # Deploying Validator Contract
@@ -49,7 +49,7 @@ For managed validator contract (if you already know the blockchain RID of your c
 $ yarn deploy:validator --network sepolia --verify --directory-validator {DIRECTORY_VALIDATOR_CONTRACT_ADDRESS}
 ```
 
-For directory chain validator:
+For directory chain validator (if you have deployed your own Chromia network):
 
 ```sh
 $ yarn deploy:directoryValidator --network sepolia --verify --blockchain-rid {DIRECTORY_CHAIN_RID}
