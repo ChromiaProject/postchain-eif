@@ -2,6 +2,13 @@ import { task } from "hardhat/config";
 import { ALICE, ALICE__factory } from "../../typechain-types";
 import { delay } from "./utils";
 
+/**
+ * Deploys the ALICE token.
+ * 
+ * This task deploys the ALICE token contract.
+ * 
+ * @param verify - Optional. If set, verifies the deployed contract at Etherscan.
+ */
 task("deploy:alice", "Deploy ALICE token")
     .addFlag("verify", "Verify contracts at Etherscan")
     .setAction(async ({ verify }, hre) => {

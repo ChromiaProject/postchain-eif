@@ -11,8 +11,19 @@ import { exit } from "process";
 import { inspectManagedValidatorContract } from "./validator";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
+/**
+ * Deploys a TokenBridge contract with a proxy pattern.
+ * 
+ * This task deploys a TokenBridge contract using the OpenZeppelin upgradeable proxy pattern.
+ * It initializes the bridge with the provided validator address and withdraw offset.
+ * After deployment, it logs the bridge address and proxy admin address to the console. 
+ * 
+ * @param validatorAddress - The address of the validator contract to be used by the bridge.
+ * @param offset - Optional. The withdraw offset value for the bridge. Defaults to 0 if not provided.
+ * @param verify - Optional flag. If set, verifies the deployed contract on Etherscan.
+ */
 task("deploy:bridge")
-    .addOptionalParam("validatorAddress", "Validator contract address")
+    .addParam("validatorAddress", "Validator contract address")
     .addOptionalParam('offset', 'withdraw offset')
     .addFlag('verify', 'Verify contracts at Etherscan')
     .setAction(async ({ validatorAddress, offset, verify }, hre) => {
@@ -34,6 +45,14 @@ task("deploy:bridge")
         }
     });
 
+/**
+ * Prepares an upgrade for the TokenBridge contract.
+ * 
+ * This task prepares an upgrade for the TokenBridge contract by creating a new logic contract. 
+ * It logs the new logic contract address to the console.
+ * 
+ * @param address - The address of the TokenBridge contract to be upgraded.
+ */
 task("prepare:bridge")
     .addParam("address", "")
     .setAction(async ({ address }, hre) => {
@@ -42,6 +61,15 @@ task("prepare:bridge")
         console.log("New logic contract of token bridge has been prepared for upgrade at: ", upgrade);
     });
 
+/**
+ * Upgrades the existing TokenBridge contract
+ * 
+ * This task upgrades the existing TokenBridge contract to the latest version.
+ * It logs the upgraded contract address to the console.
+ * 
+ * @param address - The address of the TokenBridge contract to be upgraded.
+ * @param verify - Optional flag. If set, verifies the upgraded contract on Etherscan.
+ */
 task("upgrade:bridge")
     .addParam("address", "")
     .addFlag("verify", "Verify contracts at Etherscan")
@@ -55,6 +83,13 @@ task("upgrade:bridge")
         }
     });
 
+/**
+ * Imports a TokenBridge contract.
+ * 
+ * This task imports a TokenBridge contract by creating a new logic contract.
+ * 
+ * @param address - The address of the TokenBridge contract to be imported.
+ */
 task("import:bridge")
     .addParam("address", "")
     .setAction(async ({ address }, hre) => {
@@ -63,6 +98,16 @@ task("import:bridge")
         console.log("Token bridge has been imported");
     });
 
+/**
+ * Sets the blockchain RID for a TokenBridge contract.
+ * 
+ * This task sets the blockchain RID of the bridge chain and the managed validator for the bridge.
+ * It logs the updated blockchain RID to the console.
+ * 
+ * @param address - The address of the TokenBridge contract.
+ * @param blockchainRid - The blockchain RID of the bridge chain to be set.
+ * @param managedValidator - Optional. The address of the managed validator contract for the bridge.
+ */
 task("setBlockchainRid:bridge")
     .addParam("address", "Bridge contract address")
     .addParam("blockchainRid", "Blockchain RID of bridge chain")
@@ -82,6 +127,15 @@ task("setBlockchainRid:bridge")
         }
     });
 
+/**
+ * Allows a token to be used on a TokenBridge contract.
+ * 
+ * This task allows a token to be used on a TokenBridge contract.
+ * It logs the updated token address to the console.
+ * 
+ * @param bridgeAddress - The address of the TokenBridge contract.
+ * @param tokenAddress - The address of the token contract to be allowed.
+ */
 task("allowToken:bridge")
     .addParam("bridgeAddress", "Bridge contract address")
     .addParam("tokenAddress", "Token contract address")
@@ -92,8 +146,24 @@ task("allowToken:bridge")
         console.log(await bridge.allowToken(tokenAddress));
     });
 
+/**
+ * Inspects a Chromia Token Bridge contract.
+ * 
+ * This task inspects a Chromia Token Bridge contract by fetching the bridge address from Economy Chain of the Chromia network.
+ * It then inspects the token bridge contract and logs the results to the console:
+ * - Economy Chain RID
+ * - EVM Network name
+ * - EVM Network ID
+ * - Bridge contract address
+ * - Validator contract address
+ * - Validators from the Validator contract
+ * - Directory Chain Validator contract address
+ * - Validators from the Directory Chain Validator contract
+ * 
+ * @param chromiaNetwork - The name of the Chromia network to inspect. Expected values are: "mainnet", "testnet", "devnet1", "devnet2".
+ */
 task("inspect:chromiabridge", "Inspect chromia token bridge contract")
-    .addParam("chromiaNetwork", "Chromia network name (mainnet, testnet, devnet1, devnet2, etc.)")
+    .addParam("chromiaNetwork", "Chromia network name (mainnet, testnet, devnet1, devnet2)")
     .setAction(async ({ chromiaNetwork }, hre) => {
         // Get economy chain RID
         const chromiaNode = Object.values(ChromiaNetwork).find((m) => m.value === chromiaNetwork);
@@ -115,6 +185,20 @@ task("inspect:chromiabridge", "Inspect chromia token bridge contract")
         await inspectTokenBridgeContract(bridgeAddress, hre);
     });
 
+/**
+ * Inspects a Token Bridge contract.
+ * 
+ * This task inspects a Token Bridge contract. It logs the results to the console:
+ * - EVM Network name
+ * - EVM Network ID
+ * - Bridge contract address
+ * - Validator contract address
+ * - Validators from the Validator contract
+ * - Directory Chain Validator contract address
+ * - Validators from the Directory Chain Validator contract
+ * 
+ * @param bridgeAddress - The address of the Token Bridge contract to be inspected.
+ */
 task("inspect:bridge", "Inspect token bridge contract")
     .addParam("bridgeAddress", "Bridge contract address")
     .setAction(async ({ bridgeAddress }, hre) => {
@@ -141,6 +225,13 @@ async function inspectTokenBridgeContract(bridgeAddress: string, hre: HardhatRun
     await inspectManagedValidatorContract(validatorAddress, hre);
 }
 
+/**
+ * Pauses a Token Bridge contract.
+ * 
+ * This task pauses a Token Bridge contract.
+ * 
+ * @param address - The address of the Token Bridge contract to be paused.
+ */
 task("pause:bridge")
     .addParam("address", "Bridge contract address")
     .setAction(async ({address}, hre) => {
@@ -155,6 +246,13 @@ task("pause:bridge")
         }
     });
 
+/**
+ * Unpauses a Token Bridge contract.
+ * 
+ * This task unpauses a Token Bridge contract.
+ * 
+ * @param address - The address of the Token Bridge contract to be unpaused.
+ */
 task("unpause:bridge")
     .addParam("address", "Bridge contract address")
     .setAction(async ({address}, hre) => {

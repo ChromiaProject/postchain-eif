@@ -6,6 +6,14 @@ import {
     ManagedValidator__factory
 } from "../../typechain-types";
 
+/**
+ * Resubmits a signer update transaction.
+ * 
+ * This task extracts the ManagedValidator contract address and transaction parameters from the input data 
+ * and resubmits a signer update transaction.
+ * 
+ * @param data - The data to resubmit.
+ */
 task("transaction:resubmitSignerUpdate", "Resubmit signer update")
     .addParam("data", "An element in JSON array output from query 'latest_signer_list_update_txs'")
     .setAction(async ({ data }, hre) => {
@@ -25,6 +33,14 @@ task("transaction:resubmitSignerUpdate", "Resubmit signer update")
 
     });
 
+/**
+ * Resubmits an anchoring transaction.
+ * 
+ * This task extracts the Anchoring contract address and transaction parameters from the input data 
+ * and resubmits an anchoring transaction.
+ * 
+ * @param data - The data to resubmit.
+ */
 task("transaction:resubmitAnchoring", "Resubmit anchoring")
     .addParam("data", "input from query 'get_transactions'")
     .setAction(async ({ data }, hre) => {

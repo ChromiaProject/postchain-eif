@@ -7,6 +7,15 @@ import {
 } from "../../typechain-types";
 import { delay } from "./utils";
 
+/**
+ * Deploys an Anchoring contract.
+ * 
+ * This task deploys a ManagedValidator contract and an Anchoring contract for the chain specified by the blockchain RID.
+ * 
+ * @param blockchainRid - The blockchain RID of the system anchoring chain.
+ * @param directoryValidator - The contract address of the directory chain validator.
+ * @param verify - Optional. If set, verifies the deployed contract at Etherscan.
+ */
 task("deploy:anchoring", "Deploy anchoring contract")
     .addParam("blockchainRid", "Blockchain RID of system anchoring chain")
     .addParam("directoryValidator", "Contract address of directory chain validator")

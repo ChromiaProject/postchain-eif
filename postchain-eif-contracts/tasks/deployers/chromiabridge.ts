@@ -44,8 +44,26 @@ const known_artifacts_by_network: { [key: string]: KnownArtifacts } = {
     },
 }
 
+/**
+ * Deploys a Chromia Token Bridge contract.
+ * 
+ * This task deploys a Chromia Token Bridge contract using the OpenZeppelin upgradeable proxy pattern.
+ * It initializes the bridge with the provided validator address and withdraw offset.
+ * After deployment, it logs the bridge address and proxy admin address to the console.
+ * 
+ * The task also deploys a TokenMinter contract (either TokenMinterETH or TokenMinterBSC depending on the network). 
+ * The TokenMinter is then set as the minter for the Chromia token and for the Chromia Token Bridge.
+ * The Chromia token is allowed on the bridge. 
+ * 
+ * The ownership of the proxy admin is transferred to a multisig wallet. 
+ * 
+ * @param validatorAddress - The address of the validator contract to be used by the bridge.
+ * @param offset - Optional. The withdraw offset value for the bridge. Defaults to 0 if not provided.
+ * @param chromiaTokenAddress - Optional. The address of the Chromia token contract to be used by the bridge.
+ * @param verify - Optional. If set, verifies the deployed contract at Etherscan.
+ */
 task("deploy:chromiabridge")
-    .addOptionalParam("validatorAddress", "Validator contract address")
+    .addParam("validatorAddress", "Validator contract address")
     .addOptionalParam("offset", "withdraw offset")
     .addOptionalParam("chromiaTokenAddress", "Chromia Token address")
     .addFlag("verify", "Verify contracts at Etherscan")
@@ -124,6 +142,11 @@ task("deploy:chromiabridge")
         }
     });
 
+/**
+ * Deploys a Chromia Token contract for the BSC network.
+ * 
+ * @param verify - Optional. If set, verifies the deployed contract at Etherscan.
+ */
 task("deploy:chromiatokenbsc")
     .addFlag("verify", "Verify contracts at block explorer")
     .setAction(async ({ verify }, hre) => {
