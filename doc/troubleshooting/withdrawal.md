@@ -1,4 +1,4 @@
-## Withdrawal Troubleshooting Guide
+# Withdrawal Troubleshooting Guide
 
 If your withdrawal from Chromia to EVM does not appear on the EVM chain, follow these steps to identify and resolve the issue.
 

@@ -22,7 +22,7 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
     bytes32 constant ERC20_WITHDRAWAL_TAG_V1 = 0x686272696467653a65726332305f77697468647261773a763101010101010101;
 
     bytes32 public massExitStateRoot;
-    // @dev each account state snapshot will be used to claim only one time.
+    // @dev Each account state snapshot will be used to claim only one time.
     mapping(bytes32 => bool) internal _snapshots;
 
     // Events
