@@ -5,8 +5,17 @@ import {
 } from "../../typechain-types";
 import { verifyProxyContract } from "./utils";
 
+/**
+ * Deploys a Token Bridge With Snapshots contract that uses snapshots for withdrawals in the event of a mass exit.
+ * 
+ * This task deploys a TokenBridgeWithSnapshotsWithdraw contract using the OpenZeppelin upgradeable proxy pattern.
+ * 
+ * @param validatorAddress - The address of the validator contract.
+ * @param offset - Optional. The withdraw offset.
+ * @param verify - Whether to verify the contract at Etherscan.
+ */
 task("deploy:snapshots")
-    .addOptionalParam("validatorAddress", "Validator contract address")
+    .addParam("validatorAddress", "Validator contract address")
     .addOptionalParam('offset', 'withdraw offset')
     .addFlag('verify', 'Verify contracts at Etherscan')
     .setAction(async ({ validatorAddress, offset, verify }, hre) => {

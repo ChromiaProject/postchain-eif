@@ -3,6 +3,14 @@ import { DirectoryChainValidator, DirectoryChainValidator__factory, IValidator, 
 import { delay, parseValidators } from "./utils";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
+/**
+ * Deploys a Directory Chain Validator contract.
+ * 
+ * This task deploys a DirectoryChainValidator contract.
+ * 
+ * @param blockchainRid - The blockchain RID of the directory chain.
+ * @param verify - Optional. If set, verifies the deployed contract at Etherscan.
+ */
 task("deploy:directoryValidator", "Deploy directory chain validator contract")
     .addParam("blockchainRid", "Blockchain RID of directory chain")
     .addFlag("verify", "Verify contracts at Etherscan")
@@ -25,6 +33,18 @@ task("deploy:directoryValidator", "Deploy directory chain validator contract")
         }
     });
 
+/**
+ * Deploys a Validator contract or a ManagedValidator contract depending on the parameters.
+ * 
+ * Depending on the parameters, this task can deploy a Validator contract or a ManagedValidator contract.
+ * The Validator contract has a fixed list of validators and can not be updated.
+ * The ManagedValidator contract has a list of validators that can be updated by Transaction Submitter chain.
+ * 
+ * @param validators - Optional. The list of validators. Not needed for managed validators.
+ * @param directoryValidator - Optional. The contract address of the directory chain validator. Only needed for managed validators.
+ * @param blockchainRid - Optional. The blockchain RID of the chain whose blocks this validator validates. Only needed for managed validators.
+ * @param verify - Optional. If set, verifies the deployed contract at Etherscan.
+ */
 task("deploy:validator")
     .addOptionalParam("validators", "List of validators, not needed for managed validators")
     .addOptionalParam("directoryValidator", "Contract address of directory chain validator, supply this to use managed validator contract")
@@ -70,8 +90,18 @@ task("deploy:validator")
         }
     });
 
+/**
+ * Inspects a ManagedValidator contract.
+ * 
+ * This task inspects a ManagedValidator contract. It logs the following:
+ * - The list of validators of the ManagedValidator contract
+ * - The address of the DirectoryChainValidator contract
+ * - The list of validators of the DirectoryChainValidator contract
+ * 
+ * @param validatorAddress - The address of the ManagedValidator contract to inspect.
+ */
 task("inspect:managedValidator", "Inspect ManagedValidator contract")
-    .addOptionalParam("validatorAddress", "Validator contract address")
+    .addParam("validatorAddress", "Validator contract address")
     .setAction(async ({ validatorAddress }, hre) => {
         if (validatorAddress === undefined) {
             throw new Error("Validator contract address is required");
@@ -134,8 +164,15 @@ export async function inspectManagedValidatorContract(validatorAddress: string, 
     }
 }
 
+/**
+ * Inspects a DirectoryChainValidator contract.
+ * 
+ * This task inspects a DirectoryChainValidator contract and logs list of validators.   
+ * 
+ * @param validatorAddress - The address of the DirectoryChainValidator contract to inspect.
+ */
 task("inspect:directoryValidator", "Inspect DirectoryChainValidator contract")
-    .addOptionalParam("validatorAddress", "Validator contract address")
+    .addParam("validatorAddress", "Validator contract address")
     .setAction(async ({ validatorAddress }, hre) => {
         if (validatorAddress === undefined) {
             throw new Error("Validator contract address is required");
@@ -157,8 +194,15 @@ task("inspect:directoryValidator", "Inspect DirectoryChainValidator contract")
         }
     });
 
+/**
+ * Inspects a Validator contract.
+ * 
+ * This task inspects a Validator contract and logs list of validators.
+ * 
+ * @param validatorAddress - The address of the Validator contract to inspect.
+ */ 
 task("inspect:validator", "Inspect Validator contract")
-    .addOptionalParam("validatorAddress", "Validator contract address")
+    .addParam("validatorAddress", "Validator contract address")
     .setAction(async ({ validatorAddress }, hre) => {
         if (validatorAddress === undefined) {
             throw new Error("Validator contract address is required");
