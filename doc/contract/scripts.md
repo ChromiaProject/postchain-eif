@@ -1,4 +1,4 @@
-# Postchain EIF Contracts Scripts
+# Postchain EIF Contract Scripts
 
 This document describes all available scripts in the `postchain-eif-contracts` package.
 
