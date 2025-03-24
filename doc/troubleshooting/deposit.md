@@ -1,4 +1,4 @@
-## Deposit Troubleshooting Guide
+# Deposit Troubleshooting Guide
 
 If your deposit from EVM to Chromia does not appear on the Chromia side, follow these steps to identify and resolve the issue.
 

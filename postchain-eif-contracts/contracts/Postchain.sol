@@ -32,13 +32,13 @@ library Postchain {
         uint timestamp;
         uint height;
         bytes32 dependenciesHashedLeaf;
-        bytes32 extraDataHashedLeaf;
+        bytes32 extraDataHashedLeaf; // @dev This field corresponds to the extra data Merkle root hash in Postchain
     }
 
     struct PostchainBlock {
         uint height;
         bytes32 blockRid;
-        bytes32 extraDataHashedLeaf;
+        bytes32 extraDataHashedLeaf; // @dev This field corresponds to the extra data Merkle root hash in Postchain
     }
 
     struct ERC20StateHeader {
