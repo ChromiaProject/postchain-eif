@@ -132,6 +132,16 @@ blockchains:
           - "net.postchain.d1.icmf.IcmfSenderGTXModule"
       transaction_submitter:
         chains:
+          base_sepolia:
+            network_id: 84532
+            max_gas_price: 30000000000000000
+            min_wallet_balance: 1000000000000000
+            gas_limit: 10000000
+            gas_limit_margin: "0.2" # 20%
+            base_fee_per_gas_margin: "1.5" # +150% (base_fee + base_fee * 1.5)
+            priority_fee_per_gas_margin: "0.000001" # 0.00001% # Small margin to pass the default priority fees
+            node_tx_verification_evm_blocks: 100
+            tx_verification_time: 20000
           bsc:
             network_id: 97
             max_gas_price: 30000000000000000
