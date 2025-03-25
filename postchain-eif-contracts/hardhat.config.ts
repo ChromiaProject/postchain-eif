@@ -13,6 +13,27 @@ import "./tasks/txsubmitter";
 
 
 const MNEMONIC = process.env.MNEMONIC || "";
+const PRIVATE_KEY = process.env.PRIVATE_KEY || "";
+
+if (MNEMONIC && PRIVATE_KEY) {
+    console.error('Specify either MNEMONIC or PRIVATE_KEY; not both.');
+    process.exit(1);
+}
+
+let accounts;
+
+if (MNEMONIC) {
+    accounts = {
+        count: 10,
+        initialIndex: 0,
+        mnemonic: MNEMONIC,
+        path: "m/44'/60'/0'/0",
+    };
+}
+
+if (PRIVATE_KEY) {
+    accounts = [PRIVATE_KEY];
+}
 
 const config: HardhatUserConfig = {
     defaultNetwork: "hardhat",
@@ -29,73 +50,38 @@ const config: HardhatUserConfig = {
             hardfork: process.env.CODE_COVERAGE ? "berlin" : "london",
         },
         bsc: { // BSC mainnet
-            accounts: {
-                count: 10,
-                initialIndex: 0,
-                mnemonic: MNEMONIC,
-                path: "m/44'/60'/0'/0",
-            },
+            accounts: accounts,
             chainId: 56,
             url: "https://bsc-mainnet.rpc.chromaway.com",
         },
         ethereum: { // ETH mainnet
-            accounts: {
-                count: 10,
-                initialIndex: 0,
-                mnemonic: MNEMONIC,
-                path: "m/44'/60'/0'/0",
-            },
+            accounts: accounts,
             chainId: 1,
             url: "https://eth-mainnet.rpc.chromaway.com",
         },
         sepolia: {
-            accounts: {
-                count: 10,
-                initialIndex: 0,
-                mnemonic: MNEMONIC,
-                path: "m/44'/60'/0'/0",
-            },
+            accounts: accounts,
             chainId: 11155111,
             url: "https://eth-testnet.rpc.chromaway.com",
         },        
         bsc_testnet: { // BSC testnet
-            accounts: {
-                count: 10,
-                initialIndex: 0,
-                mnemonic: MNEMONIC,
-                path: "m/44'/60'/0'/0",
-            },
+            accounts: accounts,
             chainId: 97,
             url: "https://data-seed-prebsc-1-s1.binance.org:8545/",
         },
         base: { // BASE Mainnet
-            accounts: {
-                count: 10,
-                initialIndex: 0,
-                mnemonic: MNEMONIC,
-                path: "m/44'/60'/0'/0",
-            },
+            accounts: accounts,
             chainId: 8453,
             url: "https://base-rpc.publicnode.com",
         },
         base_sepolia: { // BASE Sepolia Testnet
-            accounts: {
-                count: 10,
-                initialIndex: 0,
-                mnemonic: MNEMONIC,
-                path: "m/44'/60'/0'/0",
-            },
+            accounts: accounts,
             chainId: 84532,
             url: "https://base-sepolia-rpc.publicnode.com",
         },
         /*
             eth: { // ETH sepolia
-              accounts: {
-                count: 10,
-                initialIndex: 0,
-                mnemonic: MNEMONIC,
-                path: "m/44'/60'/0'/0",
-              },
+              accounts: accounts,
               chainId: 11155111,
               url: "[[FILL ME IN]]",
             },
