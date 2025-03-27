@@ -4,7 +4,6 @@ pragma solidity 0.8.24;
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 import "./utils/TwoWeekDelay.sol";
-import {ITokenMinter} from "./ChromiaTokenBridge.sol";
 
 interface ChromiaToken_Base {
     function changeMinter(address newMinter) external;
@@ -23,7 +22,7 @@ interface ChromiaToken_BSC {
 }
 
 
-abstract contract TokenMinterBase is TwoWeekDelay, Ownable2Step, ITokenMinter {
+abstract contract TokenMinterBase is TwoWeekDelay, Ownable2Step {
     uint private dayStart; // Timestamp at which the day started
     uint private dayAmount; // Amount of tokens withdrawn so far
     uint private dayLimit; // Maximum amount of tokens that can be withdrawn in a day
@@ -57,17 +56,15 @@ abstract contract TokenMinterBase is TwoWeekDelay, Ownable2Step, ITokenMinter {
 
     // Function to modify the day limit
     function setDayLimit(uint _newDayLimit) external onlyOwner {
-        // if we already have a pending change, reset it
-        if (pendingDayLimit != 0) resetDelayForFunction(this.setDayLimit.selector);
-
         if (_newDayLimit > dayLimit) {
+            // if we already have a pending change, reset it
+            if (pendingDayLimit != 0) resetDelayForFunction(this.setDayLimit.selector);
             // Set pending day limit and start the two-week delay
             pendingDayLimit = _newDayLimit;
             startDelayedAction(this.setDayLimit.selector);
         } else {
             // If the new limit is lower, apply immediately
             dayLimit = _newDayLimit;
-            delete pendingDayLimit;
             emit DayLimitChanged(_newDayLimit);
         }
     }
@@ -80,7 +77,7 @@ abstract contract TokenMinterBase is TwoWeekDelay, Ownable2Step, ITokenMinter {
     }
 
     function transferMintRole(address newMinter) external onlyOwner {
-        resetDelayForFunction(this.transferMintRole.selector);
+        if (pendingNewMinter != address(0)) resetDelayForFunction(this.transferMintRole.selector);
         startDelayedAction(this.transferMintRole.selector);
         pendingNewMinter = newMinter;
     }
@@ -93,7 +90,7 @@ abstract contract TokenMinterBase is TwoWeekDelay, Ownable2Step, ITokenMinter {
     }
 
     function transferOwnership(address newOwner) public override onlyOwner {
-        resetDelayForFunction(this.transferOwnership.selector);
+        if (pendingOwner() != address(0)) resetDelayForFunction(this.transferOwnership.selector);
         startDelayedAction(this.transferOwnership.selector);
         super.transferOwnership(newOwner);
     }

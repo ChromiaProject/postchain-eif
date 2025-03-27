@@ -1,22 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 import {BaseManagedValidator} from "./BaseManagedValidator.sol";
 import {IManagedValidator} from "./IManagedValidator.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract ManagedValidator is BaseManagedValidator, Ownable {
+contract ManagedValidator is BaseManagedValidator {
     IManagedValidator public directoryChainValidator;
 
-    constructor(IManagedValidator _directoryChainValidator) Ownable(msg.sender) {
+    constructor(IManagedValidator _directoryChainValidator) {
         directoryChainValidator = _directoryChainValidator;
     }
 
-    function renounceOwnership() public override view onlyOwner {
-        revert("ManagedValidator: renounce ownership is not allowed");
-    }
-
-    function setBlockchainRid(bytes32 _blockchainRid) public onlyOwner {
+    function setBlockchainRid(bytes32 _blockchainRid) public {
         if (blockchainRid != bytes32(0)) {
             revert("Blockchain RID is already set");
         }

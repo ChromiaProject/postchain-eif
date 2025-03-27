@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 import "./Hash.sol";
 
@@ -49,14 +49,5 @@ library MerkleProof {
             r = sha256(abi.encodePacked(uint8(0x08), proofs[last], r));
         }
         return (r == rootHash);
-    }
-
-    function bytesToBytes32(bytes memory b, uint offset) internal pure returns (bytes32) {
-        bytes32 out;
-
-        for (uint i = 0; i < 32; i++) {
-            out |= bytes32(b[offset + i] & 0xFF) >> (i * 8);
-        }
-        return out;
     }
 }

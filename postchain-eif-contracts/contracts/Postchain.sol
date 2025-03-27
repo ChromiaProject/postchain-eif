@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 // Interfaces
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -10,15 +10,11 @@ import "./utils/cryptography/MerkleProof.sol";
 import "./Data.sol";
 
 library Postchain {
-
-    // Merkle hash of GTV String "eif"
-    bytes32 constant EIF_KEY_MERKLE_HASH = 0x1E816A557ACB74AEBECC8B0598B81DFCDBCA912CA8BA030740F5BEAEF3FF0797;
-
     using MerkleProof for bytes32[];
 
     struct Event {
         uint256 serialNumber;
-        uint256 discriminator;
+        uint256 networkId;
         IERC20 token;
         address beneficiary;
         uint256 amount;
@@ -32,24 +28,7 @@ library Postchain {
         uint timestamp;
         uint height;
         bytes32 dependenciesHashedLeaf;
-        bytes32 extraDataHashedLeaf; // @dev This field corresponds to the extra data Merkle root hash in Postchain
-    }
-
-    struct PostchainBlock {
-        uint height;
-        bytes32 blockRid;
-        bytes32 extraDataHashedLeaf; // @dev This field corresponds to the extra data Merkle root hash in Postchain
-    }
-
-    struct ERC20StateHeader {
-        bytes32 tag;
-        address beneficiary;
-        uint256 discriminator;
-    }
-
-    struct ERC20BalanceRecord {
-        IERC20 token;
-        uint amount;
+        bytes32 extraDataHashedLeaf;
     }
 
     function verifyEvent(bytes32 _hash, bytes memory _event) internal pure returns (IERC20, address, uint256, uint256) {
@@ -58,23 +37,19 @@ library Postchain {
         if (hash != _hash) {
             revert("Postchain: invalid event");
         }
-        return (evt.token, evt.beneficiary, evt.amount, evt.discriminator);
+        return (evt.token, evt.beneficiary, evt.amount, evt.networkId);
     }
 
     function verifyBlockHeader(
         bytes32 blockchainRid,
         bytes memory blockHeader,
-        Data.ExtraProofData memory proof,
-        bytes32 extraDataKey
+        Data.ExtraProofData memory proof
     ) internal pure returns (uint, bytes32) {
         BlockHeaderData memory header = decodeBlockHeader(blockHeader);
         if (blockchainRid != header.blockchainRid) revert("Postchain: invalid blockchain rid");
         require(proof.extraRoot == header.extraDataHashedLeaf, "Postchain: invalid extra data root");
         if (!proof.extraMerkleProofs.verifySHA256(proof.hashedLeaf, proof.position, proof.extraRoot)) {
             revert("Postchain: invalid extra merkle proof");
-        }
-        if (proof.extraMerkleProofs[0] != extraDataKey) {
-            revert("Postchain: proof does not originate from EIF");
         }
         return (header.height, header.blockRid);
     }
@@ -116,13 +91,4 @@ library Postchain {
         return header;
     }
 
-    function verifyDiscriminator(uint256 networkId, address contractAddress, uint256 discriminator) internal pure {
-        uint256 networkDiscriminator = networkId << 160;
-        uint256 networkContractDiscriminator = networkDiscriminator + uint160(contractAddress);
-
-        bool isValid = (discriminator == networkDiscriminator)
-            || (discriminator == networkContractDiscriminator);
-
-        require(isValid, "Postchain: Invalid discriminator. Please verify the network ID and bridge contract.");
-    }
 }
