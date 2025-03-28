@@ -34,9 +34,10 @@ blockchains:
           base_sepolia:
             network_id: 84532
             contracts:
-              - "0x71bf30cDaec15885F13A9f3448d3A27C72f0d3eA" # TransparentUpgradeableProxy / bridge contract
+              - "050c4a184c47AFAc1B606E75fF8E11AABeF9B362" # TransparentUpgradeableProxy / bridge contract
             evm_read_offset: 10
             skip_to_height: 20000000 # Jan-01-2025 09:51:28 PM +UTC
+            events: !include configs/events.yml
     moduleArgs:
       chain_version: *chain_version
 
@@ -87,7 +88,7 @@ blockchains:
               network_id: 97
             - address: "2BcA7182ee241C29AaF63E6Fef7ECd25AE43A418" # directory validator
               network_id: 11155111
-            - address: "b0134B981B1f8F758c39d4A9f14193cf624a4480" # directory validator
+            - address: "719D2c560a9B665beC06ff65F15B241FC7B0Bf7e" # directory validator
               network_id: 84532
         # Omit this to disable anchoring
         system_anchoring_chain_config:
@@ -103,8 +104,8 @@ blockchains:
               - address: "247b4200a8e8Db6878A2A5e4CDfbF84a50f5fFa8" # token bridge
                 validator_contract: "338E16D38ac3123DAdd0E4912103fB8E5A0D42d8" # native validator
                 network_id: 97
-              - address: "71bf30cDaec15885F13A9f3448d3A27C72f0d3eA" # token bridge
-                validator_contract: "5Bbed52263B4791e4Ea3EEF8Fc70Fb9dE14541f3" # native validator
+              - address: "050c4a184c47AFAc1B606E75fF8E11AABeF9B362" # token bridge
+                validator_contract: "D5733007A3413a28c6793Ec50E2CD2229D1AE041" # native validator
                 network_id: 84532
               # ETH Sepolia bridge is omitted here since it was created with directory chain validator as validator
         contract_tx_rate_limit: 60000
@@ -132,6 +133,16 @@ blockchains:
           - "net.postchain.d1.icmf.IcmfSenderGTXModule"
       transaction_submitter:
         chains:
+          base_sepolia:
+            network_id: 84532
+            max_gas_price: 30000000000000000
+            min_wallet_balance: 1000000000000000
+            gas_limit: 10000000
+            gas_limit_margin: "0.2" # 20%
+            base_fee_per_gas_margin: "1.5" # +150% (base_fee + base_fee * 1.5)
+            priority_fee_per_gas_margin: "0.000001" # 0.00001% # Small margin to pass the default priority fees
+            node_tx_verification_evm_blocks: 100
+            tx_verification_time: 20000
           bsc:
             network_id: 97
             max_gas_price: 30000000000000000
