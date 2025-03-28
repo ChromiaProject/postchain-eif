@@ -30,7 +30,11 @@ const known_artifacts_by_network: { [key: string]: KnownArtifacts } = {
   "hardhat": {
     "multiSigOwner": "0x6e8187435d5140214552ef3989ddb1457f4a663a", // nonsense
     "chromiaTokenAddress": "0x8A22279d4A90B6fe1C4B30fa660cC9f926797bAA2", // nonsense
-  }
+  },
+  "base_sepolia": {
+    "multiSigOwner": "0xFd216ffe32B556121097a0897B082F4C226103cA", // testnet provider0
+    "chromiaTokenAddress": "0x7dC7AcAaa144F44B5cc6Bb5e04435b0244c1aC4C", // tCHR on Base Sepolia
+  },
 }
 
 task("deploy:chromiabridge")
