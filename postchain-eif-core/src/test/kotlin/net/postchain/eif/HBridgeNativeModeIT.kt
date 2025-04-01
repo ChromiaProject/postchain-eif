@@ -388,8 +388,13 @@ class HBridgeNativeModeIT : HBridgeBaseIntegrationTest() {
         snapshotHeights.add(currentBlockHeight)
 
         // Getting accountNum
-        aliceAccount.accountNum = blockQuery.query("eif.hbridge.get_state_slot_ids_for_address",
-                gtv("recipient_address" to gtv(aliceCredentials.evmAddressStr))).get()[0].asInteger()
+        aliceAccount.accountNum = blockQuery.query(
+                "eif.hbridge.get_state_slot_ids_for_address",
+                gtv(
+                        "recipient_address" to gtv(aliceCredentials.evmAddressStr),
+                        "network_id" to gtv(networkId)
+                )
+        ).get()[0].asInteger()
     }
 
     @Test

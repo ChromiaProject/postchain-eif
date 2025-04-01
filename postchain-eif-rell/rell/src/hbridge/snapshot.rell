@@ -86,13 +86,9 @@ function get_or_create_local_erc20_state_slot(ft4.accounts.account, erc20_asset)
             discriminator = build_discriminator(erc20_asset),
             local = true
         );
-
-        create local_erc20_state_slot_binding (
-            account,
-            erc20_asset,
-            existing_slot
-        );
     }
+
+    create local_erc20_state_slot_binding (account, erc20_asset, existing_slot);
 
     return existing_slot;
 }
@@ -176,7 +172,7 @@ function add_erc20_withdrawal_to_snapshot(ew: erc20_withdrawal) {
     emit_erc20_withdrawal_state_eif_event(state_slot, event_hashes);
 }
 
-function emit_erc20_state_eif_event(state_slot: state_slot, balance_records: list<balance_record>) {
+function emit_erc20_state_eif_event(state_slot, balance_records: list<balance_record>) {
     if (empty(balance_records)) {
         // erase state slot when there are no balances
         op_context.emit_event(
@@ -206,7 +202,7 @@ function emit_erc20_state_eif_event(state_slot: state_slot, balance_records: lis
 function emit_local_erc20_state_slot(state_slot) {
     val balance_records = list<balance_record>();
 
-    // note: there must be at least one record per state_slot, otherwise we don't know that slot is erc20_asset
+    // Note: there must be at least one record per state_slot, otherwise we don't know that slot is erc20_asset
     // @+ ensures there's at least one
     for (lss in local_erc20_state_slot_binding @+ { state_slot } (.account, erc20_asset = .erc20_asset.to_struct())) {
         val amount = ft4.assets.get_asset_balance(lss.account, lss.erc20_asset.asset);
@@ -247,19 +243,13 @@ function emit_local_erc20_state_slot(state_slot) {
 
 @extend(after_evm_account_linked) function (address: byte_array, account: ft4.accounts.account, network_id: integer, is_contract: boolean) {
     if (address == find_address_for_ft4_account(account, network_id)) {
-        val existing_slot = state_slot @? {
-            .recipient_address == address, .type == state_slot_type.erc20, .local == true
-        } limit 1;
-
-        if (empty(existing_slot)) {
-            val assets = (b: ft4.assets.balance, e: erc20_asset_snapshots_enabled) @* {
-                b.account == account,
-                b.asset == e.asset,
-            } (.erc20_asset);
-            for (asset in assets) {
-                val slot = get_or_create_local_erc20_state_slot(account, asset);
-                if (exists(slot)) emit_local_erc20_state_slot(slot);
-            }
+        val assets = (b: ft4.assets.balance, e: erc20_asset_snapshots_enabled) @* {
+            b.account == account,
+            b.asset == e.asset,
+        } (.erc20_asset);
+        for (asset in assets) {
+            val slot = get_or_create_local_erc20_state_slot(account, asset);
+            if (exists(slot)) emit_local_erc20_state_slot(slot);
         }
     }
 }
@@ -327,6 +317,36 @@ entity recovery_contract {
     network_id: integer;
     contract_address: byte_array;
     key blockchain_rid, network_id, contract_address;
+}
+
+entity recovery_contract_auth {
+    key blockchain_rid: byte_array;
+    mutable latest_height: integer;
+    mutable latest_tx_index: integer;
+}
+
+function validate_and_update_recovery_contract_auth(iccf_auth_data) {
+    val auth = recovery_contract_auth @? { iccf_auth_data.blockchain_rid };
+    val height = iccf_auth_data.block_height;
+    val tx_index = iccf_auth_data.tx_index;
+
+    if (empty(auth)) {
+        create recovery_contract_auth(iccf_auth_data.blockchain_rid, latest_height = height, latest_tx_index = tx_index);
+        return;
+    }
+
+    require(
+        height != auth.latest_height or tx_index != auth.latest_tx_index, 
+        "ICCF transaction has already been processed"
+    );
+
+    require(
+        height > auth.latest_height or (height == auth.latest_height and tx_index > auth.latest_tx_index),
+        "ICCF transaction is older than previous, confirmed in block %d transaction %d".format(auth.latest_height, auth.latest_tx_index)
+    );
+
+    auth.latest_height = height;
+    auth.latest_tx_index = tx_index;
 }
 
 @extend(ft4.crosschain.after_crosschain_balance_change) function (

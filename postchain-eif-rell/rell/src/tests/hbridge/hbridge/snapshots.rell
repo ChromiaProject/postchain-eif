@@ -9,6 +9,8 @@ val hub_chain_recovery_contract = x"01".repeat(20);
 val island1_chain_recovery_contract = x"02".repeat(20);
 val island2_chain_recovery_contract = x"03".repeat(20);
 
+// Cross-chain transfer
+
 function _build_init_tx(
     sender_blockchain_rid: byte_array,
     sender_account_id: byte_array,
@@ -81,31 +83,38 @@ function _build_cancel_tx(
     signatures = []
 );
 
-function _build_register_recovery_contract_tx(
-    blockchain_rid: byte_array,
-    network_id: integer,
-    contract_address: byte_array
-) = gtx_transaction(
+// Register recovery contract
+
+function _build_tx(blockchain_rid: byte_array, op: rell.test.op) = gtx_transaction(
     body = gtx_transaction_body(
         blockchain_rid = blockchain_rid,
-        operations = [
-            helpers.register_recovery_contract_op(network_id, contract_address).to_gtx_operation()
-        ],
+        operations = [op.to_gtx_operation()],
         signers = []
     ),
     signatures = []
 );
 
-function _register_recovery_contract(brid: byte_array, network_id: integer, contract_address: byte_array) {
-    val reg_recovery_contract_tx = _build_register_recovery_contract_tx(brid, network_id, contract_address);
+/**
+ * Registers a recovery contract
+ * 
+ * @param brid The Blockchain RID of the chain to register the recovery contract for
+ * @param network_id The EVM network ID of the recovery contract
+ * @param contract_address The recovery contract address
+ * 
+ * @return The register recovery contract tx on the chain whose RID is brid
+ */
+function _register_recovery_contract(brid: byte_array, network_id: integer, contract_address: byte_array, height: integer = 0): gtx_transaction {
+    val reg_recovery_contract_tx = _build_tx(brid, helpers.register_recovery_contract_op(network_id, contract_address));
 
     rell.test.tx()
         .op(helpers.iccf_proof(
             brid, 
             reg_recovery_contract_tx.to_gtv().hash(), 
-            helpers.mock_confirmation_proof_bytes(brid), 
+            helpers.mock_confirmation_proof_bytes(brid, height), 
             x"", 0, x""
         ))
         .op(register_recovery_contract(reg_recovery_contract_tx, 0))
-        .run();
+        .nop().run();
+    
+    return reg_recovery_contract_tx;
 }

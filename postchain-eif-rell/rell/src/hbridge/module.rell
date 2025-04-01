@@ -47,6 +47,8 @@ function withdraw_check_access_list(account_id: byte_array): boolean = true;
 
 struct iccf_auth_data {
     blockchain_rid: byte_array;
+    block_height: integer;
+    tx_index: integer;
     op_args: list<gtv>;
 }
 
@@ -72,8 +74,10 @@ function require_iccf_auth(tx_to_prove: gtx_transaction, op_index: integer, op_n
     require(op.args.size() >= op_arg_count, "Wrong number of operation arguments <%s>, expected <%s>".format(op.args.size(), op_arg_count));
 
     return iccf_auth_data(
-        block_header.blockchain_rid,
-        op.args
+        blockchain_rid = block_header.blockchain_rid,
+        block_height = block_header.height,
+        tx_index = proof.txIndex,
+        op_args = op.args
     );
 }
 
