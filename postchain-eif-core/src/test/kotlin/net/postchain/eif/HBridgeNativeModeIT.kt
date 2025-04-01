@@ -391,7 +391,7 @@ class HBridgeNativeModeIT : HBridgeBaseIntegrationTest() {
         aliceAccount.accountNum = blockQuery.query(
                 "eif.hbridge.get_state_slot_ids_for_address",
                 gtv(
-                        "recipient_address" to gtv(aliceCredentials.evmAddressStr),
+                        "beneficiary" to gtv(aliceCredentials.evmAddressStr),
                         "network_id" to gtv(networkId)
                 )
         ).get()[0].asInteger()
