@@ -67,27 +67,24 @@ struct block_header {
     extra: map<text,gtv>;
 }
 
-function mock_blockheader_bytes(blockchain_rid: byte_array) = block_header(
+function mock_blockheader_bytes(blockchain_rid: byte_array, height: integer = 0) = block_header(
     blockchain_rid = blockchain_rid,
     previous_block_rid = x"",
     merkle_root_hash = x"",
     timestamp = 0,
-    height = 0,
+    height = height,
     dependencies = null.to_gtv(),
     extra = ["merkle_hash_version" : (2).to_gtv()] // TODO: why it only works with 2?
 ).to_gtv().to_bytes();
 
-function mock_confirmation_proof_bytes(blockchain_rid: byte_array = x"") = confirmation_proof(
+function mock_confirmation_proof_bytes(blockchain_rid: byte_array = x"", height: integer = 0, tx_index: integer = 0) = confirmation_proof(
     hash = x"",
-    blockHeader = mock_blockheader_bytes(blockchain_rid),
+    blockHeader = mock_blockheader_bytes(blockchain_rid, height),
     witness = x"",
     merkleProofTree = list<gtv>(),
-    txIndex = 0
+    txIndex = tx_index
 ).to_gtv_pretty().to_bytes();
 
 
 @mount("register_recovery_contract")
 operation register_recovery_contract_op(network_id: integer, contract_address: byte_array) {}
-
-@mount("unregister_recovery_contract")
-operation unregister_recovery_contract_op(network_id: integer, contract_address: byte_array) {}

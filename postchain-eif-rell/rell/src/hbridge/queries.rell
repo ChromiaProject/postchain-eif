@@ -187,16 +187,16 @@ query get_registered_bridge_erc20_assets(network_id: integer, bridge_contract_ad
     } (map_erc20_asset_to_erc20_asset_info(.erc20_asset));
 }
 
-// snapshot queries
+// Snapshot queries
 
 query are_snapshots_enabled_for_asset(asset_id: byte_array): boolean {
     val asset = ft4.assets.Asset(asset_id);
     return exists(erc20_asset_snapshots_enabled @? { asset });
 }
 
-query get_state_slot_ids_for_account(account_id: byte_array): list<integer> {
+query get_state_slot_ids_for_account(account_id: byte_array, network_id: integer): list<integer> {
     val account = ft4.accounts.Account(account_id);
-    return local_erc20_state_slot_binding @* { account } (.state_slot.id);
+    return local_erc20_state_slot_binding @* { account, .state_slot.network_id == network_id } (.state_slot.id);
 }
 
 query get_withdrawal_state_slot_ids_for_address(beneficiary: byte_array, network_id: integer): list<integer> {
@@ -208,8 +208,8 @@ query get_withdrawal_state_slot_ids_for_address(beneficiary: byte_array, network
     } (.id);
 }
 
-query get_state_slot_ids_for_address(recipient_address: byte_array): list<integer> {
-    return state_slot @* { recipient_address } (.id);
+query get_state_slot_ids_for_address(recipient_address: byte_array, network_id: integer): list<integer> {
+    return state_slot @* { recipient_address, network_id } (.id);
 }
 
 query get_recovery_contract(blockchain_rid: byte_array, network_id: integer): byte_array? {
