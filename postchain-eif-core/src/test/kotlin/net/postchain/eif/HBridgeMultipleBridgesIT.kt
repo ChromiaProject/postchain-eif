@@ -185,8 +185,8 @@ class HBridgeMultipleBridgesIT : HBridgeBaseIntegrationTest() {
         }
         snapshotHeights.add(currentBlockHeight)
 
-        // Getting accountNum
-        aliceAccount.accountNum = blockQuery.query(
+        // Getting account state slot id
+        aliceAccount.accountStateSlotId = blockQuery.query(
                 "eif.hbridge.get_state_slot_ids_for_address",
                 gtv(
                         "beneficiary" to gtv(aliceCredentials.evmAddressStr),
