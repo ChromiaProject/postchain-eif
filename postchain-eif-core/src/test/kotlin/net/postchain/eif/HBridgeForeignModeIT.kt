@@ -197,11 +197,11 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
         }
         snapshotHeights.add(currentBlockHeight)
 
-        // Getting accountNum
-        aliceAccount.accountNum = blockQuery.query(
+        // Getting account state slot id
+        aliceAccount.accountStateSlotId = blockQuery.query(
                 "eif.hbridge.get_state_slot_ids_for_address",
                 gtv(
-                        "recipient_address" to gtv(aliceCredentials.evmAddressStr),
+                        "beneficiary" to gtv(aliceCredentials.evmAddressStr),
                         "network_id" to gtv(networkId)
                 )
         ).get()[0].asInteger()
@@ -481,7 +481,7 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
                     "get_account_state_merkle_proof",
                     gtv(
                             "blockHeight" to gtv(lastSnapshotBlockHeight),
-                            "accountNumber" to gtv(aliceAccount.accountNum)
+                            "accountNumber" to gtv(aliceAccount.accountStateSlotId)
                     )
             ).get().toObject<AccountStateMerkleProof>()
 
@@ -591,7 +591,7 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
                 "get_account_state_merkle_proof",
                 gtv(
                         "blockHeight" to gtv(lastSnapshotBlockHeight),
-                        "accountNumber" to gtv(aliceAccount.accountNum)
+                        "accountNumber" to gtv(aliceAccount.accountStateSlotId)
                 )
         ).get().toObject<AccountStateMerkleProof>()
 

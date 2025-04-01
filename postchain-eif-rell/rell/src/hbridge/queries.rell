@@ -208,8 +208,8 @@ query get_withdrawal_state_slot_ids_for_address(beneficiary: byte_array, network
     } (.id);
 }
 
-query get_state_slot_ids_for_address(recipient_address: byte_array, network_id: integer): list<integer> {
-    return state_slot @* { recipient_address, network_id } (.id);
+query get_state_slot_ids_for_address(beneficiary: byte_array, network_id: integer): list<integer> {
+    return state_slot @* { beneficiary, network_id } (.id);
 }
 
 query get_recovery_contract(blockchain_rid: byte_array, network_id: integer): byte_array? {
