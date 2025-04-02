@@ -34,7 +34,7 @@ blockchains:
           base_sepolia:
             network_id: 84532
             contracts:
-              - "050c4a184c47AFAc1B606E75fF8E11AABeF9B362" # TransparentUpgradeableProxy / bridge contract
+              - "0x050c4a184c47AFAc1B606E75fF8E11AABeF9B362" # TransparentUpgradeableProxy / bridge contract
             evm_read_offset: 10
             skip_to_height: 20000000 # Jan-01-2025 09:51:28 PM +UTC
             events: !include configs/events.yml
