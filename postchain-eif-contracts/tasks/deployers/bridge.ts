@@ -115,16 +115,40 @@ task("setBlockchainRid:bridge")
     .setAction(async ({ address, blockchainRid, managedValidator }, hre) => {
         const factory = await hre.ethers.getContractFactory("TokenBridge") as TokenBridge__factory;
         const bridge = factory.attach(address) as TokenBridge;
-        console.log("Updating brid for bridge");
-        console.log(await bridge.setBlockchainRid(blockchainRid));
+        console.log("Setting blockchain RID...");
+        const tx = await bridge.setBlockchainRid(blockchainRid);
+        await tx.wait();
+        console.log("Blockchain RID set successfully");
 
         if (managedValidator !== undefined) {
             const validatorFactory = await hre.ethers.getContractFactory("ManagedValidator") as ManagedValidator__factory;
             const validator = validatorFactory.attach(managedValidator) as ManagedValidator;
 
-            console.log("Updating brid for managed validator");
-            console.log(await validator.setBlockchainRid(blockchainRid));
+            console.log("Setting blockchain RID for managed validator...");
+            const tx2 = await validator.setBlockchainRid(blockchainRid);
+            await tx2.wait();
+            console.log("Blockchain RID set successfully for managed validator");
         }
+    });
+
+/**
+ * Finalizes the blockchain RID for a TokenBridge contract.
+ * 
+ * This task finalizes the blockchain RID for a TokenBridge contract, making it immutable.
+ * Once finalized, the blockchain RID cannot be changed.
+ * 
+ * @param address - The address of the TokenBridge contract.
+ */
+task("finalizeBlockchainRid:bridge", "Finalize blockchain RID for token bridge contract")
+    .addParam("address", "Bridge contract address")
+    .setAction(async ({ address }, hre: HardhatRuntimeEnvironment) => {
+        const factory = await hre.ethers.getContractFactory("TokenBridge") as TokenBridge__factory;
+        const bridge = factory.attach(address) as TokenBridge;
+
+        console.log("Finalizing blockchain RID...");
+        const tx = await bridge.finalizeBlockchainRid();
+        await tx.wait();
+        console.log("Blockchain RID finalized successfully");
     });
 
 /**
