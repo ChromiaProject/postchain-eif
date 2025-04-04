@@ -5,3 +5,4 @@ import "./bridgeWithSnapshots"
 import "./validator";
 import "./token";
 import "./utils";
+import "./recovery";

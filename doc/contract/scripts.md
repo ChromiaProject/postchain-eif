@@ -38,7 +38,14 @@ This document describes all available scripts in the `postchain-eif-contracts` p
 - **pause:bridge**: Pauses the TokenBridge contract
 - **unpause:bridge**: Unpauses the TokenBridge contract
 
-## Transaction Scripts
+
+## Recovery Contract Scripts
+
+- **deploy:recovery**: Deploys the RecoveryContract contract
+- **setBlockchainRid:recovery**: Sets the blockchain RID for a RecoveryContract contract
+
+
+## Transaction Submitter Scripts
 
 - **transaction:resubmitSignerUpdate**: Resubmits a signer update transaction by extracting the ManagedValidator contract address and transaction parameters from the input data
 - **transaction:resubmitAnchoring**: Resubmits an anchoring transaction by extracting the Anchoring contract address and transaction parameters from the input data
