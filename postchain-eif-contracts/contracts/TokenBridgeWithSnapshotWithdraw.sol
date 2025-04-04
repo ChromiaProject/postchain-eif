@@ -39,10 +39,10 @@ contract TokenBridgeWithSnapshotWithdraw is TokenBridge {
      *      In the mass exit scenario, we are not able to verify block headers as validators are considered non-trustworthy,
      *      thus we need to use the snapshot data to verify the withdrawal request.
      *      Snapshot data includes withdrawal event hashes.
-     * @param _stateRecord contains header and a list of event hashes
-     * @param n index of the event hash we want to use
+     * @param _stateRecord account state data, contains header and a list of withdrawal event hashes
+     * @param n index of the withdrawal event hash in the account state data
      * @param _event withdrawal event data
-     * @param stateProof the proof of the snapshot data
+     * @param stateProof the proof of the account state snapshot data
      */
     function completeWithdrawalBySnapshot(
         bytes calldata _stateRecord,

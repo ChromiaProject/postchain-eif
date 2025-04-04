@@ -528,9 +528,14 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
     }
 
     private fun completeWithdrawalBySnapshot(wdTxHash: Hash) {
-        // Request withdrawal
+        // Request withdrawal proof
         val eventHash = getWithdrawalEventHashByTxRid(wdTxHash)
+        val eventProof = blockQuery.query(
+                "get_event_merkle_proof",
+                gtv("eventHash" to gtv(eventHash.toHex()))
+        ).get().toObject<EventMerkleProof>()
 
+        // Request account state proof
         val wStateSlotID = blockQuery.query(
                 "eif.hbridge.get_withdrawal_state_slot_ids_for_address",
                 gtv(
@@ -538,7 +543,6 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
                         "network_id" to gtv(networkId),
                 )
         ).get().asArray()[0].asInteger()
-
         val stateProof = blockQuery.query(
                 "get_account_state_merkle_proof",
                 gtv(
@@ -547,11 +551,7 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
                 )
         ).get().toObject<AccountStateMerkleProof>()
 
-        val eventProof = blockQuery.query(
-                "get_event_merkle_proof",
-                gtv("eventHash" to gtv(eventHash.toHex()))
-        ).get().toObject<EventMerkleProof>()
-
+        // Find the index of the withdrawal event hash in the account state data
         val offset = indexOfSubsequence(stateProof.stateData, eventHash)
         assertTrue(offset > 0)
         assertTrue(offset % 32 == 0)

@@ -30,6 +30,9 @@
     "pause:bridge": "npx hardhat pause:bridge",
     "unpause:bridge": "npx hardhat unpause:bridge",
 
+    "deploy:recovery": "npx hardhat deploy:recovery",
+    "setBlockchainRid:recovery": "npx hardhat setBlockchainRid:recovery",
+
     "deploy:alice": "npx hardhat deploy:alice",
     "transaction:resubmitSignerUpdate": "npx hardhat transaction:resubmitSignerUpdate",
     "transaction:resubmitAnchoring": "npx hardhat transaction:resubmitAnchoring"
