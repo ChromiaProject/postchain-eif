@@ -47,3 +47,24 @@ task("setBlockchainRid:recovery", "Set blockchain RID for recovery contract")
         await tx.wait();
         console.log("Blockchain RID set successfully");
     });
+
+/**
+ * Finalizes the blockchain RID for a Recovery Contract.
+ * 
+ * This task finalizes the blockchain RID for a Recovery Contract, making it immutable.
+ * Once finalized, the blockchain RID cannot be changed.
+ * 
+ * @param address - The address of the Recovery Contract.
+ */
+task("finalizeBlockchainRid:recovery", "Finalize blockchain RID for recovery contract")
+    .addParam("address", "Recovery contract address")
+    .setAction(async ({ address }, hre: HardhatRuntimeEnvironment) => {
+        const recoveryFactory = await hre.ethers.getContractFactory("RecoveryContract") as RecoveryContract__factory;
+        const recoveryContract = recoveryFactory.attach(address);
+
+        console.log("Finalizing blockchain RID...");
+        const tx = await recoveryContract.finalizeBlockchainRid();
+        await tx.wait();
+        console.log("Blockchain RID finalized successfully");
+    });
+

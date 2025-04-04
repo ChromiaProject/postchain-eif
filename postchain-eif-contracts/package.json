@@ -24,6 +24,7 @@
     "upgrade:bridge": "npx hardhat upgrade:bridge",
     "import:bridge": "npx hardhat import:bridge",
     "setBlockchainRid:bridge": "npx hardhat setBlockchainRid:bridge",
+    "finalizeBlockchainRid:bridge": "npx hardhat finalizeBlockchainRid:bridge",
     "allowToken:bridge": "npx hardhat allowToken:bridge",
     "inspect:bridge": "npx hardhat inspect:bridge",
     "inspect:chromiabridge": "npx hardhat inspect:chromiabridge",
@@ -32,6 +33,7 @@
 
     "deploy:recovery": "npx hardhat deploy:recovery",
     "setBlockchainRid:recovery": "npx hardhat setBlockchainRid:recovery",
+    "finalizeBlockchainRid:recovery": "npx hardhat finalizeBlockchainRid:recovery",
 
     "deploy:alice": "npx hardhat deploy:alice",
     "transaction:resubmitSignerUpdate": "npx hardhat transaction:resubmitSignerUpdate",

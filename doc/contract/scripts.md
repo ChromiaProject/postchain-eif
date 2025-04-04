@@ -32,6 +32,7 @@ This document describes all available scripts in the `postchain-eif-contracts` p
 - **upgrade:bridge**: Upgrades the existing TokenBridge contract
 - **import:bridge**: Imports a TokenBridge contract
 - **setBlockchainRid:bridge**: Sets the blockchain RID for a TokenBridge contract
+- **finalizeBlockchainRid:bridge**: Finalizes the blockchain RID for a TokenBridge contract
 - **allowToken:bridge**: Configures token allowance on a TokenBridge contract
 - **inspect:bridge**: Inspects the deployed TokenBridge contract
 - **inspect:chromiabridge**: Inspects the deployed ChromiaTokenBridge contract
@@ -43,6 +44,7 @@ This document describes all available scripts in the `postchain-eif-contracts` p
 
 - **deploy:recovery**: Deploys the RecoveryContract contract
 - **setBlockchainRid:recovery**: Sets the blockchain RID for a RecoveryContract contract
+- **finalizeBlockchainRid:recovery**: Finalizes the blockchain RID for a RecoveryContract contract
 
 
 ## Transaction Submitter Scripts
