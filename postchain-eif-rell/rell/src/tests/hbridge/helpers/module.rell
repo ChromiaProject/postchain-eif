@@ -28,6 +28,10 @@ operation register_bridge_with_erc20_assets_op(network_id: integer, bridge_contr
     hbridge.register_bridge_with_erc20_assets(network_id, bridge_contract_address, erc20_assets);
 }
 
+operation unregister_bridge_op(network_id: integer, bridge_contract_address: byte_array) {
+    hbridge.unregister_bridge(network_id, bridge_contract_address);
+}
+
 operation get_or_create_bridge_op(
     network_id: integer, bridge_contract_address: byte_array
 ) {

@@ -1,0 +1,37 @@
+import hbridge.*;
+
+function test_unregister_bridge() {
+    // CHR
+    val ft_chr_asset = register_ft4_asset(CHR);
+    val erc20_chr_asset = register_erc20_asset(ft_chr_asset, CHR, network_id1);
+    // FOO
+    val ft_foo_asset = register_ft4_asset(FOO);
+    val erc20_foo_asset = register_erc20_asset(ft_foo_asset, FOO, network_id2);
+    rell.test.tx().op(
+            helpers.register_bridge_with_erc20_assets_op(
+                network_id = network_id1,
+                bridge_contract_address = bridge_address1,
+                erc20_assets = [erc20_chr_asset]
+            ),
+            helpers.register_bridge_with_erc20_assets_op(
+                network_id = network_id2,
+                bridge_contract_address = bridge_address2,
+                erc20_assets = [erc20_foo_asset]
+            )
+        ).run();
+
+    assert_equals(bridge_contract @ {} ( @sum 1 ), 2);
+    assert_equals(bridge_erc20_asset @ {} ( @sum 1 ), 2);
+
+    rell.test.tx().op(
+            helpers.unregister_bridge_op(
+                network_id = network_id1,
+                bridge_contract_address = bridge_address1
+            )
+        ).run();
+
+    assert_equals(bridge_contract @ {} ( @sum 1 ), 1);
+    assert_equals(bridge_erc20_asset @ {} ( @sum 1 ), 1);
+    assert_true(empty(bridge_contract @* { network_id1, bridge_address1 }));
+    assert_true(empty(bridge_erc20_asset @* { erc20_chr_asset }));
+}

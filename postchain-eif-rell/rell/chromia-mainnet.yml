@@ -59,11 +59,9 @@ blockchains:
             events: !include configs/events.yml
       icmf:
         receiver:
-          local:
-            - bc-rid: x"" # Replace with token chain
-              topic: "L_eif_event_receiver_dynamic_config"
-            - bc-rid: x"" # Replace with token chain
-              topic: "L_eif_event_receiver_dynamic_config_v2"
+          directory-chain:
+            topics:
+              - "L_blockchain_rid_topic"
     moduleArgs:
       chain_version: *chain_version
       eif_event_receiver_dynamic_icmf_config:
