@@ -48,7 +48,7 @@ blockchains:
         receiver:
           directory-chain:
             topics:
-             - "L_blockchain_rid_topic"
+              - "L_blockchain_rid_topic"
     moduleArgs:
       chain_version: *chain_version
       eif_event_receiver_dynamic_icmf_config:

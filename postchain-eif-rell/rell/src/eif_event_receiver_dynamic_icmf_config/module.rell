@@ -23,6 +23,7 @@ function eif_event_reciever_dynamic_config_message(sender: byte_array, topic: te
     when (topic) {
         eif_event_receiver_dynamic_config_topic -> handle_dynamic_config_message(body);
         eif_event_receiver_dynamic_config_topic_v2 -> handle_dynamic_config_message_v2(body);
+        eif_event_receiver_dynamic_remove_topic -> handle_dynamic_remove_message(body);
         blockchain_rid_topic -> handle_blockchain_rid_message(body);
     }
 }
@@ -65,6 +66,13 @@ function handle_dynamic_config_message_v2(body: gtv) {
     }
 }
 
+function handle_dynamic_remove_message(body: gtv) {
+    val message = eif_event_receiver_dynamic_remove_message.from_gtv(body);
+    for (bridge in message.bridges) {
+        delete contract_config @* { .network_id == bridge.network_id, .address == bridge.address };
+    }
+}
+
 function handle_blockchain_rid_message(body: gtv) {
 
     val message = blockchain_rid_message.from_gtv(body);
@@ -74,6 +82,7 @@ function handle_blockchain_rid_message(body: gtv) {
             [
                 icmf_receiver_topic(topic = eif_event_receiver_dynamic_config_topic, bc_rid = message.rid),
                 icmf_receiver_topic(topic = eif_event_receiver_dynamic_config_topic_v2, bc_rid = message.rid),
+                icmf_receiver_topic(topic = eif_event_receiver_dynamic_remove_topic, bc_rid = message.rid),
             ],
             false);
     }
