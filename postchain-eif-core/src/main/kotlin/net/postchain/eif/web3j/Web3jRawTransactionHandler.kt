@@ -1,6 +1,5 @@
 package net.postchain.eif.web3j
 
-import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.eif.web3j.Web3jRequestHandler.Companion.logger
 import org.web3j.crypto.Credentials
 import org.web3j.protocol.Web3j
@@ -32,7 +31,7 @@ open class Web3jRawTransactionHandler(
                     val errorMessage =
                             "Failed to send transaction $requestId to rpc $rpcUrl with error code: ${response.error.code} and message: ${response.error.message}"
                     logger.error(errorMessage)
-                    throw ProgrammerMistake(errorMessage)
+                    throw RuntimeException(errorMessage)
                 }
 
                 return response
@@ -41,6 +40,6 @@ open class Web3jRawTransactionHandler(
             }
         }
 
-        throw ProgrammerMistake("Failed to send transaction to all ${transactionManagers.size} nodes")
+        throw RuntimeException("Failed to send transaction to all ${transactionManagers.size} nodes")
     }
 }
