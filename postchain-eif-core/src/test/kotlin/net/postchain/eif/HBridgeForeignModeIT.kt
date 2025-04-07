@@ -709,8 +709,8 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
         )
 
         val pauseFunctionData = TransactionSubmitter.encodeFunction("pause", listOf(), listOf())
-        val gasLimitPauseFunction = gasProvider.getGasLimit(pauseFunctionData)
-        val gasPricePauseFunction = gasProvider.getGasPrice(pauseFunctionData)
+        val gasLimitPauseFunction = estimateGas(bridgeAddress.toHex(), pauseFunctionData)
+        val gasPricePauseFunction = gasProvider.gasPrice
 
         nodeTransactionManager.sendTransaction(
                 gasPricePauseFunction,
@@ -726,8 +726,8 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
         }
 
         val unpauseFunctionData = TransactionSubmitter.encodeFunction("unpause", listOf(), listOf())
-        val gasLimitUnpauseFunction = gasProvider.getGasLimit(unpauseFunctionData)
-        val gasPriceUnpauseFunction = gasProvider.getGasPrice(unpauseFunctionData)
+        val gasLimitUnpauseFunction = estimateGas(bridgeAddress.toHex(), pauseFunctionData)
+        val gasPriceUnpauseFunction = gasProvider.gasPrice
 
         transactionManager.sendTransaction(
                 gasPriceUnpauseFunction,

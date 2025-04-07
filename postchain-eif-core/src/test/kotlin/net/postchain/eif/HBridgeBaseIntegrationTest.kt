@@ -31,6 +31,7 @@ import net.postchain.gtv.merkleHash
 import net.postchain.gtx.GtxBuilder
 import org.awaitility.Awaitility.await
 import org.awaitility.Duration
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertArrayEquals
@@ -46,6 +47,7 @@ import org.web3j.crypto.Sign
 import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import java.security.Security
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
@@ -96,6 +98,13 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
             evmCredentials = Credentials.create("346B362B66A4F3CE3FEB41043E522C625B6310DEBEBA0E69DF2011748FB38325")
     )
     lateinit var bobAccount: FtAccount
+
+    init {
+        // We add this provider so that we can get keccak-256 message digest instances
+        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
+            Security.addProvider(BouncyCastleProvider())
+        }
+    }
 
     @BeforeAll
     fun setupBeforeAll() {

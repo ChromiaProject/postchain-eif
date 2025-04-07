@@ -7,13 +7,21 @@ import org.web3j.abi.datatypes.Event
 
 /**
  * Maps gtv representations of JSON ABI specifications to web3j [Event] objects.
- * Does not support structs, statically sized arrays or multi dimension arrays due to limitations in [org.web3j.abi.EventEncoder]
+ * Does not support structs due to limitations in web3j [TypeReference.makeTypeReference].
+ * Does not support multi-dimensional arrays due to a bug in [EncodedEvent.encode]
+ *
+ * Web3j also introduces some limits to statically sized values:
+ * Static array sizes: 0 - 32
+ * Bytes: 1 - 32
+ * int and uint: 8 - 256 (and only values dividable by 8 in this range)
  */
 object GtvToEventMapper {
 
+    private const val SUPPORTED_STATIC_ARRAY_SIZES = "(3[0-2]|[1-2][0-9]|[0-9])" // Web3j limitations 0 - 32
+
     private val supportedTypes = listOf("address", "bool", "bytes", "int", "string", "uint")
     private val supportedTypesExpression = supportedTypes
-            .joinToString("|", "^(", ")([0-9]{1,3})?(\\[\\])?\$")
+            .joinToString("|", "^(", ")([0-9]{1,3})?(\\[$SUPPORTED_STATIC_ARRAY_SIZES?\\])?\$")
             .toRegex()
 
     fun map(gtv: Gtv): Event {
@@ -53,6 +61,9 @@ object GtvToEventMapper {
         }
     }
 
+    /**
+     * Ensure that we align with Web3j limitations
+     */
     private fun validRange(type: String, number: Int): Boolean {
         return when (type) {
             "bytes" -> number in 1..32
