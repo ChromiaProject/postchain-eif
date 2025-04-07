@@ -14,6 +14,7 @@ import org.testcontainers.containers.DockerComposeContainer
 import org.testcontainers.containers.wait.strategy.Wait
 import org.web3j.crypto.Credentials
 import org.web3j.protocol.Web3j
+import org.web3j.protocol.core.methods.request.Transaction
 import org.web3j.protocol.core.methods.response.EthSendTransaction
 import org.web3j.protocol.http.HttpService
 import org.web3j.tx.FastRawTransactionManager
@@ -124,7 +125,7 @@ abstract class EifBaseIntegrationTest(private val prependUrls: List<String> = li
     fun sendTransaction(contractAddress: String, functionName: String, parameterTypes: List<String>, parameterValues: List<Gtv>): EthSendTransaction? {
 
         val functionData = TransactionSubmitter.encodeFunction(functionName, parameterTypes, parameterValues)
-        val gasLimit = gasProvider.getGasLimit(functionData)
+        val gasLimit = estimateGas(contractAddress, functionData)
 
         return transactionManager.sendEIP1559Transaction(
                 1337,
@@ -139,4 +140,18 @@ abstract class EifBaseIntegrationTest(private val prependUrls: List<String> = li
 
     fun getRegisterMessage(evmAddress: String, disposableKey: String) =
             "Create account for EVM wallet:\n${evmAddress}\n\nDisposable key:\n${disposableKey}"
+
+    fun estimateGas(contractAddress: String, functionData: String): BigInteger {
+        val transaction = Transaction.createFunctionCallTransaction(
+                null,
+                null,
+                null,
+                null,
+                contractAddress,
+                BigInteger.ZERO,
+                functionData
+        )
+
+        return gasProvider.getGasLimit(transaction)
+    }
 }

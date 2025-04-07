@@ -17,6 +17,7 @@ import org.web3j.abi.datatypes.Utf8String
 import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.abi.datatypes.generated.Int64
 import org.web3j.abi.datatypes.generated.Int72
+import org.web3j.abi.datatypes.generated.StaticArray2
 import org.web3j.abi.datatypes.generated.Uint56
 import org.web3j.abi.datatypes.generated.Uint64
 import java.math.BigInteger
@@ -81,5 +82,13 @@ class TypeToGtvMapperTest {
         val int72Gtv = TypeToGtvMapper.map(Int72(int72Max))
         assertInstanceOf(GtvBigInteger::class.java, int72Gtv)
         assertEquals(int72Gtv.asBigInteger(), int72Max)
+    }
+
+    @Test
+    fun `Test statically sized arrays`() {
+        val staticArray = StaticArray2(Uint::class.java, Uint(BigInteger.ONE), Uint(BigInteger.TWO))
+        val arrayGtv = TypeToGtvMapper.map(staticArray).asArray()
+        assertEquals(arrayGtv[0].asBigInteger(), BigInteger.ONE)
+        assertEquals(arrayGtv[1].asBigInteger(), BigInteger.TWO)
     }
 }

@@ -8,7 +8,15 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.web3j.abi.EventEncoder
-import org.web3j.abi.datatypes.*
+import org.web3j.abi.datatypes.Address
+import org.web3j.abi.datatypes.Bool
+import org.web3j.abi.datatypes.DynamicArray
+import org.web3j.abi.datatypes.DynamicBytes
+import org.web3j.abi.datatypes.Type
+import org.web3j.abi.datatypes.Uint
+import org.web3j.abi.datatypes.Utf8String
+import org.web3j.abi.datatypes.generated.StaticArray0
+import org.web3j.abi.datatypes.generated.StaticArray32
 import org.web3j.abi.datatypes.generated.Uint256
 
 class GtvToEventMapperTest {
@@ -76,6 +84,12 @@ class GtvToEventMapperTest {
     }
 
     @Test
+    fun `Allow static arrays`() {
+        assertTypeNameIsSupported("address[0]", StaticArray0::class.java) // Not sure why anyone would use this
+        assertTypeNameIsSupported("address[32]", StaticArray32::class.java)
+    }
+
+    @Test
     fun `Prevent multi dimension arrays`() {
         assertTypeNameIsUnsupported("string[][]")
     }
@@ -94,6 +108,7 @@ class GtvToEventMapperTest {
 
     @Test
     fun `Prevent illegal static array sizes`() {
+        assertTypeNameIsUnsupported("address[100]")
         assertTypeNameIsUnsupported("address[33]")
     }
 
