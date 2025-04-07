@@ -1,11 +1,18 @@
-package net.postchain.eif
+package net.postchain.eif.web3j
 
+import assertk.assertThat
+import assertk.assertions.hasSize
+import assertk.assertions.isEqualTo
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
-import net.postchain.eif.web3j.Web3jRequestHandler
+import net.postchain.common.exception.ProgrammerMistake
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import org.mockito.kotlin.doAnswer
+import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.times
@@ -13,6 +20,7 @@ import org.mockito.kotlin.verify
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.Response
+import org.web3j.protocol.core.methods.response.EthBlockNumber
 
 class Web3jRequestHandlerTest {
 
@@ -45,5 +53,37 @@ class Web3jRequestHandlerTest {
         // Wait the extra back off time and verify that we call send
         testScheduler.advanceTimeBy((500 * Web3jRequestHandler.DELAY_POWER_BASE).toLong() - 500)
         verify(requestMock, times(3)).send()
+    }
+
+    @Test
+    fun `Assert that web3j attempts all rpcs and then fails`() {
+
+        val web3jServiceMock1: Web3j = mock()
+        val web3jServiceMock2: Web3j = mock()
+        val web3jRequestHandler = Web3jRequestHandler(500, 1L, 2,
+                listOf("http://dummy:1", "http://dummy:2"), listOf(web3jServiceMock1, web3jServiceMock2))
+
+        val requestMock: Request<*, Response<*>> = mock {
+            on { send() } doAnswer {
+                mock<EthBlockNumber> {
+                    on { hasError() } doReturn true
+                    on { error } doReturn Response.Error(300, "oh no")
+                }
+            }
+        }
+
+        val calledWeb3js = mutableSetOf<Web3j>()
+        val exception = assertThrows<ProgrammerMistake> {
+            runBlocking {
+                web3jRequestHandler.sendWeb3jRequestWithRetry {
+                    calledWeb3js.add(it)
+                    requestMock
+                }
+            }
+        }
+
+        assertThat(calledWeb3js).hasSize(2)
+        verify(requestMock, times(4)).send()
+        assertThat(exception.message).isEqualTo("Request has failed on all 2 RPCs. No more nodes to try. Giving up.")
     }
 }

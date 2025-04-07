@@ -21,12 +21,11 @@ import org.web3j.protocol.exceptions.ClientConnectionException
 import java.io.Closeable
 import kotlin.coroutines.coroutineContext
 import kotlin.math.min
-import kotlin.random.Random
 
 open class Web3jRequestHandler(
         private val baseTimeout: Long,
         private val maxTimeout: Long,
-        private val maxTryErrors: Long,
+        private val maxTryErrors: Long, // Attempts per RPC
         private val urls: List<String>,
         private val web3jServices: List<Web3j>,
         private val metrics: RpcUsageMetrics? = null
@@ -58,13 +57,17 @@ open class Web3jRequestHandler(
         throw ProgrammerMistake("Failed to send web3j request to all ${web3jServices.size} nodes")
     }
 
+    /**
+     * Sends request to first RPC. Will retry on failure and eventually move on to the next
+     * RPC in list. If calls to all RPCs fail it will throw an exception.
+     */
     suspend fun <T : Response<*>> sendWeb3jRequestWithRetry(
             requestFactory: (Web3j) -> Request<*, T>
     ): T {
         val requests = web3jServices.map(requestFactory)
         val retryTimeouts = Array(requests.size) { baseTimeout }
         var tryErrors = 0L
-        var index = if (requests.size > 1) Random.nextInt(0, requests.size - 1) else 0
+        var index = 0
         while (true) {
             val currentIndex = index
             val response = try {
@@ -83,10 +86,14 @@ open class Web3jRequestHandler(
             }
 
             if (response == null || response.hasError()) {
-                tryErrors++
-                if (tryErrors >= maxTryErrors && requests.size > 1) {
+                if (++tryErrors >= maxTryErrors) {
                     logger.error { "Web3j request failed after $tryErrors tries on ${requests[index].method}/${urls[index]}" }
                     index = (index + 1) % requests.size
+                    if (index == 0) {
+                        val message = "Request has failed on all ${requests.size} RPCs. No more nodes to try. Giving up."
+                        logger.error(message)
+                        throw ProgrammerMistake(message)
+                    }
                     tryErrors = 0L
                     logger.info { "Switching to another rpc endpoint at ${urls[index]} in ${retryTimeouts[index]} ms" }
                 }
