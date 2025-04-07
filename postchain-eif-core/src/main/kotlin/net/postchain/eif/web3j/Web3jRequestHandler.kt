@@ -3,7 +3,6 @@ package net.postchain.eif.web3j
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import mu.KLogging
-import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.eif.metrics.RpcUsageMetrics
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameter
@@ -45,7 +44,7 @@ open class Web3jRequestHandler(
 
                 if (response.hasError()) {
                     val errorMessage = "Web3J error code: ${response.error.code} and message: ${response.error.message}"
-                    throw ProgrammerMistake(errorMessage)
+                    throw RuntimeException(errorMessage)
                 }
 
                 return response
@@ -54,7 +53,7 @@ open class Web3jRequestHandler(
             }
         }
 
-        throw ProgrammerMistake("Failed to send web3j request to all ${web3jServices.size} nodes")
+        throw RuntimeException("Failed to send web3j request to all ${web3jServices.size} nodes")
     }
 
     /**
@@ -86,13 +85,14 @@ open class Web3jRequestHandler(
             }
 
             if (response == null || response.hasError()) {
-                if (++tryErrors >= maxTryErrors) {
+                tryErrors++
+                if (tryErrors >= maxTryErrors) {
                     logger.error { "Web3j request failed after $tryErrors tries on ${requests[index].method}/${urls[index]}" }
                     index = (index + 1) % requests.size
                     if (index == 0) {
                         val message = "Request has failed on all ${requests.size} RPCs. No more nodes to try. Giving up."
                         logger.error(message)
-                        throw ProgrammerMistake(message)
+                        throw RuntimeException(message)
                     }
                     tryErrors = 0L
                     logger.info { "Switching to another rpc endpoint at ${urls[index]} in ${retryTimeouts[index]} ms" }
