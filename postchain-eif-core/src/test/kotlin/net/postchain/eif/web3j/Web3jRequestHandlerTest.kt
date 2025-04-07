@@ -8,7 +8,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
-import net.postchain.common.exception.ProgrammerMistake
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.doAnswer
@@ -73,7 +72,7 @@ class Web3jRequestHandlerTest {
         }
 
         val calledWeb3js = mutableSetOf<Web3j>()
-        val exception = assertThrows<ProgrammerMistake> {
+        val exception = assertThrows<RuntimeException> {
             runBlocking {
                 web3jRequestHandler.sendWeb3jRequestWithRetry {
                     calledWeb3js.add(it)
