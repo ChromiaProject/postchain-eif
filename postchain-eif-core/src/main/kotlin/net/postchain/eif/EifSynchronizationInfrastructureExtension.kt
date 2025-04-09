@@ -132,7 +132,7 @@ class EifSynchronizationInfrastructureExtension(
             if (evmBlockchainConfig.skipToHeight < 0) throw UserMistake("skip-to-height for EVM network: $evmBlockchainName is negative")
 
             val staticContractConfig = (evmBlockchainConfig.contractsToFetch
-                    ?: listOf()) + (evmBlockchainConfig.contracts?.map { EifEvmContractConfig(it, 0) } ?: listOf())
+                    ?: listOf()) + (evmBlockchainConfig.contracts?.map { EifEvmContractConfig(it.toHex(), 0) } ?: listOf())
             if (staticContractConfig.isEmpty() && !hasLegacyDynamicContracts && !hasDynamicContacts) throw UserMistake("No contracts configured for EVM network: $evmBlockchainName")
             val staticContracts = staticContractConfig.map { contractConfig: EifEvmContractConfig ->
                 if (contractConfig.skipToHeight < 0) throw UserMistake("skip-to-height for contract ${contractConfig.address} is negative")
@@ -140,7 +140,7 @@ class EifSynchronizationInfrastructureExtension(
                 if (skipToHeight < evmBlockchainConfig.skipToHeight) {
                     throw UserMistake("skip-to-height for contract ${contractConfig.address} is lower than skip-to-height for EVM network: $evmBlockchainName")
                 }
-                parseEvmAddress(contractConfig.address) to skipToHeight
+                contractConfig.address to skipToHeight
             }
             val staticEvents = evmBlockchainConfig.events.let { if (it.isNull()) listOf() else it.asArray().map(GtvToEventMapper::map) }
             if (staticEvents.isEmpty() && !hasDynamicEvents) throw UserMistake("No events configured for EVM network: $evmBlockchainName")

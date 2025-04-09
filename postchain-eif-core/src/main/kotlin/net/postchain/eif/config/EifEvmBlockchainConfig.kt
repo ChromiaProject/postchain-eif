@@ -1,5 +1,6 @@
 package net.postchain.eif.config
 
+import net.postchain.eif.parseEvmAddress
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.mapper.DefaultValue
 import net.postchain.gtv.mapper.Name
@@ -11,7 +12,7 @@ data class EifEvmBlockchainConfig(
         @Name("network_id")
         val networkId: Long,
         @Name("contracts")
-        val contracts: List<String>?,
+        private val _contracts: List<String>?,
         @Name("events")
         val events: Gtv,
         @Name("skip_to_height")
@@ -28,12 +29,16 @@ data class EifEvmBlockchainConfig(
         val maxQueueSize: Long,
         @Name("contracts_to_fetch")
         val contractsToFetch: List<EifEvmContractConfig>?,
-)
+) {
+    val contracts get() = _contracts?.map { parseEvmAddress(it) }
+}
 
 data class EifEvmContractConfig(
         @Name("address")
-        val address: String,
+        private val _address: String,
         @Name("skip_to_height")
         @DefaultValue(defaultLong = 0)
         val skipToHeight: Long,
-)
+) {
+    val address get() = parseEvmAddress(_address)
+}
