@@ -4,6 +4,12 @@ entity bridge_contract {
     key network_id, contract_address;
 }
 
+struct bridge_contract_info {
+    contract_address: byte_array;
+    evm_read_offset: integer;
+    erc20_assets: list<erc20_asset_info>;
+}
+
 entity bridge_erc20_asset {
     key bridge_contract, erc20_asset;
 }
