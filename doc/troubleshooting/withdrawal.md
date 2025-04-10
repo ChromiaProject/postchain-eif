@@ -30,7 +30,7 @@ chr query --api-url $NODE -brid $BRIDGE eif.hbridge.get_erc20_withdrawals -- fil
 
 #### 2. Verify Withdrawal Request on EVM side
 
-This section covers the most common issues that might occur when a withdrawal request is created on the EVM side. For more technical details, refer to the [bridge_contract.md](bridge_contract.md) guide.
+This section covers the most common issues that might occur when a withdrawal request can't be created on the EVM side. For more technical details, refer to the [bridge_contract.md](bridge_contract.md) guide.
 
 `TokenBridge: blockchain rid is not set` -- This error means that the Token Bridge was not initialized with the blockchain RID.
 
@@ -54,7 +54,7 @@ When completing the withdrawal on the EVM side, you may encounter the following 
 `TokenBridge: not mature enough to withdraw the fund` -- This error means the required number of block confirmations hasn't yet been reached. The confirmation period is set during bridge initialization using the `--offset` parameter. The recommended value for mainnet(s) is equivalent to 72 hours.
 
 `TokenBridge: fund is pending or was already claimed` -- This error indicates that either:
-  - The withdrawal is still in a pending state and is not yet ready to be claimed;
-  - The withdrawal has already been claimed previously and cannot be claimed again.
+  - The withdrawal is still in a `Pending` state and is not yet ready to be claimed;
+  - The withdrawal has already been claimed previously and cannot be claimed again (`Withdrawn` or `PostchainWithdrawn` states).
 
 If you encounter any other errors, refer to the [bridge_contract.md](bridge_contract.md) guide for more details.
