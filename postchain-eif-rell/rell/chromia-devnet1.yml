@@ -49,6 +49,10 @@ blockchains:
           directory-chain:
             topics:
               - "L_blockchain_rid_topic"
+          local:
+            # Token chain adds this topic automatically at first deploy but is needed for here since it was deployed before this functionality was added.
+            - topic: "L_eif_event_receiver_dynamic_remove"
+              bc-rid: x"335C75E08AFAC7D6678263F1A13D5AFED9CD009344B6349107D7CEEA3A40EA08" # Token chain
     moduleArgs:
       chain_version: *chain_version
       eif_event_receiver_dynamic_icmf_config:
