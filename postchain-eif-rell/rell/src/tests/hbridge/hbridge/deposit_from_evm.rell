@@ -383,7 +383,7 @@ function test_deposit_foreign_token_from_evm_will_collect_pending_deposits_when_
     assert_equals(create_on_transfer.get_pending_transfer_strategies(recipient_id), set(["open"]));
 
     // Verify pending deposits
-    val pending_depostis = get_erc20_deposits(deposit_filter(recipient_id = recipient_id), null, null);
+    val pending_depostis = get_erc20_deposits(deposit_filter(recipient_id = recipient_id), null, null, null, null);
     assert_equals(
         pending_depostis.data @* {} (erc20_deposit_info.from_gtv_pretty($)) @* {} (_ = .asset_id, _ = .amount, _ = .state),
         [

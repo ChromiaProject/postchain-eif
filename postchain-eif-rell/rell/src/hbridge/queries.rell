@@ -27,7 +27,7 @@ query get_erc20_withdrawal(network_id: integer, token_address: byte_array, benef
  * @param page_cursor A cursor for pagination, typically pointing to the start of the next page of results. If not specified, the first page will be returned.
  * @return A `ft4.utils.paged_result` containing the filtered results and pagination data. This result includes data such as the list of withdrawals (see [erc20_withdrawal_info]), and the next page cursor (`next_cursor`). If `next_cursor` is null, there are no more pages to fetch.
  */
-query get_erc20_withdrawals(filter: withdrawal_filter, page_size: integer?, page_cursor: text?): ft4.utils.paged_result {
+query get_erc20_withdrawals(filter: withdrawal_filter, page_size: integer? = null, page_cursor: text? = null): ft4.utils.paged_result {
     val before_rowid = ft4.utils.before_rowid(page_cursor);
 
     val paginated_result = (
@@ -88,11 +88,14 @@ query get_sc_addresses_for_account(account_id: byte_array): list<(address: byte_
  * Retrieves ERC20 token deposits based on a given filter, with pagination options.
  *
  * @param filter The filter applied to the deposit search. See [deposit_filter] structure.
+ * @param from Marks the beginning of a time interval. If not null, deposits last updated before `from` are excluded.
+ * @param to Marks the end of a time interval. If not null, deposits last updated at `to` and after `to` are excluded.
  * @param page_size The number of deposit records to return per page. Limited by the maximum page size defined in the chain configuration. If not specified, a maximum page size defined in the chain configuration is used.
  * @param page_cursor A cursor for pagination, typically pointing to the start of the next page of results. If not specified, the first page will be returned.
  * @return A `ft4.utils.paged_result` containing the filtered results and pagination data. This result includes data such as the list of deposits (see [erc20_deposit_info]), and the next page cursor (`next_cursor`). If `next_cursor` is null, there are no more pages to fetch.
  */
-query get_erc20_deposits(filter: deposit_filter, page_size: integer?, page_cursor: text?): ft4.utils.paged_result {
+query get_erc20_deposits(filter: deposit_filter, from: timestamp? = null, to: timestamp? = null,
+        page_size: integer? = null, page_cursor: text? = null): ft4.utils.paged_result {
     val before_rowid = ft4.utils.before_rowid(page_cursor);
 
     val paginated_result = erc20_deposit @* {
@@ -101,6 +104,8 @@ query get_erc20_deposits(filter: deposit_filter, page_size: integer?, page_curso
         filter.recipient_id == null or .recipient_id == filter.recipient_id,
         filter.state == null or .state == filter.state,
         filter.evm_tx_hash == null or .evm_tx_hash == filter.evm_tx_hash,
+        from == null or .last_updated >= from,
+        to == null or .last_updated < to,
         .rowid > (before_rowid ?: rowid(0))
     } (
         ft4.utils.pagination_result(
