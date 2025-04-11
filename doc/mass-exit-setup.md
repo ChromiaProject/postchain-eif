@@ -5,13 +5,16 @@ This guide describes how to configure the Chromia chains to support mass exit. S
 * [Token bridge chain configuration](token-bridge-chain-configuration.md) for more details on the basic bridge chain configuration.
 
 
-## Handling mass exit on the bridge chain
+## Handling mass exit on the EVM side
 
 1. To deploy the `TokenBridgeWithSnapshotWithdraw` bridge contract, that supports mass exit, use the following command:
 
 ```sh
 $ yarn deploy:snapshots --network sepolia --verify --validator-address {VALIDATOR_CONTRACT_ADDRESS} --offset 2
 ```
+
+
+## Handling mass exit on the bridge chain
 
 2. To register the FT4 asset on the bridge chain, use the following snippet:
 
@@ -33,7 +36,7 @@ val asset = ft4.assets.Unsafe.register_asset(
 val erc20_asset = hbridge.register_erc20_asset(
     network_id,                     // EVM network ID
     token_address,                  // Address of the ERC-20 token contract
-    asset,                          // FT4 asset to bind to the ERC-20 token
+    asset,                          // FT4 asset registered in step 2 to link to the ERC-20 token
     bridge_mode.foreign,            // Foreign bridge mode: mass exit applies only to foreign assets.
     true                            // The `use_snapshots` parameter must be set to `true` for mass exit to work.
 );
