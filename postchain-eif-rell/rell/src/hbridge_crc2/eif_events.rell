@@ -1,0 +1,56 @@
+
+function emit_withdrawal_event(network_id: integer, contract_address: byte_array, token_id: big_integer, beneficiary: byte_array, amount: big_integer, bridge_address: byte_array = x"") {
+    val next_serial = common.event_counter.counter + 1;
+    common.event_counter.counter = next_serial;
+
+    val (event_gtv, event_hash) = pack_withdrawal_event(next_serial, network_id, contract_address, token_id, beneficiary, bridge_address, amount);
+
+    val withdrawal = create nft_withdrawal(
+        serial = next_serial,
+        network_id,
+        contract_address,
+        token_id,
+        beneficiary,
+        bridge_address,
+        amount,
+        timestamp = op_context.last_block_time,
+        event_hash
+    );
+
+    update_withdrawal_status(event_hash, withdrawal_status.created);
+    //add_erc20_withdrawal_to_snapshot(withdrawal);
+
+    op_context.emit_event("eif_event", event_gtv);
+}
+
+function pack_withdrawal_event(
+    serial: integer,
+    network_id: integer,
+    contract_address: byte_array,
+    token_id: big_integer,
+    beneficiary: byte_array,
+    bridge_address: byte_array,
+    amount: big_integer
+): (gtv, byte_array) {
+
+    val discriminator = network_contract_discriminator(network_id, bridge_address);
+
+    val event = [
+        serial.to_gtv(),
+        discriminator.to_gtv(),
+        utils.evm_address_to_32_byte_array(contract_address).to_gtv(),
+        token_id.to_gtv(),
+        utils.evm_address_to_32_byte_array(beneficiary).to_gtv(),
+        amount.to_gtv()
+    ].to_gtv();
+
+    val data = utils.integer_to_32_byte_array(serial)
+        + utils.big_integer_to_32_byte_array(discriminator)
+        + utils.evm_address_to_32_byte_array(contract_address)
+        + utils.big_integer_to_32_byte_array(token_id)
+        + utils.evm_address_to_32_byte_array(beneficiary)
+        + utils.big_integer_to_32_byte_array(amount);
+    val hash = crypto.keccak256(data);
+
+    return (event, hash);
+}

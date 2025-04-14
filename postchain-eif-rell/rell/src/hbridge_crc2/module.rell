@@ -1,0 +1,57 @@
+@mount("eif.hbridge")
+module;
+
+import messaging: ^.eif.messaging;
+import common: ^.eif.common;
+import utils: ^.eif.utils;
+import version: ^.eif.version;
+
+namespace ft4 {
+    import lib.ft4.accounts;
+    import lib.ft4.accounts.strategies;
+    import lib.ft4.assets;
+    import lib.ft4.crosschain;
+    import lib.ft4.auth;
+    import lib.ft4.utils;
+    import transfer_strategy: lib.ft4.accounts.strategies.transfer;
+}
+
+namespace crc2 {
+    import lib.crc2.tokens;
+    import lib.crc2.balances;
+    import lib.crc2.transfers;
+    import lib.crc2.evm;
+}
+
+struct module_args {
+    evm_read_offsets: gtv = map<text, integer>().to_gtv();
+
+    /**
+     * HBridge versions:
+     * - Version 1: Initial HBridge implementation
+     * - Version 2: Added support for multiple bridges
+     */
+    version: integer = 1;
+}
+
+enum bridge_mode {
+    native,
+    foreign,
+}
+
+enum evm_token_type {
+    erc721,
+    erc1155,
+}
+
+// Nothing really stops us from accepting deposits from any EVM address,
+// except that it might be icky and easier to exploit via client (front-end) attacks.
+val need_consent_on_deposit = true;
+
+val zero_beneficiary = x"0000000000000000000000000000000000000000000000000000000000000000";
+
+@extendable
+function deposit_check_access_list(account_id: byte_array): boolean = true;
+
+@extendable
+function withdraw_check_access_list(account_id: byte_array): boolean = true;
