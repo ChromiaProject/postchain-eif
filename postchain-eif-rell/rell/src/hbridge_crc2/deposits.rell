@@ -1,0 +1,85 @@
+
+entity nft_deposit {
+    index sender_address: byte_array;
+    network_id: integer;
+    contract_address: byte_array;
+    token_id: big_integer;
+    amount: big_integer;
+    from_smart_contract: boolean;
+    index recipient_id: byte_array;
+    mutable state: deposit_state;
+    mutable last_updated: timestamp;
+    index evm_tx_hash: byte_array;
+    index network_id, contract_address, token_id;
+}
+
+struct nft_deposit_info {
+    id: rowid;
+    sender_address: byte_array;
+    network_id: integer;
+    contract_address: byte_array;
+    token_id: big_integer;
+    amount: big_integer;
+    from_smart_contract: boolean;
+    recipient_id: byte_array;
+    state: deposit_state;
+    last_updated: timestamp;
+    evm_tx_hash: byte_array;
+}
+
+enum deposit_state {
+    pending,
+    completed,
+    recalled,
+}
+
+entity nft_deposit_history {
+    index nft_deposit;
+    state: deposit_state;
+    timestamp;
+}
+
+struct nft_deposit_history_entry {
+    deposit_id: integer;
+    state: deposit_state;
+    timestamp;
+}
+
+/**
+ * Deposit filter for get_nft_deposits()
+ */
+struct deposit_filter {
+    /** EVM network ID. If null, all networks are considered. */
+    network_id: integer? = null;
+    /** EVM token address. If null, all token addresses are considered. */
+    contract_address: byte_array? = null;
+    /** EVM token ID. If null, all token IDs are considered. */
+    token_id: big_integer? = null;
+    /** EVM beneficiary address. If null, all recipient_id values are considered. */
+    recipient_id: byte_array? = null;
+    /** The state of the deposit. If null, all states are considered. */
+    state: deposit_state? = null;
+    /** EVM transaction hash */
+    evm_tx_hash: byte_array? = null;
+}
+
+function map_deposit(deposit: nft_deposit) = nft_deposit_info(
+    id = deposit.rowid,
+    sender_address = deposit.sender_address,
+    network_id = deposit.network_id,
+    contract_address = deposit.contract_address,
+    token_id = deposit.token_id,
+    amount = deposit.amount,
+    from_smart_contract = deposit.from_smart_contract,
+    recipient_id = deposit.recipient_id,
+    state = deposit.state,
+    last_updated = deposit.last_updated,
+    evm_tx_hash = deposit.evm_tx_hash,
+);
+
+function update_deposit_state(deposit: nft_deposit, state: deposit_state) {
+    create nft_deposit_history(deposit, deposit.state, deposit.last_updated);
+
+    deposit.state = state;
+    deposit.last_updated = op_context.last_block_time;
+}

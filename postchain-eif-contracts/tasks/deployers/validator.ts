@@ -76,7 +76,7 @@ task("deploy:validator")
                 if (directoryValidator === undefined) {
                     await hre.run("verify:verify", {
                         address: validatorAddress,
-                        constructorArguments: [validators],
+                        constructorArguments: [parseValidators(validators)],
                     });
                 } else {
                     await hre.run("verify:verify", {

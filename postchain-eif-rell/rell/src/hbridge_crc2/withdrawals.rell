@@ -1,0 +1,126 @@
+
+@log entity nft_withdrawal {
+    op_index: integer = op_context.op_index;
+    index transaction, op_index;
+
+    key serial: integer;
+    network_id: integer;
+    contract_address: byte_array;
+    token_id: big_integer;
+    amount: big_integer;
+    index network_id, contract_address, token_id;
+    index beneficiary: byte_array;
+    index bridge_address: byte_array = x"";
+    timestamp;
+    index event_hash: byte_array;
+}
+
+entity nft_withdrawal_status {
+    key nft_withdrawal;
+    mutable withdrawal_status;
+}
+
+@log entity nft_withdrawal_history {
+    op_index: integer = op_context.op_index;
+    index transaction, op_index;
+
+    index nft_withdrawal;
+    withdrawal_status;
+}
+
+struct nft_withdrawal_history_entry {
+    withdrawal_id: integer;
+    status: withdrawal_status;
+    timestamp;
+}
+
+/**
+    +-----------------------------------+---------------------------------+
+    |             Chromia               |               EVM               |
+    +-----------------------------------+---------------------------------+
+    |                                   |  Uninitialized                  |
+    | created                           |                                 |
+    | requested                         |  Withdrawable                   |
+    | pending <-> requested             |  Pending <-> Withdrawable       |
+    | withdrawn | withdrawn_to_chromia  |  Withdrawn | PostchainWithdrawn |
+    +-----------------------------------+---------------------------------+
+ */
+enum withdrawal_status {
+    created,
+    requested,
+    pending,
+    withdrawn,
+    withdrawn_to_chromia,
+}
+
+struct nft_withdrawal_info {
+    id: rowid;
+    serial: integer;
+    network_id: integer;
+    contract_address: byte_array;
+    token_id: big_integer;
+    amount: big_integer;
+    beneficiary: byte_array;
+    bridge_address: byte_array;
+    timestamp;
+    event_hash: byte_array;
+    status: withdrawal_status;
+}
+
+/**
+ * Withdrawal filter for get_nft_withdrawals()
+ */
+struct withdrawal_filter {
+    /** EVM network ID. If null, all networks are considered. */
+    network_id: integer? = null;
+    /** EVM token address. If null, all token addresses are considered. */
+    contract_address: byte_array? = null;
+    /** EVM token ID. If null, all token IDs are considered. */
+    token_id: big_integer? = null;
+    /** EVM beneficiary address. If null, all beneficiaries are considered. */
+    beneficiary: byte_array? = null;
+    /** Marks the beginning of a time interval. If not null, withdrawals occurring before `from` are excluded. */
+    from: timestamp? = null;
+    /** Marks the end of a time interval. If not null, withdrawals occurring at `to` and after `to` are excluded. */
+    to: timestamp? = null;
+    /** Transaction RID in which the withdrawals were initiated */
+    tx_rid: byte_array? = null;
+    /** Withdrawal status list. If null or empty, all status are considered. */
+    statuses: list<withdrawal_status>? = null;
+}
+
+function map_withdrawal(withdrawal: nft_withdrawal, status: withdrawal_status? = null) = nft_withdrawal_info(
+    id = withdrawal.rowid,
+    serial = withdrawal.serial,
+    network_id = withdrawal.network_id,
+    contract_address = withdrawal.contract_address,
+    token_id = withdrawal.token_id,
+    amount = withdrawal.amount,
+    beneficiary = withdrawal.beneficiary,
+    bridge_address = withdrawal.bridge_address,
+    timestamp = withdrawal.transaction.block.timestamp,
+    event_hash = withdrawal.event_hash,
+    status = status ?: nft_withdrawal_status @ { withdrawal } ( .withdrawal_status ),
+);
+
+function update_withdrawal_status(withdrawal_event_hash: byte_array, status: withdrawal_status) {
+    val withdrawal = nft_withdrawal @? { .event_hash == withdrawal_event_hash };
+    if (empty(withdrawal)) {
+        log("Withdrawal event with hash %s not found".format(withdrawal_event_hash));
+        return;
+    }
+
+    if (empty(nft_withdrawal_status @? { withdrawal })) {
+        create nft_withdrawal_status(
+            nft_withdrawal = withdrawal,
+            withdrawal_status = status
+        );
+    } else {
+        update nft_withdrawal_status @ { withdrawal } ( .withdrawal_status = status );
+    }
+
+    create nft_withdrawal_history(
+        nft_withdrawal = withdrawal,
+        withdrawal_status = status
+    );
+}

@@ -398,3 +398,9 @@ libs:
     tagOrBranch: 1.82.4
     rid: x"1A4B3C3A1325DEF2C426C4F0F93F7444BB074373A24367DAA958C32F21B2EA1D"
     insecure: false
+  crc2:
+    registry: https://github.com/CRC-lib/CRC2
+    path: src/lib/crc2
+    tagOrBranch: main
+    rid: x"73F2708ED5C8785FC7BFCBD676EA1FD6DCC7490B88FEB92665FBF5602FB860EE"
+    insecure: false
