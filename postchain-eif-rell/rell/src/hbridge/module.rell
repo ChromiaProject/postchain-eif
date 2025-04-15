@@ -22,8 +22,11 @@ struct module_args {
 
     /**
      * HBridge versions:
-     * - Version 1: Initial HBridge implementation
-     * - Version 2: Added support for multiple bridges
+     *
+     * - Version 1: Initial HBridge implementation.
+     *
+     * - Version 2: Adds multi-bridge support via the `discriminator` field in withdrawal events and account state snapshots.
+     *   The `discriminator` field encodes the EVM network ID and the destination bridge contract address.
      */
     version: integer = 1;
 }
