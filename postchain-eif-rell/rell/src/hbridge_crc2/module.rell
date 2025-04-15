@@ -1,4 +1,4 @@
-@mount("eif.hbridge")
+@mount("eif.hbridge_crc2")
 module;
 
 import messaging: ^.eif.messaging;
@@ -9,8 +9,6 @@ import version: ^.eif.version;
 namespace ft4 {
     import lib.ft4.accounts;
     import lib.ft4.accounts.strategies;
-    import lib.ft4.assets;
-    import lib.ft4.crosschain;
     import lib.ft4.auth;
     import lib.ft4.utils;
     import transfer_strategy: lib.ft4.accounts.strategies.transfer;
@@ -25,13 +23,6 @@ namespace crc2 {
 
 struct module_args {
     evm_read_offsets: gtv = map<text, integer>().to_gtv();
-
-    /**
-     * HBridge versions:
-     * - Version 1: Initial HBridge implementation
-     * - Version 2: Added support for multiple bridges
-     */
-    version: integer = 1;
 }
 
 enum bridge_mode {

@@ -132,28 +132,6 @@ val ACCOUNT_TYPE_BRIDGE = "EIF_BRIDGE";
 function ensure_bridge_account(blockchain_rid: byte_array) =
    ft4.accounts.ensure_account_without_auth(blockchain_rid, ACCOUNT_TYPE_BRIDGE);
 
-function transfer(from: ft4.accounts.account, to: ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
-    ft4.assets.require_zero_exclusive_asset_amount_limits(amount, "Parameter amount");
-
-    ft4.assets.deduct_balance(from, asset, amount);
-    create ft4.assets.transfer_history_entry(
-        .account = from,
-        .asset = asset,
-        .delta = amount,
-        .op_index = op_context.op_index,
-        .is_input = true
-   );
-
-    ft4.assets.increase_balance(to, asset, amount);
-    create ft4.assets.transfer_history_entry(
-        .account = to,
-        .asset = asset,
-        .delta = amount,
-        .op_index = op_context.op_index,
-        .is_input = false
-    );
-}
-
 val ACCOUNT_TYPE_PENDING_DEPOSIT = "EIF_PENDING_DEPOSIT";
 
 function ensure_pending_account() {

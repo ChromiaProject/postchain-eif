@@ -23,7 +23,7 @@ function register_bridge_and_evm_collection(
     use_snapshots: boolean = false,
     bridge_address: byte_array
 ) {
-    val evm_collection = register_evm_collection(network_id, contract_address, mode, token_type, use_snapshots);
+    val evm_collection = register_evm_collection(network_id, contract_address, token_type, mode, use_snapshots);
     val bridge_contract = get_or_create_bridge(network_id, bridge_address);
     create bridge_evm_collection(bridge_contract, evm_collection);
 }
