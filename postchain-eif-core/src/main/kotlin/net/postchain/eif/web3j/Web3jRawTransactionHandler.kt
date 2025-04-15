@@ -31,10 +31,9 @@ open class Web3jRawTransactionHandler(
                     val errorMessage =
                             "Failed to send transaction $requestId to rpc $rpcUrl with error code: ${response.error.code} and message: ${response.error.message}"
                     logger.error(errorMessage)
-                    throw RuntimeException(errorMessage)
+                } else {
+                    return response
                 }
-
-                return response
             } catch (e: Exception) {
                 logger.error("Failed to send transaction $requestId to $rpcUrl: ${e.message}", e)
             }

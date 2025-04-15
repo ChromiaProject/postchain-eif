@@ -47,10 +47,10 @@ open class Web3jRequestHandler(
                 if (response.hasError()) {
                     val errorMessage = "RPC/EVM error code: ${response.error.code} and message: ${response.error.message}"
                     rpcErrors.add(errorMessage)
-                    throw RuntimeException(errorMessage)
+                    logger.error(errorMessage)
+                } else {
+                    return response
                 }
-
-                return response
             } catch (e: Exception) {
                 logger.error("Web3j request failed: ${e.message}", e)
             }
