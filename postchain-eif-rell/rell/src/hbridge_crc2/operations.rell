@@ -41,35 +41,31 @@ operation link_evm_sc_account(address: byte_array, network_id: integer) {
 
 @extend(ft4.auth.auth_handler)
 function () = ft4.auth.add_auth_handler(
-    scope = rell.meta(bridge_crc2_token_to_evm).mount_name,
+    scope = rell.meta(bridge_tokens_to_evm).mount_name,
     flags = ["T"],
     message = bridge_crc2_token_to_evm_auth_message(*)
 );
 
 function bridge_crc2_token_to_evm_auth_message(gtv) {
-    val args = struct<bridge_crc2_token_to_evm>.from_gtv(gtv);
-    return "Please sign the message to bridge %d of CRC2 token %s\nfrom Chromia account {account_id} for beneficiary %s on network %d".format(
-        args.amount, args.token_id, args.beneficiary, args.network_id
+    val args = struct<bridge_tokens_to_evm>.from_gtv(gtv);
+    return "Please sign the message to bridge tokens from Chromia account {account_id} for beneficiary %s on network %d".format(
+        args.beneficiary, args.network_id
     );
 }
 
-operation bridge_crc2_token_to_evm(
-    token_id: byte_array,
-    amount: big_integer,
-    beneficiary: byte_array,
+operation bridge_tokens_to_evm(
     network_id: integer,
+    contract_address: byte_array,
+    tokens: list<token_amount>,
+    beneficiary: byte_array,
     bridge_address: byte_array,
 ) {
     val from_account = ft4.auth.authenticate();
-    val evm_token = crc2.evm.evm_token @? { .token.id == token_id };
-    require(evm_token, "EVM token not found for token id %s ".format(token_id));
-
-    val evm_collection = evm_collection @? { evm_token.network_id, .contract_address == evm_token.contract_address };
-    require(evm_collection, "EVM collection not found for network id %d and contract address %s ".format(evm_token.network_id, evm_token.contract_address));
+    val evm_collection = require(evm_collection @? { network_id, contract_address }, "EVM collection not found for network id %d and contract address %s ".format(network_id, contract_address));
 
     require(
         validate_bridge_contract(bridge_address, evm_collection),
-        "Bridge address %s or contract address %s are not registered on network ID %d".format(bridge_address, evm_collection.contract_address, evm_token.network_id)
+        "Bridge address %s or contract address %s are not registered on network ID %d".format(bridge_address, contract_address, network_id)
     );
 
     require(withdraw_check_access_list(from_account.id), "Account id %s not on access list.".format(from_account.id));
@@ -79,8 +75,17 @@ operation bridge_crc2_token_to_evm(
         "Can only withdraw to your own account"
     );
 
-    bridge_deduct_balance(from_account, evm_collection, evm_token.token, amount);
-    emit_withdrawal_event(evm_token.network_id, evm_token.contract_address, evm_token.token_id, beneficiary, amount, bridge_address);
+    val protocol_id = get_protocol_id_from_token_type(evm_collection.token_type);
+
+    for (token_amount in tokens) {
+        require(token_amount.amount > 0, "Amount must be greater than 0");
+        if(protocol_id == 721) {
+            require(token_amount.amount == 1, "ERC721 amount must be 1");
+        } 
+        val crc2_token = require(crc2.evm.evm_token @? { network_id, contract_address, token_amount.token_id } (.token), "CRC2 token not found for token id %s ".format(token_amount.token_id));
+        bridge_deduct_balance(from_account, evm_collection, crc2_token, token_amount.amount);
+    }
+    emit_withdrawal_event(network_id, contract_address, protocol_id, tokens, beneficiary, bridge_address);
 }
 
 // if account was not created, we can recall the deposit back to EVM
@@ -97,3 +102,10 @@ operation bridge_crc2_token_to_evm(
 //         update_deposit_state(deposit, deposit_state.recalled);
 //     }
 // }
+
+function get_protocol_id_from_token_type(token_type: evm_token_type): integer {
+    when (token_type) {
+        evm_token_type.erc721 -> return 721;
+        evm_token_type.erc1155 -> return 1155;
+    }
+}

@@ -35,6 +35,11 @@ enum evm_token_type {
     erc1155,
 }
 
+struct token_amount {
+    token_id: big_integer;
+    amount: big_integer;
+}
+
 // Nothing really stops us from accepting deposits from any EVM address,
 // except that it might be icky and easier to exploit via client (front-end) attacks.
 val need_consent_on_deposit = true;
