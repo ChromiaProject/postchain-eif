@@ -1,24 +1,21 @@
-
-function emit_withdrawal_event(network_id: integer, contract_address: byte_array, token_id: big_integer, beneficiary: byte_array, amount: big_integer, bridge_address: byte_array = x"") {
+function emit_withdrawal_event(network_id: integer, contract_address: byte_array, protocol_id: big_integer, tokens: list<token_amount>, beneficiary: byte_array, bridge_address: byte_array) {
     val next_serial = common.event_counter.counter + 1;
     common.event_counter.counter = next_serial;
 
-    val (event_gtv, event_hash) = pack_withdrawal_event(next_serial, network_id, contract_address, token_id, beneficiary, bridge_address, amount);
+    val (event_gtv, event_hash) = pack_withdrawal_event(next_serial, network_id, contract_address, protocol_id, tokens, beneficiary, bridge_address);
 
-    val withdrawal = create nft_withdrawal(
+    val withdrawal = create token_withdrawal(
         serial = next_serial,
         network_id,
         contract_address,
-        token_id,
+        protocol_id,
         beneficiary,
         bridge_address,
-        amount,
         timestamp = op_context.last_block_time,
         event_hash
     );
 
     update_withdrawal_status(event_hash, withdrawal_status.created);
-    //add_erc20_withdrawal_to_snapshot(withdrawal);
 
     op_context.emit_event("eif_event", event_gtv);
 }
@@ -27,30 +24,135 @@ function pack_withdrawal_event(
     serial: integer,
     network_id: integer,
     contract_address: byte_array,
-    token_id: big_integer,
+    protocol_id: big_integer,
+    tokens: list<token_amount>,
     beneficiary: byte_array,
-    bridge_address: byte_array,
-    amount: big_integer
+    bridge_address: byte_array
 ): (gtv, byte_array) {
 
     val discriminator = network_contract_discriminator(network_id, bridge_address);
-
+    val token_ids = list<big_integer>();
+    val amounts = list<big_integer>();
+    for (token in tokens) {
+        token_ids.add(token.token_id);
+        amounts.add(token.amount);
+    }
+    
+    // Create the ABI-encoded event data that can be decoded in Solidity
+    val encoded_event = encode_nft_event(
+        big_integer(serial),
+        discriminator,
+        protocol_id,
+        contract_address,
+        token_ids,
+        amounts,
+        beneficiary
+    );
+    
+    // Use the encoded event in the GTV representation
     val event = [
-        serial.to_gtv(),
-        discriminator.to_gtv(),
-        utils.evm_address_to_32_byte_array(contract_address).to_gtv(),
-        token_id.to_gtv(),
-        utils.evm_address_to_32_byte_array(beneficiary).to_gtv(),
-        amount.to_gtv()
+        encoded_event.to_gtv()
     ].to_gtv();
-
-    val data = utils.integer_to_32_byte_array(serial)
-        + utils.big_integer_to_32_byte_array(discriminator)
-        + utils.evm_address_to_32_byte_array(contract_address)
-        + utils.big_integer_to_32_byte_array(token_id)
-        + utils.evm_address_to_32_byte_array(beneficiary)
-        + utils.big_integer_to_32_byte_array(amount);
-    val hash = crypto.keccak256(data);
+    
+    // Calculate hash from the encoded event
+    val hash = crypto.keccak256(encoded_event);
 
     return (event, hash);
+}
+
+function big_integer_array_to_byte_array(values: list<big_integer>): byte_array {
+    var result = x"";
+    for (value in values) {
+        result += utils.big_integer_to_32_byte_array(value);
+    }
+    return result;
+}
+
+/**
+ * Creates an ABI-encoded byte array for an NFTEvent structure that can be decoded in Solidity.
+ * 
+ * @param serial_number The serial number of the event
+ * @param discriminator The discriminator value
+ * @param protocol_id The protocol ID (721 or 1155)
+ * @param contract_address The EVM contract address (20 bytes)
+ * @param token_ids Array of token IDs
+ * @param amounts Array of token amounts (used for ERC1155)
+ * @param beneficiary The beneficiary address (20 bytes)
+ * @return A properly ABI-encoded byte array that can be decoded with abi.decode in Solidity
+ */
+function encode_nft_event(
+    serial_number: big_integer,
+    discriminator: big_integer,
+    protocol_id: big_integer, 
+    contract_address: byte_array,
+    token_ids: list<big_integer>,
+    amounts: list<big_integer>,
+    beneficiary: byte_array
+): byte_array {
+    // Validate inputs
+    require(contract_address.size() == 20, "Contract address must be 20 bytes");
+    require(beneficiary.size() == 20, "Beneficiary address must be 20 bytes");
+    
+    // In Solidity ABI encoding, we need to allocate 32 bytes for each static field
+    // and 32 bytes for each dynamic array offset
+    
+    // For a struct with 7 fields where 2 are dynamic arrays:
+    // - 5 static fields (serialNumber, discriminator, protocolId, contractAddress, beneficiary)
+    // - 2 dynamic fields (tokenIds, amounts)
+    
+    // Calculate the head size (static part): 7 fields * 32 bytes
+    val head_size = 7 * 32;
+    
+    // Start building the encoding
+    var result = x"";
+    
+    // 1. serialNumber (fixed 32 bytes)
+    result += utils.big_integer_to_32_byte_array(serial_number);
+    
+    // 2. discriminator (fixed 32 bytes)
+    result += utils.big_integer_to_32_byte_array(discriminator);
+    
+    // 3. protocolId (fixed 32 bytes)
+    result += utils.big_integer_to_32_byte_array(protocol_id);
+    
+    // 4. contractAddress (address padded to 32 bytes)
+    result += utils.evm_address_to_32_byte_array(contract_address);
+    
+    // 5. & 6. Offset pointers to tokenIds and amounts arrays
+    // Calculate offsets:
+    // - tokenIds starts at head_size (7 * 32 = 224)
+    // - amounts starts at head_size + 32 (tokenIds length) + (tokenIds.size * 32)
+    val token_ids_offset = head_size;
+    val token_ids_length_encoded = utils.integer_to_32_byte_array(token_ids.size());
+    val token_ids_data_size = token_ids.size() * 32;
+    val amounts_offset = token_ids_offset + 32 + token_ids_data_size;
+    
+    // Add tokenIds offset to result
+    result += utils.integer_to_32_byte_array(token_ids_offset);
+    
+    // Add amounts offset to result
+    result += utils.integer_to_32_byte_array(amounts_offset);
+    
+    // 7. beneficiary (address padded to 32 bytes)
+    result += utils.evm_address_to_32_byte_array(beneficiary);
+    
+    // Now add the dynamic parts:
+    
+    // TokenIds array
+    // First add the array length
+    result += token_ids_length_encoded;
+    // Then add each token ID
+    for (token_id in token_ids) {
+        result += utils.big_integer_to_32_byte_array(token_id);
+    }
+    
+    // Amounts array
+    // First add the array length
+    result += utils.integer_to_32_byte_array(amounts.size());
+    // Then add each amount
+    for (amount in amounts) {
+        result += utils.big_integer_to_32_byte_array(amount);
+    }
+    
+    return result;
 }

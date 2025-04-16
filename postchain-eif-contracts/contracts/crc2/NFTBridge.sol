@@ -35,21 +35,21 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
     struct NFTWithdraw {
         uint256 protocolId;
         address contractAddress;
-        uint256 tokenId;
-        uint256 amount;
+        uint256[] tokenIds;
+        uint256[] amounts;
         address beneficiary;
         uint256 blockNumber;
         uint256 postchainHeight;
         Status status;
     }
 
-    struct NFTEvent {
+    struct TokenEvent {
         uint256 serialNumber;
         uint256 discriminator;
         uint256 protocolId;
         address contractAddress;
-        uint256 tokenId;
-        uint256 amount;
+        uint256[] tokenIds;
+        uint256[] amounts;
         address beneficiary;
     }
 
@@ -88,9 +88,9 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
     event PendingWithdraw(bytes32 indexed hash);
     event UnpendingWithdraw(bytes32 indexed hash);
     event DepositedTokens(address indexed sender, address indexed contractAddress, uint256[] tokenIds, uint256[] amounts, bytes32 accountID, uint256 protocolId);
-    event TokenWithdrawRequest(uint256 protocolId, address indexed contractAddress, uint256 tokenId, uint256 amount, address indexed beneficiary, uint height, bytes32 blockRid);
+    event TokenWithdrawRequest(uint256 protocolId, address indexed contractAddress, uint256[] tokenIds, uint256[] amounts, address indexed beneficiary, uint height, bytes32 blockRid);
     event WithdrawRequestHash(bytes32 indexed hash);
-    event TokenWithdrawal(uint256 protocolId, address indexed contractAddress, uint256 indexed tokenId, uint256 amount, address indexed beneficiary);
+    event TokenWithdrawal(uint256 protocolId, address indexed contractAddress, uint256[] tokenIds, uint256[] amounts, address indexed beneficiary);
     event WithdrawalHash(bytes32 indexed hash);
     event WithdrawalToPostchain(bytes32 indexed hash);
     event LinkAccountID(address indexed sender, bytes32 accountID, bool isContract);
@@ -315,23 +315,24 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
     function _updateWithdraw(bytes32 hash, bytes memory _event, uint height, bytes32 blockRid) internal returns (bool) {
         NFTWithdraw storage wd = nftWithdraws[hash];
         {
-            NFTEvent memory evt = abi.decode(_event, (NFTEvent));
+            TokenEvent memory evt = abi.decode(_event, (TokenEvent));
             require(keccak256(_event) == hash, "NFTBridge: invalid event");
             Postchain.verifyDiscriminator(networkId, address(this), evt.discriminator);
             
             AllowedContract memory allowedContract = AllowedContracts[evt.contractAddress];
             require(allowedContract.isAllowed, "NFTBridge: token not allowed");
             require(allowedContract.protocolId == evt.protocolId, "NFTBridge: protocol ID mismatch");
+            require(evt.tokenIds.length == evt.amounts.length, "NFTBridge: tokenIds and amounts length mismatch");
             wd.protocolId = evt.protocolId;
             wd.contractAddress = evt.contractAddress;
-            wd.tokenId = evt.tokenId;
-            wd.amount = evt.amount;
+            wd.tokenIds = evt.tokenIds;
+            wd.amounts = evt.amounts;
             wd.beneficiary = evt.beneficiary;
             wd.postchainHeight = height;
             wd.blockNumber = block.number + withdrawOffset;
             wd.status = Status.Withdrawable;
             
-            emit TokenWithdrawRequest(evt.protocolId, evt.contractAddress, evt.tokenId, evt.amount, evt.beneficiary, height, blockRid);
+            emit TokenWithdrawRequest(evt.protocolId, evt.contractAddress, evt.tokenIds, evt.amounts, evt.beneficiary, height, blockRid);
             emit WithdrawRequestHash(hash);
         }
         return true;
@@ -347,12 +348,14 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
         wd.status = Status.Withdrawn;
         
         if (wd.protocolId == 721) {
-            IERC721(wd.contractAddress).safeTransferFrom(address(this), beneficiary, wd.tokenId);
+            for (uint256 i = 0; i < wd.tokenIds.length; i++) {
+                IERC721(wd.contractAddress).safeTransferFrom(address(this), beneficiary, wd.tokenIds[i]);
+            }
         } else if (wd.protocolId == 1155) {
-            IERC1155(wd.contractAddress).safeTransferFrom(address(this), beneficiary, wd.tokenId, wd.amount, "");
+            IERC1155(wd.contractAddress).safeBatchTransferFrom(address(this), beneficiary, wd.tokenIds, wd.amounts, "");
         }
         
-        emit TokenWithdrawal(wd.protocolId, wd.contractAddress, wd.tokenId, wd.amount, beneficiary);
+        emit TokenWithdrawal(wd.protocolId, wd.contractAddress, wd.tokenIds, wd.amounts, beneficiary);
         emit WithdrawalHash(_hash);
     }
 
@@ -368,12 +371,7 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
         
         wd.status = Status.PostchainWithdrawn;
         
-        // Re-deposit to the sender's account on Postchain
-        uint256[] memory tokenIds = new uint256[](1);
-        tokenIds[0] = wd.tokenId;
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = wd.amount;
-        emit DepositedTokens(msg.sender, wd.contractAddress, tokenIds, amounts, bytes32(0), wd.protocolId);
+        emit DepositedTokens(msg.sender, wd.contractAddress, wd.tokenIds, wd.amounts, bytes32(0), wd.protocolId);
         emit WithdrawalToPostchain(_hash);
     }
 

@@ -1,25 +1,26 @@
 
-entity nft_deposit {
+entity token_deposit {
     index sender_address: byte_array;
-    network_id: integer;
-    contract_address: byte_array;
-    token_id: big_integer;
-    amount: big_integer;
+    index network_id: integer, contract_address: byte_array;
     from_smart_contract: boolean;
     index recipient_id: byte_array;
     mutable state: deposit_state;
     mutable last_updated: timestamp;
     index evm_tx_hash: byte_array;
-    index network_id, contract_address, token_id;
 }
 
-struct nft_deposit_info {
+entity deposited_token {
+    index token_deposit;
+    token_id: big_integer;
+    amount: big_integer;
+}
+
+struct token_deposit_info {
     id: rowid;
     sender_address: byte_array;
     network_id: integer;
     contract_address: byte_array;
-    token_id: big_integer;
-    amount: big_integer;
+    tokens: list<token_amount>;
     from_smart_contract: boolean;
     recipient_id: byte_array;
     state: deposit_state;
@@ -33,20 +34,20 @@ enum deposit_state {
     recalled,
 }
 
-entity nft_deposit_history {
-    index nft_deposit;
+entity token_deposit_history {
+    index token_deposit;
     state: deposit_state;
     timestamp;
 }
 
-struct nft_deposit_history_entry {
+struct token_deposit_history_entry {
     deposit_id: integer;
     state: deposit_state;
     timestamp;
 }
 
 /**
- * Deposit filter for get_nft_deposits()
+ * Deposit filter for get_token_deposits()
  */
 struct deposit_filter {
     /** EVM network ID. If null, all networks are considered. */
@@ -63,13 +64,12 @@ struct deposit_filter {
     evm_tx_hash: byte_array? = null;
 }
 
-function map_deposit(deposit: nft_deposit) = nft_deposit_info(
+function map_deposit(deposit: token_deposit) = token_deposit_info(
     id = deposit.rowid,
     sender_address = deposit.sender_address,
     network_id = deposit.network_id,
     contract_address = deposit.contract_address,
-    token_id = deposit.token_id,
-    amount = deposit.amount,
+    tokens = deposited_token @* { deposit } (token_amount(token_id = .token_id, amount = .amount)),
     from_smart_contract = deposit.from_smart_contract,
     recipient_id = deposit.recipient_id,
     state = deposit.state,
@@ -77,8 +77,8 @@ function map_deposit(deposit: nft_deposit) = nft_deposit_info(
     evm_tx_hash = deposit.evm_tx_hash,
 );
 
-function update_deposit_state(deposit: nft_deposit, state: deposit_state) {
-    create nft_deposit_history(deposit, deposit.state, deposit.last_updated);
+function update_deposit_state(deposit: token_deposit, state: deposit_state) {
+    create token_deposit_history(deposit, deposit.state, deposit.last_updated);
 
     deposit.state = state;
     deposit.last_updated = op_context.last_block_time;

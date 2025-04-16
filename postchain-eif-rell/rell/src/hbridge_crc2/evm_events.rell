@@ -10,25 +10,50 @@ function create_link_account_id_event(event: messaging.event_data) = link_accoun
     is_contract = boolean.from_gtv(event.non_indexed_values[1])
 );
 
-struct deposited_nft_event {
+struct deposited_tokens_event {
     bridge_address: byte_array;
     sender: byte_array;
     contract_address: byte_array;
-    token_id: big_integer;
-    amount: big_integer;
+    protocol_id: big_integer;
+    tokens: list<token_amount>;
     beneficiary: byte_array; // account_id
     evm_tx_hash: byte_array;
 }
 
-function create_deposited_nft_event(event: messaging.event_data) = deposited_nft_event(
-    bridge_address = event.contract_address,
-    sender = byte_array.from_gtv(event.indexed_values[0]),
-    contract_address = byte_array.from_gtv(event.indexed_values[1]),
-    token_id = big_integer.from_gtv(event.indexed_values[2]),
-    amount = big_integer.from_gtv(event.non_indexed_values[0]),
-    beneficiary = byte_array.from_gtv(event.non_indexed_values[1]),
-    evm_tx_hash = event.tnx_hash,
-);
+function create_deposited_tokens_event(event: messaging.event_data) { 
+    val token_ids = list<big_integer>.from_gtv(event.non_indexed_values[0]);
+    val amounts = list<big_integer>.from_gtv(event.non_indexed_values[1]);
+    val protocol_id = big_integer.from_gtv(event.non_indexed_values[3]);
+
+    val tokens = list<token_amount>();
+
+    for (i in range(token_ids.size())) {
+        tokens.add(token_amount(token_id = token_ids[i], amount =  if (protocol_id == 721) 1 else amounts[i]));
+    }
+    return deposited_tokens_event(
+        bridge_address = event.contract_address,
+        sender = byte_array.from_gtv(event.indexed_values[0]),
+        contract_address = byte_array.from_gtv(event.indexed_values[1]),
+        protocol_id = protocol_id,
+        tokens = tokens,
+        beneficiary = byte_array.from_gtv(event.non_indexed_values[2]),
+        evm_tx_hash = event.tnx_hash,
+    ); 
+}
+
+//event DepositedTokens(address indexed sender, address indexed contractAddress, uint256[] tokenIds, uint256[] amounts, bytes32 accountID, uint256 protocolId);
+
+
+// function create_resource_bridge_events(network_id: integer, event: eif.messaging.event_data) {
+//     val events = list<resource_bridge_event>();
+//     val account = byte_array.from_gtv(event.non_indexed_values[0]);
+//     val resource_ids = list<big_integer>.from_gtv(event.non_indexed_values[1]);
+//     val resource_amounts = list<big_integer>.from_gtv(event.non_indexed_values[2]);
+//     for (i in range(resource_ids.size())) {
+//         events.add(resource_bridge_event(account, resource_id = resource_ids[i], resource_amount = resource_amounts[i]));
+//     }
+//     return events;
+// }
 
 function create_withdrawal_event(event: messaging.event_data) = withdrawal_event(
     bridge_address = event.contract_address,
@@ -46,7 +71,7 @@ function (evm_block: messaging.evm_block_message) {
         when (event.name) {
             // deposit
             "LinkAccountID" -> process_link_account_event(evm_block.network_id, create_link_account_id_event(event));
-            "DepositedNFT" -> process_deposit_token_event(evm_block.network_id, create_deposited_nft_event(event));
+            "DepositedTokens" -> process_deposit_token_event(evm_block.network_id, create_deposited_tokens_event(event));
             // withdrawal
             "PendingWithdraw" -> process_pending_withdraw_event(evm_block.network_id, create_withdrawal_event(event));
             "UnpendingWithdraw" -> process_unpending_withdraw_event(evm_block.network_id, create_withdrawal_event(event));
@@ -78,36 +103,25 @@ function process_link_account_event(network_id: integer, event: link_account_id_
     create proposed_evm_sc_account_link(event.sender, network_id, account);
 }
 
-function process_deposit_token_event(network_id: integer, event: deposited_nft_event) {
+function process_deposit_token_event(network_id: integer, event: deposited_tokens_event) {
      // normally only smart contracts have non-zero beneficiary
     // given that it's just a flag which enable more complex account registration logic
     // it's OK if it's not 100% reliable -- it only needs to be true in a specific case
     var beneficiary = event.beneficiary;
     val deposit_from_smart_contract = beneficiary != zero_beneficiary;
+    val valid_tokens = event.tokens;
 
-    if (event.amount <= 0) {
-        log("Deposit event ignored: amount must be greater than 0: ERC20 token %s, sender %s".format(event.contract_address, event.sender));
-        return;
-    }
+    // if (event.amount <= 0) {
+    //     log("Deposit event ignored: amount must be greater than 0: ERC20 token %s, sender %s".format(event.contract_address, event.sender));
+    //     return;
+    // }
 
     val evm_collection = evm_collection @? { .network_id == network_id, .contract_address == event.contract_address };
 
     if (empty(evm_collection)) {
         log("Deposit event ignored: EVM collection not found: %s".format(event.contract_address));
-        bounce_deposit_event(network_id, event.contract_address, event.token_id, event.beneficiary, event.amount);
+        bounce_deposit_event(network_id, event.contract_address, event.protocol_id, event.tokens, event.beneficiary, event.bridge_address);
         return;
-    }
-
-    val token = crc2.evm.ensure_evm_token(network_id, event.contract_address, event.token_id, evm_collection.token_type == evm_token_type.erc721);
-
-    if (evm_collection.bridge_mode == bridge_mode.native) {
-        val bridge_account = ensure_bridge_account(evm_collection.virtual_blockchain_rid);
-        if (crc2.balances._get_account_balance(bridge_account, token) < event.amount) {
-            // log("Deposit event bounced: insufficient balance of token %s: CRC2 token %s, sender %s"
-            //     .format(token.id, event.contract_address, event.sender));
-            bounce_deposit_event(network_id, event.contract_address, event.token_id, event.beneficiary, event.amount);
-            return;
-        }
     }
 
     var ft4_account: ft4.accounts.account? = null;
@@ -117,7 +131,7 @@ function process_deposit_token_event(network_id: integer, event: deposited_nft_e
         if (not empty(ft4_account)) {
             // we require explicit link to avoid unwanted deposits
             if (need_consent_on_deposit and empty(evm_sc_account_link @? { event.sender, network_id, ft4_account })) {
-                bounce_deposit_event(network_id, event.contract_address, event.token_id, event.beneficiary, event.amount);
+                bounce_deposit_event(network_id, event.contract_address, event.protocol_id, event.tokens, event.beneficiary, event.bridge_address);
                 return;
             }
         }
@@ -128,41 +142,59 @@ function process_deposit_token_event(network_id: integer, event: deposited_nft_e
         beneficiary = event.sender.hash();
     }
 
+    val invalid_tokens = list<token_amount>();
+
+    for (token_amounts in event.tokens) {
+        if (token_amounts.amount <= 0) {
+            invalid_tokens.add(token_amounts);
+            log("Deposited token bounced: amount must be greater than 0: token id: %s, amount: %s, sender %s"
+                .format(token_amounts.token_id, token_amounts.amount, event.sender));
+        }
+    }
+
+    if (evm_collection.bridge_mode == bridge_mode.native) {
+        val bridge_account = ensure_bridge_account(evm_collection.virtual_blockchain_rid);
+        for (token_amounts in event.tokens) {
+            val token = crc2.evm.ensure_evm_token(network_id, event.contract_address, token_amounts.token_id, evm_collection.token_type == evm_token_type.erc721);
+            if (crc2.balances._get_account_balance(bridge_account, token) < token_amounts.amount) {
+                invalid_tokens.add(token_amounts);
+                log("Deposited token bounced: insufficient balance of token %s: CRC2 token %s, sender %s"
+                    .format(token.id, event.contract_address, event.sender));
+            }
+        }
+    }
+    
+    if (invalid_tokens.size() > 0) {
+        valid_tokens.remove_all(invalid_tokens);
+        bounce_deposit_event(network_id, event.contract_address, event.protocol_id, invalid_tokens, event.beneficiary, event.bridge_address);
+    }
+    if (valid_tokens.size() == 0) {
+        return;
+    }
+
     val sender_id = beneficiary;
     val recipient_id = beneficiary;
+    val recipient = ft4_account ?: ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid);
 
-    if (empty(ft4_account)) {
-        bridge_increase_balance(ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid), evm_collection, token, event.amount);
-    
-        val deposit = create nft_deposit(
-            sender_address = event.sender,
-            network_id,
-            contract_address = event.contract_address,
-            deposit_from_smart_contract,
-            recipient_id,
-            token_id = event.token_id,
-            amount = event.amount,
-            deposit_state.pending,
-            last_updated = op_context.last_block_time,
-            evm_tx_hash = event.evm_tx_hash,
-        );
+    val deposit = create token_deposit(
+        sender_address = event.sender,
+        network_id,
+        contract_address = event.contract_address,
+        deposit_from_smart_contract,
+        recipient_id,
+        if(ft4_account??) deposit_state.completed else deposit_state.pending,
+        last_updated = op_context.last_block_time,
+        evm_tx_hash = event.evm_tx_hash,
+    );
 
-    } else {
-        create nft_deposit(
-            sender_address = event.sender,
-            network_id,
-            contract_address = event.contract_address,
-            deposit_from_smart_contract,
-            recipient_id,
-            token_id = event.token_id,
-            amount = event.amount,
-            deposit_state.completed,
-            last_updated = op_context.last_block_time,
-            evm_tx_hash = event.evm_tx_hash,
-        );
-
-        bridge_increase_balance(ft4_account, evm_collection, token, event.amount);
+    val deposit_tokens = list<struct<deposited_token>>();
+    for (token_amounts in valid_tokens) {
+        deposit_tokens.add(struct<deposited_token>(deposit, token_id = token_amounts.token_id, amount = token_amounts.amount));
+        val token = crc2.evm.ensure_evm_token(network_id, event.contract_address, token_amounts.token_id, evm_collection.token_type == evm_token_type.erc721);
+        bridge_increase_balance(recipient, evm_collection, token, token_amounts.amount);
     }
+    create deposited_token(deposit_tokens);
+
 }
 
 function process_pending_withdraw_event(network_id: integer, event: withdrawal_event) {
@@ -186,8 +218,8 @@ function process_withdrawal_to_postchain_event(network_id: integer, event: withd
 }
 
 // return deposit if we cannot credit it to the account
-function bounce_deposit_event(network_id: integer, contract_address: byte_array, token_id: big_integer, beneficiary: byte_array, amount: big_integer) {
-    emit_withdrawal_event(network_id, contract_address, token_id, beneficiary, amount);
+function bounce_deposit_event(network_id: integer, contract_address: byte_array, protocol_id: big_integer, tokens: list<token_amount>, beneficiary: byte_array, bridge_address: byte_array) {
+    emit_withdrawal_event(network_id, contract_address, protocol_id, tokens, beneficiary, bridge_address);
 }
 
 function validate_bridge_contract(bridge_address: byte_array, evm_collection: evm_collection): boolean {
