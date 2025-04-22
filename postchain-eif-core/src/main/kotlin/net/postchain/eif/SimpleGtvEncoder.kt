@@ -23,9 +23,9 @@ object SimpleGtvEncoder {
             out = when (it) {
                 is GtvArray -> {
                     val b = it.asArray()
-                    b.forEach { ba ->
+                    b.forEachIndexed { index, ba ->
                         if (ba.asByteArray().size != 32) {
-                            throw IllegalArgumentException("invalid byte array length")
+                            throw IllegalArgumentException("Invalid byte array length in array at index $index, must be 32 bytes but got ${ba.asByteArray().size} bytes")
                         }
                         out = out.plus(ba.asByteArray())
                     }
@@ -34,7 +34,7 @@ object SimpleGtvEncoder {
 
                 is GtvByteArray -> {
                     if (it.bytearray.size != 32) {
-                        throw IllegalArgumentException("invalid byte array length")
+                        throw IllegalArgumentException("Invalid byte array length, must be 32 bytes but got ${it.bytearray.size} bytes")
                     }
                     out.plus(it.bytearray)
                 }
@@ -42,7 +42,7 @@ object SimpleGtvEncoder {
                 is GtvInteger -> {
                     val num = it.asInteger().toString(16).padStart(64, '0').hexStringToByteArray()
                     if (num.size != 32) {
-                        throw IllegalArgumentException("invalid byte array length")
+                        throw IllegalArgumentException("Invalid integer size, must fit in 32 bytes but got ${num.size} bytes")
                     }
                     out.plus(num)
                 }
@@ -50,13 +50,13 @@ object SimpleGtvEncoder {
                 is GtvBigInteger -> {
                     val num = it.asBigInteger().toString(16).padStart(64, '0').hexStringToByteArray()
                     if (num.size != 32) {
-                        throw IllegalArgumentException("invalid byte array length")
+                        throw IllegalArgumentException("Invalid big integer size, must fit in 32 bytes but got ${num.size} bytes")
                     }
                     out.plus(num)
                 }
 
                 else -> {
-                    throw IllegalArgumentException("input data type was not supported")
+                    throw IllegalArgumentException("GTV type ${it.type} is not supported")
                 }
             }
         }

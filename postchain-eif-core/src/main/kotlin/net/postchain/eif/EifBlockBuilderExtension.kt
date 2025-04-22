@@ -76,7 +76,11 @@ class EifBlockBuilderExtension(
             currentTxNrOfEvents = 0
         }
         // Note: the event hash is also calculated on the Rell side and can be retrieved from `evt` argument
-        val data = SimpleGtvEncoder.encodeGtv(evt)
+        val data = try {
+            SimpleGtvEncoder.encodeGtv(evt)
+        } catch (e: IllegalArgumentException) {
+            throw IllegalArgumentException("Unable to handle emitted event $EIF_EVENT, arguments could not be encoded: ${e.message}")
+        }
         val hash = ds.digest(data)
         leafStore.writeEvent(ctxt, PREFIX, events.size.toLong() + currentTxNrOfEvents, hash, data)
         currentTxNrOfEvents++
@@ -91,7 +95,11 @@ class EifBlockBuilderExtension(
      * during finalization
      */
     private fun emitEifState(ctxt: TxEContext, stateN: Long, state: GtvArray) {
-        val data = SimpleGtvEncoder.encodeGtv(state)
+        val data = try {
+            SimpleGtvEncoder.encodeGtv(state)
+        } catch (e: IllegalArgumentException) {
+            throw IllegalArgumentException("Unable to handle emitted event $EIF_STATE, arguments could not be encoded: ${e.message}")
+        }
         val hash = ds.digest(data)
         leafStore.writeState(bctx, PREFIX, stateN, data)
         ctxt.addAfterAppendHook {
