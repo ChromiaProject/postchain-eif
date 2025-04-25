@@ -129,25 +129,3 @@ function bridge_tokens_to_evm(
     }
     emit_withdrawal_event(network_id, contract_address, protocol_id, tokens, beneficiary, bridge_address);
 }
-
-// if account was not created, we can recall the deposit back to EVM
-// note: we do not check authorization. after a time-out the deposit can be recalled by anyone,
-// and it goes back to where it came from. this simplifies the flow
-// operation recall_pending_deposit(sender_address: byte_array) {
-//     val pending_deposits = nft_deposit @* { sender_address, deposit_state.pending };
-//     for (deposit in pending_deposits) {
-//         val token = require(crc2.evm.evm_token @? { .network_id == deposit.network_id, .contract_address == deposit.contract_address, .token_id == deposit.token_id }, "EVM token not found for token id %s ".format(deposit.token_id));
-
-//         bridge_deduct_balance(ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid), evm_collection, token.token, deposit.amount);
-//         emit_withdrawal_event(token.network_id, token.contract_address, token.token_id, sender_address, deposit.amount);
-
-//         update_deposit_state(deposit, deposit_state.recalled);
-//     }
-// }
-
-function get_protocol_id_from_token_type(token_type: evm_token_type): integer {
-    when (token_type) {
-        evm_token_type.erc721 -> return 721;
-        evm_token_type.erc1155 -> return 1155;
-    }
-}
