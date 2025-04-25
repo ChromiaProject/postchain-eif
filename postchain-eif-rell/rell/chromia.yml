@@ -410,9 +410,16 @@ libs:
     tagOrBranch: 1.82.4
     rid: x"1A4B3C3A1325DEF2C426C4F0F93F7444BB074373A24367DAA958C32F21B2EA1D"
     insecure: false
-  crc2:
-    registry: https://github.com/CRC-lib/CRC2
-    path: src/lib/crc2
-    tagOrBranch: main
-    rid: x"73F2708ED5C8785FC7BFCBD676EA1FD6DCC7490B88FEB92665FBF5602FB860EE"
+  cutp:
+    registry: https://bitbucket.org/chromawallet/cutp_1
+    path: rell/src/lib/cutp
+    tagOrBranch: master
+    rid: x"0A384FA10DB1AEAE83065E1E960B2167AEBE45E525E42690A1B8166984ADBE3C"
     insecure: false
+  crc2:
+    registry: https://gitlab.com/chromaway/crc2-lib
+    path: src/lib/crc2
+    tagOrBranch: 0.3.0
+    rid: x"24B6627872533889E4D02AF0BCDBE8C3F0106E4AB9C0FC731475EC8D1736B779"
+    insecure: false
+

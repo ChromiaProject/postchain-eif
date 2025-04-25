@@ -16,7 +16,6 @@ function emit_withdrawal_event(network_id: integer, contract_address: byte_array
     );
 
     update_withdrawal_status(event_hash, withdrawal_status.created);
-
     op_context.emit_event("eif_event", event_gtv);
 }
 
@@ -38,8 +37,8 @@ function pack_withdrawal_event(
         amounts.add(token.amount);
     }
     
-    // Create the ABI-encoded event data that can be decoded in Solidity
-    val encoded_event = encode_nft_event(
+    // Get the chunks for the event
+    val event_chunks = encode_nft_event(
         big_integer(serial),
         discriminator,
         protocol_id,
@@ -49,27 +48,30 @@ function pack_withdrawal_event(
         beneficiary
     );
     
-    // Use the encoded event in the GTV representation
-    val event = [
-        encoded_event.to_gtv()
-    ].to_gtv();
+    // Convert chunks to GTV
+    val event_gtv_chunks = list<gtv>();
+    for (chunk in event_chunks) {
+        event_gtv_chunks.add(chunk.to_gtv());
+    }
     
-    // Calculate hash from the encoded event
-    val hash = crypto.keccak256(encoded_event);
+    // Create the GTV representation
+    val event = event_gtv_chunks.to_gtv();
+    
+    // Combine all chunks to calculate the hash
+    var full_event = x"";
+    for (chunk in event_chunks) {
+        full_event += chunk;
+    }
+    
+    // Calculate hash from the full event
+    val hash = crypto.keccak256(full_event);
 
     return (event, hash);
 }
 
-function big_integer_array_to_byte_array(values: list<big_integer>): byte_array {
-    var result = x"";
-    for (value in values) {
-        result += utils.big_integer_to_32_byte_array(value);
-    }
-    return result;
-}
-
 /**
  * Creates an ABI-encoded byte array for an NFTEvent structure that can be decoded in Solidity.
+ * Returns the data in a format compatible with the TokenEvent struct in the NFTBridge contract.
  * 
  * @param serial_number The serial number of the event
  * @param discriminator The discriminator value
@@ -78,7 +80,7 @@ function big_integer_array_to_byte_array(values: list<big_integer>): byte_array 
  * @param token_ids Array of token IDs
  * @param amounts Array of token amounts (used for ERC1155)
  * @param beneficiary The beneficiary address (20 bytes)
- * @return A properly ABI-encoded byte array that can be decoded with abi.decode in Solidity
+ * @return A list of 32-byte chunks that can be used with SimpleGtvEncoder
  */
 function encode_nft_event(
     serial_number: big_integer,
@@ -88,71 +90,61 @@ function encode_nft_event(
     token_ids: list<big_integer>,
     amounts: list<big_integer>,
     beneficiary: byte_array
-): byte_array {
+): list<byte_array> {
     // Validate inputs
     require(contract_address.size() == 20, "Contract address must be 20 bytes");
     require(beneficiary.size() == 20, "Beneficiary address must be 20 bytes");
+    require(token_ids.size() == amounts.size(), "Token IDs and amounts must have the same length");
     
-    // In Solidity ABI encoding, we need to allocate 32 bytes for each static field
-    // and 32 bytes for each dynamic array offset
+    // Create a list to hold all 32-byte chunks
+    val chunks = list<byte_array>();
     
-    // For a struct with 7 fields where 2 are dynamic arrays:
-    // - 5 static fields (serialNumber, discriminator, protocolId, contractAddress, beneficiary)
-    // - 2 dynamic fields (tokenIds, amounts)
+    // Add the pointer to the start of the data (32 bytes)
+    // This is needed for top-level complex types in Solidity ABI encoding
+    chunks.add(utils.integer_to_32_byte_array(32));
     
-    // Calculate the head size (static part): 7 fields * 32 bytes
-    val head_size = 7 * 32;
-    
-    // Start building the encoding
-    var result = x"";
+    // The structure needs to match the Solidity ABI encoding for:
+    // tuple(uint256 serialNumber, uint256 discriminator, uint256 protocolId, address contractAddress, uint256[] tokenIds, uint256[] amounts, address beneficiary)
     
     // 1. serialNumber (fixed 32 bytes)
-    result += utils.big_integer_to_32_byte_array(serial_number);
+    chunks.add(utils.big_integer_to_32_byte_array(serial_number));
     
     // 2. discriminator (fixed 32 bytes)
-    result += utils.big_integer_to_32_byte_array(discriminator);
+    chunks.add(utils.big_integer_to_32_byte_array(discriminator));
     
     // 3. protocolId (fixed 32 bytes)
-    result += utils.big_integer_to_32_byte_array(protocol_id);
+    chunks.add(utils.big_integer_to_32_byte_array(protocol_id));
     
     // 4. contractAddress (address padded to 32 bytes)
-    result += utils.evm_address_to_32_byte_array(contract_address);
+    chunks.add(utils.evm_address_to_32_byte_array(contract_address));
     
-    // 5. & 6. Offset pointers to tokenIds and amounts arrays
-    // Calculate offsets:
-    // - tokenIds starts at head_size (7 * 32 = 224)
-    // - amounts starts at head_size + 32 (tokenIds length) + (tokenIds.size * 32)
-    val token_ids_offset = head_size;
-    val token_ids_length_encoded = utils.integer_to_32_byte_array(token_ids.size());
-    val token_ids_data_size = token_ids.size() * 32;
-    val amounts_offset = token_ids_offset + 32 + token_ids_data_size;
+    // 5. tokenIds offset (fixed 32 bytes) - points to where the tokenIds array starts
+    // First 4 fixed fields (32*4=128) + 3 offsets (32*3=96) = 224 bytes offset
+    chunks.add(utils.integer_to_32_byte_array(224));
     
-    // Add tokenIds offset to result
-    result += utils.integer_to_32_byte_array(token_ids_offset);
-    
-    // Add amounts offset to result
-    result += utils.integer_to_32_byte_array(amounts_offset);
+    // 6. amounts offset (fixed 32 bytes) - points to where the amounts array starts
+    // tokenIds offset (224) + tokenIds length (32) + tokenIds data (token_ids.size()*32)
+    val amounts_offset = 224 + 32 + (token_ids.size() * 32);
+    chunks.add(utils.integer_to_32_byte_array(amounts_offset));
     
     // 7. beneficiary (address padded to 32 bytes)
-    result += utils.evm_address_to_32_byte_array(beneficiary);
+    chunks.add(utils.evm_address_to_32_byte_array(beneficiary));
     
-    // Now add the dynamic parts:
+    // 8. tokenIds length (fixed 32 bytes)
+    chunks.add(utils.integer_to_32_byte_array(token_ids.size()));
     
-    // TokenIds array
-    // First add the array length
-    result += token_ids_length_encoded;
-    // Then add each token ID
+    // 9. tokenIds values (each 32 bytes)
     for (token_id in token_ids) {
-        result += utils.big_integer_to_32_byte_array(token_id);
+        chunks.add(utils.big_integer_to_32_byte_array(token_id));
     }
     
-    // Amounts array
-    // First add the array length
-    result += utils.integer_to_32_byte_array(amounts.size());
-    // Then add each amount
+    // 10. amounts length (fixed 32 bytes)
+    chunks.add(utils.integer_to_32_byte_array(amounts.size()));
+    
+    // 11. amounts values (each 32 bytes)
     for (amount in amounts) {
-        result += utils.big_integer_to_32_byte_array(amount);
+        chunks.add(utils.big_integer_to_32_byte_array(amount));
     }
     
-    return result;
+    return chunks;
 }

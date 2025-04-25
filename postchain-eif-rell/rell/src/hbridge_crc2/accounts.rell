@@ -38,58 +38,17 @@ function find_address_for_ft4_account(account: ft4.accounts.account, network_id:
 @extendable
 function after_evm_account_linked(address: byte_array, account: ft4.accounts.account, network_id: integer, is_contract: boolean) {}
 
-@extend(ft4.strategies.after_register_account)
-function (ft4.accounts.account) {
-    val pending_deposits = token_deposit @* { .recipient_id == account.id, deposit_state.pending };
-    for (deposit in pending_deposits) {
-        if (deposit.from_smart_contract) {
-            if (empty(evm_sc_account_link @? { deposit.sender_address, deposit.network_id })) {
-                create evm_sc_account_link(deposit.sender_address, deposit.network_id, account);
-                after_evm_account_linked(deposit.sender_address, account, deposit.network_id, true);
-            }
-        } else {
-            if (empty(evm_eoa_account_link @? { deposit.sender_address })) {
-                create evm_eoa_account_link(deposit.sender_address, account);
-                after_evm_account_linked(deposit.sender_address, account, -1, false);
-            }
-        }
-        val token_amounts = deposited_token @* { deposit } (token_amount(token_id = .token_id, amount = .amount));
-        for (token_amount in token_amounts) {
-            val token = crc2.evm.ensure_evm_token(deposit.network_id, deposit.contract_address, token_amount.token_id);
-            crc2.transfers._transfer(ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid), account, token, token_amount.amount);
-        }
-        update_deposit_state(deposit, deposit_state.completed);
-    }
-}
-
 // accounts might be linked explicitly (e.g. when account_id is not derived from EVM address)
 function _link_evm_eoa_account(address: byte_array, account: ft4.accounts.account) {
     require(empty(evm_eoa_account_link @? { address }), "EVM address %s is already linked to FT4 account".format(address));
     create evm_eoa_account_link(address, account);
 
-    // there's a possibility that the account_id is different from address hash
-    // collect funds from the pool account here
-    ft4.transfer_strategy.collect_pooled_assets(account, recipient_id = address.hash());
-
-    val pending_deposits = token_deposit @* { .sender_address == address, deposit_state.pending, .from_smart_contract == false };
-    for (deposit in pending_deposits) {
-        update_deposit_state(deposit, deposit_state.completed);
-    }
     after_evm_account_linked(address, account, -1, false);
 }
 
 function _link_evm_sc_account(address: byte_array, network_id: integer, account: ft4.accounts.account) {
     require(empty(evm_sc_account_link @? { address, network_id }), "EVM address %s on EVM chain ID %d is already linked to FT4 account".format(address, network_id));
     create evm_sc_account_link(address, network_id, account);
-
-    // there's a possibility that the account_id is different from address hash
-    // collect funds from the pool account here
-    ft4.transfer_strategy.collect_pooled_assets(account, recipient_id = address.hash());
-
-    val pending_deposits = token_deposit @* { .sender_address == address, deposit_state.pending, .from_smart_contract == true };
-    for (deposit in pending_deposits) {
-        update_deposit_state(deposit, deposit_state.completed);
-    }
 
     after_evm_account_linked(address, account, network_id, true);
 }
@@ -130,14 +89,8 @@ function bridge_increase_balance(ft4.accounts.account, evm_collection, crc2.toke
     }
 }
 
-val ACCOUNT_TYPE_BRIDGE = "EIF_BRIDGE";
+val ACCOUNT_TYPE_BRIDGE = "CRC2_BRIDGE";
 
 function ensure_bridge_account(blockchain_rid: byte_array) =
    ft4.accounts.ensure_account_without_auth(blockchain_rid, ACCOUNT_TYPE_BRIDGE);
-
-val ACCOUNT_TYPE_PENDING_DEPOSIT = "EIF_PENDING_DEPOSIT";
-
-function ensure_pending_account() {
-    return ft4.accounts.ensure_account_without_auth(ACCOUNT_TYPE_PENDING_DEPOSIT.hash(), ACCOUNT_TYPE_PENDING_DEPOSIT);
-}
 
