@@ -41,19 +41,61 @@ operation link_evm_sc_account(address: byte_array, network_id: integer) {
 
 @extend(ft4.auth.auth_handler)
 function () = ft4.auth.add_auth_handler(
-    scope = rell.meta(bridge_tokens_to_evm).mount_name,
+    scope = rell.meta(bridge_erc721_tokens_to_evm).mount_name,
     flags = ["T"],
-    message = bridge_crc2_token_to_evm_auth_message(*)
+    message = bridge_erc721_tokens_to_evm_auth_message(*)
 );
 
-function bridge_crc2_token_to_evm_auth_message(gtv) {
-    val args = struct<bridge_tokens_to_evm>.from_gtv(gtv);
-    return "Please sign the message to bridge tokens from Chromia account {account_id} for beneficiary %s on network %d".format(
-        args.beneficiary, args.network_id
+function bridge_erc721_tokens_to_evm_auth_message(gtv) {
+    val args = struct<bridge_erc721_tokens_to_evm>.from_gtv(gtv);
+    return "Please sign the message to bridge the following tokens from Chromia account {account_id} for beneficiary %s on network %d\n\nContract Address: %s\nTokens: %s".format(
+        args.beneficiary, args.network_id, args.contract_address, args.token_ids
     );
 }
 
-operation bridge_tokens_to_evm(
+operation bridge_erc721_tokens_to_evm(
+    network_id: integer,
+    contract_address: byte_array,
+    token_ids: list<big_integer>,
+    beneficiary: byte_array,
+    bridge_address: byte_array,
+) {
+    val tokens = list<token_amount>();
+    for (token_id in token_ids) {
+        tokens.add(token_amount(token_id = token_id, amount = 1L));
+    }
+    bridge_tokens_to_evm(network_id, contract_address, tokens, beneficiary, bridge_address);
+}
+
+@extend(ft4.auth.auth_handler)
+function () = ft4.auth.add_auth_handler(
+    scope = rell.meta(bridge_erc1155_tokens_to_evm).mount_name,
+    flags = ["T"],
+    message = bridge_erc1155_tokens_to_evm_auth_message(*)
+);
+
+function bridge_erc1155_tokens_to_evm_auth_message(gtv) {
+    val args = struct<bridge_erc1155_tokens_to_evm>.from_gtv(gtv);
+    return "Please sign the message to bridge the following tokens from Chromia account {account_id} for beneficiary %s on network %d\n\nContract Address: %s\nTokens: %s".format(
+        args.beneficiary, args.network_id, args.contract_address, args.token_amounts
+    );
+}
+
+operation bridge_erc1155_tokens_to_evm(
+    network_id: integer,
+    contract_address: byte_array,
+    token_amounts: list<(token_id: big_integer, amount: big_integer)>,
+    beneficiary: byte_array,
+    bridge_address: byte_array,
+) {
+    val tokens = list<token_amount>();
+    for (token_amount in token_amounts) {
+        tokens.add(token_amount(token_id = token_amount.token_id, amount = token_amount.amount));
+    }
+    bridge_tokens_to_evm(network_id, contract_address, tokens, beneficiary, bridge_address);
+}
+
+function bridge_tokens_to_evm(
     network_id: integer,
     contract_address: byte_array,
     tokens: list<token_amount>,

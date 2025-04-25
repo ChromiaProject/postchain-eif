@@ -29,7 +29,6 @@ struct token_deposit_info {
 }
 
 enum deposit_state {
-    pending,
     completed,
     recalled,
 }
