@@ -51,3 +51,10 @@ function deposit_check_access_list(account_id: byte_array): boolean = true;
 
 @extendable
 function withdraw_check_access_list(account_id: byte_array): boolean = true;
+
+function get_protocol_id_from_token_type(token_type: evm_token_type): integer {
+    when (token_type) {
+        evm_token_type.erc721 -> return 721;
+        evm_token_type.erc1155 -> return 1155;
+    }
+}
