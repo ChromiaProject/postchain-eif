@@ -91,11 +91,6 @@ function encode_nft_event(
     amounts: list<big_integer>,
     beneficiary: byte_array
 ): list<byte_array> {
-    // Validate inputs
-    require(contract_address.size() == 20, "Contract address must be 20 bytes");
-    require(beneficiary.size() == 20, "Beneficiary address must be 20 bytes");
-    require(token_ids.size() == amounts.size(), "Token IDs and amounts must have the same length");
-    
     // Create a list to hold all 32-byte chunks
     val chunks = list<byte_array>();
     

@@ -101,7 +101,7 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
 
     if (empty(evm_collection)) {
         log("Deposit event ignored: EVM collection not found: %s".format(event.contract_address));
-        bounce_deposit_event(network_id, event.contract_address, event.protocol_id, event.tokens, event.beneficiary, event.bridge_address);
+        bounce_deposit_event(network_id, event.contract_address, event.protocol_id, event.tokens, event.sender, event.bridge_address);
         return;
     }
 
@@ -112,7 +112,7 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
         if (not empty(ft4_account)) {
             // we require explicit link to avoid unwanted deposits
             if (need_consent_on_deposit and empty(evm_sc_account_link @? { event.sender, network_id, ft4_account })) {
-                bounce_deposit_event(network_id, event.contract_address, event.protocol_id, event.tokens, event.beneficiary, event.bridge_address);
+                bounce_deposit_event(network_id, event.contract_address, event.protocol_id, event.tokens, event.sender, event.bridge_address);
                 return;
             }
         }
@@ -134,7 +134,7 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
             last_updated = op_context.last_block_time,
             evm_tx_hash = event.evm_tx_hash,
         );
-        bounce_deposit_event(network_id, event.contract_address, event.protocol_id, event.tokens, event.beneficiary, event.bridge_address);
+        bounce_deposit_event(network_id, event.contract_address, event.protocol_id, event.tokens, event.sender, event.bridge_address);
         log("Deposit event recalled: no FT4 account found for deposit from sender %s".format(event.sender));
         return;
     }
@@ -163,7 +163,7 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
     
     if (invalid_tokens.size() > 0) {
         valid_tokens.remove_all(invalid_tokens);
-        bounce_deposit_event(network_id, event.contract_address, event.protocol_id, invalid_tokens, event.beneficiary, event.bridge_address);
+        bounce_deposit_event(network_id, event.contract_address, event.protocol_id, invalid_tokens, event.sender, event.bridge_address);
     }
 
     if (valid_tokens.size() == 0) {
