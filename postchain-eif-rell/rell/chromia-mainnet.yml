@@ -7,6 +7,8 @@ blockchains:
   eif_event_receiver_mainnet:
     module: eif_event_receiver_chain_common
     config:
+      features:
+        merkle_hash_version: 2
       gtx:
         modules:
           - "net.postchain.eif.EifGTXModule"
@@ -37,6 +39,8 @@ blockchains:
   eif_event_receiver_token_chain_mainnet:
     module: eif_event_receiver_dynamic_icmf_config_chain_common
     config:
+      features:
+        merkle_hash_version: 2
       gtx:
         modules:
           - "net.postchain.eif.EifGTXModule"
@@ -70,6 +74,8 @@ blockchains:
   eif_event_receiver_price_oracle_mainnet:
     module: eif_event_receiver_chain_common
     config:
+      features:
+        merkle_hash_version: 2
       gtx:
         modules:
           - "net.postchain.eif.EifGTXModule"
@@ -150,6 +156,8 @@ blockchains:
         anchoring_interval: 7200000 # every 2 hours
       chain_version: *chain_version
     config:
+      features:
+        merkle_hash_version: 2
       gtx:
         modules:
           - "net.postchain.eif.transaction.TransactionSubmitterGTXModule"
