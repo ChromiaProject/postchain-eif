@@ -171,6 +171,31 @@ task("allowToken:bridge")
     });
 
 /**
+ * Approves a TokenBridge contract to spend tokens on an ERC-20 contract.
+ * 
+ * This task approves a TokenBridge contract to spend tokens on an ERC-20 contract.
+ * It logs the approval transaction hash to the console.
+ * 
+ * @param bridgeAddress - The address of the TokenBridge contract.
+ * @param tokenAddress - The address of the ERC-20 token contract.
+ * @param amount - The amount of tokens to approve for spending.
+ */
+task("approveToken:bridge")
+    .addParam("bridgeAddress", "Bridge contract address")
+    .addParam("tokenAddress", "Token contract address")
+    .addParam("amount", "Amount of tokens to approve")
+    .setAction(async ({ bridgeAddress, tokenAddress, amount }, hre) => {
+        const tokenFactory = await hre.ethers.getContractFactory("IERC20") as IERC20__factory;
+        const token = tokenFactory.attach(tokenAddress) as IERC20;
+
+        console.log(`Approving bridge ${bridgeAddress} to spend ${amount} tokens from ${tokenAddress}...`);
+        const tx = await token.approve(bridgeAddress, amount);
+        await tx.wait();
+        console.log(`Approval successful. Transaction hash: ${tx.hash}`);
+    });
+
+    
+/**
  * Inspects a Chromia Token Bridge contract.
  * 
  * This task inspects a Chromia Token Bridge contract by fetching the bridge address from Economy Chain of the Chromia network.
