@@ -148,6 +148,45 @@ function test_directory_cancelled_signer_update_at_same_height() {
     assert_equals(cancelled_update_signers, new_signers.to_gtv().to_bytes());
 }
 
+function test_directory_skip_parked_update_at_same_height() {
+    val initial_signers = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub];
+    val new_signers = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub, rell.test.keypairs.charlie.pub];
+    val new_signers_at_same_height = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub, rell.test.keypairs.charlie.pub, rell.test.keypairs.trudy.pub];
+    rell.test.tx().op(
+        signer_update_message_op(
+            signer_list_update_message(
+                serial = 1,
+                blockchain_rid = test_directory_chain_brid,
+                signers = initial_signers.to_gtv().to_bytes(),
+                confirmed_in_directory_at_height = 1
+            )
+        ),
+        signer_update_message_op(
+            signer_list_update_message(
+                serial = 2,
+                blockchain_rid = test_directory_chain_brid,
+                signers = new_signers.to_gtv().to_bytes(),
+                confirmed_in_directory_at_height = 2
+            )
+        ),
+        signer_update_message_op(
+            signer_list_update_message(
+                serial = 3,
+                blockchain_rid = test_directory_chain_brid,
+                signers = new_signers_at_same_height.to_gtv().to_bytes(),
+                confirmed_in_directory_at_height = 2
+            )
+        )
+    ).run();
+
+    val queued_updates = get_queued_signer_updates();
+    assert_equals(queued_updates.size(), 1);
+    assert_equals(queued_updates[0].signers, initial_signers.to_gtv().to_bytes());
+
+    val parked_update = parked_directory_signer_list_update @ {};
+    assert_equals(parked_update.signers, new_signers_at_same_height.to_gtv().to_bytes());
+}
+
 function test_adding_bridge_mapping_triggers_signer_update() {
     val unmapped_chain_brid = x"11";
     val new_signers = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub];

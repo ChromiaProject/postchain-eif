@@ -4,6 +4,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import mu.KLogging
 import net.postchain.eif.metrics.RpcUsageMetrics
+import net.postchain.eif.transaction.TransactionSubmitterException
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.core.Request
@@ -37,23 +38,29 @@ open class Web3jRequestHandler(
             requestFactory: (Web3j) -> Request<*, T>
     ): T {
         val requests = web3jServices.map(requestFactory)
+        val rpcErrors = mutableListOf<String>()
         for (request in requests) {
 
             try {
                 val response = request.send()
 
                 if (response.hasError()) {
-                    val errorMessage = "Web3J error code: ${response.error.code} and message: ${response.error.message}"
-                    throw RuntimeException(errorMessage)
+                    val errorMessage = "RPC/EVM error code: ${response.error.code} and message: ${response.error.message}"
+                    rpcErrors.add(errorMessage)
+                    logger.error(errorMessage)
+                } else {
+                    return response
                 }
-
-                return response
             } catch (e: Exception) {
                 logger.error("Web3j request failed: ${e.message}", e)
             }
         }
 
-        throw RuntimeException("Failed to send web3j request to all ${web3jServices.size} nodes")
+        // Include RCP errors in chain message - should be safe
+        val tse = TransactionSubmitterException(
+                "Failed to send web3j request to all ${web3jServices.size} RPC nodes. RPC/EVM errors: ${rpcErrors.joinToString()}")
+        logger.error(tse) { tse.message }
+        throw tse
     }
 
     /**
@@ -67,6 +74,7 @@ open class Web3jRequestHandler(
         val retryTimeouts = Array(requests.size) { baseTimeout }
         var tryErrors = 0L
         var index = 0
+        val rpcErrors = mutableMapOf<Int, String>()
         while (true) {
             val currentIndex = index
             val response = try {
@@ -85,14 +93,18 @@ open class Web3jRequestHandler(
             }
 
             if (response == null || response.hasError()) {
+                rpcErrors[index] = response?.error?.message ?: "Unknown"
                 tryErrors++
                 if (tryErrors >= maxTryErrors) {
                     logger.error { "Web3j request failed after $tryErrors tries on ${requests[index].method}/${urls[index]}" }
                     index = (index + 1) % requests.size
                     if (index == 0) {
-                        val message = "Request has failed on all ${requests.size} RPCs. No more nodes to try. Giving up."
-                        logger.error(message)
-                        throw RuntimeException(message)
+                        val rpcErrorSummary = rpcErrors.map { "${it.key}=${it.value}" }.joinToString()
+                        // Include RCP errors in chain message - should be safe
+                        val tse = TransactionSubmitterException(
+                                "Request has failed on all ${requests.size} RPCs. No more nodes to try. Giving up. Last error for each RPC: $rpcErrorSummary")
+                        logger.error(tse) { tse.message }
+                        throw tse
                     }
                     tryErrors = 0L
                     logger.info { "Switching to another rpc endpoint at ${urls[index]} in ${retryTimeouts[index]} ms" }

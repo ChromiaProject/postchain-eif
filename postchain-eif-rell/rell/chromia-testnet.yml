@@ -7,6 +7,8 @@ blockchains:
   eif_event_receiver_testnet:
     module: eif_event_receiver_chain_common
     config:
+      features:
+        merkle_hash_version: 2
       gtx:
         modules:
           - "net.postchain.eif.EifGTXModule"
@@ -44,6 +46,8 @@ blockchains:
   eif_event_receiver_token_chain_testnet:
     module: eif_event_receiver_dynamic_icmf_config_chain_common
     config:
+      features:
+        merkle_hash_version: 2
       gtx:
         modules:
           - "net.postchain.eif.EifGTXModule"
@@ -63,6 +67,11 @@ blockchains:
             network_id: 11155111
             evm_read_offset: 10
             skip_to_height: 2000000 # TODO: Set to current height
+            events: !include configs/events.yml
+          base_sepolia:
+            network_id: 84532
+            evm_read_offset: 10
+            skip_to_height: 20000000 # TODO: Set to current height
             events: !include configs/events.yml
       icmf:
         receiver:
@@ -126,6 +135,8 @@ blockchains:
         anchoring_interval: 3600000 # every 1 hour
       chain_version: *chain_version
     config:
+      features:
+        merkle_hash_version: 2
       gtx:
         modules:
           - "net.postchain.eif.transaction.TransactionSubmitterGTXModule"

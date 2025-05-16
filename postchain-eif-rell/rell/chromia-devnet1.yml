@@ -7,6 +7,8 @@ blockchains:
   eif_event_receiver_devnet1:
     module: eif_event_receiver_chain_common
     config:
+      features:
+        merkle_hash_version: 2
       gtx:
         modules:
           - "net.postchain.eif.EifGTXModule"
@@ -29,6 +31,8 @@ blockchains:
   eif_event_receiver_token_chain_devnet1:
     module: eif_event_receiver_dynamic_icmf_config_chain_common
     config:
+      features:
+        merkle_hash_version: 2
       gtx:
         modules:
           - "net.postchain.eif.EifGTXModule"
@@ -99,6 +103,8 @@ blockchains:
         tx_verification_timeout: 1500000 # 25 min - a bit less than tx_node_submit_timeout
       chain_version: *chain_version
     config:
+      features:
+        merkle_hash_version: 2
       gtx:
         modules:
           - "net.postchain.eif.transaction.TransactionSubmitterGTXModule"

@@ -83,6 +83,6 @@ class Web3jRequestHandlerTest {
 
         assertThat(calledWeb3js).hasSize(2)
         verify(requestMock, times(4)).send()
-        assertThat(exception.message).isEqualTo("Request has failed on all 2 RPCs. No more nodes to try. Giving up.")
+        assertThat(exception.message).isEqualTo("Request has failed on all 2 RPCs. No more nodes to try. Giving up. Last error for each RPC: 0=oh no, 1=oh no")
     }
 }

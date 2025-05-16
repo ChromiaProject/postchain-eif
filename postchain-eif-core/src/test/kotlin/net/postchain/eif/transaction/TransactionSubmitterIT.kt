@@ -272,7 +272,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
         Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertStatusOperation(txSubmitterTestModule0, txSubmit.rowId, RellTransactionStatus.QUEUED)
-            testLogAppender.assertError("Failed to send web3j request to all 1 nodes")
+            testLogAppender.assertError("Failed to send web3j request to all 1 RPC nodes. RPC/EVM errors: ")
         }
 
         // Mock rell status for other nodes to be able to verify the operation

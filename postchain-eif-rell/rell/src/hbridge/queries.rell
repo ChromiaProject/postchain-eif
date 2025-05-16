@@ -37,10 +37,10 @@ query get_erc20_withdrawals(filter: withdrawal_filter, page_size: integer? = nul
         filter.network_id == null or w.network_id == filter.network_id,
         filter.token_address == null or w.token_address == filter.token_address,
         filter.beneficiary == null or w.beneficiary == filter.beneficiary,
-        filter.from == null or w.transaction.block.timestamp >= filter.from!!,
-        filter.to == null or w.transaction.block.timestamp < filter.to!!,
-        filter.tx_rid == null or w.transaction.tx_rid == filter.tx_rid!!,
-        empty(filter.statuses) or s.withdrawal_status in filter.statuses!!,
+        filter.from == null or w.transaction.block.timestamp >= filter.from,
+        filter.to == null or w.transaction.block.timestamp < filter.to,
+        filter.tx_rid == null or w.transaction.tx_rid == filter.tx_rid,
+        empty(filter.statuses) or s.withdrawal_status in filter.statuses,
         w.rowid > (before_rowid ?: rowid(0))
     } (
         ft4.utils.pagination_result(

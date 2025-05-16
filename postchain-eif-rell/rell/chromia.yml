@@ -20,6 +20,8 @@ definitions:
     lib.ft4.core.accounts.strategies.transfer:
       rules: [ ]
   - &common_hbridge_config
+    features:
+      merkle_hash_version: 2
     gtx:
       modules:
         - "net.postchain.eif.EifGTXModule"
@@ -124,6 +126,8 @@ blockchains:
   eif_event_receiver_test:
     module: eif_event_receiver_chain_common
     config:
+      features:
+        merkle_hash_version: 2
       gtx:
         modules:
           - "net.postchain.eif.EifGTXModule"
@@ -153,6 +157,8 @@ blockchains:
   eif_event_receiver:
     module: eif_event_receiver_chain_common
     config:
+      features:
+        merkle_hash_version: 2
       gtx:
         modules:
           - "net.postchain.eif.EifGTXModule"
@@ -179,6 +185,8 @@ blockchains:
   eif_event_receiver_price_oracle:
     module: eif_event_receiver_chain_common
     config:
+      features:
+        merkle_hash_version: 2
       gtx:
         modules:
           - "net.postchain.eif.EifGTXModule"
@@ -278,6 +286,8 @@ blockchains:
   eif_event_receiver_token_chain:
     module: eif_event_receiver_dynamic_icmf_config_chain_common
     config:
+      features:
+        merkle_hash_version: 2
       gtx:
         modules:
           - "net.postchain.eif.EifGTXModule"
@@ -342,6 +352,8 @@ blockchains:
         anchoring_interval: 3600000 # 1 per hour
       chain_version: *chain_version
     config:
+      features:
+        merkle_hash_version: 2
       gtx:
         modules:
           - "net.postchain.eif.transaction.TransactionSubmitterGTXModule"
