@@ -13,7 +13,7 @@ contract ALICE is ERC20, AccessControl {
     constructor() ERC20("ALICE", "ALICE") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
-        _mint(msg.sender, 1000000*10**18);
+        _mint(msg.sender, 1000000*10**6);
     }
 
     function mint(address to, uint256 amount) external {
