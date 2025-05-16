@@ -187,8 +187,7 @@ task("approveToken:bridge")
     .addParam("tokenAddress", "Token contract address")
     .addParam("amount", "Amount of tokens to approve")
     .setAction(async ({ bridgeAddress, tokenAddress, amount }, hre) => {
-        const tokenFactory = await hre.ethers.getContractFactory("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20") as IERC20__factory;
-        const token = tokenFactory.attach(tokenAddress) as IERC20;
+        const token = await hre.ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", tokenAddress) as IERC20;
 
         console.log(`Approving bridge ${bridgeAddress} to spend ${amount} tokens from ${tokenAddress}...`);
         const tx = await token.approve(bridgeAddress, amount);
