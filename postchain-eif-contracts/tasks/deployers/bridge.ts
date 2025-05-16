@@ -3,7 +3,9 @@ import {
     ManagedValidator,
     ManagedValidator__factory,
     TokenBridge,
-    TokenBridge__factory
+    TokenBridge__factory,
+    IERC20__factory,
+    IERC20
 } from "../../typechain-types";
 import fetch from 'node-fetch';
 import { ChromiaNetwork, verifyProxyContract } from "./utils";
@@ -185,7 +187,7 @@ task("approveToken:bridge")
     .addParam("tokenAddress", "Token contract address")
     .addParam("amount", "Amount of tokens to approve")
     .setAction(async ({ bridgeAddress, tokenAddress, amount }, hre) => {
-        const tokenFactory = await hre.ethers.getContractFactory("IERC20") as IERC20__factory;
+        const tokenFactory = await hre.ethers.getContractFactory("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20") as IERC20__factory;
         const token = tokenFactory.attach(tokenAddress) as IERC20;
 
         console.log(`Approving bridge ${bridgeAddress} to spend ${amount} tokens from ${tokenAddress}...`);
