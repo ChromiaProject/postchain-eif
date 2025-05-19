@@ -140,6 +140,33 @@ $ yarn deploy:anchoring --network sepolia --verify --blockchain-rid {SYSTEM_ANCH
 - Gas reporter [hardhat-gas-reporter](https://hardhat.org/plugins/hardhat-gas-reporter.html)
 - Etherscan [hardhat-etherscan](https://hardhat.org/plugins/nomiclabs-hardhat-etherscan.html)
 
+## Upgrade chromia token bridge contract to version 2
+
+This bridge will be identical but enable setting a new block number offset.
+
+1. Proxy configuration
+
+   Is the proxy configuration in `.openzeppeling/<network>.json` up to date? If not, or you don't know, remove it and import it:
+
+    ```
+    rm -rf .openzeppeling/<network>.json
+    yarn import:bridge --network <network> --address <proxy admin address>
+    ```
+
+3. Upgrade contract
+
+    ```
+    yarn upgrade:chromiabridge-to-v2 --network <network> --address <bridge/proxy address> --offset <offset> --verify
+    ```
+
+4. Optional: Read current block number offset again
+
+    Verify the block number offset is updated:
+
+    ```
+    npx hardhat read:chromiabridge-offset --network <network> --address <bridge/proxy address>
+    ```
+
 ## Upgrade token bridge contracts
 
 ### Prepare

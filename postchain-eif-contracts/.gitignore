@@ -8,6 +8,7 @@ artifacts
 factories
 coverage
 typechain
+typechain-types
 types
 
 .env

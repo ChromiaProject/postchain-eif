@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
-import { TestDelegator__factory, TestDelegator } from "../src/types";
+import { TestDelegator__factory, TestDelegator } from "../typechain";
 
 chai.use(solidity);
 const { expect } = chai;
