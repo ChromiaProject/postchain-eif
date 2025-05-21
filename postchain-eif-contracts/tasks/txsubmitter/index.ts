@@ -19,7 +19,7 @@ task("transaction:resubmitSignerUpdate", "Resubmit signer update")
     .setAction(async ({ data }, hre) => {
         const resubmission = JSON.parse(data)
         const validatorFactory = await hre.ethers.getContractFactory("ManagedValidator") as ManagedValidator__factory;
-        const validator = validatorFactory.attach(resubmission.contract_address) as ManagedValidator;
+        const validator = validatorFactory.attach(`0x${resubmission.contract_address}`) as ManagedValidator;
 
         const parameters = resubmission.parameter_values;
         console.log(await validator.updateValidators(
@@ -46,7 +46,7 @@ task("transaction:resubmitAnchoring", "Resubmit anchoring")
     .setAction(async ({ data }, hre) => {
         const resubmission = JSON.parse(data)
         const anchoringFactory = await hre.ethers.getContractFactory("Anchoring") as Anchoring__factory;
-        const anchoring = anchoringFactory.attach(resubmission.contract_address) as Anchoring;
+        const anchoring = anchoringFactory.attach(`0x${resubmission.contract_address}`) as Anchoring;
 
         console.log(resubmission.contract_address);
 
