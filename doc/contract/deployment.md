@@ -105,6 +105,11 @@ After deploying bridge chain on Chromia retrieve the blockchain RID of that chai
 $ yarn setBlockchainRid:bridge --network sepolia --address {BRIDGE_CONTRACT_ADDRESS} --blockchain-rid {BRIDGE_BLOCKCHAIN_RID} --managed-validator {MANAGED_VALIDATOR_CONTRACT_ADDRESS}
 ```
 
+Then allow a token to be bridged on the bridge contract:
+```sh
+$ yarn allowToken:bridge --network sepolia --bridge-address {BRIDGE_CONTRACT_ADDRESS} --token-address {TOKEN_CONTRACT_ADDRESS}
+```
+
 # Upgrading token bridge contract
 
 Run the following tasks to upgrade token bridge smart contract:

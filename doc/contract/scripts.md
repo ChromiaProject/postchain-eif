@@ -34,6 +34,7 @@ This document describes all available scripts in the `postchain-eif-contracts` p
 - **setBlockchainRid:bridge**: Sets the blockchain RID for a TokenBridge contract
 - **finalizeBlockchainRid:bridge**: Finalizes the blockchain RID for a TokenBridge contract
 - **allowToken:bridge**: Configures token allowance on a TokenBridge contract
+- **approveToken:bridge**: Approves token spending by the TokenBridge contract
 - **inspect:bridge**: Inspects the deployed TokenBridge contract
 - **inspect:chromiabridge**: Inspects the deployed ChromiaTokenBridge contract
 - **pause:bridge**: Pauses the TokenBridge contract

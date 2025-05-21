@@ -3,7 +3,9 @@ import {
     ManagedValidator,
     ManagedValidator__factory,
     TokenBridge,
-    TokenBridge__factory
+    TokenBridge__factory,
+    IERC20__factory,
+    IERC20
 } from "../../typechain-types";
 import fetch from 'node-fetch';
 import { ChromiaNetwork, verifyProxyContract } from "./utils";
@@ -170,6 +172,30 @@ task("allowToken:bridge")
         console.log(await bridge.allowToken(tokenAddress));
     });
 
+/**
+ * Approves a TokenBridge contract to spend tokens on an ERC-20 contract.
+ * 
+ * This task approves a TokenBridge contract to spend tokens on an ERC-20 contract.
+ * It logs the approval transaction hash to the console.
+ * 
+ * @param bridgeAddress - The address of the TokenBridge contract.
+ * @param tokenAddress - The address of the ERC-20 token contract.
+ * @param amount - The amount of tokens to approve for spending.
+ */
+task("approveToken:bridge")
+    .addParam("bridgeAddress", "Bridge contract address")
+    .addParam("tokenAddress", "Token contract address")
+    .addParam("amount", "Amount of tokens to approve")
+    .setAction(async ({ bridgeAddress, tokenAddress, amount }, hre) => {
+        const token = await hre.ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", tokenAddress) as IERC20;
+
+        console.log(`Approving bridge ${bridgeAddress} to spend ${amount} tokens from ${tokenAddress}...`);
+        const tx = await token.approve(bridgeAddress, amount);
+        await tx.wait();
+        console.log(`Approval successful. Transaction hash: ${tx.hash}`);
+    });
+
+    
 /**
  * Inspects a Chromia Token Bridge contract.
  * 
