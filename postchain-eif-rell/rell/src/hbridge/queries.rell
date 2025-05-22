@@ -231,7 +231,7 @@ query get_recovery_contract(blockchain_rid: byte_array, network_id: integer): by
  * and the list of ERC20 assets associated with each bridge contract.
  */
 query get_bridge_contracts(network_id: integer): list<bridge_contract_info> {
-    val read_offset = map<text, integer>.from_gtv_pretty(chain_context.args.evm_read_offsets).get_or_null("%d".format(network_id));
+    val read_offset = get_evm_read_offset(network_id);
 
     val res = list<bridge_contract_info>();
     for (bridge_contract_address in bridge_contract @* { network_id } ( .contract_address )) {
@@ -239,10 +239,35 @@ query get_bridge_contracts(network_id: integer): list<bridge_contract_info> {
 
         res.add(bridge_contract_info(
             contract_address = bridge_contract_address,
-            evm_read_offset = read_offset ?: 0,
+            evm_read_offset = read_offset,
             erc20_assets = erc20_assets,
         ));
     }
 
     return res;
+}
+
+/**
+ * Retrieves information about a bridge contract based on its contract address.
+ *
+ * @param network_id The ID of the EVM network.
+ * @param contract_address The contract address of the bridge contract.
+ *
+ * @return A `bridge_contract_info` object containing the bridge `contract_address`, `evm_read_offset`,
+ * and the list of ERC20 assets associated with the bridge contract.
+ */
+query get_bridge_contract_info(network_id: integer, contract_address: byte_array): bridge_contract_info? {
+    val bridge_contract = bridge_contract @? { network_id, contract_address } ($.to_struct());
+    if (bridge_contract == null) return null;
+
+    return bridge_contract_info(
+        contract_address = bridge_contract.contract_address,
+        evm_read_offset = get_evm_read_offset(bridge_contract.network_id),
+        erc20_assets = get_registered_bridge_erc20_assets(bridge_contract.network_id, bridge_contract.contract_address)
+    );
+}
+
+function get_evm_read_offset(network_id: integer): integer {
+    return map<text, integer>.from_gtv_pretty(chain_context.args.evm_read_offsets)
+        .get_or_default("%d".format(network_id), 0);
 }
