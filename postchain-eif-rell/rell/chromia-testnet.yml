@@ -117,6 +117,17 @@ blockchains:
                 validator_contract: "D5733007A3413a28c6793Ec50E2CD2229D1AE041" # native validator
                 network_id: 84532
               # ETH Sepolia bridge is omitted here since it was created with directory chain validator as validator
+          - blockchain_rid: x"221EF06183BD9A0781FBF18CA6D4F55A0992FDD478E771721DE8F9EF3B289D5B" # token chain
+            bridge_contracts:
+              - address: ""
+                validator_contract: "0444d0F8799272AE52644264873de86aa28D222A"
+                network_id: 84532 # Base sepolia
+              - address: ""
+                validator_contract: "aFa6a94e56975974d168721490a225feA345c91b"
+                network_id: 97 # BSC testnet
+              - address: ""
+                validator_contract: "6E8187435D5140214552ef3989DDb1457f4A663A"
+                network_id: 11155111 # ETH sepolia
         contract_tx_rate_limit: 60000
         tx_node_submit_timeout: 1800000 # 30m
         tx_verification_timeout: 5400000 # 90 min - from the time a TX was TAKEN
@@ -164,16 +175,16 @@ blockchains:
             priority_fee_per_gas_margin: "0.000001" # 0.00001% # Small margin to pass the default priority fees
             node_tx_verification_evm_blocks: 100
             tx_verification_time: 20000
-          # ethereum:
-          #   network_id: 11155111
-          #   max_gas_price: 30000000000000000
-          #   min_wallet_balance: 1000000000000000
-          #   gas_limit: 10000000
-          #   gas_limit_margin: "0.2" # 20%
-          #   base_fee_per_gas_margin: "1.5" # +150% (base_fee + base_fee * 1.5)
-          #   priority_fee_per_gas_margin: "0.000001" # 0.00001% # Small margin to pass the default priority fees
-          #   node_tx_verification_evm_blocks: 50
-          #   tx_verification_time: 20000
+          ethereum:
+            network_id: 11155111
+            max_gas_price: 30000000000000000
+            min_wallet_balance: 1000000000000000
+            gas_limit: 10000000
+            gas_limit_margin: "0.2" # 20%
+            base_fee_per_gas_margin: "1.5" # +150% (base_fee + base_fee * 1.5)
+            priority_fee_per_gas_margin: "0.000001" # 0.00001% # Small margin to pass the default priority fees
+            node_tx_verification_evm_blocks: 50
+            tx_verification_time: 20000
       sync_ext:
         - "net.postchain.eif.transaction.TransactionSubmitterSynchronizationInfrastructureExtension"
         - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"
