@@ -53,6 +53,7 @@ const config: HardhatUserConfig = {
             accounts: accounts,
             chainId: 56,
             url: "https://bsc-mainnet.rpc.chromaway.com",
+            gasPrice: 1000000000,
         },
         ethereum: { // ETH mainnet
             accounts: accounts,
@@ -90,7 +91,7 @@ const config: HardhatUserConfig = {
     etherscan: {
         apiKey: {
             // Ethereum
-            ethereum: process.env.ETHERSCAN_API_KEY,
+            mainnet: process.env.ETHERSCAN_API_KEY,
             sepolia: process.env.ETHERSCAN_API_KEY,
             // BSC
             bsc: process.env.BSCSCAN_API_KEY,
