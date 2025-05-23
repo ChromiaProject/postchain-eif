@@ -25,7 +25,7 @@ interface ITokenMinter {
 // This contract is upgradeable. This imposes restrictions on how storage layout can be modified once it is deployed
 // Some instructions are also not allowed. Read more at: https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable
 // Note: To enhance the security & decentralization, we should call transferOwnership() to external multi-sig owner after deploy the smart contract
-contract ChromiaTokenBridgeV2 is TokenBridgeV2 {
+contract ChromiaTokenBridgeV11 is TokenBridgeV2 {
     ITokenMinter public tokenMinter;
     using Postchain for bytes32;
     using MerkleProof for bytes32[];

@@ -156,7 +156,7 @@ This bridge will be identical but enable setting a new block number offset.
 3. Upgrade contract
 
     ```
-    yarn upgrade:chromiabridge-to-v2 --network <network> --address <bridge/proxy address> --offset <offset> --verify
+    yarn upgrade:chromiabridge-to-v1.1 --network <network> --address <bridge/proxy address> --offset <offset> --verify
     ```
 
 4. Optional: Read current block number offset again

@@ -15,7 +15,7 @@ import {
 import {
   Chromia__factory,
   ChromiaTokenBridge__factory,
-  ChromiaTokenBridgeV2__factory,
+  ChromiaTokenBridgeV11__factory,
   TokenMinterBase,
   TokenMinterETH__factory,
   Validator__factory
@@ -212,7 +212,7 @@ describe("ChromiaToken Bridge Test", () => {
         const withdrawBlockNumber = (await bridge._withdraw(eventProof.leaf)).block_number
 
         // Upgrade contract to V2
-        const bridgeV2Factory = new ChromiaTokenBridgeV2__factory(admin)
+        const bridgeV2Factory = new ChromiaTokenBridgeV11__factory(admin)
         const upgradedBridge = await upgrades.upgradeProxy(
             bridgeAddress,
             bridgeV2Factory
@@ -390,7 +390,7 @@ describe("ChromiaToken Bridge Test", () => {
         expect(await bridge.withdrawOffset()).eq(WITHDRAW_OFFSET)
 
         // Upgrade contract to V2
-        const bridgeV2Factory = new ChromiaTokenBridgeV2__factory(admin)
+        const bridgeV2Factory = new ChromiaTokenBridgeV11__factory(admin)
         const upgradedBridge = await upgrades.upgradeProxy(
             bridgeAddress,
             bridgeV2Factory

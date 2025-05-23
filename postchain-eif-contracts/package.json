@@ -19,7 +19,7 @@
     "deploy": "npx hardhat deploy:bridge",
     "deploy:native": "npx hardhat deploy:chromiabridge",
     "deploy:chromiabridge": "npx hardhat deploy:chromiabridge",
-    "upgrade:chromiabridge-to-v2": "npx hardhat upgrade:chromiabridge-to-v2",
+    "upgrade:chromiabridge-to-v1.1": "npx hardhat upgrade:chromiabridge-to-v1.1",
     "deploy:directoryValidator": "npx hardhat deploy:directoryValidator",
     "deploy:anchoring": "npx hardhat deploy:anchoring",
     "prepare:bridge": "npx hardhat prepare:bridge",
