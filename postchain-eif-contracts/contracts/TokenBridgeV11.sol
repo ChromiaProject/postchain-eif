@@ -13,12 +13,12 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./Postchain.sol";
 import "./IValidator.sol";
 
-// Identical to TokenBridge except TokenBridgeV2 has a second initializer to support updating the withdrawOffset variable
+// Identical to TokenBridge except TokenBridgeV11 has a second initializer to support updating the withdrawOffset variable
 // offset once.
 // This contract is upgradeable. This imposes restrictions on how storage layout can be modified once it is deployed
 // Some instructions are also not allowed. Read more at: https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable
 // Note: To enhance the security & decentralization, we should call transferOwnership() to external multi-sig owner after deploy the smart contract
-contract TokenBridgeV2 is Initializable, PausableUpgradeable, Ownable2StepUpgradeable, ReentrancyGuardUpgradeable {
+contract TokenBridgeV11 is Initializable, PausableUpgradeable, Ownable2StepUpgradeable, ReentrancyGuardUpgradeable {
     uint8 constant ERC20_ACCOUNT_STATE_BYTE_SIZE = 64;
     uint constant EMERGENCY_DURATION = 90 days;
 

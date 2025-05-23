@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import {Postchain} from "./Postchain.sol";
-import {TokenBridgeV2} from "./TokenBridgeV2.sol";
+import {TokenBridgeV11} from "./TokenBridgeV11.sol";
 import {MerkleProof} from "./utils/cryptography/MerkleProof.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -25,7 +25,7 @@ interface ITokenMinter {
 // This contract is upgradeable. This imposes restrictions on how storage layout can be modified once it is deployed
 // Some instructions are also not allowed. Read more at: https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable
 // Note: To enhance the security & decentralization, we should call transferOwnership() to external multi-sig owner after deploy the smart contract
-contract ChromiaTokenBridgeV11 is TokenBridgeV2 {
+contract ChromiaTokenBridgeV11 is TokenBridgeV11 {
     ITokenMinter public tokenMinter;
     using Postchain for bytes32;
     using MerkleProof for bytes32[];
