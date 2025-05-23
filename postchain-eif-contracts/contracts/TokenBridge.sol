@@ -28,7 +28,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     uint256 public networkId;
     bool public isMassExit;
     Postchain.PostchainBlock public massExitBlock;
-    uint256 public withdrawOffset;
+    uint256 public withdrawTimeOffset;      // @dev Block time in seconds
 
     bytes32 internal blockchainRid;         // @dev Postchain/Chromia blockchain RID
     bool public isBlockchainRidFinalized;   // @dev Flag to track if blockchain RID is finalized
@@ -48,12 +48,12 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         IERC20 token;
         address beneficiary;
         uint256 amount;
-        uint256 block_number;
+        uint256 block_time;
         uint postchain_height;
         Status status;
     }
 
-    event Initialize(IValidator indexed _validator, uint256 _withdrawOffset);
+    event Initialize(IValidator indexed _validator, uint256 _withdrawTimeOffset);
     event SetBlockchainRid(bytes32 rid);
     event BlockchainRidFinalized(bytes32 rid);
     event AllowToken(IERC20 indexed token);
@@ -89,7 +89,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         _;
     }
 
-    function initialize(IValidator _validator, uint256 _withdrawOffset) public initializer {
+    function initialize(IValidator _validator, uint256 _withdrawTimeOffset) public initializer {
         require(address(_validator) != address(0), "TokenBridge: validator address is invalid");
         __Ownable_init(msg.sender);
         __Pausable_init();
@@ -101,9 +101,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         }
         networkId = id;
         validator = _validator;
-        withdrawOffset = _withdrawOffset;
+        withdrawTimeOffset = _withdrawTimeOffset;
         isBlockchainRidFinalized = false;
-        emit Initialize(_validator, _withdrawOffset);
+        emit Initialize(_validator, _withdrawTimeOffset);
     }
 
     function renounceOwnership() public override view onlyOwner {
@@ -253,7 +253,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
             wd.beneficiary = beneficiary;
             wd.amount = amount;
             wd.postchain_height = height;
-            wd.block_number = block.number + withdrawOffset;
+            wd.block_time = block.timestamp + withdrawTimeOffset;
             wd.status = Status.Withdrawable;
             _withdraw[hash] = wd;
             emit WithdrawRequest(beneficiary, token, amount, height, blockRid);
@@ -265,7 +265,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     function withdraw(bytes32 _hash, address payable beneficiary) external whenNotMassExit whenNotPaused nonReentrant {
         Withdraw storage wd = _withdraw[_hash];
         require(wd.beneficiary == beneficiary, "TokenBridge: no fund for the beneficiary");
-        require(wd.block_number <= block.number, "TokenBridge: not mature enough to withdraw the fund");
+        require(wd.block_time <= block.timestamp, "TokenBridge: not mature enough to withdraw the fund");
         require(wd.status == Status.Withdrawable, "TokenBridge: fund is pending or was already claimed");
         wd.status = Status.Withdrawn;
         uint value = wd.amount;
@@ -286,7 +286,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     function withdrawToPostchain(bytes32 _hash) external whenNotPaused nonReentrant {
         Withdraw storage wd = _withdraw[_hash];
         require(wd.beneficiary == msg.sender, "TokenBridge: no fund for the beneficiary");
-        require(wd.block_number <= block.number, "TokenBridge: not mature enough to withdraw the fund");
+        require(wd.block_time <= block.timestamp, "TokenBridge: not mature enough to withdraw the fund");
         require(wd.status == Status.Withdrawable, "TokenBridge: fund is pending or was already claimed");
         wd.status = Status.PostchainWithdrawn;
         uint amount = wd.amount;
