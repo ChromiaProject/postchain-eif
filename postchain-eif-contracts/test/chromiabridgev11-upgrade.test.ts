@@ -24,7 +24,7 @@ import {
 chai.use(solidity);
 const { expect } = chai;
 const WITHDRAW_OFFSET = "0x20";
-const WITHDRAW_V2_OFFSET = "0xFFFFFF";
+const WITHDRAW_V11_OFFSET = "0xFFFFFF";
 const DAILY_LIMIT = BigInt(1000000000000000000000000);
 describe("ChromiaToken Bridge Test", () => {
   let tokenAddress: string;
@@ -67,7 +67,7 @@ describe("ChromiaToken Bridge Test", () => {
   });
 
   describe("Withdraw by normal user before upgrade", async () => {
-    it("Create withdraw, upgrade bridge to v2 and complete the withdrawal with the offset inherited from bridge v1", async () => {
+    it("Create withdraw, upgrade bridge to v1.1 and complete the withdrawal with the offset inherited from bridge v1", async () => {
       const [deployer, user] = await ethers.getSigners();
       const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
       const toMint = ethers.utils.parseEther("10000");
@@ -211,19 +211,19 @@ describe("ChromiaToken Bridge Test", () => {
 
         const withdrawBlockNumber = (await bridge._withdraw(eventProof.leaf)).block_number
 
-        // Upgrade contract to V2
-        const bridgeV2Factory = new ChromiaTokenBridgeV11__factory(admin)
+        // Upgrade contract to v1.1
+        const bridgeV11Factory = new ChromiaTokenBridgeV11__factory(admin)
         const upgradedBridge = await upgrades.upgradeProxy(
             bridgeAddress,
-            bridgeV2Factory
+            bridgeV11Factory
         );
-        await expect(upgradedBridge.initializeV2(WITHDRAW_V2_OFFSET)).to.emit(upgradedBridge, "InitializeV2");
+        await expect(upgradedBridge.initializeV11(WITHDRAW_V11_OFFSET)).to.emit(upgradedBridge, "InitializeV11");
 
-        // V2 initialize can only be run once
-        await expect(upgradedBridge.initializeV2(WITHDRAW_V2_OFFSET)).to.be.revertedWith("InvalidInitialization()");
+        // V1.1 initialize can only be run once
+        await expect(upgradedBridge.initializeV11(WITHDRAW_V11_OFFSET)).to.be.revertedWith("InvalidInitialization()");
 
         // Assert block_number is unchanged
-        // console.log("Withdraw V2 but with V1 structure: ", (await bridge._withdraw(eventProof.leaf)));
+        // console.log("Withdraw V1.1 but with V1 structure: ", (await bridge._withdraw(eventProof.leaf)));
         expect((await bridge._withdraw(eventProof.leaf)).block_number).to.equal(withdrawBlockNumber)
         expect((await upgradedBridge._withdraw(eventProof.leaf)).block_number).to.equal(withdrawBlockNumber)
 
@@ -261,7 +261,7 @@ describe("ChromiaToken Bridge Test", () => {
   });
 
   describe("Withdraw by normal user after upgrade", async () => {
-    it("Upgrade bridge to v2 and make a withdraw with new offset", async () => {
+    it("Upgrade bridge to v1.1 and make a withdraw with new offset", async () => {
       const [deployer, user] = await ethers.getSigners();
       const tokenInstance = new Chromia__factory(deployer).attach(tokenAddress);
       const toMint = ethers.utils.parseEther("10000");
@@ -389,19 +389,19 @@ describe("ChromiaToken Bridge Test", () => {
         // V1 offset is set
         expect(await bridge.withdrawOffset()).eq(WITHDRAW_OFFSET)
 
-        // Upgrade contract to V2
-        const bridgeV2Factory = new ChromiaTokenBridgeV11__factory(admin)
+        // Upgrade contract to V1.1
+        const bridgeV11Factory = new ChromiaTokenBridgeV11__factory(admin)
         const upgradedBridge = await upgrades.upgradeProxy(
             bridgeAddress,
-            bridgeV2Factory
+            bridgeV11Factory
         );
-        await expect(upgradedBridge.initializeV2(WITHDRAW_V2_OFFSET)).to.emit(upgradedBridge, "InitializeV2");
+        await expect(upgradedBridge.initializeV11(WITHDRAW_V11_OFFSET)).to.emit(upgradedBridge, "InitializeV11");
 
-        // V2 initialize can only be run once
-        await expect(upgradedBridge.initializeV2(WITHDRAW_V2_OFFSET)).to.be.revertedWith("InvalidInitialization()");
+        // V1.1 initialize can only be run once
+        await expect(upgradedBridge.initializeV11(WITHDRAW_V11_OFFSET)).to.be.revertedWith("InvalidInitialization()");
 
         // New offset is set
-        expect(await bridge.withdrawOffset()).eq(WITHDRAW_V2_OFFSET)
+        expect(await bridge.withdrawOffset()).eq(WITHDRAW_V11_OFFSET)
 
         // Request withdraw
         await expect(
@@ -429,8 +429,8 @@ describe("ChromiaToken Bridge Test", () => {
             bridge.withdraw(DecodeHexStringToByteArray(hashEventLeaf.substring(2, hashEventLeaf.length)), user.address),
         ).to.revertedWith("TokenBridge: not mature enough to withdraw the fund");
 
-        // Mine v2 offset of blocks
-        await ethers.provider.send("hardhat_mine", [WITHDRAW_V2_OFFSET]);
+        // Mine v1.1 offset of blocks
+        await ethers.provider.send("hardhat_mine", [WITHDRAW_V11_OFFSET]);
 
         // Withdraw can be completed
         expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint.sub(toDeposit));

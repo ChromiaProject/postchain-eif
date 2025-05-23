@@ -72,7 +72,7 @@ contract TokenBridgeV11 is Initializable, PausableUpgradeable, Ownable2StepUpgra
     }
 
     event Initialize(IValidator indexed _validator, uint256 _withdrawOffset);
-    event InitializeV2(uint256 _withdrawOffset);
+    event InitializeV11(uint256 _withdrawOffset);
     event SetBlockchainRid(bytes32 rid);
     event AllowToken(IERC20 indexed token);
     event TriggerMassExit(uint indexed height, bytes32 indexed blockRid);
@@ -117,13 +117,11 @@ contract TokenBridgeV11 is Initializable, PausableUpgradeable, Ownable2StepUpgra
         validator = _validator;
         withdrawOffset = _withdrawOffset;
         emit Initialize(_validator, _withdrawOffset);
-
-        initializeV2(_withdrawOffset);
     }
 
-    function initializeV2(uint256 _withdrawOffset) public reinitializer(2) {
+    function initializeV11(uint256 _withdrawOffset) public reinitializer(2) {
         withdrawOffset = _withdrawOffset;
-        emit InitializeV2(_withdrawOffset);
+        emit InitializeV11(_withdrawOffset);
     }
 
     function renounceOwnership() public override view onlyOwner {

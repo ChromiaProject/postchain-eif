@@ -227,11 +227,11 @@ const dailyLimit: DailyLimit = dailyLimitFactory.attach(
  * Task to upgrade an existing ChromiaTokenBridge contract to ChromiaTokenBridgeV11.sol.
  *
  * This task upgrades the contract implementation while preserving the contract's state and address.
- * After the upgrade, it initializes the V2 contract with a new withdraw offset value.
+ * After the upgrade, it initializes the V1.1 contract with a new withdraw offset value.
  *
  * @task upgrade:chromiabridge-to-v1.1
  * @param {string} address - The address of the deployed ChromiaTokenBridge contract to upgrade
- * @param {string|number} offset - The new withdraw offset value to set during V2 initialization
+ * @param {string|number} offset - The new withdraw offset value to set during V1.1 initialization
  * @param {boolean} [verify] - Flag to verify the upgraded contract on Etherscan after deployment
  *
  * @example
@@ -241,7 +241,7 @@ const dailyLimit: DailyLimit = dailyLimitFactory.attach(
  */
 task("upgrade:chromiabridge-to-v1.1")
   .addParam("address", "Address of the ChromiaTokenBridge contract to upgrade")
-  .addParam("offset", "New withdraw offset value for initializeV2")
+  .addParam("offset", "New withdraw offset value for initializeV11")
   .addFlag("verify", "Verify contracts at Etherscan")
   .setAction(async ({address, offset, verify}, hre) => {
 
@@ -258,16 +258,16 @@ task("upgrade:chromiabridge-to-v1.1")
     }
 
     const factory: ContractFactory = await hre.ethers.getContractFactory("ChromiaTokenBridgeV11");
-    const bridgeV2: ChromiaTokenBridgeV11 = <ChromiaTokenBridgeV11>await hre.upgrades.upgradeProxy(
+    const bridgeV11: ChromiaTokenBridgeV11 = <ChromiaTokenBridgeV11>await hre.upgrades.upgradeProxy(
       bridgeV1.address, factory);
 
     console.log("ChromiaTokenBridge has been upgraded to ChromiaTokenBridgeV11");
     console.log(`Initializing ChromiaTokenBridgeV11 with offset ${offset}`);
 
-    const tx = await bridgeV2.initializeV2(offset);
+    const tx = await bridgeV11.initializeV11(offset);
     await tx.wait();
     console.log("ChromiaTokenBridgeV11.sol initialized successfully");
-    console.log("New withdraw offset: ", hre.ethers.utils.formatUnits(await bridgeV2.withdrawOffset(), 0));
+    console.log("New withdraw offset: ", hre.ethers.utils.formatUnits(await bridgeV11.withdrawOffset(), 0));
 
     if (verify) {
       try {
@@ -286,7 +286,7 @@ task("read:chromiabridge-offset")
     const factory: ContractFactory = await hre.ethers.getContractFactory("ChromiaTokenBridge");
     const bridge: ChromiaTokenBridge = factory.attach(address) as ChromiaTokenBridge;
 
-    console.log("BridgeV2 address: ", bridge.address);
+    console.log("BridgeV1.1 address: ", bridge.address);
     console.log("Offset: ", hre.ethers.utils.formatUnits(await bridge.withdrawOffset(), 0));
 
     const firstBlockNumber = await hre.ethers.provider.getBlockNumber();
