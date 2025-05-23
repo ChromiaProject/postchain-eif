@@ -257,11 +257,11 @@ task("upgrade:chromiabridge-to-v1.1")
       console.log("Deploying contracts with the account:", as.address);
     }
 
-    const factory: ContractFactory = await hre.ethers.getContractFactory("ChromiaTokenBridgeV11.sol");
+    const factory: ContractFactory = await hre.ethers.getContractFactory("ChromiaTokenBridgeV11");
     const bridgeV2: ChromiaTokenBridgeV11 = <ChromiaTokenBridgeV11>await hre.upgrades.upgradeProxy(
       bridgeV1.address, factory);
 
-    console.log("ChromiaTokenBridge has been upgraded to ChromiaTokenBridgeV11.sol");
+    console.log("ChromiaTokenBridge has been upgraded to ChromiaTokenBridgeV11");
     console.log(`Initializing ChromiaTokenBridgeV11 with offset ${offset}`);
 
     const tx = await bridgeV2.initializeV2(offset);
