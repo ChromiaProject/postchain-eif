@@ -5,7 +5,7 @@
 root = true
 
 # Default settings for all files
-[*]
+[*.{sol,ts}]
 charset = utf-8
 indent_style = space
 indent_size = 2
