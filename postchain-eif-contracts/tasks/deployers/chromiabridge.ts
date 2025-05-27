@@ -39,8 +39,8 @@ const known_artifacts_by_network: { [key: string]: KnownArtifacts } = {
     "networkType": "ETH"
   },
   "bsc_testnet": {
-    "multiSigOwner": "0x1c918FC9C7f3D8943e67cAD0BfB4B8e57220490D", // your pubkey of .env file account
-    "chromiaTokenAddress": "0xAe04277f3226CFb9849c86011F2C4A367b4d4b88", // my chromia token
+    "multiSigOwner": "0x782Ab06A00e04BBb86a819bF527d42290C46B77C", // your pubkey of .env file account
+    "chromiaTokenAddress": "0x4e6c3C8b94797d6F0Ae48b389101CD3D5B0d4FFB", // my chromia token
     "networkType": "BSC"
   },
   "base_sepolia": {
@@ -53,23 +53,28 @@ const known_artifacts_by_network: { [key: string]: KnownArtifacts } = {
 task("deploy:chromiabridge")
   .addOptionalParam("app", "app node, not needed when using managed validator")
   .addOptionalParam("offset", "withdraw offset")
-  .addOptionalParam("directoryValidator", "Contract address of directory chain validator, supply this to use managed validator contract")
+  .addOptionalParam("directoryValidator", "Contract address of directory chain validator. Supply this to use managed validator contract")
+  .addOptionalParam("validatorAddress", "Validator contract address. Supply this to use existing validator contract.")
   .addFlag("verify", "Verify contracts at Etherscan")
-  .setAction(async ({verify, app, offset, directoryValidator}, hre) => {
+  .setAction(async ({verify, app, offset, directoryValidator, validatorAddress}, hre) => {
 
     let multiSigOwner = known_artifacts_by_network[hre.network.name].multiSigOwner;
 
     // deploy validator smart contract
     let validator;
-    let validators;
-    if (directoryValidator === undefined) {
-      const validatorFactory: Validator__factory = await hre.ethers.getContractFactory("Validator");
-      validators = app === undefined ? [] : getNodes(app);
-      validator = <IValidator>await validatorFactory.deploy(validators);
+    let validators;    
+    if (validatorAddress !== undefined) {
+        const validatorFactory: ManagedValidator__factory = await hre.ethers.getContractFactory("ManagedValidator");
+        validator = validatorFactory.attach(validatorAddress);
+    } else if (directoryValidator !== undefined) {
+        const validatorFactory: ManagedValidator__factory = await hre.ethers.getContractFactory("ManagedValidator");
+        validator = <IValidator>await validatorFactory.deploy(directoryValidator);
     } else {
-      const validatorFactory: ManagedValidator__factory = await hre.ethers.getContractFactory("ManagedValidator");
-      validator = <IValidator>await validatorFactory.deploy(directoryValidator);
+        const validatorFactory: Validator__factory = await hre.ethers.getContractFactory("Validator");
+        validators = app === undefined ? [] : getNodes(app);
+        validator = <IValidator>await validatorFactory.deploy(validators);
     }
+    
     console.log("Validator deployed to: ", validator.address);
     const withdrawOffset = offset === undefined ? 0 : parseInt(offset);
 
@@ -123,12 +128,12 @@ task("deploy:chromiabridge")
       // with the similar code, then calling verify will return error.
       // We add try/catch to handle the error and continue to verify the main bridge smart contract.
       try {
-        if (directoryValidator === undefined) {
+        if (directoryValidator === undefined && validatorAddress === undefined) {
           await hre.run("verify:verify", {
             address: validator.address,
             constructorArguments: [validators],
           });
-        } else {
+        } else if (directoryValidator !== undefined) {
           await hre.run("verify:verify", {
             address: validator.address,
             constructorArguments: [directoryValidator],
