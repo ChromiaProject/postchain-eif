@@ -39,8 +39,8 @@ const known_artifacts_by_network: { [key: string]: KnownArtifacts } = {
     "networkType": "ETH"
   },
   "bsc_testnet": {
-    "multiSigOwner": "0x782Ab06A00e04BBb86a819bF527d42290C46B77C", // your pubkey of .env file account
-    "chromiaTokenAddress": "0xB1b6360d53CC13663c3B6E1434bEfeEa313F468e", // my chromia token
+    "multiSigOwner": "0x1c918FC9C7f3D8943e67cAD0BfB4B8e57220490D", // your pubkey of .env file account
+    "chromiaTokenAddress": "0xAe04277f3226CFb9849c86011F2C4A367b4d4b88", // my chromia token
     "networkType": "BSC"
   },
   "base_sepolia": {
@@ -62,7 +62,7 @@ task("deploy:chromiabridge")
 
     // deploy validator smart contract
     let validator;
-    let validators;    
+    let validators;
     if (validatorAddress !== undefined) {
         const validatorFactory: ManagedValidator__factory = await hre.ethers.getContractFactory("ManagedValidator");
         validator = validatorFactory.attach(validatorAddress);
