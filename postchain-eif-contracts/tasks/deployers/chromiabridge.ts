@@ -74,8 +74,8 @@ task("deploy:chromiabridge")
         validators = app === undefined ? [] : getNodes(app);
         validator = <IValidator>await validatorFactory.deploy(validators);
     }
-    
     console.log("Validator deployed to: ", validator.address);
+    
     const withdrawOffset = offset === undefined ? 0 : parseInt(offset);
 
     // deploy token bridge smart contracts
@@ -265,10 +265,9 @@ task("upgrade:chromiabridge-to-v1.1")
     const factory: ContractFactory = await hre.ethers.getContractFactory("ChromiaTokenBridgeV11");
     const bridgeV11: ChromiaTokenBridgeV11 = <ChromiaTokenBridgeV11>await hre.upgrades.upgradeProxy(
       bridgeV1.address, factory);
-
     console.log("ChromiaTokenBridge has been upgraded to ChromiaTokenBridgeV11");
-    console.log(`Initializing ChromiaTokenBridgeV11 with offset ${offset}`);
 
+    console.log(`Initializing ChromiaTokenBridgeV11 with offset ${offset}`);
     const tx = await bridgeV11.initializeV11(offset);
     await tx.wait();
     console.log("ChromiaTokenBridgeV11.sol initialized successfully");

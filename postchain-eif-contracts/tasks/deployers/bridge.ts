@@ -11,22 +11,27 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 task("deploy:bridge")
   .addOptionalParam("app", "app node, not needed when using managed validator")
   .addOptionalParam('offset', 'withdraw offset')
-  .addOptionalParam("directoryValidator", "Contract address of directory chain validator, supply this to use managed validator contract")
+  .addOptionalParam("directoryValidator", "Contract address of directory chain validator. Supply this to use managed validator contract")
+  .addOptionalParam("validatorAddress", "Validator contract address. Supply this to use existing validator contract.")
   .addFlag('verify', 'Verify contracts at Etherscan')
-  .setAction(async ({verify, app, offset, directoryValidator}, hre) => {
+  .setAction(async ({verify, app, offset, directoryValidator, validatorAddress}, hre) => {
     // deploy validator smart contract
-    const withdrawOffset = offset === undefined ? 0 : parseInt(offset)
     let validator;
-    let validators;
-    if (directoryValidator === undefined) {
-      const validatorFactory: Validator__factory = await hre.ethers.getContractFactory("Validator");
-      validators = app === undefined ? [] : getNodes(app);
-      validator = <IValidator>await validatorFactory.deploy(validators);
+    let validators;    
+    if (validatorAddress !== undefined) {
+        const validatorFactory: ManagedValidator__factory = await hre.ethers.getContractFactory("ManagedValidator");
+        validator = validatorFactory.attach(validatorAddress);
+    } else if (directoryValidator !== undefined) {
+        const validatorFactory: ManagedValidator__factory = await hre.ethers.getContractFactory("ManagedValidator");
+        validator = <IValidator>await validatorFactory.deploy(directoryValidator);
     } else {
-      const validatorFactory: ManagedValidator__factory = await hre.ethers.getContractFactory("ManagedValidator");
-      validator = <IValidator>await validatorFactory.deploy(directoryValidator);
+        const validatorFactory: Validator__factory = await hre.ethers.getContractFactory("Validator");
+        validators = app === undefined ? [] : getNodes(app);
+        validator = <IValidator>await validatorFactory.deploy(validators);
     }
     console.log("Validator deployed to: ", validator.address);
+
+    const withdrawOffset = offset === undefined ? 0 : parseInt(offset)
 
     // deploy token bridge smart contracts
     const factory: TokenBridge__factory = await hre.ethers.getContractFactory("TokenBridge")
@@ -41,12 +46,12 @@ task("deploy:bridge")
         // with the similar code, then calling verify will return error.
         // We add try/catch to handle the error and continue to verify the main bridge smart contract.
         try {
-          if (directoryValidator === undefined) {
+          if (directoryValidator === undefined && validatorAddress === undefined) {
             await hre.run("verify:verify", {
               address: validator.address,
               constructorArguments: [validators],
             });
-          } else {
+          } else if (directoryValidator !== undefined) {
             await hre.run("verify:verify", {
               address: validator.address,
               constructorArguments: [directoryValidator],
