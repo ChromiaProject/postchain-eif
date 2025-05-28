@@ -40,7 +40,7 @@ const known_artifacts_by_network: { [key: string]: KnownArtifacts } = {
   },
   "bsc_testnet": {
     "multiSigOwner": "0x782Ab06A00e04BBb86a819bF527d42290C46B77C", // your pubkey of .env file account
-    "chromiaTokenAddress": "0x4e6c3C8b94797d6F0Ae48b389101CD3D5B0d4FFB", // my chromia token
+    "chromiaTokenAddress": "0xB1b6360d53CC13663c3B6E1434bEfeEa313F468e", // my chromia token
     "networkType": "BSC"
   },
   "base_sepolia": {

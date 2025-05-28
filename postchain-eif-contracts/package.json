@@ -30,6 +30,7 @@
     "prepare:nft": "npx hardhat prepare:nft",
     "upgrade:nft": "npx hardhat upgrade:nft",
     "deploy:alice": "npx hardhat deploy:alice",
+    "set-minter:chromia": "npx hardhat set-minter:chromia",
     "transaction:resubmitSignerUpdate": "npx hardhat transaction:resubmitSignerUpdate",
     "transaction:resubmitAnchoring": "npx hardhat transaction:resubmitAnchoring"
   },
