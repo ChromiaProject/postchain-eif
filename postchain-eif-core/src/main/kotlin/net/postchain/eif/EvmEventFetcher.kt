@@ -194,7 +194,7 @@ class EvmEventFetcher(
                         val skipToHeight = getLastCommittedEvmEventHeight(networkId, contractAddress.data)
                                 ?: BigInteger.valueOf(contracts.find { contract -> contract.first == contractAddress }?.second
                                         ?: networkSkipToHeight)
-                        event.blockNumber >= skipToHeight
+                        event.blockNumber > skipToHeight
                     }
                 }
                 .toList()
