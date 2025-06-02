@@ -18,6 +18,8 @@
     "coverage": "cross-env CODE_COVERAGE=true hardhat coverage --solcoverjs ./.solcover.js --temp artifacts --testfiles \"./test/**/*.ts\"",
     "deploy": "npx hardhat deploy:bridge",
     "deploy:native": "npx hardhat deploy:chromiabridge",
+    "deploy:chromiabridge": "npx hardhat deploy:chromiabridge",
+    "upgrade:chromiabridge-to-v1.1": "npx hardhat upgrade:chromiabridge-to-v1.1",
     "deploy:directoryValidator": "npx hardhat deploy:directoryValidator",
     "deploy:anchoring": "npx hardhat deploy:anchoring",
     "prepare:bridge": "npx hardhat prepare:bridge",
@@ -28,6 +30,7 @@
     "prepare:nft": "npx hardhat prepare:nft",
     "upgrade:nft": "npx hardhat upgrade:nft",
     "deploy:alice": "npx hardhat deploy:alice",
+    "set-minter:chromia": "npx hardhat set-minter:chromia",
     "transaction:resubmitSignerUpdate": "npx hardhat transaction:resubmitSignerUpdate",
     "transaction:resubmitAnchoring": "npx hardhat transaction:resubmitAnchoring"
   },

@@ -91,11 +91,6 @@ task("set-minter:chromia", "Set minter for an existing Chromia token")
     .addParam("tokenAddress", "The address of the Chromia token contract")
     .addParam("newMinter", "The address that will have minting privileges")
     .setAction(async ({ tokenAddress, newMinter }, hre) => {
-        // Ensure we're on an Ethereum network
-        if (!["base", "base_sepolia", "ethereum", "sepolia"].includes(hre.network.name)) {
-            throw new Error("This task must be run on an Ethereum network.");
-        }
-
         // Get the token contract
         const tokenFactory = (await hre.ethers.getContractFactory("Chromia")) as unknown as Chromia__factory;
         const token = tokenFactory.attach(tokenAddress) as unknown as Chromia;

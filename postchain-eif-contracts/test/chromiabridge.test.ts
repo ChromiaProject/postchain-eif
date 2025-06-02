@@ -4,12 +4,11 @@ import { solidity } from "ethereum-waffle";
 import {
   Chromia__factory,
   ChromiaTokenBridge__factory,
-  DailyLimit__factory,
   TokenBridgeDelegator__factory,
-  Validator__factory,
   TokenMinterBase,
-  TokenMinterETH__factory, Address,
-} from "../src/types";
+  TokenMinterETH__factory,
+  Validator__factory
+} from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BytesLike, hexZeroPad, keccak256 } from "ethers/lib/utils";
 import { ContractReceipt, ContractTransaction } from "ethers";

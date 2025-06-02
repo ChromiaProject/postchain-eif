@@ -7,7 +7,7 @@ import {
   TokenBridgeDelegator__factory,
   Validator__factory,
   TokenMinterETH__factory,
-} from "../src/types";
+} from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { constants } from "ethers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
