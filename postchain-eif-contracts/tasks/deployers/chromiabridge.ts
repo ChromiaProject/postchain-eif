@@ -255,13 +255,6 @@ task("upgrade:chromiabridge-to-v1.1")
     const bridgeV1Factory: ContractFactory = await hre.ethers.getContractFactory("ChromiaTokenBridge");
     const bridgeV1: ChromiaTokenBridge = bridgeV1Factory.attach(address) as ChromiaTokenBridge;
 
-    console.log("BridgeV1 address: ", bridgeV1.address);
-    console.log("BridgeV1 owner: ", await bridgeV1.owner());
-
-    for (const as of await hre.ethers.getSigners()) {
-      console.log("Deploying contracts with the account:", as.address);
-    }
-
     const factory: ContractFactory = await hre.ethers.getContractFactory("ChromiaTokenBridgeV11");
     const bridgeV11: ChromiaTokenBridgeV11 = <ChromiaTokenBridgeV11>await hre.upgrades.upgradeProxy(
       bridgeV1.address, factory);
