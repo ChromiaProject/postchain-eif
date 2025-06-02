@@ -94,9 +94,6 @@ task("deploy:chromiabridge")
 
     const DAILY_LIMIT = 1000000 * 1000000; // agreed on weekly meeting 2024-06-19
 
-    let signers = await hre.ethers.getSigners();
-    let signerAddress = await signers[0].getAddress();
-
     // Import the Chromia token contract
     const tokenFactory: Chromia__factory = await hre.ethers.getContractFactory("Chromia");
     const token: Chromia = tokenFactory.attach(
@@ -139,10 +136,6 @@ task("deploy:chromiabridge")
             constructorArguments: [directoryValidator],
           });
         }
-        await hre.run("verify:verify", {
-          address: token.address,
-          constructorArguments: [signerAddress, 0],
-        });
         await hre.run("verify:verify", {
           address: tokenMinter.address,
           constructorArguments: [DAILY_LIMIT, token.address, bridge.address, multiSigOwner],
