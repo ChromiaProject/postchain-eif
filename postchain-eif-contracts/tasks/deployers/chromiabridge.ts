@@ -84,9 +84,6 @@ task("deploy:chromiabridge")
 
         const DAILY_LIMIT = 1000000 * 1000000; // agreed on weekly meeting 2024-06-19
 
-        let signers = await hre.ethers.getSigners();
-        let signerAddress = await signers[0].getAddress();
-
         // Import the Chromia token contract
         const tokenFactory  = await hre.ethers.getContractFactory("Chromia") as Chromia__factory;
         const token = tokenFactory.attach(chromiaTokenAddress ?? known_artifacts_by_network[hre.network.name].chromiaTokenAddress) as Chromia;
@@ -122,10 +119,7 @@ task("deploy:chromiabridge")
             // with the similar code, then calling verify will return error. 
             // We add try/catch to handle the error and continue to verify the main bridge smart contract.
             try {
-                await hre.run("verify:verify", {
-                    address: tokenAddress,
-                    constructorArguments: [signerAddress, 0],
-                });
+                console.log("Verifying token minter contract...");
                 await hre.run("verify:verify", {
                     address: tokenMinterAddress,
                     constructorArguments: [DAILY_LIMIT, tokenAddress, bridgeAddress, multiSigOwner],
