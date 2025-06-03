@@ -71,7 +71,7 @@ describe("ChromiaToken Bridge Test", () => {
         const validatorFactory = await ethers.getContractFactory("Validator", admin) as Validator__factory;
         validatorContract = await validatorFactory.deploy([validator1.address, validator2.address]);
         await validatorContract.waitForDeployment();
-        let validatorAddress = await validatorContract.getAddress();
+        const validatorAddress = await validatorContract.getAddress();
 
         const bridgeFactory = await ethers.getContractFactory("ChromiaTokenBridge", admin) as ChromiaTokenBridge__factory;
         // @dev We need this to be deployed only to get the specific address for tokenBridgeDelegatorContract, as it is part of the hash calculation(s).
@@ -90,6 +90,9 @@ describe("ChromiaToken Bridge Test", () => {
         const tokenMinterFactory = await ethers.getContractFactory("TokenMinterETH", admin) as TokenMinterETH__factory;
         tokenMinterContract = await tokenMinterFactory.deploy(DAILY_LIMIT, chromiaTokenAddress, bridgeAddress, deployer.address);
         await tokenMinterContract.waitForDeployment();
+        expect(await bridgeContract.withdrawTimeOffset()).to.eq(WITHDRAW_TIME_OFFSET);
+        expect(await bridgeContract.version()).to.eq(3);
+
         tokenMinterAddress = await tokenMinterContract.getAddress();
         await bridgeContract.setTokenMinter(tokenMinterAddress);
 

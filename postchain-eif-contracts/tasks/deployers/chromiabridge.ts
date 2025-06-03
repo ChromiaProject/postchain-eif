@@ -48,7 +48,7 @@ const known_artifacts_by_network: { [key: string]: KnownArtifacts } = {
  * Deploys a Chromia Token Bridge contract.
  * 
  * This task deploys a Chromia Token Bridge contract using the OpenZeppelin upgradeable proxy pattern.
- * It initializes the bridge with the provided validator address and withdraw offset.
+ * It initializes the bridge with the provided validator address and withdraw time offset.
  * After deployment, it logs the bridge address and proxy admin address to the console.
  * 
  * The task also deploys a TokenMinter contract (either TokenMinterETH or TokenMinterBSC depending on the network). 
@@ -58,21 +58,21 @@ const known_artifacts_by_network: { [key: string]: KnownArtifacts } = {
  * The ownership of the proxy admin is transferred to a multisig wallet. 
  * 
  * @param validatorAddress - The address of the validator contract to be used by the bridge.
- * @param offset - Optional. The withdraw offset value for the bridge. Defaults to 0 if not provided.
+ * @param offset - Optional. The withdraw time offset value for the bridge, in seconds. Defaults to 0 if not provided.
  * @param chromiaTokenAddress - Optional. The address of the Chromia token contract to be used by the bridge.
  * @param verify - Optional. If set, verifies the deployed contract at Etherscan.
  */
 task("deploy:chromiabridge")
     .addParam("validatorAddress", "Validator contract address")
-    .addOptionalParam("offset", "withdraw offset")
+    .addOptionalParam("offset", "withdraw time offset in seconds")
     .addOptionalParam("chromiaTokenAddress", "Chromia Token address")
     .addFlag("verify", "Verify contracts at Etherscan")
     .setAction(async ({ validatorAddress, offset, chromiaTokenAddress, verify }, hre) => {
         let multiSigOwner = known_artifacts_by_network[hre.network.name].multiSigOwner;
 
-        const withdrawOffset = offset === undefined ? 0 : parseInt(offset);
+        const withdrawTimeOffset = offset === undefined ? 0 : parseInt(offset);
         const factory = await hre.ethers.getContractFactory("ChromiaTokenBridge") as ChromiaTokenBridge__factory;
-        const bridge = await hre.upgrades.deployProxy(factory, [validatorAddress, withdrawOffset]) as ChromiaTokenBridge;
+        const bridge = await hre.upgrades.deployProxy(factory, [validatorAddress, withdrawTimeOffset]) as ChromiaTokenBridge;
         await bridge.waitForDeployment();
         const bridgeAddress = await bridge.getAddress();
         console.log("Token bridge deployed to: ", bridgeAddress);

@@ -17,21 +17,21 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
  * Deploys a TokenBridge contract with a proxy pattern.
  * 
  * This task deploys a TokenBridge contract using the OpenZeppelin upgradeable proxy pattern.
- * It initializes the bridge with the provided validator address and withdraw offset.
+ * It initializes the bridge with the provided validator address and withdraw time offset.
  * After deployment, it logs the bridge address and proxy admin address to the console. 
  * 
  * @param validatorAddress - The address of the validator contract to be used by the bridge.
- * @param offset - Optional. The withdraw offset value for the bridge. Defaults to 0 if not provided.
+ * @param offset - Optional. The withdraw time offset value for the bridge, in seconds. Defaults to 0 if not provided.
  * @param verify - Optional flag. If set, verifies the deployed contract on Etherscan.
  */
 task("deploy:bridge")
     .addParam("validatorAddress", "Validator contract address")
-    .addOptionalParam('offset', 'withdraw offset')
+    .addOptionalParam('offset', 'withdraw time offset in seconds')
     .addFlag('verify', 'Verify contracts at Etherscan')
     .setAction(async ({ validatorAddress, offset, verify }, hre) => {
-        const withdrawOffset = offset === undefined ? 0 : parseInt(offset)
+        const withdrawTimeOffset = offset === undefined ? 0 : parseInt(offset)
         const factory = await hre.ethers.getContractFactory("TokenBridge") as TokenBridge__factory;
-        const bridge = await hre.upgrades.deployProxy(factory, [validatorAddress, withdrawOffset]) as TokenBridge;
+        const bridge = await hre.upgrades.deployProxy(factory, [validatorAddress, withdrawTimeOffset]) as TokenBridge;
         await bridge.waitForDeployment();
         const bridgeAddress = await bridge.getAddress();
         console.log("Token bridge deployed to: ", bridgeAddress);

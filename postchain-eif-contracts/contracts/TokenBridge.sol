@@ -36,6 +36,8 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
     // Each postchain event will be used to claim only one time.
     mapping(bytes32 => bool) internal _events;
 
+    uint8 public version;                   // @dev Bridge contract version.
+
     enum Status {
         Uninitialized, // to prevent creating empty Withdraw objects by unused hash in unpendingWithdraw()
         Pending,
@@ -53,7 +55,7 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         Status status;
     }
 
-    event Initialize(IValidator indexed _validator, uint256 _withdrawTimeOffset);
+    event Initialize(IValidator indexed _validator, uint256 _withdrawTimeOffset, uint8 version);
     event SetBlockchainRid(bytes32 rid);
     event BlockchainRidFinalized(bytes32 rid);
     event AllowToken(IERC20 indexed token);
@@ -103,7 +105,8 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         validator = _validator;
         withdrawTimeOffset = _withdrawTimeOffset;
         isBlockchainRidFinalized = false;
-        emit Initialize(_validator, _withdrawTimeOffset);
+        version = 3;
+        emit Initialize(_validator, _withdrawTimeOffset, version);
     }
 
     function renounceOwnership() public override view onlyOwner {
