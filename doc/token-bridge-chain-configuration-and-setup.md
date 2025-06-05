@@ -1,4 +1,6 @@
-## EVM Token Bridge Chain Configuration
+# EVM Token Bridge Chain Configuration
+
+## Blockchain Configuration
 
 EVM Token Bridge blockchain configuration contains `snapshot` configuration. The `snapshot` has the following configuration properties:
 
@@ -79,3 +81,14 @@ libs:
     rid: x"3DE398220EF81C16C4ACD8FE93DC39943FE253AEC79358D9231CC4D1968FEAA1"
     insecure: false
 ```
+
+
+## Setup
+
+First, the ERC-20 token must be properly registered on the chain. After that, the bridge contract and its associated ERC-20 assets must also be registered. This setup enables the chain to expose bridge information via queries such as [`get_bridge_contracts()`](../postchain-eif-rell/rell/src/hbridge/queries.rell#get_bridge_contracts), which is essential for bridge discovery within the Chromia ecosystem.
+
+There are two main functions for registering ERC-20 tokens and bridge contracts:
+
+1. `register_bridge_and_erc20_asset`: Creates a bridge contract if it doesn't exist, creates an ERC20 asset, and registers the asset on the bridge;
+2. `register_bridge_with_erc20_assets`: Creates a bridge contract if it doesn't exist, and registers multiple ERC20 assets on it.
+
