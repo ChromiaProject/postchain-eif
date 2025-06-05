@@ -17,7 +17,7 @@ import {
 } from "../typechain-types";
 
 const { expect } = chai;
-const WITHDRAW_OFFSET = "0x20";
+const WITHDRAW_TIME_OFFSET = "0x20";
 const DAILY_LIMIT = BigInt(50000000000000000000000);
 
 describe("TokenMinter test", () => {
@@ -47,7 +47,7 @@ describe("TokenMinter test", () => {
         var validatorAddress = await validatorContract.getAddress();
 
         const bridgeFactory = await ethers.getContractFactory("ChromiaTokenBridge", admin) as ChromiaTokenBridge__factory;
-        bridgeContract = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_OFFSET]) as ChromiaTokenBridge;
+        bridgeContract = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_TIME_OFFSET]) as ChromiaTokenBridge;
         await bridgeContract.waitForDeployment();
         var bridgeAddress = await bridgeContract.getAddress();
 

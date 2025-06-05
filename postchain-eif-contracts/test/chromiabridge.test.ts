@@ -30,7 +30,7 @@ import { blockchainRid, dependenciesHashedLeaf, merkleRootHashHashedLeaf, previo
 
 const { expect } = chai;
 
-const WITHDRAW_OFFSET = "0x20";
+const WITHDRAW_TIME_OFFSET = 100000000000;
 const DAILY_LIMIT = BigInt(1000000000000000000000000);
 const EIF_HEADER_KEY_HASH = hashGtvStringLeaf("eif");
 
@@ -71,14 +71,14 @@ describe("ChromiaToken Bridge Test", () => {
         const validatorFactory = await ethers.getContractFactory("Validator", admin) as Validator__factory;
         validatorContract = await validatorFactory.deploy([validator1.address, validator2.address]);
         await validatorContract.waitForDeployment();
-        let validatorAddress = await validatorContract.getAddress();
+        const validatorAddress = await validatorContract.getAddress();
 
         const bridgeFactory = await ethers.getContractFactory("ChromiaTokenBridge", admin) as ChromiaTokenBridge__factory;
         // @dev We need this to be deployed only to get the specific address for tokenBridgeDelegatorContract, as it is part of the hash calculation(s).
         let bfInstance = await bridgeFactory.deploy();
         await bfInstance.waitForDeployment();
 
-        bridgeContract = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_OFFSET]) as ChromiaTokenBridge;
+        bridgeContract = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_TIME_OFFSET]) as ChromiaTokenBridge;
         await bridgeContract.waitForDeployment();
         bridgeAddress = await bridgeContract.getAddress();
 
@@ -90,6 +90,9 @@ describe("ChromiaToken Bridge Test", () => {
         const tokenMinterFactory = await ethers.getContractFactory("TokenMinterETH", admin) as TokenMinterETH__factory;
         tokenMinterContract = await tokenMinterFactory.deploy(DAILY_LIMIT, chromiaTokenAddress, bridgeAddress, deployer.address);
         await tokenMinterContract.waitForDeployment();
+        expect(await bridgeContract.withdrawTimeOffset()).to.eq(WITHDRAW_TIME_OFFSET);
+        expect(await bridgeContract.version()).to.eq(3);
+
         tokenMinterAddress = await tokenMinterContract.getAddress();
         await bridgeContract.setTokenMinter(tokenMinterAddress);
 
@@ -402,7 +405,14 @@ describe("ChromiaToken Bridge Test", () => {
             await expect(bridge.withdraw(hashEventLeaf, deployer.address)).to.revertedWith("TokenBridge: no fund for the beneficiary");
             await expect(bridge.withdraw(hashEventLeaf, user.address)).to.revertedWith("TokenBridge: not mature enough to withdraw the fund");
 
-            await ethers.provider.send("hardhat_mine", [WITHDRAW_OFFSET]);
+            // Amount of block mined does not matter
+            await ethers.provider.send("hardhat_mine", ["0xFFFF"]);
+
+            await expect(bridge.withdraw(hashEventLeaf, user.address)).to.revertedWith("TokenBridge: not mature enough to withdraw the fund");
+
+            // Time offset will now be approved
+            await time.increase(WITHDRAW_TIME_OFFSET);
+
             let eventHash = hashEventLeaf;
 
             // smart contract owner can update withdraw request status to pending (emergency case)
@@ -466,7 +476,7 @@ describe("ChromiaToken Bridge Test", () => {
             const tokenAddress = zeroPadValue(chromiaTokenAddress, 32);
             const toAddress = zeroPadValue(bridgeDelegatorAddress, 32);
             const amountHex = zeroPadValue(toBeHex(toDeposit), 32);
-            
+
             // normal event
             let event: string = buildWithdrawEvent(serialNumber, discriminator, tokenAddress, toAddress, amountHex);
             let data = toHex(event);
@@ -480,7 +490,7 @@ describe("ChromiaToken Bridge Test", () => {
 
             // malicious event, toAddress and tokenAddress swapped
             let maliciousEvent: string = buildWithdrawEvent(serialNumber, discriminator, toAddress, tokenAddress, amountHex);
-            let maliciousData = toHex(maliciousEvent);            
+            let maliciousData = toHex(maliciousEvent);
             let maliciousHashEventLeaf = keccak256(keccak256(data));
 
             // blockRid calculation
@@ -505,13 +515,13 @@ describe("ChromiaToken Bridge Test", () => {
             let h = zeroPadValue(toBeHex(height), 32);
 
             const blockHeaderBuilder = getBlockHeaderBuilder(
-                blockchainRid, blockRid, previousBlockRid, merkleRootHashHashedLeaf, ts, h, 
+                blockchainRid, blockRid, previousBlockRid, merkleRootHashHashedLeaf, ts, h,
                 dependenciesHashedLeaf, extraDataMerkleRoot
             );
 
             let blockHeader = blockHeaderBuilder.build();
-            let maliciousBlockHeader = blockHeaderBuilder.update({ 
-                blockRid: maliciousBlockRid, 
+            let maliciousBlockHeader = blockHeaderBuilder.update({
+                blockRid: maliciousBlockRid,
             }).build();
 
             // update to add new validator list
@@ -630,7 +640,14 @@ describe("ChromiaToken Bridge Test", () => {
                 hashEventLeaf, bridgeDelegatorAddress
             )).to.revertedWith("TokenBridge: not mature enough to withdraw the fund");
 
-            await ethers.provider.send("hardhat_mine", [WITHDRAW_OFFSET]);
+            // Amount of block mines does not matter
+            await ethers.provider.send("hardhat_mine", ["0xFFFF"]);
+
+            await expect(bridgeDelegator.withdraw(
+                hashEventLeaf, bridgeDelegatorAddress
+            )).to.revertedWith("TokenBridge: not mature enough to withdraw the fund");
+
+            await time.increase(WITHDRAW_TIME_OFFSET);
 
             let eventHash = hashEventLeaf;
 

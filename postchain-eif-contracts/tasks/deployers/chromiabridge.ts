@@ -48,7 +48,7 @@ const known_artifacts_by_network: { [key: string]: KnownArtifacts } = {
  * Deploys a Chromia Token Bridge contract.
  * 
  * This task deploys a Chromia Token Bridge contract using the OpenZeppelin upgradeable proxy pattern.
- * It initializes the bridge with the provided validator address and withdraw offset.
+ * It initializes the bridge with the provided validator address and withdraw time offset.
  * After deployment, it logs the bridge address and proxy admin address to the console.
  * 
  * The task also deploys a TokenMinter contract (either TokenMinterETH or TokenMinterBSC depending on the network). 
@@ -58,21 +58,21 @@ const known_artifacts_by_network: { [key: string]: KnownArtifacts } = {
  * The ownership of the proxy admin is transferred to a multisig wallet. 
  * 
  * @param validatorAddress - The address of the validator contract to be used by the bridge.
- * @param offset - Optional. The withdraw offset value for the bridge. Defaults to 0 if not provided.
+ * @param offset - Optional. The withdraw time offset value for the bridge, in seconds. Defaults to 0 if not provided.
  * @param chromiaTokenAddress - Optional. The address of the Chromia token contract to be used by the bridge.
  * @param verify - Optional. If set, verifies the deployed contract at Etherscan.
  */
 task("deploy:chromiabridge")
     .addParam("validatorAddress", "Validator contract address")
-    .addOptionalParam("offset", "withdraw offset")
+    .addOptionalParam("offset", "withdraw time offset in seconds")
     .addOptionalParam("chromiaTokenAddress", "Chromia Token address")
     .addFlag("verify", "Verify contracts at Etherscan")
     .setAction(async ({ validatorAddress, offset, chromiaTokenAddress, verify }, hre) => {
         let multiSigOwner = known_artifacts_by_network[hre.network.name].multiSigOwner;
 
-        const withdrawOffset = offset === undefined ? 0 : parseInt(offset);
+        const withdrawTimeOffset = offset === undefined ? 0 : parseInt(offset);
         const factory = await hre.ethers.getContractFactory("ChromiaTokenBridge") as ChromiaTokenBridge__factory;
-        const bridge = await hre.upgrades.deployProxy(factory, [validatorAddress, withdrawOffset]) as ChromiaTokenBridge;
+        const bridge = await hre.upgrades.deployProxy(factory, [validatorAddress, withdrawTimeOffset]) as ChromiaTokenBridge;
         await bridge.waitForDeployment();
         const bridgeAddress = await bridge.getAddress();
         console.log("Token bridge deployed to: ", bridgeAddress);
@@ -83,9 +83,6 @@ task("deploy:chromiabridge")
         console.log("Proxy admin ownership transferred to multisig owner:", multiSigOwner);
 
         const DAILY_LIMIT = 1000000 * 1000000; // agreed on weekly meeting 2024-06-19
-
-        let signers = await hre.ethers.getSigners();
-        let signerAddress = await signers[0].getAddress();
 
         // Import the Chromia token contract
         const tokenFactory  = await hre.ethers.getContractFactory("Chromia") as Chromia__factory;
@@ -122,10 +119,7 @@ task("deploy:chromiabridge")
             // with the similar code, then calling verify will return error. 
             // We add try/catch to handle the error and continue to verify the main bridge smart contract.
             try {
-                await hre.run("verify:verify", {
-                    address: tokenAddress,
-                    constructorArguments: [signerAddress, 0],
-                });
+                console.log("Verifying token minter contract...");
                 await hre.run("verify:verify", {
                     address: tokenMinterAddress,
                     constructorArguments: [DAILY_LIMIT, tokenAddress, bridgeAddress, multiSigOwner],

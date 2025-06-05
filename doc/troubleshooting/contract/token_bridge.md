@@ -151,8 +151,8 @@ These errors can occur during withdrawals as well as deposits (see above for det
 
 
 ### Error: `TokenBridge: not mature enough to withdraw the fund`
-* **Description:** This error occurs when attempting to withdraw funds (or withdraw back to Postchain) before the required waiting period has elapsed. When a withdrawal is requested, the contract sets a future block number (current block number + `withdrawOffset`) after which the withdrawal becomes available. If you try to withdraw before reaching that block number, this error is triggered.
-* **Solution:** Wait until more blocks have been produced on the network. The withdrawal will become available once the current block number exceeds the maturity block number set during the withdrawal request.
+* **Description:** This error occurs when attempting to withdraw funds (or withdraw back to Postchain) before the required waiting period has elapsed. When a withdrawal is requested, the contract sets a future block time (current block time + `withdrawTimeOffset`) after which the withdrawal becomes available. If you try to withdraw before reaching that block time, this error is triggered.
+* **Solution:** Wait until more blocks have been produced on the network. The withdrawal will become available once the current block time exceeds the maturity block time set during the withdrawal request.
 
 
 ### Error: `TokenBridge: fund is pending or was already claimed`

@@ -24,9 +24,10 @@ import {
     postchainMerkleNodeHash,
     strip0x, toHex
 } from "./utils";
+import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 const { expect } = chai;
-const WITHDRAW_OFFSET = "0x20";
+const WITHDRAW_TIME_OFFSET = 10000;
 const EIF_HEADER_KEY_HASH = hashGtvStringLeaf("eif");
 
 describe("Token Bridge Test", () => {
@@ -61,20 +62,23 @@ describe("Token Bridge Test", () => {
         const validatorFactory = await ethers.getContractFactory("Validator", admin) as Validator__factory;
         validatorContract = await validatorFactory.deploy([validator1.address, validator2.address]);
         await validatorContract.waitForDeployment();
-        var validatorAddress = await validatorContract.getAddress();
+        const validatorAddress = await validatorContract.getAddress();
 
         const bridgeFactory = await ethers.getContractFactory("TokenBridgeWithSnapshotWithdraw", admin) as TokenBridgeWithSnapshotWithdraw__factory;
         // @dev We need this to be deployed only to get the specific address for tokenBridgeDelegatorContract, as it is part of the hash calculation(s).
         let bfInstance = await bridgeFactory.deploy();
         await bfInstance.waitForDeployment();
 
-        bridgeContract = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_OFFSET]) as TokenBridgeWithSnapshotWithdraw;
+        bridgeContract = await upgrades.deployProxy(bridgeFactory, [validatorAddress, WITHDRAW_TIME_OFFSET]) as TokenBridgeWithSnapshotWithdraw;
         await bridgeContract.waitForDeployment();
         bridgeAddress = await bridgeContract.getAddress();
 
         const bridgeDelegatorFactory = await ethers.getContractFactory("TokenBridgeDelegator", deployer) as TokenBridgeDelegator__factory;
         tokenBridgeDelegatorContract = await bridgeDelegatorFactory.deploy(bridgeAddress);
         await tokenBridgeDelegatorContract.waitForDeployment();
+        expect(await bridgeContract.withdrawTimeOffset()).to.eq(WITHDRAW_TIME_OFFSET);
+        expect(await bridgeContract.version()).to.eq(3);
+
         bridgeDelegatorAddress = await tokenBridgeDelegatorContract.getAddress();
 
         await expect(bridgeContract.allowToken(ethers.ZeroAddress)).to.rejectedWith("TokenBridge: token address is invalid");
@@ -530,7 +534,8 @@ describe("Token Bridge Test", () => {
                 hashEventLeaf, user.address
             )).to.revertedWith("TokenBridge: not mature enough to withdraw the fund");
 
-            await ethers.provider.send('hardhat_mine', [WITHDRAW_OFFSET]);
+            // Time offset will now be approved
+            await time.increase(WITHDRAW_TIME_OFFSET);
             let eventHash = hashEventLeaf;
 
             // smart contract owner can update withdraw request status to pending (emergency case)
@@ -758,7 +763,8 @@ describe("Token Bridge Test", () => {
                 hashEventLeaf, bridgeDelegatorAddress
             )).to.revertedWith("TokenBridge: not mature enough to withdraw the fund");
 
-            await ethers.provider.send('hardhat_mine', [WITHDRAW_OFFSET]);
+            // Time offset will now be approved
+            await time.increase(WITHDRAW_TIME_OFFSET);
 
             let eventHash = hashEventLeaf;
 

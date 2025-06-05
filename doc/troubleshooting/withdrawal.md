@@ -51,7 +51,7 @@ When completing the withdrawal on the EVM side, you may encounter the following 
 
 `TokenBridge: no fund for the beneficiary` -- This error occurs when attempting to withdraw funds for a beneficiary address that doesn't match the one specified in the withdrawal request. Ensure you are using the correct beneficiary address as specified when creating the withdrawal request.
 
-`TokenBridge: not mature enough to withdraw the fund` -- This error means the required number of block confirmations hasn't yet been reached. The confirmation period is set during bridge initialization using the `--offset` parameter. The recommended value for mainnet(s) is equivalent to 72 hours.
+`TokenBridge: not mature enough to withdraw the fund` -- This error means the required time elapsed has not been reached. The confirmation period is set during bridge initialization using the `--offset` parameter. The recommended value for Ethereum mainnet(s) is 259200 seconds (72 hours).
 
 `TokenBridge: fund is pending or was already claimed` -- This error indicates that either:
   - The withdrawal is still in a `Pending` state and is not yet ready to be claimed;
