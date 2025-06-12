@@ -1,0 +1,61 @@
+/**
+ * Registers an EVM recovery contract for a specific blockchain.
+ * 
+ * This operation requires ICCF proof from the source blockchain and validates that:
+ * - The operation name matches "register_recovery_contract"
+ * - The operation has exactly 2 arguments: network_id: integer and contract_address: byte_array
+ * - No recovery contract is already registered for the blockchain
+ * 
+ * After validation, it:
+ * 1. Creates a recovery contract record linking the blockchain RID, network ID and contract address
+ * 2. Links the contract address to the source blockchain FT4 account
+ * 
+ * @param tx_to_prove       The transaction containing the registration operation to be proven
+ * @param op_index          Index of the registration operation within the transaction
+ * 
+ * Expected operation signature in tx_to_prove:
+ *      operation register_recovery_contract(network_id: integer, contract_address: byte_array)
+ */
+operation register_recovery_contract(tx_to_prove: gtx_transaction, op_index: integer) {
+    val iccf_auth_data = require_iccf_auth(tx_to_prove, op_index, rell.meta(register_recovery_contract).simple_name, 2);
+    val blockchain_rid = iccf_auth_data.blockchain_rid;
+    val network_id = integer.from_gtv(iccf_auth_data.op_args[0]);
+    val contract_address = byte_array.from_gtv(iccf_auth_data.op_args[1]);
+
+    validate_evm_network_and_address(network_id, contract_address);
+    validate_and_update_recovery_contract_auth(iccf_auth_data);
+
+    val recovery_contract = recovery_contract @? { blockchain_rid, network_id };
+    if (exists(recovery_contract)) {
+        require(recovery_contract.contract_address != contract_address, "This recovery contract is already registered");
+        val blockchain_account = ft4.crosschain.ensure_blockchain_account(blockchain_rid);
+        // For all existing recovery contract state slots, for all ERC20 assets, emit eif_state events with amount 0
+        val erc20_assets = (s: state_slot, sl: local_erc20_state_slot_binding) @* {
+            sl.account == blockchain_account,
+            sl.state_slot == s,
+            s.recipient_address == recovery_contract.contract_address,
+            s.network_id == network_id,
+            s.type == state_slot_type.erc20,
+            s.local == true,
+        } (@group s, @list sl.erc20_asset) @ {} (@map $);
+        
+        for ((slot, assets) in erc20_assets) {
+            emit_erc20_state_eif_event(slot, assets @* {} (balance_record(.token_address, 0L)));
+            delete local_erc20_state_slot_binding @* { slot }; // Unbind state slots
+        }
+
+        // Unlink and delete recovery contract
+        _unlink_evm_sc_account(recovery_contract.contract_address, network_id, blockchain_account);
+        delete recovery_contract;
+
+        // (1) Create new recovery contract; (2) link it to the blockchain account; 
+        // (3) create and bind state slots; (4) emit eif_state events.
+        create recovery_contract(blockchain_rid, network_id, contract_address);
+        _link_evm_sc_account(contract_address, network_id, ft4.crosschain.ensure_blockchain_account(blockchain_rid));
+    } else {
+        // Create new recovery contract and link it to the blockchain account
+        create recovery_contract(blockchain_rid, network_id, contract_address);
+        _link_evm_sc_account(contract_address, network_id, ft4.crosschain.ensure_blockchain_account(blockchain_rid));
+    }    
+}
+

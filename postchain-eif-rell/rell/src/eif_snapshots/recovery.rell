@@ -1,0 +1,103 @@
+/*
+ * A remote state slots are used to track balances in other blockchains on Chromia
+ * which are downstream of the bridge.
+ * 
+ * Given that we don't update balances synchronously, remote might be slightly out of sync.
+ * We still need to enforce that the sum of balances in remote state slots is less than
+ * or equal to the balance of the downstream blockchain.
+ * Updates which violate these balance make state slots temporarily inactive.
+ * They can be reactivated when the remote balance is updated.
+ **/
+
+/*
+
+ // Implementation of remote state slots is not part of the current release,
+ // the commented out code is a sketch for the future implementation.
+
+entity remote_blockchain_erc20_state_sum {
+    key blockchain_rid: byte_array, erc20_asset;
+    mutable amount: big_integer;
+}
+
+entity remote_erc20_state_slot {
+    key state_slot;
+    blockchain_rid: byte_array;
+    erc20_asset;
+    mutable balance: big_integer;
+    mutable active: boolean; // slot is inactive when 
+}
+
+function emit_remote_erc20_state_slot(slot: remote_erc20_state_slot) {
+    val state_data = slot.to_struct();
+    val balance_records = list<balance_record>();
+    if (state_data.balance > 0) {
+        balance_records.add(balance_record(state_data.erc20_asset.token_address, state_data.balance));
+    }
+    emit_erc20_state(state_data.state_slot, balance_records);
+}
+
+function update_remote_erc20_state_slot(slot: remote_erc20_state_slot, balance: big_integer) {
+    val old_balance = slot.balance;
+    val delta = balance - old_balance;
+    val sum = remote_blockchain_erc20_state_sum @ { slot.blockchain_rid, slot.erc20_asset } .amount;
+}    
+*/
+
+entity recovery_contract {
+    index blockchain_rid: byte_array,
+    network_id: integer;
+    contract_address: byte_array;
+    key blockchain_rid, network_id, contract_address;
+}
+
+entity recovery_contract_auth {
+    key blockchain_rid: byte_array;
+    mutable latest_height: integer;
+    mutable latest_tx_index: integer;
+}
+
+function validate_and_update_recovery_contract_auth(iccf_auth_data) {
+    val auth = recovery_contract_auth @? { iccf_auth_data.blockchain_rid };
+    val height = iccf_auth_data.block_height;
+    val tx_index = iccf_auth_data.tx_index;
+
+    if (empty(auth)) {
+        create recovery_contract_auth(iccf_auth_data.blockchain_rid, latest_height = height, latest_tx_index = tx_index);
+        return;
+    }
+
+    require(
+        height != auth.latest_height or tx_index != auth.latest_tx_index, 
+        "ICCF transaction has already been processed"
+    );
+
+    require(
+        height > auth.latest_height or (height == auth.latest_height and tx_index > auth.latest_tx_index),
+        "ICCF transaction is older than previous, confirmed in block %d transaction %d".format(auth.latest_height, auth.latest_tx_index)
+    );
+
+    auth.latest_height = height;
+    auth.latest_tx_index = tx_index;
+}
+
+@extend(ft4.crosschain.after_crosschain_balance_change) function (
+    sender: ft4.accounts.account,
+    recipient: ft4.accounts.account,
+    ft4.assets.asset,
+    amount: big_integer,
+    has_changed_sender: boolean,
+    has_changed_recipient: boolean
+) {
+    val erc20_asset = erc20_asset_snapshots_enabled @? { asset } .erc20_asset;
+    if (empty(erc20_asset)) return;
+
+    if (has_changed_sender) {
+        val sender_slot = get_or_create_local_erc20_state_slot(sender, erc20_asset);
+        if (exists(sender_slot)) emit_local_erc20_state_slot(sender_slot);
+    }
+
+    if (has_changed_recipient) {
+        val recipient_slot = get_or_create_local_erc20_state_slot(recipient, erc20_asset);
+        if (exists(recipient_slot)) emit_local_erc20_state_slot(recipient_slot);
+    }
+}
