@@ -56,6 +56,12 @@ entity recovery_contract_auth {
     mutable latest_tx_index: integer;
 }
 
+@extendable 
+function before_delete_recovery_contract(network_id: integer, token_address: byte_array, blockchain_account: ft4.accounts.account);
+
+@extendable 
+function after_create_recovery_contract(network_id: integer, token_address: byte_array, blockchain_account: ft4.accounts.account);
+
 function validate_and_update_recovery_contract_auth(iccf_auth_data) {
     val auth = recovery_contract_auth @? { iccf_auth_data.blockchain_rid };
     val height = iccf_auth_data.block_height;
@@ -88,16 +94,16 @@ function validate_and_update_recovery_contract_auth(iccf_auth_data) {
     has_changed_sender: boolean,
     has_changed_recipient: boolean
 ) {
-    val erc20_asset = erc20_asset_snapshots_enabled @? { asset } .erc20_asset;
-    if (empty(erc20_asset)) return;
+    val evm_asset = get_evm_asset_by_ft4_asset(asset);
+    if (empty(evm_asset)) return;
 
     if (has_changed_sender) {
-        val sender_slot = get_or_create_local_erc20_state_slot(sender, erc20_asset);
+        val sender_slot = get_or_create_local_erc20_state_slot(sender, evm_asset);
         if (exists(sender_slot)) emit_local_erc20_state_slot(sender_slot);
     }
 
     if (has_changed_recipient) {
-        val recipient_slot = get_or_create_local_erc20_state_slot(recipient, erc20_asset);
+        val recipient_slot = get_or_create_local_erc20_state_slot(recipient, evm_asset);
         if (exists(recipient_slot)) emit_local_erc20_state_slot(recipient_slot);
     }
 }

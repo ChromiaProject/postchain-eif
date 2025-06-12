@@ -1,0 +1,176 @@
+/**
+ * A state slot is a leaf in the state snapshot Merkle tree.
+ * The state slot's id represents its position in the Merkle tree.
+ * Each state slot is associated with a single account and recipient address.
+ * One account may use multiple state slots corresponding to different protocols, 
+ * bridge contracts, networks, etc.
+ * 
+ * The state associated with the state slot contains information which facilitates 
+ * withdrawal in "mass exit" scenarios. For example, for ERC20 tokens, the state 
+ * contains a list of (token address,  balance) pairs. When mass exit is triggered,
+ * users will be able to withdraw their tokens according to the state snapshot.
+ * 
+ * A state record associated with a state slot also include a header which disambiguates
+ * different contracts, protocols, networks, etc. It also includes a recipient address.
+ */
+
+enum state_slot_type {    
+    erc20,
+    // temporary state which facilitates withdrawals which are pending at the time of mass exit
+    erc20_withdrawal,
+    erc721
+}
+
+entity state_slot {
+    key id: integer;
+    network_id: integer;
+    recipient_address: byte_array;
+    type: state_slot_type;
+    local: boolean;
+    discriminator: big_integer; // binds slot to a specific (v1) network, or (v2) network and bridge contract address
+    index network_id, recipient_address, type, local;
+}
+
+struct state_data {
+    state_n: integer;
+    account: list<gtv>;
+}
+
+struct balance_record {
+    token_address: byte_array;
+    balance: big_integer;
+}
+
+entity erc20_asset_snapshots_enabled {
+    key ft4.assets.asset; // only one erc20 asset can be linked to ft4 asset when snapshots are enabled
+}
+
+function enable_erc20_asset_snapshots(ft4.assets.asset) {
+    create erc20_asset_snapshots_enabled(asset);
+}
+
+/**
+ * This entity is used to track the relationship between accounts, ERC20 tokens,
+ * and their corresponding state slots in the Merkle tree.
+ *
+ * The balance for this binding is not stored directly in this entity,
+ * but can be retrieved as needed from the FT4 account's balance for the given ERC20 asset.
+ */
+entity local_erc20_state_slot_binding {
+    key ft4.accounts.account, evm_asset;    // only one slot per account per token
+    index state_slot;                       // slot might collect info from multiple assets
+}
+
+function get_next_state_slot_id(): integer {
+    val last_slot_id = state_slot @? { } (@sort_desc .id) limit 1;
+    if (exists(last_slot_id)) {
+        return last_slot_id + 1;
+    } else {
+        return 0;
+    }
+}
+
+function get_local_erc20_state_slot(ft4.accounts.account, evm_asset): state_slot? {
+    return local_erc20_state_slot_binding @? { account, evm_asset } .state_slot;
+}
+
+function get_or_create_local_erc20_state_slot(ft4.accounts.account, evm_asset): state_slot? {
+    val network_id = evm_asset.network_id;
+
+    val account_address = resolve_evm_address_for_account(account, network_id);
+    if (empty(account_address)) return null;
+
+    val bound_slot = local_erc20_state_slot_binding @? { account, evm_asset } .state_slot;
+    if (exists(bound_slot)) return bound_slot;
+
+    var existing_slot = state_slot @? { network_id, account_address, state_slot_type.erc20, .local == true };
+
+    if (empty(existing_slot)) {
+        val discriminator = compute_slot_discriminator(network_id, evm_asset.token_address);
+        if (empty(discriminator)) return null;
+
+        existing_slot = create state_slot (
+            id = get_next_state_slot_id(),
+            network_id = network_id,
+            recipient_address = account_address,
+            type = state_slot_type.erc20,
+            discriminator = discriminator,
+            local = true
+        );
+    }
+
+    create local_erc20_state_slot_binding(account, evm_asset, existing_slot);
+
+    return existing_slot;
+}
+
+function get_or_create_state_slot(network_id: integer, token_address: byte_array, beneficiary: byte_array): state_slot? {
+    // Ensure asset supports snapshots
+    if (empty(get_evm_asset(network_id, token_address))) return null;
+
+    // Compute slot discriminator and ensure it's valid
+    val discriminator = compute_slot_discriminator(network_id, token_address);
+    if (empty(discriminator)) return null;
+
+    // Try to find existing slot and create it if it doesn't exist
+    var state_slot = state_slot @? {
+        network_id,
+        .recipient_address == beneficiary,
+        .type == state_slot_type.erc20_withdrawal,
+        .local == true,
+        discriminator,
+    };
+    
+    if (empty(state_slot)) {
+        state_slot = create state_slot (
+            id = get_next_state_slot_id(),
+            network_id,
+            recipient_address = beneficiary,
+            type = state_slot_type.erc20_withdrawal,
+            local = true,
+            discriminator,
+        );
+    }
+
+    return state_slot;
+}
+
+function emit_local_erc20_state_slot(state_slot) {
+    val balance_records = list<balance_record>();
+
+    // Note: there must be at least one record per state_slot, otherwise we don't know that slot is erc20_asset
+    // @+ ensures there's at least one
+    for (lss in local_erc20_state_slot_binding @+ { state_slot } (.account, erc20_asset = .evm_asset.to_struct())) {
+        val amount = ft4.assets.get_asset_balance(lss.account, lss.erc20_asset.asset);
+        balance_records.add(balance_record(lss.erc20_asset.token_address, amount));
+    }
+
+    // Note: we must emit it even if there are no records! 
+    // It's important to overwrite previous state with empty state to signal that the slot is empty
+    emit_erc20_balance_state_event(state_slot, balance_records);
+}
+
+function emit_erc20_balance_state_event(state_slot, balance_records: list<balance_record>) {
+    if (empty(balance_records)) {
+        // Erase state slot when there are no balances
+        emit_state_event(state_slot.id, list<gtv>());
+        return;
+    }
+
+    val state_slot_data = state_slot.to_struct();
+    val state_parts = list<gtv>();
+    state_parts.add(ERC20_STATE_TAG.to_gtv());
+    state_parts.add(utils.evm_address_to_32_byte_array(state_slot_data.recipient_address).to_gtv());
+    state_parts.add(state_slot_data.discriminator.to_gtv()); // discriminator includes (v1) network_id, or (v2) network_id and bridge_address
+
+    for (balance_record in balance_records) {
+        state_parts.add(utils.evm_address_to_32_byte_array(balance_record.token_address).to_gtv());
+        state_parts.add(balance_record.balance.to_gtv());
+    }
+    
+    emit_state_event(state_slot_data.id, state_parts);
+}
+
+function emit_state_event(state_id: integer, state_parts: list<gtv>) {
+    op_context.emit_event("eif_state", state_data(state_id, state_parts).to_gtv());
+}

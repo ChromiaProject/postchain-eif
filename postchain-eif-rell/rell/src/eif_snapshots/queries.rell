@@ -15,4 +15,3 @@ query get_state_slot_ids_for_address(beneficiary: byte_array, network_id: intege
 query get_recovery_contract(blockchain_rid: byte_array, network_id: integer): byte_array? {
     return recovery_contract @? { blockchain_rid, network_id } .contract_address;
 }
-

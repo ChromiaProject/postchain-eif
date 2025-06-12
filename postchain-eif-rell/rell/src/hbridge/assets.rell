@@ -43,8 +43,7 @@ function register_erc20_asset(
     );
     
     if (use_snapshots) {
-        require(empty(erc20_asset_snapshots_enabled @* { asset }), "Only one ERC-20 asset can be linked to an FT4 asset when snapshots are enabled");
-        enable_erc20_asset_snapshots(erc20_asset);
+        snapshots.register_evm_asset(network_id, token_address, asset);
     }
 
     return erc20_asset;

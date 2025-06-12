@@ -192,13 +192,18 @@ query get_registered_bridge_erc20_assets(network_id: integer, bridge_contract_ad
     } (map_erc20_asset_to_erc20_asset_info(.erc20_asset));
 }
 
-// Snapshot queries
-
+/**
+ * Retrieves the list of withdrawal state slot IDs for a given beneficiary and network ID.
+ *
+ * @param beneficiary The address of the beneficiary.
+ * @param network_id The ID of the EVM network.
+ * @return A list of `integer` state slot IDs.
+ */
 query get_withdrawal_state_slot_ids_for_address(beneficiary: byte_array, network_id: integer): list<integer> {
-    return state_slot @* {
+    return snapshots.state_slot @* {
         .recipient_address == beneficiary,
         .network_id == network_id,
-        .type == state_slot_type.erc20_withdrawal,
+        .type == snapshots.state_slot_type.erc20_withdrawal,
         .local == true
     } (.id);
 }

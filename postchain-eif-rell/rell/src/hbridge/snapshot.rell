@@ -2,37 +2,59 @@
 // hbridge:erc20_withdrawal:v1 followed by 7x 01 bytes, 32 bytes in total
 val ERC20_WITHDRAWAL_STATE_TAG = x"686272696467653a65726332305f77697468647261773a763101010101010101";
 
-function add_erc20_withdrawal_to_snapshot(ew: erc20_withdrawal) {
-    val withdrawal_info = ew.to_struct();
-    val asset = erc20_asset @? { .token_address == withdrawal_info.token_address, 
-        .network_id == withdrawal_info.network_id };
+@extend(snapshots.before_delete_recovery_contract) function(network_id: integer, contract_address: byte_array, blockchain_account: ft4.accounts.account) {
+    _unlink_evm_sc_account(contract_address, network_id, blockchain_account);
+}
 
-    if (not exists(asset)) return;
-    if (not exists(erc20_asset_snapshots_enabled @? { .erc20_asset == asset })) return;
+@extend(snapshots.after_create_recovery_contract) function(network_id: integer, contract_address: byte_array, blockchain_account: ft4.accounts.account) {
+    _link_evm_sc_account(contract_address, network_id, blockchain_account);
+}
 
+@extend(snapshots.resolve_evm_address_for_account) function(account: ft4.accounts.account, network_id: integer): byte_array? {
+    return find_address_for_ft4_account(account, network_id);
+}
+
+@extend(after_evm_account_linked) function (address: byte_array, account: ft4.accounts.account, network_id: integer, is_contract: boolean) {
+    if (address == find_address_for_ft4_account(account, network_id)) {
+        val evm_assets = (b: ft4.assets.balance, a: snapshots.evm_asset) @* {
+            b.account == account,
+            b.asset == a.asset,
+        } (a);
+        for (evm_asset in evm_assets) {
+            snapshots.ensure_slot_and_emit_state_event(account, evm_asset);
+        }
+    }
+}
+
+@extend(snapshots.compute_slot_discriminator) function(network_id: integer, token_address: byte_array): big_integer {
+    if (chain_context.args.version == 1) {
+        return network_discriminator(network_id);
+    }
+
+    // Get primary bridge
+    val primary_bridge = require(
+        bridge_erc20_asset @? { 
+            .erc20_asset.network_id == network_id, 
+            .erc20_asset.token_address == token_address 
+        } ( @omit @sort .rowid, .bridge_contract.contract_address ) limit 1,
+        "Bridge address for ERC-20 token %s not found on network ID %d".format(token_address, network_id)
+    );
+
+    return network_contract_discriminator(network_id, primary_bridge);
+}
+
+function add_erc20_withdrawal_to_snapshot(withdrawal: erc20_withdrawal) {
+    val withdrawal_info = withdrawal.to_struct();
     val network_id = withdrawal_info.network_id;
     val beneficiary = withdrawal_info.beneficiary;
-    
-    // Create state_slot as needed
-    val discriminator = build_discriminator(asset);
-    var state_slot = state_slot @? {
-        .recipient_address == beneficiary,
-        .type == state_slot_type.erc20_withdrawal,
-        .network_id == network_id,
-        .discriminator == discriminator,
-        .local == true
-    };
-    
-    if (empty(state_slot)) {
-        state_slot = create state_slot (
-            id = get_next_state_slot_id(),
-            network_id,
-            recipient_address = beneficiary,
-            type = state_slot_type.erc20_withdrawal,
-            discriminator = discriminator,
-            local = true
-        );
-    }
+
+    // Ensure asset exists
+    val erc20_asset = erc20_asset @? { network_id, .token_address == withdrawal_info.token_address };
+    if (empty(erc20_asset)) return;
+
+    // Ensure state slot exists
+    val state_slot = snapshots.get_or_create_state_slot(network_id, withdrawal_info.token_address, beneficiary);
+    if (empty(state_slot)) return;
 
     // Collect all withdrawals for a given address with status other than withdrawn
     val event_hashes = (
@@ -46,21 +68,18 @@ function add_erc20_withdrawal_to_snapshot(ew: erc20_withdrawal) {
         s.withdrawal_status != withdrawal_status.withdrawn_to_chromia
     } ( w.event_hash );
 
-    // Emit state
-    emit_erc20_withdrawal_state_eif_event(state_slot, event_hashes);
+    // Emit state event
+    emit_erc20_withdrawal_state_event(state_slot, event_hashes);
 }
 
-function emit_erc20_withdrawal_state_eif_event(state_slot: state_slot, event_hashes: list<byte_array>) {
-    val state_slot_data = state_slot.to_struct();
+function emit_erc20_withdrawal_state_event(snapshots.state_slot, event_hashes: list<byte_array>) {
+    val slot_data = state_slot.to_struct();
     val state_parts = list<gtv>();
     state_parts.add(ERC20_WITHDRAWAL_STATE_TAG.to_gtv());
-    state_parts.add(utils.evm_address_to_32_byte_array(state_slot_data.recipient_address).to_gtv());
-    state_parts.add(state_slot_data.discriminator.to_gtv()); // discriminator includes (v1) network_id, or (v2) network_id and bridge_address
+    state_parts.add(utils.evm_address_to_32_byte_array(slot_data.recipient_address).to_gtv());
+    state_parts.add(slot_data.discriminator.to_gtv()); // discriminator includes (v1) network_id, or (v2) network_id and bridge_address
     for (event_hash in event_hashes) {
         state_parts.add(event_hash.to_gtv());
     }
-    op_context.emit_event(
-        "eif_state",
-        state_data(state_slot_data.id, state_parts).to_gtv()
-    );
+    snapshots.emit_state_event(slot_data.id, state_parts);
 }

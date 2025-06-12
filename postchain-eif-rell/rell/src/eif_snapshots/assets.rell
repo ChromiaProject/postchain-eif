@@ -1,0 +1,25 @@
+entity evm_asset {
+    network_id: integer;
+    token_address: byte_array;
+    key network_id, token_address;
+    key ft4.assets.asset;
+}
+
+function register_evm_asset(network_id: integer, token_address: byte_array, ft4.assets.asset) {
+    // Only one ERC-20 asset can be linked to an FT4 asset when snapshots are enabled
+    require(empty(evm_asset @? { network_id, token_address, asset }), "EVM asset %s on network %d already exists".format(token_address, network_id));
+    create evm_asset(network_id, token_address, asset);
+}
+
+function unregister_evm_asset(network_id: integer, token_address: byte_array) {
+    require(exists(evm_asset @? { network_id, token_address }), "EVM asset %s on network %d does not exist".format(token_address, network_id));
+    delete evm_asset @* { network_id, token_address };
+}
+
+function get_evm_asset(network_id: integer, token_address: byte_array): evm_asset? {
+    return evm_asset @? { network_id, token_address };
+}
+
+function get_evm_asset_by_ft4_asset(ft4.assets.asset): evm_asset? {
+    return evm_asset @? { asset };
+}

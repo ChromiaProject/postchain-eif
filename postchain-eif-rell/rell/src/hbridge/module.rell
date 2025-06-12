@@ -6,6 +6,7 @@ import common: ^.eif.common;
 import utils: ^.eif.utils;
 import version: ^.eif.version;
 import lib.iccf;
+import snapshots: ^.eif_snapshots;
 
 namespace ft4 {
     import lib.ft4.accounts;
@@ -47,9 +48,3 @@ function deposit_check_access_list(account_id: byte_array): boolean = true;
 
 @extendable
 function withdraw_check_access_list(account_id: byte_array): boolean = true;
-
-
-function validate_evm_network_and_address(network_id: integer, address: byte_array) {
-    require(network_id > 0, "Network ID must be positive");
-    require(address.size() == 20, "Contract address must be 20 bytes");
-}

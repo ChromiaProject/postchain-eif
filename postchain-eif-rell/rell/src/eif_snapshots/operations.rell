@@ -22,7 +22,7 @@ operation register_recovery_contract(tx_to_prove: gtx_transaction, op_index: int
     val network_id = integer.from_gtv(iccf_auth_data.op_args[0]);
     val contract_address = byte_array.from_gtv(iccf_auth_data.op_args[1]);
 
-    validate_evm_network_and_address(network_id, contract_address);
+    utils.validate_evm_network_and_address(network_id, contract_address);
     validate_and_update_recovery_contract_auth(iccf_auth_data);
 
     val recovery_contract = recovery_contract @? { blockchain_rid, network_id };
@@ -37,7 +37,7 @@ operation register_recovery_contract(tx_to_prove: gtx_transaction, op_index: int
             s.network_id == network_id,
             s.type == state_slot_type.erc20,
             s.local == true,
-        } (@group s, @list sl.erc20_asset) @ {} (@map $);
+        } (@group s, @list sl.evm_asset) @ {} (@map $);
         
         for ((slot, assets) in erc20_assets) {
             emit_erc20_state_eif_event(slot, assets @* {} (balance_record(.token_address, 0L)));
@@ -45,17 +45,16 @@ operation register_recovery_contract(tx_to_prove: gtx_transaction, op_index: int
         }
 
         // Unlink and delete recovery contract
-        _unlink_evm_sc_account(recovery_contract.contract_address, network_id, blockchain_account);
+        before_delete_recovery_contract(network_id, contract_address, blockchain_account);
         delete recovery_contract;
 
         // (1) Create new recovery contract; (2) link it to the blockchain account; 
         // (3) create and bind state slots; (4) emit eif_state events.
         create recovery_contract(blockchain_rid, network_id, contract_address);
-        _link_evm_sc_account(contract_address, network_id, ft4.crosschain.ensure_blockchain_account(blockchain_rid));
+        after_create_recovery_contract(network_id, contract_address, ft4.crosschain.ensure_blockchain_account(blockchain_rid));
     } else {
         // Create new recovery contract and link it to the blockchain account
         create recovery_contract(blockchain_rid, network_id, contract_address);
-        _link_evm_sc_account(contract_address, network_id, ft4.crosschain.ensure_blockchain_account(blockchain_rid));
+        after_create_recovery_contract(network_id, contract_address, ft4.crosschain.ensure_blockchain_account(blockchain_rid));
     }    
 }
-

@@ -1,0 +1,35 @@
+
+@extend(ft4.assets.after_transfer) function (from: ft4.accounts.account, to: ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
+    val evm_asset = get_evm_asset_by_ft4_asset(asset);
+    if (exists(evm_asset)) {
+        emit_state_event_if_slot_exists(from, evm_asset);
+        ensure_slot_and_emit_state_event(to, evm_asset);
+    }
+}
+
+@extend(ft4.assets.after_mint) function (ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
+    val evm_asset = get_evm_asset_by_ft4_asset(asset);
+    if (exists(evm_asset)) {
+        ensure_slot_and_emit_state_event(account, evm_asset);
+    }
+}
+
+@extend(ft4.assets.after_burn) function (ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
+    val evm_asset = get_evm_asset_by_ft4_asset(asset);
+    if (exists(evm_asset)) {
+        emit_state_event_if_slot_exists(account, evm_asset);
+    }
+}
+
+function emit_state_event_if_slot_exists(account: ft4.accounts.account, evm_asset: evm_asset) {
+    val slot = get_local_erc20_state_slot(account, evm_asset);
+    if (exists(slot)) emit_local_erc20_state_slot(slot);
+}
+
+function ensure_slot_and_emit_state_event(account: ft4.accounts.account, evm_asset: evm_asset) {
+    val slot = get_or_create_local_erc20_state_slot(account, evm_asset);
+    if (exists(slot)) emit_local_erc20_state_slot(slot);
+}
+
+@extendable
+function resolve_evm_address_for_account(account: ft4.accounts.account, network_id: integer): byte_array?;
