@@ -40,7 +40,7 @@ operation register_recovery_contract(tx_to_prove: gtx_transaction, op_index: int
         } (@group s, @list sl.evm_asset) @ {} (@map $);
         
         for ((slot, assets) in erc20_assets) {
-            emit_erc20_state_eif_event(slot, assets @* {} (balance_record(.token_address, 0L)));
+            emit_erc20_balance_state_event(slot, assets @* {} (balance_record(.token_address, 0L)));
             delete local_erc20_state_slot_binding @* { slot }; // Unbind state slots
         }
 
