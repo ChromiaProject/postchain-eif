@@ -7,8 +7,8 @@ import utils: ^.eif.utils;
 import version: ^.eif.version;
 import lib.iccf;
 
-@mount("snapshots")
-namespace eif.hbridge {
+@mount("foo")
+namespace bar {
     import ^.eif_snapshots.*;
 }
 
