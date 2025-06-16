@@ -1,4 +1,4 @@
-@mount("eif.snapshots")
+@mount("eif.hbridge")
 module;
 
 import utils: ^.eif.utils;
