@@ -1,0 +1,143 @@
+
+// link between EVM address and FT4 account, specifically for EOA. (Where user has the private key)
+entity evm_eoa_account_link {
+    key address: byte_array;
+    index ft4.accounts.account;
+}
+
+// for smart contracts we need to keep track of network_id
+entity evm_sc_account_link {
+    key address: byte_array, network_id: integer;
+    index ft4.accounts.account;
+}
+
+entity proposed_evm_sc_account_link {
+    key address: byte_array, network_id: integer;
+    index ft4.accounts.account;
+}
+
+function find_ft4_account_for_address(address: byte_array, network_id: integer): ft4.accounts.account? {
+    val candidate = evm_eoa_account_link @? { address } .account;
+    if (not empty(candidate)) {
+        return candidate;
+    } else {
+        return evm_sc_account_link @? { address, network_id } .account;
+    }
+}
+
+function find_address_for_ft4_account(account: ft4.accounts.account, network_id: integer): byte_array? {
+    // if multiple EOA addresses are linked to the same FT4 account, we return the one first one
+    val candidate = evm_eoa_account_link @? { account } (@sort @omit .rowid, .address) limit 1;
+    if (not empty(candidate)) {
+        return candidate;
+    } else {
+        return evm_sc_account_link @? { account, network_id } (@sort @omit .rowid, .address) limit 1;
+    }
+}
+
+@extendable
+function after_evm_account_linked(address: byte_array, account: ft4.accounts.account, network_id: integer, is_contract: boolean) {}
+
+function _link_evm_account_if_not_linked(network_id: integer, address: byte_array, is_contract: boolean, account: ft4.accounts.account) {
+    if (is_contract) {
+        if (empty(evm_sc_account_link @? { address, network_id })) {
+            create evm_sc_account_link(address, network_id, account);
+            ensure_slots_and_emit_state_events_for_account(account, network_id);
+        }
+    } else {
+        if (empty(evm_eoa_account_link @? { address })) {
+            create evm_eoa_account_link(address, account);
+            ensure_slots_and_emit_state_events_for_account(account, -1);
+        }
+    }
+}
+
+// accounts might be linked explicitly (e.g. when account_id is not derived from EVM address)
+function _link_evm_eoa_account(address: byte_array, account: ft4.accounts.account) {
+    require(empty(evm_eoa_account_link @? { address }), "EVM address %s is already linked to FT4 account".format(address));
+    create evm_eoa_account_link(address, account);
+
+    // There's a possibility that the account_id is different from address hash
+    // collect funds from the pool account here
+    ft4.transfer_strategy.collect_pooled_assets(account, recipient_id = address.hash());
+
+    after_evm_account_linked(address, account, -1, false);
+
+    ensure_slots_and_emit_state_events_for_account(account, -1);
+}
+
+function _link_evm_sc_account(address: byte_array, network_id: integer, account: ft4.accounts.account) {
+    require(empty(evm_sc_account_link @? { address, network_id }), "EVM address %s on EVM chain ID %d is already linked to FT4 account".format(address, network_id));
+    create evm_sc_account_link(address, network_id, account);
+
+    // There's a possibility that the account_id is different from address hash
+    // collect funds from the pool account here
+    ft4.transfer_strategy.collect_pooled_assets(account, recipient_id = address.hash());
+
+    after_evm_account_linked(address, account, network_id, true);
+
+    ensure_slots_and_emit_state_events_for_account(account, network_id);
+}
+
+function _unlink_evm_sc_account(address: byte_array, network_id: integer, account: ft4.accounts.account) {
+    val link = require(
+        evm_sc_account_link @? { address, network_id, account },
+        "EVM address %s on EVM chain ID %d is not linked to FT4 account %s".format(address, network_id, account.id)
+    );
+    delete link;
+}
+
+// function which deducts balance from the account in a smart way:
+//  * burn when bridge is in foreign mode
+//  * transfer to pool account when bridge is in native mode
+function bridge_deduct_balance(ft4.accounts.account, erc20_asset, amount: big_integer) {
+    when (erc20_asset.bridge_mode) {
+        bridge_mode.foreign ->
+            ft4.assets.Unsafe.burn(account, erc20_asset.asset, amount);
+        bridge_mode.native -> {
+            val bridge_account = ensure_bridge_account(erc20_asset.virtual_blockchain_rid);
+            transfer(account, bridge_account, erc20_asset.asset, amount);
+        }
+    }
+}
+
+// function which increase balance of the account in a smart way:
+//  * mint when bridge is in foreign mode
+//  * transfer from pool account when bridge is in native mode
+function bridge_increase_balance(ft4.accounts.account, erc20_asset, amount: big_integer) {
+    when (erc20_asset.bridge_mode) {
+        bridge_mode.foreign ->
+            ft4.assets.Unsafe.mint(account, erc20_asset.asset, amount);
+        bridge_mode.native -> {
+            val bridge_account = ensure_bridge_account(erc20_asset.virtual_blockchain_rid);
+            transfer(bridge_account, account, erc20_asset.asset, amount);
+        }
+    }
+}
+
+val ACCOUNT_TYPE_BRIDGE = "EIF_BRIDGE";
+
+function ensure_bridge_account(blockchain_rid: byte_array) =
+   ft4.accounts.ensure_account_without_auth(blockchain_rid, ACCOUNT_TYPE_BRIDGE);
+
+function transfer(from: ft4.accounts.account, to: ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
+    ft4.assets.require_zero_exclusive_asset_amount_limits(amount, "Parameter amount");
+
+    ft4.assets.deduct_balance(from, asset, amount);
+    create ft4.assets.transfer_history_entry(
+        .account = from,
+        .asset = asset,
+        .delta = amount,
+        .op_index = op_context.op_index,
+        .is_input = true
+   );
+
+    ft4.assets.increase_balance(to, asset, amount);
+    create ft4.assets.transfer_history_entry(
+        .account = to,
+        .asset = asset,
+        .delta = amount,
+        .op_index = op_context.op_index,
+        .is_input = false
+    );
+}

@@ -37,6 +37,23 @@ entity erc20_asset_snapshots_enabled {
     key ft4.assets.asset; // only one erc20 asset can be linked to ft4 asset when snapshots are enabled
 }
 
+struct state_data {
+    state_n: integer;
+    account: list<gtv>;
+}
+
+// Hexadecimal representation of the "hbridge:erc20:v1" string followed by 16x 0x01 bytes, 32 bytes in total.
+val ERC20_STATE_TAG = x"686272696467653a65726332303a763101010101010101010101010101010101";
+
+struct balance_record {
+    token_address: byte_array;
+    balance: big_integer;
+}
+
+function emit_state_event(state_id: integer, state_parts: list<gtv>) {
+    op_context.emit_event("eif_state", state_data(state_id, state_parts).to_gtv());
+}
+
 function enable_erc20_asset_snapshots(erc20_asset) {
     create erc20_asset_snapshots_enabled(erc20_asset.asset, erc20_asset);
 }
@@ -78,12 +95,15 @@ function get_or_create_local_erc20_state_slot(ft4.accounts.account, erc20_asset)
     var existing_slot = state_slot @? { network_id, account_address, state_slot_type.erc20, .local == true };
 
     if (empty(existing_slot)) {
+        val discriminator = compute_erc20_asset_discriminator(erc20_asset);
+        if (empty(discriminator)) return null;
+
         existing_slot = create state_slot (
             id = get_next_state_slot_id(),
             network_id = network_id,
             recipient_address = account_address,
             type = state_slot_type.erc20,
-            discriminator = build_discriminator(erc20_asset),
+            discriminator = discriminator,
             local = true
         );
     }
@@ -93,56 +113,21 @@ function get_or_create_local_erc20_state_slot(ft4.accounts.account, erc20_asset)
     return existing_slot;
 }
 
-struct state_data {
-    state_n: integer;
-    account: list<gtv>;
-}
+function get_or_create_state_slot(network_id: integer, token_address: byte_array, beneficiary: byte_array, type: state_slot_type): state_slot? {
+    val asset = erc20_asset @? { token_address, network_id };
 
-// Hexadecimal representation of the "hbridge:erc20:v1" string followed by 16x 0x01 bytes, 32 bytes in total.
-val ERC20_STATE_TAG = x"686272696467653a65726332303a763101010101010101010101010101010101";
+    if (not exists(asset)) return null;
+    if (not exists(erc20_asset_snapshots_enabled @? { .erc20_asset == asset })) return null;
 
-// hbridge:erc20_withdrawal:v1 followed by 7x 01 bytes, 32 bytes in total
-val ERC20_WITHDRAWAL_STATE_TAG = x"686272696467653a65726332305f77697468647261773a763101010101010101";
+    val discriminator = compute_erc20_asset_discriminator(asset);
+    if (empty(discriminator)) return null;
 
-struct balance_record {
-    token_address: byte_array;
-    balance: big_integer;
-}
-
-function emit_erc20_withdrawal_state_eif_event(state_slot: state_slot, event_hashes: list<byte_array>) {
-    val state_slot_data = state_slot.to_struct();
-    val state_parts = list<gtv>();
-    state_parts.add(ERC20_WITHDRAWAL_STATE_TAG.to_gtv());
-    state_parts.add(utils.evm_address_to_32_byte_array(state_slot_data.recipient_address).to_gtv());
-    state_parts.add(state_slot_data.discriminator.to_gtv()); // discriminator includes (v1) network_id, or (v2) network_id and bridge_address
-    for (event_hash in event_hashes) {
-        state_parts.add(event_hash.to_gtv());
-    }
-    op_context.emit_event(
-        "eif_state",
-        state_data(state_slot_data.id, state_parts).to_gtv()
-    );
-}
-
-function add_erc20_withdrawal_to_snapshot(ew: erc20_withdrawal) {
-    val withdrawal_info = ew.to_struct();
-    val asset = erc20_asset @? { .token_address == withdrawal_info.token_address, 
-        .network_id == withdrawal_info.network_id };
-
-    if (not exists(asset)) return;
-    if (not exists(erc20_asset_snapshots_enabled @? { .erc20_asset == asset })) return;
-
-    val network_id = withdrawal_info.network_id;
-    val beneficiary = withdrawal_info.beneficiary;
-    
-    // Create state_slot as needed
-    val discriminator = build_discriminator(asset);
     var state_slot = state_slot @? {
+        network_id,
         .recipient_address == beneficiary,
-        .type == state_slot_type.erc20_withdrawal,
-        .network_id == network_id,
-        .discriminator == discriminator,
-        .local == true
+        type,
+        .local == true,
+        discriminator,
     };
     
     if (empty(state_slot)) {
@@ -150,53 +135,13 @@ function add_erc20_withdrawal_to_snapshot(ew: erc20_withdrawal) {
             id = get_next_state_slot_id(),
             network_id,
             recipient_address = beneficiary,
-            type = state_slot_type.erc20_withdrawal,
-            discriminator = discriminator,
-            local = true
+            type,
+            local = true,
+            discriminator,
         );
     }
 
-    // Collect all withdrawals for a given address with status other than withdrawn
-    val event_hashes = (
-        w: erc20_withdrawal,
-        s: erc20_withdrawal_status
-    ) @* {
-        w.beneficiary == beneficiary,
-        w.network_id == network_id,
-        s.erc20_withdrawal == w,
-        s.withdrawal_status != withdrawal_status.withdrawn,
-        s.withdrawal_status != withdrawal_status.withdrawn_to_chromia
-    } ( w.event_hash );
-
-    // Emit state
-    emit_erc20_withdrawal_state_eif_event(state_slot, event_hashes);
-}
-
-function emit_erc20_state_eif_event(state_slot, balance_records: list<balance_record>) {
-    if (empty(balance_records)) {
-        // erase state slot when there are no balances
-        op_context.emit_event(
-            "eif_state",
-            state_data(state_slot.id, list<gtv>()).to_gtv()
-        );
-        return;
-    }
-
-    val state_slot_data = state_slot.to_struct();
-    val state_parts = list<gtv>();
-    state_parts.add(ERC20_STATE_TAG.to_gtv());
-    state_parts.add(utils.evm_address_to_32_byte_array(state_slot_data.recipient_address).to_gtv());
-    state_parts.add(state_slot_data.discriminator.to_gtv()); // discriminator includes (v1) network_id, or (v2) network_id and bridge_address
-
-    for (balance_record in balance_records) {
-        state_parts.add(utils.evm_address_to_32_byte_array(balance_record.token_address).to_gtv());
-        state_parts.add(balance_record.balance.to_gtv());
-    }
-    
-    op_context.emit_event(
-        "eif_state",
-        state_data(state_slot_data.id, state_parts).to_gtv()
-    );
+    return state_slot;
 }
 
 function emit_local_erc20_state_slot(state_slot) {
@@ -212,6 +157,27 @@ function emit_local_erc20_state_slot(state_slot) {
     // Note: we must emit it even if there are no records! 
     // It's important to overwrite previous state with empty state to signal that the slot is empty
     emit_erc20_state_eif_event(state_slot, balance_records);
+}
+
+function emit_erc20_state_eif_event(state_slot, balance_records: list<balance_record>) {
+    if (empty(balance_records)) {
+        // erase state slot when there are no balances
+        emit_state_event(state_slot.id, list<gtv>());
+        return;
+    }
+
+    val state_slot_data = state_slot.to_struct();
+    val state_parts = list<gtv>();
+    state_parts.add(ERC20_STATE_TAG.to_gtv());
+    state_parts.add(utils.evm_address_to_32_byte_array(state_slot_data.recipient_address).to_gtv());
+    state_parts.add(state_slot_data.discriminator.to_gtv()); // discriminator includes (v1) network_id, or (v2) network_id and bridge_address
+
+    for (balance_record in balance_records) {
+        state_parts.add(utils.evm_address_to_32_byte_array(balance_record.token_address).to_gtv());
+        state_parts.add(balance_record.balance.to_gtv());
+    }
+    
+    emit_state_event(state_slot_data.id, state_parts);
 }
 
 @extend(ft4.assets.after_transfer) function (from: ft4.accounts.account, to: ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
@@ -241,30 +207,18 @@ function emit_local_erc20_state_slot(state_slot) {
     }
 }
 
-@extend(after_evm_account_linked) function (address: byte_array, account: ft4.accounts.account, network_id: integer, is_contract: boolean) {
-    if (address == find_address_for_ft4_account(account, network_id)) {
-        val assets = (b: ft4.assets.balance, e: erc20_asset_snapshots_enabled) @* {
-            b.account == account,
-            b.asset == e.asset,
-        } (.erc20_asset);
-        for (asset in assets) {
-            val slot = get_or_create_local_erc20_state_slot(account, asset);
-            if (exists(slot)) emit_local_erc20_state_slot(slot);
-        }
-    }
-}
+function ensure_slots_and_emit_state_events_for_account(ft4.accounts.account, network_id: integer) {
+    val address = find_address_for_ft4_account(account, network_id);
+    if (empty(address)) return;
 
-function build_discriminator(erc20_asset): big_integer {
-    if (chain_context.args.version == 1) {
-        return network_discriminator(erc20_asset.network_id);
+    val assets = (b: ft4.assets.balance, e: erc20_asset_snapshots_enabled) @* {
+        b.account == account,
+        b.asset == e.asset,
+    } (.erc20_asset);
+    for (asset in assets) {
+        val slot = get_or_create_local_erc20_state_slot(account, asset);
+        if (exists(slot)) emit_local_erc20_state_slot(slot);
     }
-
-    // Get primary bridge
-    val primary_bridge = require(
-        bridge_erc20_asset @? { erc20_asset } ( @omit @sort .rowid, .bridge_contract.contract_address ) limit 1,
-        "Bridge address for ERC-20 token %s not found on network ID %d".format(erc20_asset.token_address, erc20_asset.network_id)
-    );
-    return network_contract_discriminator(erc20_asset.network_id, primary_bridge);
 }
 
 /*

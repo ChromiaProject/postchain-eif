@@ -24,6 +24,8 @@ struct erc20_asset_info {
     virtual_blockchain_rid: byte_array; // virtual blockchain RID derived from network_id and token_address
 }
 
+@extendable function compute_erc20_asset_discriminator(erc20_asset): big_integer?;
+
 function register_erc20_asset(
     network_id: integer,
     token_address: byte_array,
