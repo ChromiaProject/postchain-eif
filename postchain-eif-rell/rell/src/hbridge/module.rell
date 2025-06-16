@@ -6,7 +6,11 @@ import common: ^.eif.common;
 import utils: ^.eif.utils;
 import version: ^.eif.version;
 import lib.iccf;
-import snapshots: ^.eif_snapshots;
+
+@mount("eif.hbridge")
+namespace snapshots {
+    import ^.eif_snapshots.*;
+}
 
 namespace ft4 {
     import lib.ft4.accounts;
