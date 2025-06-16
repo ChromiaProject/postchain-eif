@@ -1,3 +1,4 @@
+@mount("eif.snapshots")
 module;
 
 import utils: ^.eif.utils;
