@@ -116,7 +116,18 @@ function enqueue_signer_update_transaction_impl(
         );
     }
 
-    signer_list_update.status = signer_list_update_status.PENDING;
+    if (contracts.empty()) {
+        log(
+            "No contracts are configured for blockchain %s, completing update"
+                .format(
+                    signer_list_update
+                        .blockchain_rid
+                )
+        );
+        complete_signer_update(signer_list_update);
+    } else {
+        signer_list_update.status = signer_list_update_status.PENDING;
+    }
 }
 
 query get_queued_signer_updates() = signer_list_update @* { .status == signer_list_update_status.QUEUED } ( 
@@ -127,6 +138,16 @@ query get_queued_signer_updates() = signer_list_update @* { .status == signer_li
         signers = .signers,
         confirmed_in_directory_at_height = .confirmed_in_directory_at_height
     ) 
+);
+
+query get_pending_signer_updates() = signer_list_update @* { .status == signer_list_update_status.PENDING } (
+    signer_list_update_data (
+        rowid = .rowid.to_integer(),
+        serial = .serial,
+        blockchain_rid = .blockchain_rid,
+        signers = .signers,
+        confirmed_in_directory_at_height = .confirmed_in_directory_at_height
+    )
 );
 
 query get_current_evm_signer_list(blockchain_rid: byte_array): list<byte_array> {
@@ -289,6 +310,16 @@ function check_for_new_system_bridges_and_validators() {
         handle_new_validator_contract(directory_chain_brid, validator.network_id, validator.validator_contract);
     }
 
+    // Anchoring chain validators
+    val system_anchoring_chain_brid = get_system_anchoring_blockchain_rid();
+    if (system_anchoring_chain_brid != null) {
+        val system_anchoring_chain_validator_contracts = get_system_chain_validator_contracts(system_anchoring_chain_brid)
+        ?: list<(validator_contract: text, network_id: integer)>();
+        for (validator in system_anchoring_chain_validator_contracts) {
+            handle_new_validator_contract(directory_chain_brid, validator.network_id, validator.validator_contract);
+        }
+    }
+
     // System chain bridges
     for (system_chain in get_system_chains_with_bridges()) {
         for (bridge_contract in system_chain.bridge_contracts) {
@@ -297,6 +328,19 @@ function check_for_new_system_bridges_and_validators() {
                 bridge_contract.network_id,
                 bridge_contract.validator_contract
             );
+        }
+    }
+
+    // TODO: Temporary code to clean up empty updates on testnet, can be removed once completed
+    clean_up_empty_pending_txs();
+}
+
+function clean_up_empty_pending_txs() {
+    val pending_updates = signer_list_update @* { .status == signer_list_update_status.PENDING };
+    for (pending_update in pending_updates) {
+        if (empty(signer_list_update_transaction @* { pending_update })) {
+            log("Cleaned up empty pending update for blockchain %s".format(pending_update.blockchain_rid));
+            complete_signer_update(pending_update);
         }
     }
 }
@@ -396,9 +440,7 @@ function handle_completed_signer_transaction(
             .evm_submit_transaction.status != transaction_status.SUCCESS
         }).empty()) {
             // Now completed on all networks
-            signer_list_update.status = signer_list_update_status.COMPLETED;
-
-            dequeue_parked_update(signer_list_update.blockchain_rid);
+            complete_signer_update(signer_list_update);
         }
     } else {
         log(
@@ -415,6 +457,12 @@ function handle_completed_signer_transaction(
         //    For directory chain: Confirm that signers have been updated via manually_resolve_failed_signer_update (required)
         signer_list_update.status = signer_list_update_status.FAILED;
     }
+}
+
+function complete_signer_update(signer_list_update) {
+    signer_list_update.status = signer_list_update_status.COMPLETED;
+
+    dequeue_parked_update(signer_list_update.blockchain_rid);
 }
 
 operation manually_resolve_failed_signer_update(blockchain_rid: byte_array) {
