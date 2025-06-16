@@ -330,19 +330,6 @@ function check_for_new_system_bridges_and_validators() {
             );
         }
     }
-
-    // TODO: Temporary code to clean up empty updates on testnet, can be removed once completed
-    clean_up_empty_pending_txs();
-}
-
-function clean_up_empty_pending_txs() {
-    val pending_updates = signer_list_update @* { .status == signer_list_update_status.PENDING };
-    for (pending_update in pending_updates) {
-        if (empty(signer_list_update_transaction @* { pending_update })) {
-            log("Cleaned up empty pending update for blockchain %s".format(pending_update.blockchain_rid));
-            complete_signer_update(pending_update);
-        }
-    }
 }
 
 function handle_new_validator_contract(blockchain_rid: byte_array, network_id: integer, validator_contract: text) {
