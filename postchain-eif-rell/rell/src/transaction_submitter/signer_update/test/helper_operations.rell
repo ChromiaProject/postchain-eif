@@ -13,3 +13,17 @@ operation signer_update_message_op(signer_list_update_message) {
 operation bridge_mapping_message_update_op(bridge_mapping_message) {
     handle_bridge_mapping_updates(x"", bridge_mapping_topic, bridge_mapping_message.to_gtv());
 }
+
+operation add_empty_pending_update(blockchain_rid: byte_array) {
+    create signer_list_update (
+        serial = 1,
+        blockchain_rid = blockchain_rid,
+        signers = x"",
+        confirmed_in_directory_at_height = 1,
+        status = signer_list_update_status.PENDING
+    );
+}
+
+operation trigger_empty_pending_txs_cleanup() {
+    clean_up_empty_pending_txs();
+}

@@ -259,3 +259,29 @@ function test_directory_signer_update_payer_chain_set() {
     val signer_list_update = trigger_signer_update(new_signers);
     assert_equals(signer_list_update_transaction @ { signer_list_update }.evm_submit_transaction.payer_chain, test_directory_chain_brid);
 }
+
+function test_clean_up_empty_pending_txs() {
+    // trigger directory chain update
+    val new_signers = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub];
+    val signer_list_update = trigger_signer_update(new_signers);
+
+    // Add a dummy empty pending update
+    val dummy_brid = x"010101";
+    rell.test.tx().op(
+            add_empty_pending_update(dummy_brid)
+        ).run();
+
+    assert_equals((signer_list_update @* { .status == signer_list_update_status.PENDING }).size(), 2);
+
+    // Run clean up
+    rell.test.tx().op(
+            trigger_empty_pending_txs_cleanup()
+        ).run();
+
+    // Assert only one pending update is left
+    val directory_chain_update = signer_list_update @ { .status == signer_list_update_status.PENDING };
+    assert_equals(directory_chain_update.blockchain_rid, test_directory_chain_brid);
+
+    val dummy_update = signer_list_update @ { .blockchain_rid == dummy_brid };
+    assert_equals(dummy_update.status, signer_list_update_status.COMPLETED);
+}
