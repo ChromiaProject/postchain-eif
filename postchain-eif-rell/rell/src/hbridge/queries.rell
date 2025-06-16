@@ -200,10 +200,10 @@ query get_registered_bridge_erc20_assets(network_id: integer, bridge_contract_ad
  * @return A list of `integer` state slot IDs.
  */
 query get_withdrawal_state_slot_ids_for_address(beneficiary: byte_array, network_id: integer): list<integer> {
-    return state_slot @* {
+    return eif.hbridge.state_slot @* {
         .recipient_address == beneficiary,
         .network_id == network_id,
-        .type == state_slot_type.erc20_withdrawal,
+        .type == eif.hbridge.state_slot_type.erc20_withdrawal,
         .local == true
     } (.id);
 }
