@@ -56,7 +56,7 @@ test:
     - eif_bridge_admin.test
   moduleArgs:
     <<: *common_args
-    hbridge:
+    hbridge.core:
       evm_read_offsets:
         "97": 10
         "11155111": 20
@@ -266,7 +266,7 @@ blockchains:
       <<: *common_hbridge_config
     moduleArgs:
       <<: *common_args
-      hbridge:
+      hbridge.core:
         evm_read_offsets: # See test moduleArgs
       <<: *rell_test_args
       lib.ft4.core.accounts.strategies.transfer:
