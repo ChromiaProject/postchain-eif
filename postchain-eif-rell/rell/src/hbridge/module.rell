@@ -5,12 +5,9 @@ import messaging: ^.eif.messaging;
 import common: ^.eif.common;
 import utils: ^.eif.utils;
 import version: ^.eif.version;
+import snapshots: ^.eif_snapshots;
 import lib.iccf;
 
-@mount("foo")
-namespace bar {
-    import ^.eif_snapshots.*;
-}
 
 namespace ft4 {
     import lib.ft4.accounts;

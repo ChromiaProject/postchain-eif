@@ -43,7 +43,7 @@ function register_erc20_asset(
     );
     
     if (use_snapshots) {
-        bar.register_evm_asset(network_id, token_address, asset);
+        snapshots.register_evm_asset(network_id, token_address, asset);
     }
 
     return erc20_asset;
