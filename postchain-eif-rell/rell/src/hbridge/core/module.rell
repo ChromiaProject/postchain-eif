@@ -1,4 +1,4 @@
-@mount("eif.hbridge.core")
+@mount("eif.hbridge")
 module;
 
 import lib.iccf;
@@ -24,4 +24,3 @@ enum bridge_mode {
 struct module_args {
     evm_read_offsets: gtv = map<text, integer>().to_gtv();
 }
-
