@@ -148,7 +148,7 @@ Follow the steps to transfer a single signature bridge ownership to a gnosis mul
 
 Is the proxy configuration in `.openzeppeling/<network>.json` up to date? If not, or you don't know, remove it and import it:
 
-```
+```sh
 rm -rf .openzeppeling/<network>.json
 yarn import:bridge --network <network> --address <proxy admin address>
 ```
@@ -159,7 +159,7 @@ Get or create your multi signature account, e.g. from [safe](https://app.safe.gl
 
 As contract owner:
 
-```
+```sh
 npx hardhat transfer-ownership:chromiabridge --network <network>> --address <bridge-address> --newOwner <multi-sig-address>
 ```
 
