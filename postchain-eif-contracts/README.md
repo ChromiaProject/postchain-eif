@@ -160,7 +160,7 @@ Get or create your multi signature account, e.g. from [safe](https://app.safe.gl
 As contract owner:
 
 ```sh
-npx hardhat transfer-ownership:chromiabridge --network <network>> --address <bridge-address> --newOwner <multi-sig-address>
+npx hardhat transfer-ownership:chromiabridge --network <network> --address <bridge-address> --newOwner <multi-sig-address>
 ```
 
 This will initiate the transfer of the bridge to the new owner, verify this by reading the `pendingOwner` which should match the provided `<multi-sig-address>`.
