@@ -239,7 +239,7 @@ Next step is to create, sign and execute the transaction to upgrade the contract
 Example on how to do it through [safe](https://app.safe.global/) or [safe-bnb](https://multisig.bnbchain.org/) with a multi signature wallet already set up:
 
 **⚠️ WARNING**
-> At the time writing this I fail to get this working on the safe-bnb website for BNC testnet.
+> At the time of writing this, the safe-bnb website fails to work for BNC testnet.
 
 1. Click `New transaction` followed by the `Transaction builder` and toggle the `Custom data` in the top right corner.
 2. Provide the proxy admin address (is in the output from previous command)
