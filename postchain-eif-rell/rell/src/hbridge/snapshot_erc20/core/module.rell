@@ -1,0 +1,24 @@
+@mount("eif.hbridge")
+module;
+
+import lib.iccf;
+
+namespace ft4 {
+    import lib.ft4.accounts;
+    import lib.ft4.assets;
+    import lib.ft4.crosschain;
+    import lib.ft4.auth;
+    import lib.ft4.utils;
+}
+
+import utils: ^^^.eif.utils;
+
+
+enum bridge_mode {
+    native,
+    foreign,
+}
+
+struct module_args {
+    evm_read_offsets: gtv = map<text, integer>().to_gtv();
+}

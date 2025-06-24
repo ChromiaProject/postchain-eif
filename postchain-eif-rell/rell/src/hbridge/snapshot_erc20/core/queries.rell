@@ -1,0 +1,23 @@
+query get_account_for_eoa_address(evm_address: byte_array): byte_array? =
+        evm_eoa_account_link @? { .address == evm_address } (.account.id);
+
+query get_account_for_sc_address(evm_address: byte_array, network_id: integer): byte_array? =
+        evm_sc_account_link @? { .address == evm_address, network_id } (.account.id);
+
+query get_eoa_addresses_for_account(account_id: byte_array): list<byte_array> {
+    val account = ft4.accounts.Account(account_id);
+    return evm_eoa_account_link @* { account } (.address);
+}
+
+query get_sc_addresses_for_account(account_id: byte_array): list<(address: byte_array, network_id: integer)> {
+    val account = ft4.accounts.Account(account_id);
+    return evm_sc_account_link @* { account } (.address, .network_id);
+}
+
+query get_state_slot_ids_for_address(beneficiary: byte_array, network_id: integer): list<integer> {
+    return state_slot @* { beneficiary, network_id } (.id);
+}
+
+query get_recovery_contract(blockchain_rid: byte_array, network_id: integer): byte_array? {
+    return recovery_contract @? { blockchain_rid, network_id } .contract_address;
+}

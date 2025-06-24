@@ -17,7 +17,7 @@ namespace ft4 {
     import transfer_strategy: lib.ft4.accounts.strategies.transfer;
 }
 
-import .core;
+import snapshot: .snapshot_erc20;
 
 struct module_args {
     /**
