@@ -140,32 +140,117 @@ $ yarn deploy:anchoring --network sepolia --verify --blockchain-rid {SYSTEM_ANCH
 - Gas reporter [hardhat-gas-reporter](https://hardhat.org/plugins/hardhat-gas-reporter.html)
 - Etherscan [hardhat-etherscan](https://hardhat.org/plugins/nomiclabs-hardhat-etherscan.html)
 
-## Upgrade chromia token bridge contract to version 2
+## Transfer chromia bridge ownership
+
+Follow the steps to transfer a single signature bridge ownership to a gnosis multi signature ownership.
+
+### Prepare proxy configuration
+
+Is the proxy configuration in `.openzeppeling/<network>.json` up to date? If not, or you don't know, remove it and import it:
+
+```sh
+rm -rf .openzeppeling/<network>.json
+yarn import:bridge --network <network> --address <proxy admin address>
+```
+
+Get or create your multi signature account, e.g. from [safe](https://app.safe.global/).
+
+### Transfer
+
+As contract owner:
+
+```sh
+npx hardhat transfer-ownership:chromiabridge --network <network> --address <bridge-address> --newOwner <multi-sig-address>
+```
+
+This will initiate the transfer of the bridge to the new owner, verify this by reading the `pendingOwner` which should match the provided `<multi-sig-address>`.
+
+Accept the transfer by creating a transaction, sign and execute it. First by creating the transaction data we need:
+
+```
+npx hardhat accept-ownership:chromiabridge --network sepolia --address 0x2228b0Ed569d55366Ac5e96dFD53B019D97bb85f
+
+Preparing Gnosis Safe transaction to accept ownership of ChromiaTokenBridge at 0x2228b0Ed569d55366Ac5e96dFD53B019D97bb85f
+Current owner: 0x1c918FC9C7f3D8943e67cAD0BfB4B8e57220490D
+Pending owner: 0x106eEB7F727c4d3C7B331ff39bEC75F93ff7167a
+📨 Gnosis Safe Transaction
+To: 0x2228b0Ed569d55366Ac5e96dFD53B019D97bb85f
+Data: 0x79ba5097
+```
+
+Now add a transaction, sign it by all required signatures and execute it, e.g. from [safe](https://app.safe.global/):
+
+1. Click `New transaction` followed by the `Transaction builder` and toggle the `Custom data` in the top right corner.
+2. Provide the bridge address (`To: ` output)
+3. Set `0` as ETH/BNB.
+4. Paste the `Data` output from previous command into the `Data` field.
+5. Click `Add new transaction` and `Create batch`
+6. Click `Simulate` to verify the transaction, and if everything looks good `Add batch`
+7. Click `Continue` and then `Sign`.
+8. Send transaction to other signers to have them sign it.
+9. Once signed by the threshold of required signatures, execute it.
+
+Verify the change by reading `owner` on the contract.
+
+
+## Upgrade chromia token bridge contract to version 1.1
 
 This bridge will be identical but enable setting a new block number offset.
 
-1. Proxy configuration
+### Prepare proxy configuration
 
-   Is the proxy configuration in `.openzeppeling/<network>.json` up to date? If not, or you don't know, remove it and import it:
+Is the proxy configuration in `.openzeppeling/<network>.json` up to date? If not, or you don't know, remove it and import it:
 
-    ```
-    rm -rf .openzeppeling/<network>.json
-    yarn import:bridge --network <network> --address <proxy admin address>
-    ```
+```
+rm -rf .openzeppeling/<network>.json
+yarn import:bridge --network <network> --address <proxy admin address>
+```
 
-3. Upgrade contract
+### Option 1: Single signature upgrade
 
-    ```
-    yarn upgrade:chromiabridge-to-v1.1 --network <network> --address <bridge/proxy address> --offset <offset> --verify
-    ```
+If the bridge is owned by a single signature the upgrade is straight forward:
 
-4. Optional: Read current block number offset again
+```
+yarn upgrade:chromiabridge-to-v1.1 --network <network> --address <bridge/proxy address> --offset <offset> --verify
+```
 
-    Verify the block number offset is updated:
 
-    ```
-    npx hardhat read:chromiabridge-offset --network <network> --address <bridge/proxy address>
-    ```
+### Option 2: Multiple signature upgrade
+
+For a bridge which ownership has been transferred to a multi signature account, such as gnosis safe, we need to deploy
+the new contract (v1.1), create a upgrade transaction and have it signed by enough signatures to execute it.
+
+
+Start by deploying the new bridge contract and construct the call data we need to pass to our multi signature transaction:
+
+```
+npx hardhat prepare-upgrade:chromiabridge-to-v1.1 --network <network> --address 0x838F9e7B21F27a2facF843CCDA2b7a3f7d6a724b --offset 100
+
+The contract 0x5659f283Ce5297A966033968Ffb4A7D20D120b6D has already been verified
+✅ New implementation deployed at: 0x5659f283Ce5297A966033968Ffb4A7D20D120b6D
+📨 Gnosis Safe Transaction
+To: 0x838F9e7B21F27a2facF843CCDA2b7a3f7d6a724b
+Proxy admin address is:  0xFB1E8b7CeEab4020EA163Cda6C5308dE29Aeb50b
+Data: 0x9623609d000000000000000000000000838f9e7b21f27a2facf843ccda2b7a3f7d6a724b0000000000000000000000005659f283ce5297a966033968ffb4a7d20d120b6d00000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000024dc216dca000000000000000000000000000000000000000000000000000000000000006400000000000000000000000000000000000000000000000000000000
+```
+
+Next step is to create, sign and execute the transaction to upgrade the contract.
+
+Example on how to do it through [safe](https://app.safe.global/) or [safe-bnb](https://multisig.bnbchain.org/) with a multi signature wallet already set up:
+
+**⚠️ WARNING**
+> At the time of writing this, the safe-bnb website fails to work for BNC testnet.
+
+1. Click `New transaction` followed by the `Transaction builder` and toggle the `Custom data` in the top right corner.
+2. Provide the proxy admin address (is in the output from previous command)
+3. Set `0` as ETH.
+4. Paste the `Data` output from previous command into the `Data` field.
+5. Click `Add new transaction` and `Create batch`
+6. Click `Simulate` to verify the transaction, and if everything looks good `Add batch`
+7. Click `Continue` and then `Sign`.
+8. Send transaction to other signers to have them sign it.
+9. Once signed by the threshold of required signatures, execute it.
+
 
 ## Upgrade token bridge contracts
 

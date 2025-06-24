@@ -28,6 +28,11 @@ const known_artifacts_by_network: { [key: string]: KnownArtifacts } = {
     "chromiaTokenAddress": "0x8A2279d4A90B6fe1C4B30fa660cC9f926797bAA2", // chr.tokens
     "networkType": "ETH"
   },
+  "sepolia": {
+    "multiSigOwner": "0x106eEB7F727c4d3C7B331ff39bEC75F93ff7167a",
+    "chromiaTokenAddress": "8e59d72e4DdA56F26963C6b8c77cA1959E9A74F0",
+    "networkType": "ETH"
+  },
   "bsc": {
     "multiSigOwner": "0xe33D5C1DFDEde024f612c33C90B1D4a3d3504da0", // system.ops.wallets
     "chromiaTokenAddress": "0xf9CeC8d50f6c8ad3Fb6dcCEC577e05aA32B224FE", // chr.tokens
@@ -75,7 +80,7 @@ task("deploy:chromiabridge")
         validator = <IValidator>await validatorFactory.deploy(validators);
     }
     console.log("Validator deployed to: ", validator.address);
-    
+
     const withdrawOffset = offset === undefined ? 0 : parseInt(offset);
 
     // deploy token bridge smart contracts
@@ -268,6 +273,144 @@ task("upgrade:chromiabridge-to-v1.1")
     }
   });
 
+/**
+ * Same as upgrade:chromiabridge-to-v1.1 but for multi signature ownership.
+ *
+ * The whole upgrade is made up of two parts:
+ *  1. Deploy the new contract
+ *  2. Create, sign and execute a gnosis safe transaction which applies to proxy upgrade and runs the
+ *     initializer.
+ *
+ * @task prepare-upgrade:chromiabridge-to-v1.1
+ * @param {string} address - The address of the deployed ChromiaTokenBridge contract to upgrade
+ * @param {string|number} offset - The new withdraw offset value to set during V1.1 initialization
+ *
+ * @example
+ * npx hardhat prepare-upgrade:chromiabridge-to-v1.1 --network bsc_testnet --address 0x838F9e7B21F27a2facF843CCDA2b7a3f7d6a724b --offset 100
+ *
+ */
+task("prepare-upgrade:chromiabridge-to-v1.1")
+  .addParam("address", "Address of the ChromiaTokenBridge contract to upgrade")
+  .addParam("offset", "New withdraw offset value for initializeV11")
+  .setAction(async ({address, offset}, hre) => {
+
+    console.log(`Preparing upgrade of ChromiaTokenBridge at ${address} to ChromiaTokenBridgeV11 with offset ${offset}`);
+
+    const factoryV11 = await hre.ethers.getContractFactory("ChromiaTokenBridgeV11");
+    const bridgeV11 = await hre.upgrades.prepareUpgrade(address, factoryV11);
+
+    try {
+      await hre.run("verify:verify", {
+        address: bridgeV11,
+      });
+    } catch (e) {
+      console.log(e);
+    }
+
+    console.log("✅ New implementation deployed at:", bridgeV11);
+
+    const initData = factoryV11.interface.encodeFunctionData("initializeV11", [offset]);
+
+    const proxyAdminInterface = new hre.ethers.utils.Interface([
+      "function upgradeAndCall(address proxy, address implementation, bytes data)"
+    ]);
+    const upgradeCallData = proxyAdminInterface.encodeFunctionData("upgradeAndCall", [
+      address,
+      bridgeV11,
+      initData
+    ]);
+
+    const proxyAdmin = await hre.upgrades.erc1967.getAdminAddress(address);
+
+    console.log("📨 Gnosis Safe Transaction");
+    console.log("To:", address);
+    console.log("Proxy admin address is:", proxyAdmin);
+    console.log("Data:", upgradeCallData);
+  });
+
+/**
+ * Task to transfer ownership of an existing ChromiaTokenBridge contract to a new owner.
+ *
+ * This task initiates the first step of the two-step ownership transfer process.
+ * After this task is executed, the new owner must call `acceptOwnership()` to complete the transfer.
+ *
+ * @task transfer-ownership:chromiabridge
+ * @param {string} address - The address of the deployed ChromiaTokenBridge contract
+ * @param {string} newOwner - The address of the new owner (typically a multi-sig wallet)
+ *
+ * @example
+ * npx hardhat transfer-ownership:chromiabridge --network bsc_testnet --address 0x838F9e7B21F27a2facF843CCDA2b7a3f7d6a724b --new-owner 0x106eEB7F727c4d3C7B331ff39bEC75F93ff7167a
+ *
+ */
+task("transfer-ownership:chromiabridge")
+  .addParam("address", "Address of the ChromiaTokenBridge contract")
+  .addParam("newOwner", "Address of the new owner")
+  .setAction(async ({address, newOwner}, hre) => {
+
+    console.log(`Transferring ownership of ChromiaTokenBridge at ${address} to ${newOwner}`);
+
+    const factory: ContractFactory = await hre.ethers.getContractFactory("ChromiaTokenBridge");
+    const bridge: ChromiaTokenBridge = factory.attach(address) as ChromiaTokenBridge;
+
+    const currentOwner = await bridge.owner();
+    console.log(`Current owner: ${currentOwner}`);
+
+    // Check if the caller is the current owner
+    const [signer] = await hre.ethers.getSigners();
+    if (currentOwner.toLowerCase() !== signer.address.toLowerCase()) {
+      console.error(`Error: Transaction signer (${signer.address}) is not the current owner of the bridge.`);
+      return;
+    }
+
+    console.log(`Initiating ownership transfer...`);
+    const tx = await bridge.transferOwnership(newOwner);
+    await tx.wait();
+
+    console.log(`✅ Ownership transfer initiated. Transaction hash: ${tx.hash}`);
+    console.log(`NOTE: The new owner (${newOwner}) must call acceptOwnership() to complete the transfer.`);
+  });
+
+/**
+ * Task to create a Gnosis Safe transaction that accepts ownership of a ChromiaTokenBridge contract.
+ *
+ * This task generates the transaction data needed for a Gnosis Safe to call the acceptOwnership() function
+ * on the ChromiaTokenBridge contract, completing the two-step ownership transfer process.
+ *
+ * @task accept-ownership:chromiabridge
+ * @param {string} address - The address of the ChromiaTokenBridge contract
+ *
+ * @example
+ * npx hardhat accept-ownership:chromiabridge --network bsc_testnet --address 0x838F9e7B21F27a2facF843CCDA2b7a3f7d6a724b
+ *
+ */
+task("accept-ownership:chromiabridge")
+  .addParam("address", "Address of the ChromiaTokenBridge contract")
+  .setAction(async ({address}, hre) => {
+
+    console.log(`Preparing Gnosis Safe transaction to accept ownership of ChromiaTokenBridge at ${address}`);
+
+    const factory: ContractFactory = await hre.ethers.getContractFactory("ChromiaTokenBridge");
+    const bridge: ChromiaTokenBridge = factory.attach(address) as ChromiaTokenBridge;
+
+    const currentOwner = await bridge.owner();
+    const pendingOwner = await bridge.pendingOwner();
+
+    console.log(`Current owner: ${currentOwner}`);
+    console.log(`Pending owner: ${pendingOwner}`);
+
+    if (pendingOwner === "0x0000000000000000000000000000000000000000") {
+      console.error(`Error: No pending ownership transfer found for this contract.`);
+      return;
+    }
+
+    // Generate the transaction data for calling acceptOwnership()
+    const acceptOwnershipData = bridge.interface.encodeFunctionData("acceptOwnership");
+
+    console.log("📨 Gnosis Safe Transaction");
+    console.log("To:", address);
+    console.log("Data:", acceptOwnershipData);
+  });
+
 // Dev task to read bridge offset and count blocks since start. Used to monitor withdraws during testing.
 task("read:chromiabridge-offset")
   .addParam("address", "Address of the bridge to read")
@@ -288,3 +431,4 @@ task("read:chromiabridge-offset")
       await delay(1000);
     }
   });
+
