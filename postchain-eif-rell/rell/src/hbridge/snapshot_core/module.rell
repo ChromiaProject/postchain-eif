@@ -11,7 +11,7 @@ namespace ft4 {
     import lib.ft4.utils;
 }
 
-import utils: ^^^.eif.utils;
+import utils: ^^.eif.utils;
 
 
 enum bridge_mode {
