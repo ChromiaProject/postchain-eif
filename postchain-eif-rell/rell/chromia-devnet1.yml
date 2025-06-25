@@ -48,6 +48,11 @@ blockchains:
             evm_read_offset: 10
             skip_to_height: 5801241
             events: !include configs/events.yml
+          base_sepolia:
+            network_id: 84532
+            evm_read_offset: 10
+            skip_to_height: 27469403
+            events: !include configs/events.yml
       icmf:
         receiver:
           directory-chain:
