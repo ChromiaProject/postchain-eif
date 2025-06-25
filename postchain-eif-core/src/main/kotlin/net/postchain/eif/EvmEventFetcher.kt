@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.slf4j.MDCContext
 import mu.KLogging
+import mu.withLoggingContext
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.types.WrappedByteArray
@@ -67,14 +68,16 @@ class EvmEventFetcher(
 
     private fun launchEventFetching() =
             CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-event-processor") + MDCContext()) {
-                while (isActive) {
-                    try {
-                        fetchEvents()
-                    } catch (_: CancellationException) {
-                        break
-                    } catch (e: Exception) {
-                        logger.error("Parsing of EVM logs unexpectedly failed: $e", e)
-                        delay(500) // Delay a bit and hope that we can recover
+                withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
+                    while (isActive) {
+                        try {
+                            fetchEvents()
+                        } catch (_: CancellationException) {
+                            break
+                        } catch (e: Exception) {
+                            logger.error("Parsing of EVM logs unexpectedly failed: $e", e)
+                            delay(500) // Delay a bit and hope that we can recover
+                        }
                     }
                 }
             }
@@ -237,13 +240,15 @@ class EvmEventFetcher(
     }
 
     override fun flushEvents(resetToHeight: BigInteger) {
-        // We first need to stop the ongoing fetching to avoid conflicts
-        runBlocking {
-            job.cancelAndJoin()
+        withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
+            // We first need to stop the ongoing fetching to avoid conflicts
+            runBlocking {
+                job.cancelAndJoin()
+            }
+            logger.info("Flushing EVM events from network $networkId and re-fetching from height: $resetToHeight")
+            evmEventProcessor.flushEvents(resetToHeight)
+            job = launchEventFetching()
         }
-        logger.info("Flushing EVM events from network $networkId and re-fetching from height: $resetToHeight")
-        evmEventProcessor.flushEvents(resetToHeight)
-        job = launchEventFetching()
     }
 
     override fun shutdown() {

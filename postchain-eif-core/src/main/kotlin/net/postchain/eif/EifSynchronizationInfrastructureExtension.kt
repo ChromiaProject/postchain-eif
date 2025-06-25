@@ -1,6 +1,7 @@
 package net.postchain.eif
 
 import mu.KLogging
+import mu.withLoggingContext
 import net.postchain.PostchainContext
 import net.postchain.common.BlockchainRid
 import net.postchain.common.exception.UserMistake
@@ -119,6 +120,7 @@ class EifSynchronizationInfrastructureExtension(
         if (evmBlockchainConfig.maxQueueSize < 0) throw UserMistake("maxQueueSize cannot be negative")
 
         val eventProcessor = EvmEventProcessor(
+                evmBlockchainConfig.networkId,
                 BigInteger.valueOf(evmBlockchainConfig.readOffset),
                 evmBlockchainConfig.maxQueueSize,
         )
@@ -127,12 +129,14 @@ class EifSynchronizationInfrastructureExtension(
             NoOpEventProcessor().let { it to NoOpEventFetcher(it) }
         } else {
             if (evmBlockchainConfig.skipToHeight == 0L) {
-                logger.warn("Skip to height config is set to 0 for EVM network: $evmBlockchainName. Consider changing it to avoid redundant queries.")
+                withLoggingContext(NETWORK_ID_TAG to evmBlockchainConfig.networkId.toString()) {
+                    logger.warn("Skip to height config is set to 0 for EVM network: $evmBlockchainName. Consider changing it to avoid redundant queries.")
+                }
             }
             if (evmBlockchainConfig.skipToHeight < 0) throw UserMistake("skip-to-height for EVM network: $evmBlockchainName is negative")
 
-            val staticContractConfig = (evmBlockchainConfig.contractsToFetch
-                    ?: listOf()) + (evmBlockchainConfig.contracts?.map { EifEvmContractConfig(it.toHex(), 0) } ?: listOf())
+            val staticContractConfig = (evmBlockchainConfig.contractsToFetch ?: listOf()) +
+                    (evmBlockchainConfig.contracts?.map { EifEvmContractConfig(it.toHex(), 0) } ?: listOf())
             if (staticContractConfig.isEmpty() && !hasLegacyDynamicContracts && !hasDynamicContacts) throw UserMistake("No contracts configured for EVM network: $evmBlockchainName")
             val staticContracts = staticContractConfig.map { contractConfig: EifEvmContractConfig ->
                 if (contractConfig.skipToHeight < 0) throw UserMistake("skip-to-height for contract ${contractConfig.address} is negative")
