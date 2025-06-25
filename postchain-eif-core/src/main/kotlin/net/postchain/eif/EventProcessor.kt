@@ -1,16 +1,11 @@
 package net.postchain.eif
 
 import mu.KLogging
-import net.postchain.common.exception.ProgrammerMistake
-import net.postchain.concurrent.util.get
-import net.postchain.core.BlockchainEngine
+import mu.withLoggingContext
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvBigInteger
 import net.postchain.gtv.GtvByteArray
-import net.postchain.gtv.GtvFactory.gtv
-import net.postchain.gtv.GtvInteger
-import net.postchain.gtv.GtvNull
 import net.postchain.gtv.GtvString
 import java.math.BigInteger
 import java.util.LinkedList
@@ -80,6 +75,7 @@ class NoOpEventProcessor : EventProcessor {
  * (so that slower nodes may have a chance to validate the events)
  */
 class EvmEventProcessor(
+        private val networkId: Long,
         private val readOffset: BigInteger,
         private val maxQueueSize: Long,
 ) : EventProcessor {
@@ -95,37 +91,39 @@ class EvmEventProcessor(
 
     @Synchronized
     override fun isValidEventData(ops: List<EvmBlockOp>): EventValidationResult {
-        // We are strict here, if we have not seen something we will not try to go and fetch it.
-        // We simply verify that the same blocks and events are coming in the same order that we have seen them
-        // If there are too many rejections, readOffset should be increased
-        if (ops.size > eventBlocks.size) {
-            // We don't have all these blocks
-            logger.warn("Received unexpected blocks")
-            val conflictingHeight = if (lastReadLogBlockHeight >= ops.last().evmBlockHeight) {
-                val firstReceivedEventHeight = ops.last().evmBlockHeight
-                eventBlocks.peek()?.evmBlockHeight?.min(firstReceivedEventHeight) ?: firstReceivedEventHeight
-            } else null
-            return EventValidationResult(false, conflictingHeight)
-        }
-        for ((index, eventBlock) in eventBlocks.withIndex()) {
-            if (index >= ops.size) break
-
-            val op = ops[index]
-
-            if (op.networkId != eventBlock.networkId || op.evmBlockHeight != eventBlock.evmBlockHeight || op.evmBlockHash != eventBlock.evmBlockHash) {
-                logger.warn(
-                        "Received unexpected block ${op.evmBlockHeight} with hash ${op.evmBlockHash} in network ${op.networkId}." +
-                                " Expected block ${eventBlock.evmBlockHeight} with hash ${eventBlock.evmBlockHash} in network ${eventBlock.networkId}"
-                )
-                return EventValidationResult(false, op.evmBlockHeight.min(eventBlock.evmBlockHeight))
+        withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
+            // We are strict here, if we have not seen something we will not try to go and fetch it.
+            // We simply verify that the same blocks and events are coming in the same order that we have seen them
+            // If there are too many rejections, readOffset should be increased
+            if (ops.size > eventBlocks.size) {
+                // We don't have all these blocks
+                logger.warn("Received unexpected blocks")
+                val conflictingHeight = if (lastReadLogBlockHeight >= ops.last().evmBlockHeight) {
+                    val firstReceivedEventHeight = ops.last().evmBlockHeight
+                    eventBlocks.peek()?.evmBlockHeight?.min(firstReceivedEventHeight) ?: firstReceivedEventHeight
+                } else null
+                return EventValidationResult(false, conflictingHeight)
             }
+            for ((index, eventBlock) in eventBlocks.withIndex()) {
+                if (index >= ops.size) break
 
-            if (op.events != eventBlock.events) {
-                logger.warn("Events in received block ${op.evmBlockHeight} do not match expected events")
-                return EventValidationResult(false, op.evmBlockHeight)
+                val op = ops[index]
+
+                if (op.networkId != eventBlock.networkId || op.evmBlockHeight != eventBlock.evmBlockHeight || op.evmBlockHash != eventBlock.evmBlockHash) {
+                    logger.warn(
+                            "Received unexpected block ${op.evmBlockHeight} with hash ${op.evmBlockHash} in network ${op.networkId}." +
+                                    " Expected block ${eventBlock.evmBlockHeight} with hash ${eventBlock.evmBlockHash} in network ${eventBlock.networkId}"
+                    )
+                    return EventValidationResult(false, op.evmBlockHeight.min(eventBlock.evmBlockHeight))
+                }
+
+                if (op.events != eventBlock.events) {
+                    logger.warn("Events in received block ${op.evmBlockHeight} do not match expected events")
+                    return EventValidationResult(false, op.evmBlockHeight)
+                }
             }
+            return EventValidationResult(true)
         }
-        return EventValidationResult(true)
     }
 
     override fun markAsProcessed(ops: List<EvmBlockOp>) {

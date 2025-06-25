@@ -1,6 +1,7 @@
 package net.postchain.eif.transaction
 
 import mu.KLogging
+import mu.withLoggingContext
 import net.postchain.base.SpecialTransactionPosition
 import net.postchain.common.BlockchainRid
 import net.postchain.concurrent.util.get
@@ -12,6 +13,7 @@ import net.postchain.crypto.CryptoSystem
 import net.postchain.crypto.KeyPair
 import net.postchain.crypto.SigMaker
 import net.postchain.crypto.Signature
+import net.postchain.eif.NETWORK_ID_TAG
 import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvNull
@@ -392,11 +394,14 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
 
     private fun withTxSubmitter(networkId: Long, function: (TransactionSubmitter) -> Unit) {
 
-        val txSubmitter = transactionSubmitters[networkId]
-        if (txSubmitter == null) {
-            logger.warn("Ignoring tx since there is no submitter for $networkId")
-        } else {
-            function(txSubmitter)
+        withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
+
+            val txSubmitter = transactionSubmitters[networkId]
+            if (txSubmitter == null) {
+                logger.warn("Ignoring tx since there is no submitter for $networkId")
+            } else {
+                function(txSubmitter)
+            }
         }
     }
 

@@ -9,6 +9,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.slf4j.MDCContext
 import mu.KLogging
+import mu.withLoggingContext
 import net.postchain.base.withReadWriteConnection
 import net.postchain.base.withWriteConnection
 import net.postchain.core.BlockEContext
@@ -16,6 +17,7 @@ import net.postchain.core.EContext
 import net.postchain.core.Shutdownable
 import net.postchain.core.Storage
 import net.postchain.eif.GtvToTypeMapper
+import net.postchain.eif.NETWORK_ID_TAG
 import net.postchain.eif.transaction.gas.EIP1559FeeEstimatorFactory
 import net.postchain.eif.web3j.Web3jRawTransactionHandler
 import net.postchain.eif.web3j.Web3jRequestHandler
@@ -82,94 +84,109 @@ open class TransactionSubmitter(
 
     init {
 
-        logger.info {
-            "Initializing transaction submitter - chainId: $chainId, networkId: $networkId, " +
-                    "txPollInterval: $txPollInterval, healthCheckInterval: $healthCheckInterval, " +
-                    "cancelFeeMargin: $cancelFeeMargin, nodeTxVerificationEvmBlocks: $nodeTxVerificationEvmBlocks, " +
-                    "txVerificationTime: $txVerificationTime"
-        }
+        withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
 
-        // Add transactions to queue and recover states lost on node restart
-        for (txSubmit in initQueue) {
+            logger.info {
+                "Initializing transaction submitter - chainId: $chainId, networkId: $networkId, " +
+                        "txPollInterval: $txPollInterval, healthCheckInterval: $healthCheckInterval, " +
+                        "cancelFeeMargin: $cancelFeeMargin, nodeTxVerificationEvmBlocks: $nodeTxVerificationEvmBlocks, " +
+                        "txVerificationTime: $txVerificationTime"
+            }
 
-            if (txSubmit.txHash == null) {
-                // Transaction taken but not yet submitted
+            // Add transactions to queue and recover states lost on node restart
+            for (txSubmit in initQueue) {
 
-                logger.info { "Adding transaction ${txSubmit.rowId} to the queue to be submitted on network $networkId" }
-                queue.offer(txSubmit)
+                if (txSubmit.txHash == null) {
+                    // Transaction taken but not yet submitted
 
-            } else if (!txSubmit.bcPersisted) {
-                // Transaction submitted but status not yet persisted to BC
+                    logger.info { "Adding transaction ${txSubmit.rowId} to the queue to be submitted on network $networkId" }
+                    queue.offer(txSubmit)
 
-                logger.info { "Adding transaction ${txSubmit.rowId} to the status update queue to be set to ${RellTransactionStatus.PENDING}" }
-                submitTxUpdates.add(EvmSubmitTransactionResult(txSubmit.rowId, RellTransactionStatus.PENDING, txSubmit.txHash!!))
+                } else if (!txSubmit.bcPersisted) {
+                    // Transaction submitted but status not yet persisted to BC
+
+                    logger.info { "Adding transaction ${txSubmit.rowId} to the status update queue to be set to ${RellTransactionStatus.PENDING}" }
+                    submitTxUpdates.add(EvmSubmitTransactionResult(txSubmit.rowId, RellTransactionStatus.PENDING, txSubmit.txHash!!))
+                }
             }
         }
 
         txSubmitJob =
                 CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-transaction-submitter") + MDCContext()) {
-                    while (isActive) {
-                        try {
-                            val txToSubmit = queue.take()
+                    withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
+                        while (isActive) {
                             try {
-                                submitTransaction(txToSubmit)
-                            } catch (e: Exception) {
-                                val errorMessage = "Failed to submit EVM transaction ${txToSubmit.rowId}: ${e.message}"
-                                logger.error(errorMessage, e)
-                                submitTxUpdates.add(EvmSubmitTransactionResult(
-                                        txToSubmit.rowId,
-                                        RellTransactionStatus.QUEUED,
-                                        failureReason = if (e is TransactionSubmitterException) e.chainMessage else null))
+                                val txToSubmit = queue.take()
+                                try {
+                                    submitTransaction(txToSubmit)
+                                } catch (e: Exception) {
+                                    val errorMessage = "Failed to submit EVM transaction ${txToSubmit.rowId}: ${e.message}"
+                                    logger.error(errorMessage, e)
+                                    submitTxUpdates.add(EvmSubmitTransactionResult(
+                                            txToSubmit.rowId,
+                                            RellTransactionStatus.QUEUED,
+                                            failureReason = if (e is TransactionSubmitterException) e.chainMessage else null))
+                                }
+                            } catch (e: CancellationException) {
+                                break
                             }
-                        } catch (e: CancellationException) {
-                            break
                         }
                     }
                 }
+
         txStatusPollJob =
                 CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-transaction-status-poller") + MDCContext()) {
-                    while (isActive) {
-                        try {
-                            pollPendingTransactions()
+                    withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
+                        while (isActive) {
+                            try {
+                                pollPendingTransactions()
 
-                            delay(txPollInterval)
-                        } catch (e: CancellationException) {
-                            break
-                        } catch (e: Exception) {
-                            logger.error("Unable to poll status on pending EVM transactions: ${e.message}", e)
+                                delay(txPollInterval)
+                            } catch (e: CancellationException) {
+                                break
+                            } catch (e: Exception) {
+                                logger.error("Unable to poll status on pending EVM transactions: ${e.message}", e)
+                            }
                         }
                     }
                 }
+
         txCancelJob =
                 CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-transaction-tx-cancel") + MDCContext()) {
-                    while (isActive) {
-                        try {
-                            val txPending = cancelQueue.take()
+                    withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
+                        while (isActive) {
                             try {
-                                cancelTransaction(txPending)
+                                val txPending = cancelQueue.take()
+                                try {
+                                    cancelTransaction(txPending)
+                                } catch (e: Exception) {
+                                    logger.error("Failed to cancel EVM transaction ${txPending.rowId}: ${e.message}", e)
+                                }
+                            } catch (e: CancellationException) {
+                                break
                             } catch (e: Exception) {
-                                logger.error("Failed to cancel EVM transaction ${txPending.rowId}: ${e.message}", e)
+                                logger.error("Unable to cancel transaction: ${e.message}", e)
                             }
-                        } catch (e: CancellationException) {
-                            break
-                        } catch (e: Exception) {
-                            logger.error("Unable to cancel transaction: ${e.message}", e)
                         }
                     }
                 }
+
         healthCheckJob =
                 CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-health-check") + MDCContext()) {
-                    while (isActive && healthCheckInterval >= 0) {
-                        try {
-                            healthCheck()
+                    withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
+                        while (isActive && healthCheckInterval >= 0) {
+                            try {
+                                healthCheck()
 
-                            delay(healthCheckInterval)
-                        } catch (e: CancellationException) {
-                            break
+                                delay(healthCheckInterval)
+                            } catch (e: CancellationException) {
+                                break
+                            }
                         }
                     }
                 }
     }
+
 
     fun isHealthy() = healthy.get()
 
@@ -178,9 +195,9 @@ open class TransactionSubmitter(
             // This will implicitly test our RPC connections
             web3jRequestHandler.ethGetBalance(
                     transactionHandler.fromAddress,
-                        DefaultBlockParameterName.LATEST
-                )
-        } catch (e: Exception) {
+                    DefaultBlockParameterName.LATEST
+            )
+        } catch (_: Exception) {
             val previouslyHealthy = healthy.getAndSet(false)
             if (previouslyHealthy) {
                 logger.warn("Unable to check wallet balance. Marking tx submitter for network id $networkId as unhealthy")
@@ -253,7 +270,7 @@ open class TransactionSubmitter(
                 if (txReceipt == null) {
                     logger.info { "Re-fetching receipt for pending transaction ${txPending.rowId}" }
 
-                val txReceiptResult = fetchTransactionReceipt(txPending.txHash, txPending.rowId)
+                    val txReceiptResult = fetchTransactionReceipt(txPending.txHash, txPending.rowId)
 
                     if (txReceiptResult.transactionReceipt.isPresent) {
                         txReceipt = txReceiptResult.transactionReceipt.get()
@@ -285,7 +302,6 @@ open class TransactionSubmitter(
             txPending: EvmPendingTx,
             currentBlockHeight: BigInteger
     ) {
-
         logger.info { "Verify receipt of transaction ${txPending.rowId} on network $networkId" }
 
         if (txReceipt.blockNumber != txPending.blockNumber) {
@@ -407,8 +423,10 @@ open class TransactionSubmitter(
         val maxPriorityFeePerGas = multiplyAndRoundUp(transaction.maxPriorityFeePerGas, cancelFeeMargin)
         val maxFeePerGas = multiplyAndRoundUp(transaction.maxFeePerGas, cancelFeeMargin)
 
-        logger.info { "Sending cancel transaction for ${txPending.rowId} / ${txPending.txHash} " +
-                "gasLimit: ${transaction.gas}, maxPriorityFeePerGas: $maxPriorityFeePerGas (prev. ${transaction.maxPriorityFeePerGas}), maxFeePerGas: $maxFeePerGas (prev. ${transaction.maxFeePerGas})" }
+        logger.info {
+            "Sending cancel transaction for ${txPending.rowId} / ${txPending.txHash} " +
+                    "gasLimit: ${transaction.gas}, maxPriorityFeePerGas: $maxPriorityFeePerGas (prev. ${transaction.maxPriorityFeePerGas}), maxFeePerGas: $maxFeePerGas (prev. ${transaction.maxFeePerGas})"
+        }
 
         // We will also remove the function data and set our own address instead of contract address to simplify the transaction
         val rawTransaction = RawTransaction.createTransaction(
@@ -426,19 +444,24 @@ open class TransactionSubmitter(
             it.signAndSend(rawTransaction)
         }
 
-        logger.info { "Cancel transaction for ${txPending.rowId} sent with txHash: ${response.transactionHash}, " +
-                "gasLimit: ${rawTransaction.gasLimit}, maxPriorityFeePerGas: $maxPriorityFeePerGas (prev. ${transaction.maxPriorityFeePerGas}), maxFeePerGas: $maxFeePerGas (prev. ${transaction.maxFeePerGas})" }
+        logger.info {
+            "Cancel transaction for ${txPending.rowId} sent with txHash: ${response.transactionHash}, " +
+                    "gasLimit: ${rawTransaction.gasLimit}, maxPriorityFeePerGas: $maxPriorityFeePerGas (prev. ${transaction.maxPriorityFeePerGas}), maxFeePerGas: $maxFeePerGas (prev. ${transaction.maxFeePerGas})"
+        }
     }
 
     fun enqueue(evmSubmitTxRellRequest: EvmSubmitTxRequest) {
 
-        logger.info { "Enqueue transaction ${evmSubmitTxRellRequest.rowId} on network $networkId" }
+        withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
 
-        withWriteConnection(storage, chainId) {
-            databaseOperations.queueTransaction(it, evmSubmitTxRellRequest, networkId)
-            true
+            logger.info { "Enqueue transaction ${evmSubmitTxRellRequest.rowId} on network $networkId" }
+
+            withWriteConnection(storage, chainId) {
+                databaseOperations.queueTransaction(it, evmSubmitTxRellRequest, networkId)
+                true
+            }
+            queue.offer(evmSubmitTxRellRequest)
         }
-        queue.offer(evmSubmitTxRellRequest)
     }
 
     open fun getSubmitTxUpdates(): List<EvmSubmitTransactionResult> {
@@ -469,16 +492,19 @@ open class TransactionSubmitter(
 
     fun addPendingTransaction(txPending: EvmPendingTx) {
 
-        if (pendingTransactions.values.any { it.rowId == txPending.rowId }) {
-            logger.info { "Already polls transaction ${txPending.rowId} for verification - replaces it" }
-            removePendingTx(txPending.rowId)
-        }
+        withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
 
-        if (!pendingTransactions.containsKey(txPending.txHash)) {
+            if (pendingTransactions.values.any { it.rowId == txPending.rowId }) {
+                logger.info { "Already polls transaction ${txPending.rowId} for verification - replaces it" }
+                removePendingTx(txPending.rowId)
+            }
 
-            pendingTransactions[txPending.txHash] = txPending
+            if (!pendingTransactions.containsKey(txPending.txHash)) {
 
-            logger.info { "Transaction ${txPending.rowId} / ${txPending.txHash} added for verification on network $networkId" }
+                pendingTransactions[txPending.txHash] = txPending
+
+                logger.info { "Transaction ${txPending.rowId} / ${txPending.txHash} added for verification on network $networkId" }
+            }
         }
     }
 
@@ -488,7 +514,8 @@ open class TransactionSubmitter(
                 .filter {
                     it.networkId == networkId &&
                             it.status.isCompleted() &&
-                            (it.completedTime ?: Long.MAX_VALUE) <= Instant.now().minus(txVerificationTime, ChronoUnit.MILLIS).toEpochMilli()
+                            (it.completedTime
+                                    ?: Long.MAX_VALUE) <= Instant.now().minus(txVerificationTime, ChronoUnit.MILLIS).toEpochMilli()
                 }
     }
 
@@ -503,21 +530,27 @@ open class TransactionSubmitter(
 
     open fun removePendingTx(requestId: Long) {
 
-        logger.info { "Removed pending transaction $requestId on network $networkId" }
+        withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
 
-        pendingTransactions
-                .filterValues { it.rowId == requestId }
-                .keys
-                .forEach { pendingTransactions.remove(it) }
+            logger.info { "Removed pending transaction $requestId on network $networkId" }
+
+            pendingTransactions
+                    .filterValues { it.rowId == requestId }
+                    .keys
+                    .forEach { pendingTransactions.remove(it) }
+        }
     }
 
     fun removeSubmitTx(bctx: EContext, requestId: Long) {
 
-        if (queue.removeIf { it.rowId == requestId }) {
-            logger.info { "Removed submit transaction $requestId on network $networkId" }
-        }
+        withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
 
-        databaseOperations.removeTransaction(bctx, requestId)
+            if (queue.removeIf { it.rowId == requestId }) {
+                logger.info { "Removed submit transaction $requestId on network $networkId" }
+            }
+
+            databaseOperations.removeTransaction(bctx, requestId)
+        }
     }
 
     open fun getPendingTxs(): Map<String, EvmPendingTx> {
