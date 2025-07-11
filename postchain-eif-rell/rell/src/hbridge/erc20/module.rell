@@ -12,7 +12,7 @@ namespace ft4 {
 }
 
 import utils: ^^.eif.utils;
-import core: ^.snapshot_core;
+import ^.core;
 
 enum bridge_mode {
     native,

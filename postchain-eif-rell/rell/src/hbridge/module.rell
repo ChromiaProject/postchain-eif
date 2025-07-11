@@ -6,6 +6,7 @@ import common: ^.eif.common;
 import utils: ^.eif.utils;
 import version: ^.eif.version;
 import lib.iccf;
+import snapshot: .erc20;
 
 namespace ft4 {
     import lib.ft4.accounts;
@@ -17,7 +18,6 @@ namespace ft4 {
     import transfer_strategy: lib.ft4.accounts.strategies.transfer;
 }
 
-import snapshot: .snapshot_erc20;
 
 struct module_args {
     /**
