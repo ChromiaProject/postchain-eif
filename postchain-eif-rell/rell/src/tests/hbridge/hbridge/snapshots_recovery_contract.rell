@@ -15,7 +15,7 @@ function test_register_recovery_contract() {
     // Register the recovery contract and verify that it is registered
     val reg_recovery_contract_tx1 = _register_recovery_contract(hub_chain_rid, network_id1, hub_chain_recovery_contract, height++);
     val reg_recovery_contract_tx2 = _register_recovery_contract(hub_chain_rid, network_id2, hub_chain_recovery_contract, height++);
-    assert_equals(get_recovery_contract(hub_chain_rid, network_id1), hub_chain_recovery_contract);
+    assert_equals(snapshot.core.get_recovery_contract(hub_chain_rid, network_id1), hub_chain_recovery_contract);
     
     // Transfer CHR from token_chain to hub_chain and verify state slot and state event amount is 300
     _do_transfer(alice, bob, chr_asset, 300L);
@@ -40,13 +40,13 @@ function test_register_recovery_contract() {
             helpers.mock_confirmation_proof_bytes(hub_chain_rid, height++), 
             x"", 0, x""
         ))
-        .op(register_recovery_contract(reg_recovery_contract_tx1, 0))
+        .op(snapshot.core.register_recovery_contract(reg_recovery_contract_tx1, 0))
         .nop().run_must_fail("This recovery contract is already registered");
 
     // Register the recovery contract again and verify that it is registered
     val hub_chain_recovery_contract2 = island1_chain_recovery_contract;
     _register_recovery_contract(hub_chain_rid, network_id1, hub_chain_recovery_contract2, height++);
-    assert_equals(get_recovery_contract(hub_chain_rid, network_id1), hub_chain_recovery_contract2);
+    assert_equals(snapshot.core.get_recovery_contract(hub_chain_rid, network_id1), hub_chain_recovery_contract2);
     // Assert that the chain account state slot has changed
     val hub_slot2 = _verify_state_slot(hub_chain_rid, network_id1, hub_chain_recovery_contract2);
     assert_not_equals(hub_slot2, hub_slot1_chr);
@@ -59,7 +59,7 @@ function test_register_recovery_contract() {
 
     // Register the first recovery contract again
     _register_recovery_contract(hub_chain_rid, network_id1, hub_chain_recovery_contract, height++);
-    assert_equals(get_recovery_contract(hub_chain_rid, network_id1), hub_chain_recovery_contract);
+    assert_equals(snapshot.core.get_recovery_contract(hub_chain_rid, network_id1), hub_chain_recovery_contract);
     // Assert that the chain account state slot has changed back to the slot1
     val hub_slot3 = _verify_state_slot(hub_chain_rid, network_id1, hub_chain_recovery_contract);
     assert_not_equals(hub_slot3, hub_slot2);
@@ -80,29 +80,29 @@ function _do_transfer(alice: account_data, bob: account_data, ft4.assets.asset, 
         .nop().run();
 }
 
-function _verify_state_slot(brid: byte_array, network_id: integer, recipient_address: byte_array): state_slot {
+function _verify_state_slot(brid: byte_array, network_id: integer, recipient_address: byte_array): snapshot.core.state_slot {
     // Verify state slot by network id and recipient address
-    val hub_slots = state_slot @* { network_id, recipient_address };
+    val hub_slots = snapshot.core.state_slot @* { network_id, recipient_address };
     assert_equals(hub_slots.size(), 1);
 
     // Verify state slot id by account
     assert_equals(
-        set(get_state_slot_ids_for_account(crosschain.ensure_blockchain_account(brid).id, network_id)), 
+        set(snapshot.get_state_slot_ids_for_account(crosschain.ensure_blockchain_account(brid).id, network_id)), 
         set([hub_slots[0].id])
     );
     
     // Verify state slot id by recipient address
     assert_equals(
-        set(get_state_slot_ids_for_address(recipient_address, network_id)), 
+        set(snapshot.core.get_state_slot_ids_for_address(recipient_address, network_id)), 
         set([hub_slots[0].id])
     );
     
     return hub_slots[0];
 }
 
-function _verify_state_event(state_slot: state_slot, recipient_address: byte_array, event_index: integer, expected: list<(byte_array, big_integer)>) {
+function _verify_state_event(state_slot: snapshot.core.state_slot, recipient_address: byte_array, event_index: integer, expected: list<(byte_array, big_integer)>) {
     val state_data = [
-        ERC20_STATE_TAG.to_gtv(),
+        snapshot.core.ERC20_STATE_TAG.to_gtv(),
         utils.evm_address_to_32_byte_array(recipient_address).to_gtv(),
         state_slot.discriminator.to_gtv(),
     ];
@@ -130,7 +130,7 @@ function test_evm_network_and_address_validation() {
             helpers.mock_confirmation_proof_bytes(brid), 
             x"", 0, x""
         ))
-        .op(register_recovery_contract(wrong_network_id_tx, 0))
+        .op(snapshot.core.register_recovery_contract(wrong_network_id_tx, 0))
         .nop().run_must_fail("Network ID must be positive");
 
     // Invalid contract address
@@ -142,7 +142,7 @@ function test_evm_network_and_address_validation() {
             helpers.mock_confirmation_proof_bytes(brid), 
             x"", 0, x""
         ))
-        .op(register_recovery_contract(wrong_contract_address_tx, 0))
+        .op(snapshot.core.register_recovery_contract(wrong_contract_address_tx, 0))
         .nop().run_must_fail("Contract address must be 20 bytes");
 }
 
@@ -152,7 +152,7 @@ function test_iccf_proof_validation() {
     // No iccf proof
     val no_iccf_proof_tx = _build_tx(brid, rell.test.op("register_recovery_contract", [(0).to_gtv(), (0).to_gtv()]));
     rell.test.tx()
-        .op(register_recovery_contract(no_iccf_proof_tx, 0))
+        .op(snapshot.core.register_recovery_contract(no_iccf_proof_tx, 0))
         .nop().run_must_fail("No proof operation present for TX");
 
     // Wrong operation name
@@ -164,7 +164,7 @@ function test_iccf_proof_validation() {
             helpers.mock_confirmation_proof_bytes(brid), 
             x"", 0, x""
         ))
-        .op(register_recovery_contract(wrong_op_tx, 0))
+        .op(snapshot.core.register_recovery_contract(wrong_op_tx, 0))
         .nop().run_must_fail("Wrong operation name <wrong_op>, expected <register_recovery_contract>");
     
     // Wrong number of arguments
@@ -176,7 +176,7 @@ function test_iccf_proof_validation() {
             helpers.mock_confirmation_proof_bytes(brid), 
             x"", 0, x""
         ))
-        .op(register_recovery_contract(wrong_nr_of_args_tx, 0))
+        .op(snapshot.core.register_recovery_contract(wrong_nr_of_args_tx, 0))
         .nop().run_must_fail("Wrong number of operation arguments <1>, expected <2>");
     
     // Wrong type of arguments
@@ -188,7 +188,7 @@ function test_iccf_proof_validation() {
             helpers.mock_confirmation_proof_bytes(brid), 
             x"", 0, x""
         ))
-        .op(register_recovery_contract(wrong_type_of_args_tx, 0))
+        .op(snapshot.core.register_recovery_contract(wrong_type_of_args_tx, 0))
         .nop().run_must_fail("Decoding type");
 
     // Wrong iccf operation index
@@ -200,7 +200,7 @@ function test_iccf_proof_validation() {
             helpers.mock_confirmation_proof_bytes(brid), 
             x"", 0, x""
         ))
-        .op(register_recovery_contract(wrong_iccf_op_index_tx, 1)) // Wrong operation index 1
+        .op(snapshot.core.register_recovery_contract(wrong_iccf_op_index_tx, 1)) // Wrong operation index 1
         .nop().run_must_fail("op_index out of range");
 
     // Successfully register recovery contract
@@ -212,9 +212,9 @@ function test_iccf_proof_validation() {
             helpers.mock_confirmation_proof_bytes(brid, height = 10, tx_index = 11), 
             x"", 0, x""
         ))
-        .op(register_recovery_contract(success_tx, 0))
+        .op(snapshot.core.register_recovery_contract(success_tx, 0))
         .nop().run();
-    assert_equals(get_recovery_contract(hub_chain_rid, network_id), hub_chain_recovery_contract);
+    assert_equals(snapshot.core.get_recovery_contract(hub_chain_rid, network_id), hub_chain_recovery_contract);
 
     // Same iccf proof again
     rell.test.tx()
@@ -224,7 +224,7 @@ function test_iccf_proof_validation() {
             helpers.mock_confirmation_proof_bytes(brid, height = 10, tx_index = 11), 
             x"", 0, x""
         ))
-        .op(register_recovery_contract(success_tx, 0))
+        .op(snapshot.core.register_recovery_contract(success_tx, 0))
         .nop().run_must_fail("ICCF transaction has already been processed");
     
     // Older block iccf proof
@@ -235,7 +235,7 @@ function test_iccf_proof_validation() {
             helpers.mock_confirmation_proof_bytes(brid, height = 9, tx_index = 10), 
             x"", 0, x""
         ))
-        .op(register_recovery_contract(success_tx, 0))
+        .op(snapshot.core.register_recovery_contract(success_tx, 0))
         .nop().run_must_fail("ICCF transaction is older than previous, confirmed in block 10 transaction 11");
     
     // Older tx index iccf proof
@@ -246,6 +246,6 @@ function test_iccf_proof_validation() {
             helpers.mock_confirmation_proof_bytes(brid, height = 10, tx_index = 10), 
             x"", 0, x""
         ))
-        .op(register_recovery_contract(success_tx, 0))
+        .op(snapshot.core.register_recovery_contract(success_tx, 0))
         .nop().run_must_fail("ICCF transaction is older than previous, confirmed in block 10 transaction 11");
 }

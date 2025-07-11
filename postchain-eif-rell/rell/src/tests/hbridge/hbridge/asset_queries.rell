@@ -2,7 +2,7 @@ import hbridge.*;
 
 function test_get_registered_erc20_assets() {
     // Empty list
-    assert_true(get_registered_erc20_assets(network_id1).empty());
+    assert_true(snapshot.get_registered_erc20_assets(network_id1).empty());
 
     // Register FT4 and ERC20 assets
     val chr_asset = register_foreign_asset(CHR, network_id1);
@@ -13,12 +13,12 @@ function test_get_registered_erc20_assets() {
 
     // Asserts / network_id1
     assert_equals(
-        get_registered_erc20_assets(network_id1) @* {} (_ = .token_address, _ = .ft_asset_id),
+        snapshot.get_registered_erc20_assets(network_id1) @* {} (_ = .token_address, _ = .ft_asset_id),
         [(CHR.token_address, chr_asset.id)]
     );
     // Asserts / network_id2
     assert_equals(
-        get_registered_erc20_assets(network_id2) @* {} (_ = .token_address, _ = .ft_asset_id),
+        snapshot.get_registered_erc20_assets(network_id2) @* {} (_ = .token_address, _ = .ft_asset_id),
         [
             (FOO.token_address, chr_asset.id), // ERC20 FOO <-> FT4 CHR
             (BAR.token_address, bar_asset.id)

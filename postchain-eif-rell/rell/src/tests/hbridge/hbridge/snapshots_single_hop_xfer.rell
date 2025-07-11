@@ -28,11 +28,11 @@ function test_single_hop_cross_xfer__state_slots_emitted_on_init_transfer_to_ori
     assert_equals(assets.get_asset_balance(alice.account, chr_asset), 700);
 
     // verify alice account state slot balance
-    val alice_slots = state_slot @* { .network_id == network_id1, .recipient_address == alice.evm_address, state_slot_type.erc20 };
+    val alice_slots = snapshot.core.state_slot @* { .network_id == network_id1, .recipient_address == alice.evm_address, snapshot.core.state_slot_type.erc20 };
     assert_equals(alice_slots.size(), 1);
 
     // verify the hub_chain account state slot
-    val hub_slots = state_slot @* { .network_id == network_id1, .recipient_address == hub_chain_recovery_contract, state_slot_type.erc20 };
+    val hub_slots = snapshot.core.state_slot @* { .network_id == network_id1, .recipient_address == hub_chain_recovery_contract, snapshot.core.state_slot_type.erc20 };
     assert_equals(hub_slots.size(), 1);
 
     // verify eif states
@@ -41,7 +41,7 @@ function test_single_hop_cross_xfer__state_slots_emitted_on_init_transfer_to_ori
         ("eif_state", [
             alice_slots[0].id.to_gtv(),
             [
-                ERC20_STATE_TAG.to_gtv(),
+                snapshot.core.ERC20_STATE_TAG.to_gtv(),
                 utils.evm_address_to_32_byte_array(alice.evm_address).to_gtv(),
                 alice_slots[0].discriminator.to_gtv(),
                 utils.evm_address_to_32_byte_array(CHR.token_address).to_gtv(),
@@ -53,7 +53,7 @@ function test_single_hop_cross_xfer__state_slots_emitted_on_init_transfer_to_ori
         ("eif_state", [
             hub_slots[0].id.to_gtv(),
             [
-                ERC20_STATE_TAG.to_gtv(),
+                snapshot.core.ERC20_STATE_TAG.to_gtv(),
                 utils.evm_address_to_32_byte_array(hub_chain_recovery_contract).to_gtv(),
                 hub_slots[0].discriminator.to_gtv(),
                 utils.evm_address_to_32_byte_array(CHR.token_address).to_gtv(),
@@ -70,7 +70,7 @@ function test_single_hop_cross_xfer__state_slots_emitted_on_apply_transfer_to_de
 
     // create a crosschain asset issued on the token_chain, and register erc20 asset
     val chr_asset = register_crosschain_asset(CHR, issuing_blockchain_rid = token_chain_rid, origin_blockchain_rid = token_chain_rid).asset;
-    register_erc20_asset(chr_asset, CHR, network_id1, enable_snapshots = true, bridge_mode = hbridge.bridge_mode.foreign);
+    register_erc20_asset(chr_asset, CHR, network_id1, enable_snapshots = true, bridge_mode = snapshot.bridge_mode.foreign);
 
     // build init tx
     val init_tx = _build_init_tx(
@@ -94,11 +94,11 @@ function test_single_hop_cross_xfer__state_slots_emitted_on_apply_transfer_to_de
     assert_equals(assets.get_asset_balance(bob.account, chr_asset), 300L);
 
     // verify alice account state slot balance
-    val alice_slots = state_slot @* { .network_id == network_id1, .recipient_address == alice.evm_address, state_slot_type.erc20 };
+    val alice_slots = snapshot.core.state_slot @* { .network_id == network_id1, .recipient_address == alice.evm_address, snapshot.core.state_slot_type.erc20 };
     assert_true(empty(alice_slots));
 
     // verify the hub_chain account state slot
-    val bob_slots = state_slot @* { .network_id == network_id1, .recipient_address == bob.evm_address, state_slot_type.erc20 };
+    val bob_slots = snapshot.core.state_slot @* { .network_id == network_id1, .recipient_address == bob.evm_address, snapshot.core.state_slot_type.erc20 };
     assert_equals(bob_slots.size(), 1);
 
     // verify eif states
@@ -107,7 +107,7 @@ function test_single_hop_cross_xfer__state_slots_emitted_on_apply_transfer_to_de
         ("eif_state", [
             bob_slots[0].id.to_gtv(),
             [
-                ERC20_STATE_TAG.to_gtv(),
+                snapshot.core.ERC20_STATE_TAG.to_gtv(),
                 utils.evm_address_to_32_byte_array(bob.evm_address).to_gtv(),
                 bob_slots[0].discriminator.to_gtv(),
                 utils.evm_address_to_32_byte_array(CHR.token_address).to_gtv(),
