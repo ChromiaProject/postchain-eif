@@ -4,72 +4,25 @@ entity bridge_contract {
     key network_id, contract_address;
 }
 
-struct bridge_contract_info {
-    contract_address: byte_array;
-    evm_read_offset: integer;
-    erc20_assets: list<erc20_asset_info>;
-}
-
-entity bridge_erc20_asset {
-    key bridge_contract, erc20_asset;
-}
-
-/**
- * Creates a bridge contract if it doesn't exist, creates an ERC20 asset, and registers the asset on the bridge.
- *
- * @param network_id The ID of the EVM network.
- * @param token_address The address of the ERC20 token.
- * @param asset The asset to register.
- * @param mode The mode of the bridge.
- * @param use_snapshots Whether to use snapshots.
- * @param bridge_address The address of the bridge contract.
- */
-function register_bridge_and_erc20_asset(
-    network_id: integer,
-    token_address: byte_array,
-    ft4.assets.asset,
-    mode: bridge_mode,
-    use_snapshots: boolean = false,
-    bridge_address: byte_array
-) {
-    val erc20_asset = register_erc20_asset(network_id, token_address, asset, mode, use_snapshots);
-    val bridge_contract = get_or_create_bridge(network_id, bridge_address);
-    create bridge_erc20_asset(bridge_contract, erc20_asset);
-}
-
-/**
- * Creates a bridge contract if it doesn't exist, and registers multiple ERC20 assets on it.
- *
- * @param network_id The ID of the EVM network.
- * @param bridge_address The address of the bridge contract.
- * @param erc20_assets The list of ERC20 assets to register.
- */
-function register_bridge_with_erc20_assets(network_id: integer, bridge_address: byte_array, erc20_assets: list<erc20_asset>) {
-    val bridge_contract = get_or_create_bridge(network_id, bridge_address);
-
-    for (erc20_asset in erc20_assets) {
-        require(erc20_asset.network_id == bridge_contract.network_id, "Bridge must be part of the same network as the asset");
-        create bridge_erc20_asset(bridge_contract, erc20_asset);
-    }
-}
-
-/**
- * Remove a bridge and all its assets.
- */
-function unregister_bridge(network_id: integer, bridge_address: byte_array) {
-    val bridge = bridge_contract @? { network_id, bridge_address };
-    if (exists(bridge)) {
-        delete bridge_erc20_asset @* { bridge };
-        delete bridge;
-
-        log("Removed bridge and assets with contract address %s on network %s".format(bridge_address, network_id));
-    }
-}
-
 function get_or_create_bridge(network_id: integer, bridge_address: byte_array) {
     return bridge_contract @? { network_id, bridge_address }
         ?: create bridge_contract(network_id, bridge_address);
 }
+
+/**
+ * Remove a bridge.
+ */
+function unregister_bridge(network_id: integer, bridge_address: byte_array) {
+    val bridge = bridge_contract @? { network_id, bridge_address };
+    if (exists(bridge)) {
+        before_removing_bridge_contract(bridge);
+        delete bridge;
+
+        log("Removed bridge with contract address %s on network %s".format(bridge_address, network_id));
+    }
+}
+
+@extendable function before_removing_bridge_contract(bridge: bridge_contract) {}
 
 function get_evm_read_offset(network_id: integer): integer {
     return map<text, integer>.from_gtv_pretty(chain_context.args.evm_read_offsets)

@@ -70,20 +70,8 @@ operation register_recovery_contract(tx_to_prove: gtx_transaction, op_index: int
     if (exists(recovery_contract)) {
         require(recovery_contract.contract_address != contract_address, "This recovery contract is already registered");
         val blockchain_account = ft4.crosschain.ensure_blockchain_account(blockchain_rid);
-        // For all existing recovery contract state slots, for all ERC20 assets, emit eif_state events with amount 0
-        val erc20_assets = (s: state_slot, sl: local_erc20_state_slot_binding) @* {
-            sl.account == blockchain_account,
-            sl.state_slot == s,
-            s.recipient_address == recovery_contract.contract_address,
-            s.network_id == network_id,
-            s.type == state_slot_type.erc20,
-            s.local == true,
-        } (@group s, @list sl.erc20_asset) @ {} (@map $);
         
-        for ((slot, assets) in erc20_assets) {
-            emit_erc20_state_eif_event(slot, assets @* {} (balance_record(.token_address, 0L)));
-            delete local_erc20_state_slot_binding @* { slot }; // Unbind state slots
-        }
+        before_removing_recovery_contract(recovery_contract, blockchain_account);
 
         // Unlink and delete recovery contract
         _unlink_evm_sc_account(recovery_contract.contract_address, network_id, blockchain_account);
@@ -99,3 +87,5 @@ operation register_recovery_contract(tx_to_prove: gtx_transaction, op_index: int
         _link_evm_sc_account(contract_address, network_id, ft4.crosschain.ensure_blockchain_account(blockchain_rid));
     }    
 }
+
+@extendable function before_removing_recovery_contract(recovery_contract, blockchain_account: ft4.accounts.account) {}

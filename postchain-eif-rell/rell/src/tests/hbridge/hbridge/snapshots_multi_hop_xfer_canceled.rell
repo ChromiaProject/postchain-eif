@@ -21,7 +21,7 @@ function test_multi_hop_cross_xfer__state_slots_emitted_on_cancel_transfer_to_de
 
     // create a crosschain asset issued on the token_chain, and register erc20 asset
     val chr_asset = register_crosschain_asset(CHR, issuing_blockchain_rid = token_chain_rid, origin_blockchain_rid = hub_chain_rid).asset;
-    register_erc20_asset(chr_asset, CHR, network_id1, enable_snapshots = true, bridge_mode = hbridge.bridge_mode.foreign);
+    register_erc20_asset(chr_asset, CHR, network_id1, enable_snapshots = true, bridge_mode = snapshot.bridge_mode.foreign);
 
     // build init tx
     val init_tx = _build_init_tx(
@@ -46,7 +46,7 @@ function test_multi_hop_cross_xfer__state_slots_emitted_on_cancel_transfer_to_de
         .run();
 
     // no slots created, no events emitted
-    assert_true(empty(state_slot @* {}));
+    assert_true(empty(snapshot.core.state_slot @* {}));
     assert_true(rell.test.get_events().empty());
 }
 
@@ -58,7 +58,7 @@ function test_multi_hop_cross_xfer__state_slots_emitted_on_unapply_transfer_to_i
 
     // create a crosschain asset issued on the token_chain, and register erc20 asset
     val chr_asset = register_crosschain_asset(CHR, issuing_blockchain_rid = token_chain_rid, origin_blockchain_rid = token_chain_rid).asset;
-    register_erc20_asset(chr_asset, CHR, network_id1, enable_snapshots = true, bridge_mode = hbridge.bridge_mode.foreign);
+    register_erc20_asset(chr_asset, CHR, network_id1, enable_snapshots = true, bridge_mode = snapshot.bridge_mode.foreign);
 
     // register recovery contract for the island1_chain
     _register_recovery_contract(island1_chain_rid, network_id1, island1_chain_recovery_contract);
@@ -98,10 +98,10 @@ function test_multi_hop_cross_xfer__state_slots_emitted_on_unapply_transfer_to_i
     assert_equals(assets.get_asset_balance(crosschain.ensure_blockchain_account(island1_chain_rid), chr_asset), 0L);
 
     // verify the island1_chain account state slot
-    val island1_slots = state_slot @* { .network_id == network_id1, .recipient_address == island1_chain_recovery_contract, state_slot_type.erc20 };
+    val island1_slots = snapshot.core.state_slot @* { .network_id == network_id1, .recipient_address == island1_chain_recovery_contract, snapshot.core.state_slot_type.erc20 };
     assert_equals(island1_slots.size(), 1);
     // there are no other slots
-    assert_true(empty(state_slot @* { .recipient_address != island1_chain_recovery_contract }));
+    assert_true(empty(snapshot.core.state_slot @* { .recipient_address != island1_chain_recovery_contract }));
 
     // verify eif states
     assert_events(
@@ -109,7 +109,7 @@ function test_multi_hop_cross_xfer__state_slots_emitted_on_unapply_transfer_to_i
         ("eif_state", [
             island1_slots[0].id.to_gtv(),
             [
-                ERC20_STATE_TAG.to_gtv(),
+                snapshot.core.ERC20_STATE_TAG.to_gtv(),
                 utils.evm_address_to_32_byte_array(island1_chain_recovery_contract).to_gtv(),
                 island1_slots[0].discriminator.to_gtv(),
                 utils.evm_address_to_32_byte_array(CHR.token_address).to_gtv(),
@@ -184,13 +184,13 @@ function test_multi_hop_cross_xfer__state_slots_emitted_on_revert_transfer_to_or
     assert_equals(assets.get_asset_balance(alice.account, chr_asset), 1000L);
 
     // verify alice account state slot balance
-    val alice_slots = state_slot @* { .network_id == network_id1, .recipient_address == alice.evm_address, state_slot_type.erc20 };
+    val alice_slots = snapshot.core.state_slot @* { .network_id == network_id1, .recipient_address == alice.evm_address, snapshot.core.state_slot_type.erc20 };
     assert_equals(alice_slots.size(), 1);
     // verify the hub_chain account state slot
-    val hub_slots = state_slot @* { .network_id == network_id1, .recipient_address == hub_chain_recovery_contract, state_slot_type.erc20 };
+    val hub_slots = snapshot.core.state_slot @* { .network_id == network_id1, .recipient_address == hub_chain_recovery_contract, snapshot.core.state_slot_type.erc20 };
     assert_equals(hub_slots.size(), 1);
     // there are no other slots
-    assert_equals((state_slot @* {}).size(), 2);
+    assert_equals((snapshot.core.state_slot @* {}).size(), 2);
 
     // verify eif states
     assert_events(
@@ -198,7 +198,7 @@ function test_multi_hop_cross_xfer__state_slots_emitted_on_revert_transfer_to_or
         ("eif_state", [
             hub_slots[0].id.to_gtv(),
             [
-                ERC20_STATE_TAG.to_gtv(),
+                snapshot.core.ERC20_STATE_TAG.to_gtv(),
                 utils.evm_address_to_32_byte_array(hub_chain_recovery_contract).to_gtv(),
                 hub_slots[0].discriminator.to_gtv(),
                 utils.evm_address_to_32_byte_array(CHR.token_address).to_gtv(),
@@ -209,7 +209,7 @@ function test_multi_hop_cross_xfer__state_slots_emitted_on_revert_transfer_to_or
         ("eif_state", [
             alice_slots[0].id.to_gtv(),
             [
-                ERC20_STATE_TAG.to_gtv(),
+                snapshot.core.ERC20_STATE_TAG.to_gtv(),
                 utils.evm_address_to_32_byte_array(alice.evm_address).to_gtv(),
                 alice_slots[0].discriminator.to_gtv(),
                 utils.evm_address_to_32_byte_array(CHR.token_address).to_gtv(),

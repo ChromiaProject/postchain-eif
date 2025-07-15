@@ -19,7 +19,10 @@ enum state_slot_type {
     erc20,
     // temporary state which facilitates withdrawals which are pending at the time of mass exit
     erc20_withdrawal,
-    erc721
+    erc721,
+    erc721_withdrawal,
+    erc1155,
+    erc1155_withdrawal
 }
 
 entity state_slot {
@@ -30,11 +33,6 @@ entity state_slot {
     local: boolean;
     discriminator: big_integer; // binds slot to a specific (v1) network, or (v2) network and bridge contract address
     index network_id, recipient_address, type, local;
-}
-
-entity erc20_asset_snapshots_enabled {
-    key erc20_asset;
-    key ft4.assets.asset; // only one erc20 asset can be linked to ft4 asset when snapshots are enabled
 }
 
 struct state_data {
@@ -54,22 +52,6 @@ function emit_state_event(state_id: integer, state_parts: list<gtv>) {
     op_context.emit_event("eif_state", state_data(state_id, state_parts).to_gtv());
 }
 
-function enable_erc20_asset_snapshots(erc20_asset) {
-    create erc20_asset_snapshots_enabled(erc20_asset.asset, erc20_asset);
-}
-
-/**
- * This entity is used to track the relationship between accounts, ERC20 tokens,
- * and their corresponding state slots in the Merkle tree.
- *
- * The balance for this binding is not stored directly in this entity,
- * but can be retrieved as needed from the FT4 account's balance for the given ERC20 asset.
- */
-entity local_erc20_state_slot_binding {
-    key ft4.accounts.account, erc20_asset; // only one slot per account per token
-    index state_slot; // slot might collect info from multiple assets
-}
-
 function get_next_state_slot_id(): integer {
     val last_slot_id = state_slot @? { } (@sort_desc .id) limit 1;
     if (exists(last_slot_id)) {
@@ -77,86 +59,6 @@ function get_next_state_slot_id(): integer {
     } else {
         return 0;
     }
-}
-
-function get_local_erc20_state_slot(ft4.accounts.account, erc20_asset): state_slot? {
-    return local_erc20_state_slot_binding @? { account, erc20_asset } .state_slot;
-}
-
-function get_or_create_local_erc20_state_slot(ft4.accounts.account, erc20_asset): state_slot? {
-    val network_id = erc20_asset.network_id;
-
-    val account_address = find_address_for_ft4_account(account, network_id);
-    if (empty(account_address)) return null;
-
-    val bound_slot = local_erc20_state_slot_binding @? { account, erc20_asset } .state_slot;
-    if (exists(bound_slot)) return bound_slot;
-
-    var existing_slot = state_slot @? { network_id, account_address, state_slot_type.erc20, .local == true };
-
-    if (empty(existing_slot)) {
-        val discriminator = compute_erc20_asset_discriminator(erc20_asset);
-        if (empty(discriminator)) return null;
-
-        existing_slot = create state_slot (
-            id = get_next_state_slot_id(),
-            network_id = network_id,
-            recipient_address = account_address,
-            type = state_slot_type.erc20,
-            discriminator = discriminator,
-            local = true
-        );
-    }
-
-    create local_erc20_state_slot_binding (account, erc20_asset, existing_slot);
-
-    return existing_slot;
-}
-
-function get_or_create_state_slot(network_id: integer, token_address: byte_array, beneficiary: byte_array, type: state_slot_type): state_slot? {
-    val asset = erc20_asset @? { token_address, network_id };
-
-    if (not exists(asset)) return null;
-    if (not exists(erc20_asset_snapshots_enabled @? { .erc20_asset == asset })) return null;
-
-    val discriminator = compute_erc20_asset_discriminator(asset);
-    if (empty(discriminator)) return null;
-
-    var state_slot = state_slot @? {
-        network_id,
-        .recipient_address == beneficiary,
-        type,
-        .local == true,
-        discriminator,
-    };
-    
-    if (empty(state_slot)) {
-        state_slot = create state_slot (
-            id = get_next_state_slot_id(),
-            network_id,
-            recipient_address = beneficiary,
-            type,
-            local = true,
-            discriminator,
-        );
-    }
-
-    return state_slot;
-}
-
-function emit_local_erc20_state_slot(state_slot) {
-    val balance_records = list<balance_record>();
-
-    // Note: there must be at least one record per state_slot, otherwise we don't know that slot is erc20_asset
-    // @+ ensures there's at least one
-    for (lss in local_erc20_state_slot_binding @+ { state_slot } (.account, erc20_asset = .erc20_asset.to_struct())) {
-        val amount = ft4.assets.get_asset_balance(lss.account, lss.erc20_asset.asset);
-        balance_records.add(balance_record(lss.erc20_asset.token_address, amount));
-    }
-
-    // Note: we must emit it even if there are no records! 
-    // It's important to overwrite previous state with empty state to signal that the slot is empty
-    emit_erc20_state_eif_event(state_slot, balance_records);
 }
 
 function emit_erc20_state_eif_event(state_slot, balance_records: list<balance_record>) {
@@ -179,92 +81,6 @@ function emit_erc20_state_eif_event(state_slot, balance_records: list<balance_re
     
     emit_state_event(state_slot_data.id, state_parts);
 }
-
-@extend(ft4.assets.after_transfer) function (from: ft4.accounts.account, to: ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
-    val erc20_asset = erc20_asset_snapshots_enabled @? { asset } .erc20_asset;
-    if (exists(erc20_asset)) {
-        val from_slot = get_local_erc20_state_slot(from, erc20_asset);
-        if (exists(from_slot)) emit_local_erc20_state_slot(from_slot);
-
-        val to_slot = get_or_create_local_erc20_state_slot(to, erc20_asset);
-        if (exists(to_slot)) emit_local_erc20_state_slot(to_slot);
-    }
-}
-
-@extend(ft4.assets.after_mint) function (ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
-    val erc20_asset = erc20_asset_snapshots_enabled @? { asset } .erc20_asset;
-    if (exists(erc20_asset)) {
-        val slot = get_or_create_local_erc20_state_slot(account, erc20_asset);
-        if (exists(slot)) emit_local_erc20_state_slot(slot);
-    }
-}
-
-@extend(ft4.assets.after_burn) function (ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
-    val erc20_asset = erc20_asset_snapshots_enabled @? { asset } .erc20_asset;
-    if (exists(erc20_asset)) {
-        val slot = get_local_erc20_state_slot(account, erc20_asset);
-        if (exists(slot)) emit_local_erc20_state_slot(slot);
-    }
-}
-
-function ensure_slots_and_emit_state_events_for_account(ft4.accounts.account, network_id: integer) {
-    val address = find_address_for_ft4_account(account, network_id);
-    if (empty(address)) return;
-
-    val assets = (b: ft4.assets.balance, e: erc20_asset_snapshots_enabled) @* {
-        b.account == account,
-        b.asset == e.asset,
-    } (.erc20_asset);
-    for (asset in assets) {
-        val slot = get_or_create_local_erc20_state_slot(account, asset);
-        if (exists(slot)) emit_local_erc20_state_slot(slot);
-    }
-}
-
-/*
- * A remote state slots are used to track balances in other blockchains on Chromia
- * which are downstream of the bridge.
- * 
- * Given that we don't update balances synchronously, remote might be slightly out of sync.
- * We still need to enforce that the sum of balances in remote state slots is less than
- * or equal to the balance of the downstream blockchain.
- * Updates which violate these balance make state slots temporarily inactive.
- * They can be reactivated when the remote balance is updated.
- **/
-
-/*
-
- // Implementation of remote state slots is not part of the current release,
- // the commented out code is a sketch for the future implementation.
-
-entity remote_blockchain_erc20_state_sum {
-    key blockchain_rid: byte_array, erc20_asset;
-    mutable amount: big_integer;
-}
-
-entity remote_erc20_state_slot {
-    key state_slot;
-    blockchain_rid: byte_array;
-    erc20_asset;
-    mutable balance: big_integer;
-    mutable active: boolean; // slot is inactive when 
-}
-
-function emit_remote_erc20_state_slot(slot: remote_erc20_state_slot) {
-    val state_data = slot.to_struct();
-    val balance_records = list<balance_record>();
-    if (state_data.balance > 0) {
-        balance_records.add(balance_record(state_data.erc20_asset.token_address, state_data.balance));
-    }
-    emit_erc20_state(state_data.state_slot, balance_records);
-}
-
-function update_remote_erc20_state_slot(slot: remote_erc20_state_slot, balance: big_integer) {
-    val old_balance = slot.balance;
-    val delta = balance - old_balance;
-    val sum = remote_blockchain_erc20_state_sum @ { slot.blockchain_rid, slot.erc20_asset } .amount;
-}    
-*/
 
 entity recovery_contract {
     index blockchain_rid: byte_array,
@@ -301,26 +117,4 @@ function validate_and_update_recovery_contract_auth(iccf_auth_data) {
 
     auth.latest_height = height;
     auth.latest_tx_index = tx_index;
-}
-
-@extend(ft4.crosschain.after_crosschain_balance_change) function (
-    sender: ft4.accounts.account,
-    recipient: ft4.accounts.account,
-    ft4.assets.asset,
-    amount: big_integer,
-    has_changed_sender: boolean,
-    has_changed_recipient: boolean
-) {
-    val erc20_asset = erc20_asset_snapshots_enabled @? { asset } .erc20_asset;
-    if (empty(erc20_asset)) return;
-
-    if (has_changed_sender) {
-        val sender_slot = get_or_create_local_erc20_state_slot(sender, erc20_asset);
-        if (exists(sender_slot)) emit_local_erc20_state_slot(sender_slot);
-    }
-
-    if (has_changed_recipient) {
-        val recipient_slot = get_or_create_local_erc20_state_slot(recipient, erc20_asset);
-        if (exists(recipient_slot)) emit_local_erc20_state_slot(recipient_slot);
-    }
 }
