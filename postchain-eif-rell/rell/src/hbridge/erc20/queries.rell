@@ -48,7 +48,7 @@ query get_withdrawal_state_slot_ids_for_address(beneficiary: byte_array, network
     return core.state_slot @* {
         .recipient_address == beneficiary,
         .network_id == network_id,
-        .type == core.state_slot_type.erc20_withdrawal,
+        .type == state_slot_type.erc20_withdrawal,
         .local == true
     } (.id);
 }

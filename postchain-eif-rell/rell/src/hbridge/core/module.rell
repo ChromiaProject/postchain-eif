@@ -12,7 +12,7 @@ namespace ft4 {
 }
 
 import utils: ^^.eif.utils;
-
+import ^.*;
 
 struct module_args {
     evm_read_offsets: gtv = map<text, integer>().to_gtv();

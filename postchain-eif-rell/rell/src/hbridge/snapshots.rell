@@ -1,3 +1,20 @@
+/**
+ * The type of state slot.
+ * 
+ * The state slot's id represents its position in the Merkle tree.
+ * Each state slot is associated with a single account and recipient address.
+ * One account may use multiple state slots corresponding to different protocols, 
+ * bridge contracts, networks, etc.
+ */
+enum state_slot_type {    
+    erc20,
+    /** Temporary state which facilitates withdrawals which are pending at the time of mass exit */
+    erc20_withdrawal,
+    erc721,
+    erc721_withdrawal,
+    erc1155,
+    erc1155_withdrawal
+}
 
 // hbridge:erc20_withdrawal:v1 followed by 7x 01 bytes, 32 bytes in total
 val ERC20_WITHDRAWAL_STATE_TAG = x"686272696467653a65726332305f77697468647261773a763101010101010101";
@@ -9,7 +26,7 @@ function add_erc20_withdrawal_to_snapshot(ew: erc20_withdrawal) {
         network_id = withdrawal_info.network_id,
         token_address = withdrawal_info.token_address,
         beneficiary = withdrawal_info.beneficiary,
-        type = snapshot.core.state_slot_type.erc20_withdrawal
+        type = state_slot_type.erc20_withdrawal
     );
 
     if (empty(state_slot)) return;

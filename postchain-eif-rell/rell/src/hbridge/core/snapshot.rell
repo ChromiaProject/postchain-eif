@@ -14,17 +14,6 @@
  * different contracts, protocols, networks, etc. It also includes a recipient address.
  */
 
-
-enum state_slot_type {    
-    erc20,
-    // temporary state which facilitates withdrawals which are pending at the time of mass exit
-    erc20_withdrawal,
-    erc721,
-    erc721_withdrawal,
-    erc1155,
-    erc1155_withdrawal
-}
-
 entity state_slot {
     key id: integer;
     network_id: integer;

@@ -32,7 +32,7 @@ function get_or_create_local_erc20_state_slot(ft4.accounts.account, erc20_asset)
     val bound_slot = local_erc20_state_slot_binding @? { account, erc20_asset } .state_slot;
     if (exists(bound_slot)) return bound_slot;
 
-    var existing_slot = core.state_slot @? { network_id, account_address, core.state_slot_type.erc20, .local == true };
+    var existing_slot = core.state_slot @? { network_id, account_address, state_slot_type.erc20, .local == true };
 
     if (empty(existing_slot)) {
         val discriminator = compute_erc20_asset_discriminator(erc20_asset);
@@ -42,7 +42,7 @@ function get_or_create_local_erc20_state_slot(ft4.accounts.account, erc20_asset)
             id = core.get_next_state_slot_id(),
             network_id = network_id,
             recipient_address = account_address,
-            type = core.state_slot_type.erc20,
+            type = state_slot_type.erc20,
             discriminator = discriminator,
             local = true
         );
@@ -53,7 +53,7 @@ function get_or_create_local_erc20_state_slot(ft4.accounts.account, erc20_asset)
     return existing_slot;
 }
 
-function get_or_create_state_slot(network_id: integer, token_address: byte_array, beneficiary: byte_array, type: core.state_slot_type): core.state_slot? {
+function get_or_create_state_slot(network_id: integer, token_address: byte_array, beneficiary: byte_array, type: state_slot_type): core.state_slot? {
     val asset = erc20_asset @? { token_address, network_id };
 
     if (not exists(asset)) return null;
@@ -192,7 +192,7 @@ function update_remote_erc20_state_slot(slot: remote_erc20_state_slot, balance: 
         sl.state_slot == s,
         s.recipient_address == recovery_contract.contract_address,
         s.network_id == recovery_contract.network_id,
-        s.type == core.state_slot_type.erc20,
+        s.type == state_slot_type.erc20,
         s.local == true,
     } (@group s, @list sl.erc20_asset) @ {} (@map $);
     
