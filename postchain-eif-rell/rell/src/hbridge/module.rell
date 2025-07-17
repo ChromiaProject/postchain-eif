@@ -31,6 +31,11 @@ struct module_args {
     version: integer = 1;
 }
 
+enum bridge_mode {
+    native,
+    foreign,
+}
+
 // Nothing really stops us from accepting deposits from any EVM address,
 // except that it might be icky and easier to exploit via client (front-end) attacks.
 val need_consent_on_deposit = true;

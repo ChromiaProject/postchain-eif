@@ -102,7 +102,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
         return;
     }
 
-    if (erc20.bridge_mode == snapshot.bridge_mode.native) {
+    if (erc20.bridge_mode == bridge_mode.native) {
         val bridge_account = snapshot.core.ensure_bridge_account(erc20.virtual_blockchain_rid);
         if (ft4.assets.get_asset_balance(bridge_account, erc20.asset) < event.amount) {
             log("Deposit event bounced: insufficient balance of asset %s: ERC20 token %s, sender %s"
