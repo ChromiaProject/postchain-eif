@@ -1,5 +1,6 @@
 package net.postchain.eif.transaction
 
+import mu.withLoggingContext
 import net.postchain.PostchainContext
 import net.postchain.base.data.DatabaseAccess
 import net.postchain.base.withReadConnection
@@ -8,25 +9,26 @@ import net.postchain.common.BlockchainRid
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.exception.UserMistake
 import net.postchain.core.BlockchainProcess
+import net.postchain.core.EContext
 import net.postchain.core.NODE_ID_READ_ONLY
 import net.postchain.core.SynchronizationInfrastructureExtension
-import net.postchain.eif.web3j.Web3jRequestHandler
-import net.postchain.eif.web3j.Web3jServiceFactory
+import net.postchain.eif.metrics.NETWORK_ID_TAG
 import net.postchain.eif.metrics.RpcUsageMetrics
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.GET_TRANSACTION
+import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.logger
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension
 import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Companion.GET_SYSTEM_ANCHORING_BLOCKCHAIN_RID_QUERY
 import net.postchain.eif.transaction.config.EvmTransactionSubmitterConfig
 import net.postchain.eif.transaction.config.TransactionSubmitterBlockchainConfig
+import net.postchain.eif.transaction.gas.EIP1559FeeEstimatorFactory
 import net.postchain.eif.transaction.signerupdate.EvmSignerUpdateSpecialTxExtension
+import net.postchain.eif.web3j.Web3jRawTransactionHandler
+import net.postchain.eif.web3j.Web3jRequestHandler
+import net.postchain.eif.web3j.Web3jServiceFactory
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.mapper.toObject
 import net.postchain.gtx.GTXModule
 import net.postchain.gtx.GTXModuleAware
-import net.postchain.core.EContext
-import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.logger
-import net.postchain.eif.transaction.gas.EIP1559FeeEstimatorFactory
-import net.postchain.eif.web3j.Web3jRawTransactionHandler
 import java.math.BigInteger
 
 class TransactionSubmitterSynchronizationInfrastructureExtension(private val postchainContext: PostchainContext) : SynchronizationInfrastructureExtension {
@@ -138,11 +140,14 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
         withReadWriteConnection(postchainContext.sharedStorage, chainID) {
             for (queuedTransaction in databaseOperations.getQueuedTransactions(it, networkId)) {
 
-                if (txTakenByThisNode(module, it, queuedTransaction.rowId)) {
-                    queue.add(queuedTransaction)
-                } else {
-                    logger.info { "Transaction ${queuedTransaction.rowId} is no longer processed by this node" }
-                    databaseOperations.removeTransaction(it, queuedTransaction.rowId)
+                withLoggingContext(NETWORK_ID_TAG to queuedTransaction.networkId.toString()) {
+
+                    if (txTakenByThisNode(module, it, queuedTransaction.rowId)) {
+                        queue.add(queuedTransaction)
+                    } else {
+                        logger.info { "Transaction ${queuedTransaction.rowId} is no longer processed by this node" }
+                        databaseOperations.removeTransaction(it, queuedTransaction.rowId)
+                    }
                 }
             }
         }

@@ -5,7 +5,6 @@ import assertk.assertions.containsExactly
 import assertk.assertions.isEqualTo
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
-import net.postchain.common.wrap
 import net.postchain.core.BlockchainEngine
 import net.postchain.core.block.BlockQueries
 import net.postchain.eif.contracts.TestToken
@@ -75,6 +74,7 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
         val eventsToRead = listOf(TokenBridge.DEPOSITEDERC20_EVENT)
 
         val evmEventProcessor = EvmEventProcessor(
+                1,
                 BigInteger.ONE,
                 100L,
         )
@@ -219,6 +219,7 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
         }
 
         val evmEventProcessor = EvmEventProcessor(
+                1,
                 BigInteger.ONE,
                 100L,
         )
