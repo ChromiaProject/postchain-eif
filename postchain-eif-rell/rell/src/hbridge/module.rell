@@ -1,6 +1,17 @@
 @mount("eif.hbridge")
 module;
 
+/**
+ * Main HBridge module.
+ *
+ * Depends on the `core` and `erc20` modules to provide full support for
+ * bridging ERC20 tokens between EVM and FT4.
+ *
+ * Supports EVM event processing, account linking, snapshot management,
+ * and ERC20 token registration. Also handles deposit and withdrawal flows.
+ */
+
+
 import messaging: ^.eif.messaging;
 import common: ^.eif.common;
 import utils: ^.eif.utils;
