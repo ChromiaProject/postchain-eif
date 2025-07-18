@@ -15,7 +15,7 @@ import ^^.hbridge.{
     // Assets
     register_ft4_asset, register_erc20_asset, register_bridge_with_erc20_assets,
     // Accounts
-    _register_ft_account_and_link_evm_address, _mint, ensure_bridge_account,
+    _register_ft_account_and_link_evm_address, _mint, snapshot.core.ensure_bridge_account,
     // Asserts
     assert_withdraw,
 };
@@ -28,7 +28,7 @@ function test_can_not_call_operation__bridge_ft4_token_to_evm__if_hbridge_uses_v
 
 function test_withdraw_foreign_asset_to_evm_with_already_linked_account() {
     val ft_asset = register_ft4_asset(CHR);
-    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.foreign);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.snapshot.bridge_mode.foreign);
     register_bridge_with_erc20_assets(network_id1, bridge_address1, [erc20]);
 
     _withdraw_asset_to_evm_with_already_linked_account(ft_asset);
@@ -36,7 +36,7 @@ function test_withdraw_foreign_asset_to_evm_with_already_linked_account() {
 
 function test_withdraw_native_asset_to_evm_with_already_linked_account_ends_up_in_bridge_account() {
     val ft_asset = register_ft4_asset(CHR);
-    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.native);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.snapshot.bridge_mode.native);
 
     val withdraw_amount = _withdraw_asset_to_evm_with_already_linked_account(ft_asset);
 
@@ -47,8 +47,8 @@ function test_withdraw_native_asset_to_evm_with_already_linked_account_ends_up_i
 
 function test_withdraw_to_evm_using_most_recent_erc20_token_address_by_default() {
     val ft_asset = register_ft4_asset(CHR);
-    val erc20_foo = register_erc20_asset(ft_asset, FOO, network_id1, bridge_mode = hbridge.bridge_mode.foreign);
-    val erc20_bar = register_erc20_asset(ft_asset, BAR, network_id1, bridge_mode = hbridge.bridge_mode.foreign);
+    val erc20_foo = register_erc20_asset(ft_asset, FOO, network_id1, bridge_mode = hbridge.snapshot.bridge_mode.foreign);
+    val erc20_bar = register_erc20_asset(ft_asset, BAR, network_id1, bridge_mode = hbridge.snapshot.bridge_mode.foreign);
     register_bridge_with_erc20_assets(network_id1, bridge_address1, [erc20_foo, erc20_bar]);
 
     _withdraw_asset_to_evm_with_already_linked_account(ft_asset, BAR); // withdrawal to BAR token contract
@@ -64,10 +64,10 @@ function test_withdraw_foreign_asset_to_multiple_evm_bridges() {
     val ft_chr_asset = register_ft4_asset(CHR);
     val ft_foo_asset = register_ft4_asset(FOO);
     //  - on network 1
-    val erc20_chr_network1 = register_erc20_asset(ft_chr_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.foreign);
+    val erc20_chr_network1 = register_erc20_asset(ft_chr_asset, CHR, network_id1, bridge_mode = hbridge.snapshot.bridge_mode.foreign);
     register_bridge_with_erc20_assets(network_id1, bridge_address1, [erc20_chr_network1]);
     //  - on network 2
-    val erc20_foo_network2 = register_erc20_asset(ft_foo_asset, FOO, network_id2, bridge_mode = hbridge.bridge_mode.foreign);
+    val erc20_foo_network2 = register_erc20_asset(ft_foo_asset, FOO, network_id2, bridge_mode = hbridge.snapshot.bridge_mode.foreign);
     register_bridge_with_erc20_assets(network_id2, bridge_address2, [erc20_foo_network2]);
     register_bridge_with_erc20_assets(network_id2, bridge_address3, [erc20_foo_network2]);
 
@@ -80,10 +80,10 @@ function test_withdraw_native_asset_to_multiple_evm_bridges() {
     val ft_chr_asset = register_ft4_asset(CHR);
     val ft_foo_asset = register_ft4_asset(FOO);
     //  - on network 1
-    val erc20_chr_network1 = register_erc20_asset(ft_chr_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.native);
+    val erc20_chr_network1 = register_erc20_asset(ft_chr_asset, CHR, network_id1, bridge_mode = hbridge.snapshot.bridge_mode.native);
     register_bridge_with_erc20_assets(network_id1, bridge_address1, [erc20_chr_network1]);
     //  - on network 2
-    val erc20_foo_network2 = register_erc20_asset(ft_foo_asset, FOO, network_id2, bridge_mode = hbridge.bridge_mode.native);
+    val erc20_foo_network2 = register_erc20_asset(ft_foo_asset, FOO, network_id2, bridge_mode = hbridge.snapshot.bridge_mode.native);
     register_bridge_with_erc20_assets(network_id2, bridge_address2, [erc20_foo_network2]);
     register_bridge_with_erc20_assets(network_id2, bridge_address3, [erc20_foo_network2]);
 
@@ -177,13 +177,13 @@ function test_can_not_withdraw_to_evm_without_linked_evm_token() {
 
 function test_can_not_withdraw_foreign_asset_to_evm_without_linked_account() {
     val ft_asset = register_ft4_asset(CHR);
-    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.foreign);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.snapshot.bridge_mode.foreign);
     _can_not_withdraw_to_evm_without_linked_account(ft_asset);
 }
 
 function test_can_not_withdraw_native_asset_to_evm_without_linked_account() {
     val ft_asset = register_ft4_asset(CHR);
-    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.native);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.snapshot.bridge_mode.native);
     _can_not_withdraw_to_evm_without_linked_account(ft_asset);
 }
 
@@ -202,7 +202,7 @@ function _can_not_withdraw_to_evm_without_linked_account(ft_asset: assets.asset)
 
 function test_can_not_withdraw_foreign_asset_to_evm_with_no_balance() {
     val ft_asset = register_ft4_asset(CHR);
-    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.foreign);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.snapshot.bridge_mode.foreign);
     val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
 
     rell.test.tx()
@@ -214,7 +214,7 @@ function test_can_not_withdraw_foreign_asset_to_evm_with_no_balance() {
 
 function test_can_not_withdraw_foreign_asset_to_evm_with_insufficient_balance() {
     val ft_asset = register_ft4_asset(CHR);
-    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.foreign);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.snapshot.bridge_mode.foreign);
 
     val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
     val amount = _mint(ft_account, ft_asset);
@@ -228,7 +228,7 @@ function test_can_not_withdraw_foreign_asset_to_evm_with_insufficient_balance() 
 
 function test_can_not_withdraw_native_asset_to_evm_with_no_balance() {
     val ft_asset = register_ft4_asset(CHR);
-    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.native);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.snapshot.bridge_mode.native);
     val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
 
     rell.test.tx()
@@ -240,7 +240,7 @@ function test_can_not_withdraw_native_asset_to_evm_with_no_balance() {
 
 function test_can_not_withdraw_native_asset_to_evm_with_insufficient_balance() {
     val ft_asset = register_ft4_asset(CHR);
-    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.native);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.snapshot.bridge_mode.native);
 
     val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
     val amount = _mint(ft_account, ft_asset);
@@ -254,13 +254,13 @@ function test_can_not_withdraw_native_asset_to_evm_with_insufficient_balance() {
 
 function test_can_not_withdraw_foreign_asset_negative_or_zero_amount_to_evm() {
     val ft_asset = register_ft4_asset(CHR);
-    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.foreign);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.snapshot.bridge_mode.foreign);
     _can_not_withdraw_negative_or_zero_amount_to_evm(ft_asset);
 }
 
 function test_can_not_withdraw_native_asset_negative_or_zero_amount_to_evm() {
     val ft_asset = register_ft4_asset(CHR);
-    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.native);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.snapshot.bridge_mode.native);
     _can_not_withdraw_negative_or_zero_amount_to_evm(ft_asset);
 }
 

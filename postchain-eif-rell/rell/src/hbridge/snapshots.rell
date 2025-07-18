@@ -1,0 +1,62 @@
+/**
+ * The type of state slot.
+ * 
+ * The state slot's id represents its position in the Merkle tree.
+ * Each state slot is associated with a single account and recipient address.
+ * One account may use multiple state slots corresponding to different protocols, 
+ * bridge contracts, networks, etc.
+ */
+enum state_slot_type {    
+    erc20,
+    /** Temporary state which facilitates withdrawals which are pending at the time of mass exit */
+    erc20_withdrawal,
+    erc721,
+    erc721_withdrawal,
+    erc1155,
+    erc1155_withdrawal
+}
+
+// hbridge:erc20_withdrawal:v1 followed by 7x 01 bytes, 32 bytes in total
+val ERC20_WITHDRAWAL_STATE_TAG = x"686272696467653a65726332305f77697468647261773a763101010101010101";
+
+function add_erc20_withdrawal_to_snapshot(ew: erc20_withdrawal) {
+    val withdrawal_info = ew.to_struct();
+
+    val state_slot = snapshot.get_or_create_state_slot(
+        network_id = withdrawal_info.network_id,
+        token_address = withdrawal_info.token_address,
+        beneficiary = withdrawal_info.beneficiary,
+        type = state_slot_type.erc20_withdrawal
+    );
+
+    if (empty(state_slot)) return;
+
+    // Collect all withdrawals for a given address with status other than withdrawn
+    val event_hashes = (
+        w: erc20_withdrawal,
+        s: erc20_withdrawal_status
+    ) @* {
+        w.beneficiary == withdrawal_info.beneficiary,
+        w.network_id == withdrawal_info.network_id,
+        s.erc20_withdrawal == w,
+        s.withdrawal_status != withdrawal_status.withdrawn,
+        s.withdrawal_status != withdrawal_status.withdrawn_to_chromia
+    } ( w.event_hash );
+
+    // Emit state
+    emit_erc20_withdrawal_state_eif_event(state_slot, event_hashes);
+}
+
+function emit_erc20_withdrawal_state_eif_event(state_slot: snapshot.core.state_slot, event_hashes: list<byte_array>) {
+    val state_slot_data = state_slot.to_struct();
+
+    val state_parts = list<gtv>();
+    state_parts.add(ERC20_WITHDRAWAL_STATE_TAG.to_gtv());
+    state_parts.add(utils.evm_address_to_32_byte_array(state_slot_data.recipient_address).to_gtv());
+    state_parts.add(state_slot_data.discriminator.to_gtv()); // discriminator includes (v1) network_id, or (v2) network_id and bridge_address
+    for (event_hash in event_hashes) {
+        state_parts.add(event_hash.to_gtv());
+    }
+    
+    snapshot.core.emit_state_event(state_slot_data.id, state_parts);
+}

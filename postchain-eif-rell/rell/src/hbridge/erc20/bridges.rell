@@ -1,9 +1,3 @@
-entity bridge_contract {
-    network_id: integer;
-    contract_address: byte_array;
-    key network_id, contract_address;
-}
-
 struct bridge_contract_info {
     contract_address: byte_array;
     evm_read_offset: integer;
@@ -11,7 +5,7 @@ struct bridge_contract_info {
 }
 
 entity bridge_erc20_asset {
-    key bridge_contract, erc20_asset;
+    key core.bridge_contract, erc20_asset;
 }
 
 /**
@@ -33,7 +27,7 @@ function register_bridge_and_erc20_asset(
     bridge_address: byte_array
 ) {
     val erc20_asset = register_erc20_asset(network_id, token_address, asset, mode, use_snapshots);
-    val bridge_contract = get_or_create_bridge(network_id, bridge_address);
+    val bridge_contract = core.get_or_create_bridge(network_id, bridge_address);
     create bridge_erc20_asset(bridge_contract, erc20_asset);
 }
 
@@ -45,7 +39,7 @@ function register_bridge_and_erc20_asset(
  * @param erc20_assets The list of ERC20 assets to register.
  */
 function register_bridge_with_erc20_assets(network_id: integer, bridge_address: byte_array, erc20_assets: list<erc20_asset>) {
-    val bridge_contract = get_or_create_bridge(network_id, bridge_address);
+    val bridge_contract = core.get_or_create_bridge(network_id, bridge_address);
 
     for (erc20_asset in erc20_assets) {
         require(erc20_asset.network_id == bridge_contract.network_id, "Bridge must be part of the same network as the asset");
@@ -53,20 +47,7 @@ function register_bridge_with_erc20_assets(network_id: integer, bridge_address: 
     }
 }
 
-/**
- * Remove a bridge and all its assets.
- */
-function unregister_bridge(network_id: integer, bridge_address: byte_array) {
-    val bridge = bridge_contract @? { network_id, bridge_address };
-    if (exists(bridge)) {
-        delete bridge_erc20_asset @* { bridge };
-        delete bridge;
-
-        log("Removed bridge and assets with contract address %s on network %s".format(bridge_address, network_id));
-    }
-}
-
-function get_or_create_bridge(network_id: integer, bridge_address: byte_array) {
-    return bridge_contract @? { network_id, bridge_address }
-        ?: create bridge_contract(network_id, bridge_address);
+@extend(core.before_removing_bridge_contract) function (bridge: core.bridge_contract) {
+    delete bridge_erc20_asset @* { bridge };
+    log("Removed erc20 assets for bridge with contract address %s on network %s".format(bridge.contract_address, bridge.network_id));
 }

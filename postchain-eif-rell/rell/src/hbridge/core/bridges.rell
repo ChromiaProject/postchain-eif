@@ -1,0 +1,31 @@
+entity bridge_contract {
+    network_id: integer;
+    contract_address: byte_array;
+    key network_id, contract_address;
+}
+
+function get_or_create_bridge(network_id: integer, bridge_address: byte_array) {
+    return bridge_contract @? { network_id, bridge_address }
+        ?: create bridge_contract(network_id, bridge_address);
+}
+
+/**
+ * Remove a bridge.
+ */
+function unregister_bridge(network_id: integer, bridge_address: byte_array) {
+    val bridge = bridge_contract @? { network_id, bridge_address };
+    if (exists(bridge)) {
+        before_removing_bridge_contract(bridge);
+        delete bridge;
+
+        log("Removed bridge with contract address %s on network %s".format(bridge_address, network_id));
+    }
+}
+
+@extendable function before_removing_bridge_contract(bridge: bridge_contract) {}
+
+function get_evm_read_offset(network_id: integer): integer {
+    return map<text, integer>.from_gtv_pretty(chain_context.args.evm_read_offsets)
+        .get_or_default("%d".format(network_id), 0);
+}
+

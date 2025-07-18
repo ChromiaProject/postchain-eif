@@ -2,7 +2,7 @@
 module;
 
 import eif_event_receiver_with_dynamic_config.*;
-import hbridge;
+import hbridge.*;
 
 import lib.ft4.admin;
 import lib.ft4.assets;
@@ -11,14 +11,14 @@ operation register_erc20_asset(
     network_id: integer,
     token_address: byte_array,
     asset_id: byte_array,
-    hbridge.bridge_mode,
+    snapshot.bridge_mode,
     enable_snapshots: boolean
 ) {
     admin.require_admin();
 
     val asset = assets.Asset(asset_id);
 
-    hbridge.register_erc20_asset(
+    snapshot.register_erc20_asset(
         network_id,
         token_address,
         asset,
@@ -36,6 +36,6 @@ operation add_contract_config(network_id: integer, contract: byte_array, skip_to
 operation register_bridge_with_erc20_assets(network_id: integer, bridge_address: byte_array) {
     admin.require_admin();
 
-    val erc20_assets = hbridge.erc20_asset @* { network_id };
-    hbridge.register_bridge_with_erc20_assets(network_id, bridge_address, erc20_assets);
+    val erc20_assets = snapshot.erc20_asset @* { network_id };
+    snapshot.register_bridge_with_erc20_assets(network_id, bridge_address, erc20_assets);
 }

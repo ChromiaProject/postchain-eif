@@ -17,3 +17,8 @@ function big_integer_to_32_byte_array(i: big_integer): byte_array {
     val padded = "0".repeat(pad) + hex;
     return byte_array(padded);
 }
+
+function validate_evm_network_and_address(network_id: integer, address: byte_array) {
+    require(network_id > 0, "Network ID must be positive");
+    require(address.size() == 20, "Contract address must be 20 bytes");
+}

@@ -87,13 +87,13 @@ val ABC = asset_info(
 
 function register_foreign_asset(asset: asset_info = CHR, network_id: integer = network_id1): assets.asset {
     val ft4_asset = register_ft4_asset(asset);
-    register_erc20_asset(ft4_asset, asset, network_id, enable_snapshots = true, bridge_mode = hbridge.bridge_mode.foreign);
+    register_erc20_asset(ft4_asset, asset, network_id, enable_snapshots = true, bridge_mode = snapshot.bridge_mode.foreign);
     return ft4_asset;
 }
 
-function register_native_asset(asset: asset_info = CHR, network_id: integer = network_id1): erc20_asset {
+function register_native_asset(asset: asset_info = CHR, network_id: integer = network_id1): snapshot.erc20_asset {
     val ft4_asset = register_ft4_asset(asset);
-    return register_erc20_asset(ft4_asset, asset, network_id, enable_snapshots = true, bridge_mode = hbridge.bridge_mode.native);
+    return register_erc20_asset(ft4_asset, asset, network_id, enable_snapshots = true, bridge_mode = snapshot.bridge_mode.native);
 }
 
 function register_ft4_asset(asset_info: asset_info): assets.asset {
@@ -111,23 +111,23 @@ function register_erc20_asset(
     asset_info: asset_info,
     network_id: integer,
     enable_snapshots: boolean = false,
-    hbridge.bridge_mode = hbridge.bridge_mode.foreign
-): erc20_asset {
+    snapshot.bridge_mode = snapshot.bridge_mode.foreign
+): snapshot.erc20_asset {
     rell.test.tx().op(
         helpers.register_erc20_asset_op(network_id, asset_info.token_address, ft4_asset, bridge_mode, enable_snapshots)
     ).run();
 
     assert_equals(
-        hbridge.get_erc20_for_asset(ft4_asset.id) @? { .network_id == network_id, .token_address == asset_info.token_address },
-        hbridge.erc20_info(
+        snapshot.get_erc20_for_asset(ft4_asset.id) @? { .network_id == network_id, .token_address == asset_info.token_address },
+        snapshot.erc20_info(
             network_id,
             token_address = asset_info.token_address,
             bridge_mode = bridge_mode,
-            virtual_blockchain_rid = hbridge.compute_virtual_blockchain_rid(network_id, asset_info.token_address)
+            virtual_blockchain_rid = snapshot.compute_virtual_blockchain_rid(network_id, asset_info.token_address)
         )
     );
 
-    return erc20_asset @ { network_id, .token_address == asset_info.token_address };
+    return snapshot.erc20_asset @ { network_id, .token_address == asset_info.token_address };
 }
 
 function register_crosschain_asset(asset_info, issuing_blockchain_rid: byte_array, origin_blockchain_rid: byte_array): ft4.crosschain.asset_origin {
@@ -152,7 +152,7 @@ function register_crosschain_asset(asset_info, issuing_blockchain_rid: byte_arra
 
 function register_bridge_and_foreign_asset(asset: asset_info, network_id: integer, bridge_address: byte_array): assets.asset {
     val ft4_asset = register_ft4_asset(asset);
-    val erc20_asset = register_erc20_asset(ft4_asset, asset, network_id, enable_snapshots = true, bridge_mode = hbridge.bridge_mode.foreign);
+    val erc20_asset = register_erc20_asset(ft4_asset, asset, network_id, enable_snapshots = true, bridge_mode = snapshot.bridge_mode.foreign);
     // register bridge with erc20 asset
     rell.test.tx().op(
         helpers.register_bridge_with_erc20_assets_op(
@@ -165,7 +165,7 @@ function register_bridge_and_foreign_asset(asset: asset_info, network_id: intege
     return ft4_asset;
 }
 
-function register_bridge_with_erc20_assets(network_id: integer, bridge_address: byte_array, erc20_assets: list<hbridge.erc20_asset>) {
+function register_bridge_with_erc20_assets(network_id: integer, bridge_address: byte_array, erc20_assets: list<snapshot.erc20_asset>) {
     rell.test.tx().op(
         helpers.register_bridge_with_erc20_assets_op(
             network_id = network_id,
@@ -182,7 +182,7 @@ function link_eoa_account(
         auth_descriptor_id: byte_array
 ) {
     val evm_address = crypto.eth_pubkey_to_address(evm_keypair.pub);
-    val op = hbridge.link_evm_eoa_account(evm_address);
+    val op = snapshot.core.link_evm_eoa_account(evm_address);
     val message = ft4_test.create_evm_auth_message(op)
         .replace(auth.ACCOUNT_ID_PLACEHOLDER, account_id.to_hex().upper_case())
         .replace(auth.AUTH_DESCRIPTOR_ID_PLACEHOLDER, auth_descriptor_id.to_hex().upper_case());
@@ -193,10 +193,10 @@ function link_eoa_account(
         .op(op)
         .nop()
         .sign(ft_keypair).run();
-    assert_not_null(hbridge.evm_eoa_account_link @? { .address == evm_address });
+    assert_not_null(snapshot.core.evm_eoa_account_link @? { .address == evm_address });
 
-    assert_equals(hbridge.get_account_for_eoa_address(evm_address), account_id);
-    assert_equals(hbridge.get_eoa_addresses_for_account(account_id), [evm_address]);
+    assert_equals(snapshot.core.get_account_for_eoa_address(evm_address), account_id);
+    assert_equals(snapshot.core.get_eoa_addresses_for_account(account_id), [evm_address]);
 }
 
 function link_sc_account_id_event(
@@ -230,7 +230,7 @@ function link_sc_account(
         network_id: integer = network_id1
 ) {
     val evm_address = crypto.eth_pubkey_to_address(evm_keypair.pub);
-    val op = hbridge.link_evm_sc_account(evm_address, network_id);
+    val op = snapshot.core.link_evm_sc_account(evm_address, network_id);
     val message = ft4_test.create_evm_auth_message(op)
         .replace(auth.ACCOUNT_ID_PLACEHOLDER, account_id.to_hex().upper_case())
         .replace(auth.AUTH_DESCRIPTOR_ID_PLACEHOLDER, auth_descriptor_id.to_hex().upper_case());
@@ -240,10 +240,10 @@ function link_sc_account(
         .op(op)
         .nop()
         .sign(ft_keypair).run();
-    assert_not_null(hbridge.evm_sc_account_link @? { .address == evm_address });
+    assert_not_null(snapshot.core.evm_sc_account_link @? { .address == evm_address });
 
-    assert_equals(hbridge.get_account_for_sc_address(evm_address, network_id), account_id);
-    assert_equals(hbridge.get_sc_addresses_for_account(account_id), [(address = evm_address, network_id = network_id)]);
+    assert_equals(snapshot.core.get_account_for_sc_address(evm_address, network_id), account_id);
+    assert_equals(snapshot.core.get_sc_addresses_for_account(account_id), [(address = evm_address, network_id = network_id)]);
 }
 
 function deposit_from_evm(

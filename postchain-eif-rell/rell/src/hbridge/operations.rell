@@ -1,43 +1,3 @@
-@extend(ft4.auth.auth_handler)
-function () = ft4.auth.add_auth_handler(
-    scope = rell.meta(link_evm_eoa_account).mount_name,
-    flags = ["A"],
-    message = link_evm_eoa_account_auth_message(*)
-);
-
-function link_evm_eoa_account_auth_message(gtv) {
-    val args = struct<link_evm_eoa_account>.from_gtv(gtv);
-    return "Please sign the message to link Externally Owned Account %s\nto Chromia account {account_id}".format(args.address);
-}
-
-operation link_evm_eoa_account(address: byte_array) {
-    val account = ft4.auth.authenticate();
-    ft4.auth.verify_signers([address]);
-    _link_evm_eoa_account(address, account);
-}
-
-@extend(ft4.auth.auth_handler)
-function () = ft4.auth.add_auth_handler(
-    scope = rell.meta(link_evm_sc_account).mount_name,
-    flags = ["A"],
-    message = link_evm_sc_account_auth_message(*)
-);
-
-function link_evm_sc_account_auth_message(gtv) {
-    val args = struct<link_evm_sc_account>.from_gtv(gtv);
-    return "Please sign the message to link Smart Contract %s on network %d\nto Chromia account {account_id}".format(
-        args.address, args.network_id
-    );
-}
-
-operation link_evm_sc_account(address: byte_array, network_id: integer) {
-    val account = ft4.auth.authenticate();
-    require(
-        proposed_evm_sc_account_link @? { account, address, network_id },
-        "Proposed EVM SC account link not found for EVM address %s on chain ID %d".format(address, network_id)
-    );
-    _link_evm_sc_account(address, network_id, account);
-}
 
 @extend(ft4.auth.auth_handler)
 function () = ft4.auth.add_auth_handler(
@@ -60,25 +20,25 @@ operation bridge_ft4_token_to_evm(network_id: integer, asset_id: byte_array, amo
     );
 
     // In order to not ruin existing bridges we skip validation if no bridge has been defined
-    if (exists(bridge_contract @* {})) {
-        val network_bridges = bridge_contract @* { network_id };
+    if (exists(snapshot.core.bridge_contract @* {})) {
+        val network_bridges = snapshot.core.bridge_contract @* { network_id };
         require(network_bridges.size() > 0, "No bridges are configured for network ID %d".format(network_id));
         require(network_bridges.size() < 2, "More than one bridge is configured for network ID %d. Use `bridge_ft_asset_to_evm` operation.".format(network_id));
     }
 
     val ft4_asset = ft4.assets.Asset(asset_id);
-    val erc20 = erc20_asset @? { .network_id == network_id, .asset == ft4_asset } (@omit @sort_desc .rowid, $) limit 1;
+    val erc20 = snapshot.erc20_asset @? { .network_id == network_id, .asset == ft4_asset } (@omit @sort_desc .rowid, $) limit 1;
     require(erc20, "ERC20 token not found for network ID %d and ft4 asset ID %s".format(network_id, asset_id));
 
     val from_account = ft4.auth.authenticate();
     require(withdraw_check_access_list(from_account.id), "Account id %s not on access list.".format(from_account.id));
     require(
-        evm_eoa_account_link @? { from_account, beneficiary } ??
-        or evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
+        snapshot.core.evm_eoa_account_link @? { from_account, beneficiary } ??
+        or snapshot.core.evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
         "Can only withdraw to your own account"
     );
 
-    bridge_deduct_balance(from_account, erc20, amount);
+    snapshot.bridge_deduct_balance(from_account, erc20, amount);
     emit_withdrawal_event(erc20.network_id, erc20.token_address, beneficiary, amount);
 }
 
@@ -109,7 +69,7 @@ operation bridge_ft_asset_to_evm(
     );
 
     val ft4_asset = ft4.assets.Asset(asset_id);
-    val erc20 = erc20_asset @? { .network_id == network_id, .asset == ft4_asset } (@omit @sort_desc .rowid, $) limit 1;
+    val erc20 = snapshot.erc20_asset @? { .network_id == network_id, .asset == ft4_asset } (@omit @sort_desc .rowid, $) limit 1;
     require(erc20, "ERC20 token not found for network ID %d and ft4 asset ID %s".format(network_id, asset_id));
     require(
         validate_bridge_contract(bridge_address, erc20),
@@ -119,12 +79,12 @@ operation bridge_ft_asset_to_evm(
     val from_account = ft4.auth.authenticate();
     require(withdraw_check_access_list(from_account.id), "Account id %s not on access list.".format(from_account.id));
     require(
-        evm_eoa_account_link @? { from_account, beneficiary } ??
-        or evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
+        snapshot.core.evm_eoa_account_link @? { from_account, beneficiary } ??
+        or snapshot.core.evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
         "Can only withdraw to your own account"
     );
 
-    bridge_deduct_balance(from_account, erc20, amount);
+    snapshot.bridge_deduct_balance(from_account, erc20, amount);
     emit_withdrawal_event(erc20.network_id, erc20.token_address, beneficiary, amount, bridge_address);
 }
 
@@ -144,18 +104,18 @@ function bridge_ft4_token_to_evm_contract_auth_message(gtv) {
 
 operation bridge_ft4_token_to_evm_contract(network_id: integer, asset_id: byte_array, amount: big_integer, beneficiary: byte_array, token_address: byte_array) {
     val ft4_asset = ft4.assets.Asset(asset_id);
-    val erc20 = erc20_asset @? { .network_id == network_id, .asset == ft4_asset, .token_address == token_address };
+    val erc20 = snapshot.erc20_asset @? { .network_id == network_id, .asset == ft4_asset, .token_address == token_address };
     require(erc20, "ERC20 token not found for network ID %d, ft4 asset ID %s, and ERC20 token address %s".format(network_id, asset_id, token_address));
 
     val from_account = ft4.auth.authenticate();
 
     require(
-        evm_eoa_account_link @? { from_account, beneficiary } ??
-        or evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
+        snapshot.core.evm_eoa_account_link @? { from_account, beneficiary } ??
+        or snapshot.core.evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
         "Can only withdraw to your own account"
     );
 
-    bridge_deduct_balance(from_account, erc20, amount);
+    snapshot.bridge_deduct_balance(from_account, erc20, amount);
     emit_withdrawal_event(erc20.network_id, erc20.token_address, beneficiary, amount);
 }
 
@@ -172,70 +132,9 @@ operation recall_pending_deposit(sender_address: byte_array) {
 
         require(asset == deposit.token.asset, "Expected asset %s but was %s".format(asset.symbol, deposit.token.asset.symbol));
 
-        bridge_deduct_balance(ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid), deposit.token, amount);
+        snapshot.bridge_deduct_balance(ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid), deposit.token, amount);
         emit_withdrawal_event(deposit.token.network_id, deposit.token.token_address, sender_address, amount);
 
         update_deposit_state(deposit, deposit_state.recalled);
     }
-}
-
-/**
- * Registers an EVM recovery contract for a specific blockchain.
- * 
- * This operation requires ICCF proof from the source blockchain and validates that:
- * - The operation name matches "register_recovery_contract"
- * - The operation has exactly 2 arguments: network_id: integer and contract_address: byte_array
- * - No recovery contract is already registered for the blockchain
- * 
- * After validation, it:
- * 1. Creates a recovery contract record linking the blockchain RID, network ID and contract address
- * 2. Links the contract address to the source blockchain FT4 account
- * 
- * @param tx_to_prove       The transaction containing the registration operation to be proven
- * @param op_index          Index of the registration operation within the transaction
- * 
- * Expected operation signature in tx_to_prove:
- *      operation register_recovery_contract(network_id: integer, contract_address: byte_array)
- */
-operation register_recovery_contract(tx_to_prove: gtx_transaction, op_index: integer) {
-    val iccf_auth_data = require_iccf_auth(tx_to_prove, op_index, rell.meta(register_recovery_contract).simple_name, 2);
-    val blockchain_rid = iccf_auth_data.blockchain_rid;
-    val network_id = integer.from_gtv(iccf_auth_data.op_args[0]);
-    val contract_address = byte_array.from_gtv(iccf_auth_data.op_args[1]);
-
-    validate_evm_network_and_address(network_id, contract_address);
-    validate_and_update_recovery_contract_auth(iccf_auth_data);
-
-    val recovery_contract = recovery_contract @? { blockchain_rid, network_id };
-    if (exists(recovery_contract)) {
-        require(recovery_contract.contract_address != contract_address, "This recovery contract is already registered");
-        val blockchain_account = ft4.crosschain.ensure_blockchain_account(blockchain_rid);
-        // For all existing recovery contract state slots, for all ERC20 assets, emit eif_state events with amount 0
-        val erc20_assets = (s: state_slot, sl: local_erc20_state_slot_binding) @* {
-            sl.account == blockchain_account,
-            sl.state_slot == s,
-            s.recipient_address == recovery_contract.contract_address,
-            s.network_id == network_id,
-            s.type == state_slot_type.erc20,
-            s.local == true,
-        } (@group s, @list sl.erc20_asset) @ {} (@map $);
-        
-        for ((slot, assets) in erc20_assets) {
-            emit_erc20_state_eif_event(slot, assets @* {} (balance_record(.token_address, 0L)));
-            delete local_erc20_state_slot_binding @* { slot }; // Unbind state slots
-        }
-
-        // Unlink and delete recovery contract
-        _unlink_evm_sc_account(recovery_contract.contract_address, network_id, blockchain_account);
-        delete recovery_contract;
-
-        // (1) Create new recovery contract; (2) link it to the blockchain account; 
-        // (3) create and bind state slots; (4) emit eif_state events.
-        create recovery_contract(blockchain_rid, network_id, contract_address);
-        _link_evm_sc_account(contract_address, network_id, ft4.crosschain.ensure_blockchain_account(blockchain_rid));
-    } else {
-        // Create new recovery contract and link it to the blockchain account
-        create recovery_contract(blockchain_rid, network_id, contract_address);
-        _link_evm_sc_account(contract_address, network_id, ft4.crosschain.ensure_blockchain_account(blockchain_rid));
-    }    
 }
