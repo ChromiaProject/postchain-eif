@@ -1,6 +1,16 @@
 @mount("eif.hbridge")
 module;
 
+/**
+ * ERC20 module of the HBridge library.
+ *
+ * Provides basic support for ERC20 assets, including the ability to register
+ * ERC20 tokens on bridges.
+ *
+ * Depends on the `core` module for shared functionality such as account linking,
+ * snapshot management, and bridge metadata.
+ */
+
 namespace ft4 {
     import lib.ft4.accounts;
     import lib.ft4.accounts.strategies;

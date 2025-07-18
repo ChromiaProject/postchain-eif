@@ -1,7 +1,14 @@
 @mount("eif.hbridge")
 module;
 
-import lib.iccf;
+/**
+ * Core module of the HBridge library.
+ *
+ * Provides functionality for:
+ * - Linking EVM and FT4 accounts
+ * - Managing bridge contracts
+ * - Creating and maintaining state snapshots
+ */
 
 namespace ft4 {
     import lib.ft4.accounts;
@@ -11,6 +18,7 @@ namespace ft4 {
     import lib.ft4.utils;
 }
 
+import lib.iccf;
 import utils: ^^.eif.utils;
 import ^.*;
 
