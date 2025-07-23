@@ -3,7 +3,7 @@ package net.postchain.eif.transaction
 import net.postchain.devtools.getModules
 import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.contracts.Validator
-import org.awaitility.Awaitility
+import org.awaitility.Awaitility.await
 import org.awaitility.Duration
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -38,14 +38,20 @@ class TransactionSubmitterSubmitRetryIT : EifBaseIntegrationTest(
         // Deploy validator contract
         val encodedConstructor =
                 FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(BigInteger.ONE))))
-        val contract = Contract.deployRemoteCall(
+        val deployFuture = Contract.deployRemoteCall(
                 Validator::class.java,
                 web3j,
                 transactionManager,
                 gasProvider,
                 validatorBinary,
                 encodedConstructor
-        ).send()
+        ).sendAsync()
+
+        await().atMost(Duration.ONE_MINUTE).until {
+            deployFuture.isDone
+        }
+
+        val contract = deployFuture.get()
         val contractAddress = contract.contractAddress.substring(2)
 
         val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config.xml")
@@ -56,13 +62,13 @@ class TransactionSubmitterSubmitRetryIT : EifBaseIntegrationTest(
         val evmSubmitTxRellRequest = mkEvmSubmitTxRellRequest(0, contractAddress)
         txSubmitterTestModule.addTransactionsAvailableToTake(evmSubmitTxRellRequest)
 
-        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
+        await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertNoQueuedTxs(txSubmitterTestModule)
             assertStatusOperation(txSubmitterTestModule, 0, RellTransactionStatus.TAKEN)
         }
 
-        Awaitility.await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
+        await().atMost(Duration.TEN_SECONDS.multiply(2)).untilAsserted {
             buildBlock(1L)
             assertTrue(txSubmitterTestModule.conf.successfulTxs.contains(0))
         }
