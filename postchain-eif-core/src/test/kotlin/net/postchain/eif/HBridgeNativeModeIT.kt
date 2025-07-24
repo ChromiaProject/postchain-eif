@@ -80,16 +80,16 @@ class HBridgeNativeModeIT : HBridgeBaseIntegrationTest() {
         // Deploy validator contract
         validator = Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary,
                 FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, node0EvmAddress)))
-        ).send()
+        ).sendAsyncAwait()
 
         // Deploy token bridge contract
-        bridge = Contract.deployRemoteCall(ChromiaTokenBridge::class.java, web3j, transactionManager, gasProvider, chromiaTokenBridgeBinary, "").send().apply {
+        bridge = Contract.deployRemoteCall(ChromiaTokenBridge::class.java, web3j, transactionManager, gasProvider, chromiaTokenBridgeBinary, "").sendAsyncAwait().apply {
             initialize(Address(validator.contractAddress), Uint256(2)).send()
         }
         bridgeAddress = bridge.contractAddress.substring(2).hexStringToByteArray()
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contract
-        chromiaTestToken = Contract.deployRemoteCall(ChromiaTestToken::class.java, web3j, transactionManager, gasProvider, chromiaTestTokenBinary, "").send()
+        chromiaTestToken = Contract.deployRemoteCall(ChromiaTestToken::class.java, web3j, transactionManager, gasProvider, chromiaTestTokenBinary, "").sendAsyncAwait()
         chromiaTestToken.approve(Address(bridge.contractAddress), Uint256(initialMint)).send() // Bridge can spend the entire initial supply
         testTokenAddress = chromiaTestToken.contractAddress.substring(2).hexStringToByteArray()
         // Allow token
@@ -98,7 +98,7 @@ class HBridgeNativeModeIT : HBridgeBaseIntegrationTest() {
         // Deploy minter contract
         minter = Contract.deployRemoteCall(TokenMinterTest::class.java, web3j, transactionManager, gasProvider, tokenMinterBinary,
                 FunctionEncoder.encodeConstructor(listOf(Uint(initialMint), Address(chromiaTestToken.contractAddress), Address(bridge.contractAddress), aliceCredentials.evmAddress))
-        ).send()
+        ).sendAsyncAwait()
         bridge.setTokenMinter(Address(minter.contractAddress)).send()
         chromiaTestToken.setTokenMinter(Address(minter.contractAddress)).send()
 

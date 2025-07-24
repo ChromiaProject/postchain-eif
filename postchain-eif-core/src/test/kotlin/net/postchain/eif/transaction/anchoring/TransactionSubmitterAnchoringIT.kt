@@ -12,6 +12,7 @@ import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.contracts.Anchoring
 import net.postchain.eif.contracts.Validator
 import net.postchain.eif.getEthereumAddress
+import net.postchain.eif.sendAsyncAwait
 import net.postchain.eif.transaction.RellTransactionStatus
 import net.postchain.eif.transaction.assertStatusOperation
 import org.awaitility.Awaitility
@@ -44,12 +45,12 @@ class TransactionSubmitterAnchoringIT : EifBaseIntegrationTest() {
 
         // Deploy validator contract
         val encodedValidatorConstructor = FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(getEthereumAddress(node.appConfig.pubKeyByteArray).toHex()))))
-        val validatorContract = Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedValidatorConstructor).send()
+        val validatorContract = Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedValidatorConstructor).sendAsyncAwait()
 
         // Deploy anchoring contract
         val encodedAnchoringConstructor = FunctionEncoder.encodeConstructor(listOf(Address(validatorContract.contractAddress), Bytes32(systemAnchoringMockBrid.data)))
         val anchoringBinary = getBinaryFromArtifactResource("/net/postchain/eif/contracts/Anchoring.bin")
-        val anchoringContract = Contract.deployRemoteCall(Anchoring::class.java, web3j, transactionManager, gasProvider, anchoringBinary, encodedAnchoringConstructor).send()
+        val anchoringContract = Contract.deployRemoteCall(Anchoring::class.java, web3j, transactionManager, gasProvider, anchoringBinary, encodedAnchoringConstructor).sendAsyncAwait()
 
         val txSubmitterConfig = readBlockchainConfig("/net/postchain/eif/transaction/anchoring/blockchain_config_with_anchoring.xml")
 
