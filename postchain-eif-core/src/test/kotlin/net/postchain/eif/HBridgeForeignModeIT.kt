@@ -86,10 +86,10 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
 
         // Deploy validator contract
         val encodedConstructor = FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, node0EvmAddress)))
-        validator = Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedConstructor).sendAsyncAwait()
+        validator = Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedConstructor).send()
 
         // Deploy token bridge contract
-        bridge = Contract.deployRemoteCall(TokenBridgeWithSnapshotWithdraw::class.java, web3j, transactionManager, gasProvider, tokenBridgeWithSnapshotWithdrawBinary, "").sendAsyncAwait().apply {
+        bridge = Contract.deployRemoteCall(TokenBridgeWithSnapshotWithdraw::class.java, web3j, transactionManager, gasProvider, tokenBridgeWithSnapshotWithdrawBinary, "").send().apply {
             initialize(Address(validator.contractAddress), Uint256(2)).send()
         }
         bridgeAddress = bridge.contractAddress.substring(2).hexStringToByteArray()
@@ -97,7 +97,7 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
         logger.info { "Token bridge deployed as ${bridge.contractAddress} at height $bridgeDeployHeight" }
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contract
-        testToken = Contract.deployRemoteCall(TestToken::class.java, web3j, transactionManager, gasProvider, testTokenBinary, "").sendAsyncAwait()
+        testToken = Contract.deployRemoteCall(TestToken::class.java, web3j, transactionManager, gasProvider, testTokenBinary, "").send()
         testToken.mint(Address(transactionManager.fromAddress), Uint256(initialMint)).send() // Alice controls the entire initial supply
         testToken.approve(Address(bridge.contractAddress), Uint256(initialMint)).send() // Bridge can spend the entire initial supply
         testTokenAddress = testToken.contractAddress.substring(2).hexStringToByteArray()

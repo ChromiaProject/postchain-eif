@@ -11,7 +11,6 @@ import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.contracts.DirectoryChainValidator
 import net.postchain.eif.contracts.ManagedValidator
 import net.postchain.eif.getEthereumAddress
-import net.postchain.eif.sendAsyncAwait
 import net.postchain.eif.transaction.RellTransactionStatus
 import net.postchain.eif.transaction.assertStatusOperation
 import net.postchain.eif.transaction.signerupdate.DirectoryChainTestGTXModule.Companion.MOCK_SIGNER_UPDATE_OP
@@ -66,7 +65,7 @@ class EvmSignerUpdateIT : EifBaseIntegrationTest() {
         // Deploy directory chain validator contract
         val encodedDirectoryValidatorConstructor = FunctionEncoder.encodeConstructor(listOf(Bytes32(directoryChainBrid.data)))
         val directoryChainValidatorBinary = getBinaryFromArtifactResource("/net/postchain/eif/contracts/DirectoryChainValidator.bin")
-        directoryValidatorContract = Contract.deployRemoteCall(DirectoryChainValidator::class.java, web3j, transactionManager, gasProvider, directoryChainValidatorBinary, encodedDirectoryValidatorConstructor).sendAsyncAwait()
+        directoryValidatorContract = Contract.deployRemoteCall(DirectoryChainValidator::class.java, web3j, transactionManager, gasProvider, directoryChainValidatorBinary, encodedDirectoryValidatorConstructor).send()
 
         txSubmitterModule = node.getModules(txSubmitterChain).filterIsInstance<TransactionSubmitterSignerUpdateGTXModule>().first()
         val signerUpdateExt = txSubmitterModule.getSpecialTxExtensions().filterIsInstance<EvmSignerUpdateSpecialTxExtension>().first()
@@ -80,7 +79,7 @@ class EvmSignerUpdateIT : EifBaseIntegrationTest() {
         val chainToUpdateBrid = BlockchainRid(ByteArray(32) { 1 })
         val managedValidatorBinary = getBinaryFromArtifactResource("/net/postchain/eif/contracts/ManagedValidator.bin")
         val encodedValidatorConstructor = FunctionEncoder.encodeConstructor(listOf(Address(directoryValidatorContract.contractAddress)))
-        val validatorContract = Contract.deployRemoteCall(ManagedValidator::class.java, web3j, transactionManager, gasProvider, managedValidatorBinary, encodedValidatorConstructor).sendAsyncAwait()
+        val validatorContract = Contract.deployRemoteCall(ManagedValidator::class.java, web3j, transactionManager, gasProvider, managedValidatorBinary, encodedValidatorConstructor).send()
         validatorContract.setBlockchainRid(Bytes32(chainToUpdateBrid.data)).send()
         initDirectoryChainValidator()
 

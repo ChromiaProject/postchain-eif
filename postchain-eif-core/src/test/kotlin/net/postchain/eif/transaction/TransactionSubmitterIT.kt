@@ -12,7 +12,6 @@ import net.postchain.devtools.getModules
 import net.postchain.devtools.utils.configuration.NodeSeqNumber
 import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.contracts.Validator
-import net.postchain.eif.sendAsyncAwait
 import org.apache.commons.configuration2.MapConfiguration
 import org.awaitility.Awaitility
 import org.awaitility.Duration
@@ -45,14 +44,15 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
         // Deploy validator contract
         val encodedConstructor =
                 FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(BigInteger.ONE))))
-        contractAddress = Contract.deployRemoteCall(
+        val contract = Contract.deployRemoteCall(
                 Validator::class.java,
                 web3j,
                 transactionManager,
                 gasProvider,
                 validatorBinary,
                 encodedConstructor
-        ).sendAsyncAwait().contractAddress.substring(2)
+        ).send()
+        contractAddress = contract.contractAddress.substring(2)
     }
 
     @Test
@@ -171,8 +171,8 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
             assertTrue(txSubmitterTestModule.conf.queuedTxs.contains(0))
             assertStatusOperation(txSubmitterTestModule, evmSubmitTxRellRequest.rowId, RellTransactionStatus.QUEUED) // QUEUED is failed here, since it will let another node retry
             assertNodeFailureOperation(txSubmitterTestModule, evmSubmitTxRellRequest.rowId,
-                    "Estimated gas usage 63530 for tx 0 exceeds configured limit of 1")
-            testLogAppender.assertError("Failed to submit EVM transaction 0: Estimated gas usage 63530 for tx 0 exceeds configured limit of 1")
+                    "Estimated gas usage 63244 for tx 0 exceeds configured limit of 1")
+            testLogAppender.assertError("Failed to submit EVM transaction 0: Estimated gas usage 63244 for tx 0 exceeds configured limit of 1")
         }
     }
 
