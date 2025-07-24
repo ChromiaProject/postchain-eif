@@ -14,6 +14,15 @@ import org.web3j.protocol.core.RemoteCall
  */
 fun <T> RemoteCall<T>.sendAsyncAwait(): T {
     val future = this.sendAsync()
-    await().atMost(Duration.ONE_MINUTE).until { future.isDone }
+
+    await().atMost(Duration.ONE_MINUTE).until {
+        try {
+            future.get()
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     return future.get()
 }
