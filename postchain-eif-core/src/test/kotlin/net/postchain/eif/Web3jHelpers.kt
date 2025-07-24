@@ -12,8 +12,17 @@ import org.web3j.protocol.core.RemoteCall
  * @return The result of type [T] from the completed future
  * @throws Exception if the future doesn't complete within one minute
  */
-fun <T> RemoteCall<T>.sendAsyncAwait(): T {
+fun <T> RemoteCall<T>.sendAsyncAwait(timeout: Duration = Duration.ONE_MINUTE): T {
     val future = this.sendAsync()
-    await().atMost(Duration.ONE_MINUTE).until { future.isDone }
+
+    await().atMost(timeout).until {
+        try {
+            future.get()
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     return future.get()
 }
