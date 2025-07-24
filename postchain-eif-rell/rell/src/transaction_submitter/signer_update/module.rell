@@ -316,7 +316,7 @@ function check_for_new_system_bridges_and_validators() {
         val system_anchoring_chain_validator_contracts = get_system_chain_validator_contracts(system_anchoring_chain_brid)
         ?: list<(validator_contract: text, network_id: integer)>();
         for (validator in system_anchoring_chain_validator_contracts) {
-            handle_new_validator_contract(directory_chain_brid, validator.network_id, validator.validator_contract);
+            handle_new_validator_contract(system_anchoring_chain_brid, validator.network_id, validator.validator_contract);
         }
     }
 
