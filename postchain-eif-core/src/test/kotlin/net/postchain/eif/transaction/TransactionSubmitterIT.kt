@@ -52,7 +52,7 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
                 gasProvider,
                 validatorBinary,
                 encodedConstructor
-        ).sendAsyncAwait().contractAddress.substring(2)
+        ).sendAsyncAwait(Duration.TWO_MINUTES).contractAddress.substring(2)
     }
 
     @Test
