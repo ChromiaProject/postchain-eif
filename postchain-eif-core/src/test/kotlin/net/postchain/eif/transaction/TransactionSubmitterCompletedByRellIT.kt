@@ -3,7 +3,6 @@ package net.postchain.eif.transaction
 import net.postchain.devtools.getModules
 import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.contracts.Validator
-import net.postchain.eif.sendAsyncAwait
 import org.awaitility.Awaitility
 import org.awaitility.Duration
 import org.junit.jupiter.api.BeforeEach
@@ -34,14 +33,15 @@ class TransactionSubmitterCompletedByRellIT : EifBaseIntegrationTest() {
         // Deploy validator contract
         val encodedConstructor =
                 FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(BigInteger.ONE))))
-        contractAddress = Contract.deployRemoteCall(
+        val contract = Contract.deployRemoteCall(
                 Validator::class.java,
                 web3j,
                 transactionManager,
                 gasProvider,
                 validatorBinary,
                 encodedConstructor
-        ).sendAsyncAwait().contractAddress.substring(2)
+        ).send()
+        contractAddress = contract.contractAddress.substring(2)
 
         TransactionSubmitterTestGTXModule.updateTxStatus = true
     }

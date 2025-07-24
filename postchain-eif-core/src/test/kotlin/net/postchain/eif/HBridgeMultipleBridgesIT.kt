@@ -63,20 +63,20 @@ class HBridgeMultipleBridgesIT : HBridgeBaseIntegrationTest() {
 
         // Deploy validator contract
         val encodedConstructor = FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, node0EvmAddress)))
-        validator = Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedConstructor).sendAsyncAwait()
+        validator = Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedConstructor).send()
 
         // Deploy token bridge contracts
-        bridge1 = Contract.deployRemoteCall(TokenBridgeWithSnapshotWithdraw::class.java, web3j, transactionManager, gasProvider, tokenBridgeWithSnapshotWithdrawBinary, "").sendAsyncAwait().apply {
+        bridge1 = Contract.deployRemoteCall(TokenBridgeWithSnapshotWithdraw::class.java, web3j, transactionManager, gasProvider, tokenBridgeWithSnapshotWithdrawBinary, "").send().apply {
             initialize(Address(validator.contractAddress), Uint256(2)).send()
         }
         bridge1Address = bridge1.contractAddress.substring(2).hexStringToByteArray()
-        bridge2 = Contract.deployRemoteCall(TokenBridgeWithSnapshotWithdraw::class.java, web3j, transactionManager, gasProvider, tokenBridgeWithSnapshotWithdrawBinary, "").sendAsyncAwait().apply {
+        bridge2 = Contract.deployRemoteCall(TokenBridgeWithSnapshotWithdraw::class.java, web3j, transactionManager, gasProvider, tokenBridgeWithSnapshotWithdrawBinary, "").send().apply {
             initialize(Address(validator.contractAddress), Uint256(2)).send()
         }
         bridge2Address = bridge2.contractAddress.substring(2).hexStringToByteArray()
 
         // Deploy a test token
-        testToken = Contract.deployRemoteCall(TestToken::class.java, web3j, transactionManager, gasProvider, testTokenBinary, "").sendAsyncAwait()
+        testToken = Contract.deployRemoteCall(TestToken::class.java, web3j, transactionManager, gasProvider, testTokenBinary, "").send()
         testToken.mint(Address(transactionManager.fromAddress), Uint256(initialMint)).send() // Alice controls the entire initial supply
 
         // Approve bridges to transfer testToken
