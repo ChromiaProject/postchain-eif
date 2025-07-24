@@ -12,6 +12,7 @@ import net.postchain.devtools.getModules
 import net.postchain.devtools.utils.configuration.NodeSeqNumber
 import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.contracts.Validator
+import net.postchain.eif.sendAsyncAwait
 import org.apache.commons.configuration2.MapConfiguration
 import org.awaitility.Awaitility
 import org.awaitility.Duration
@@ -44,15 +45,14 @@ class TransactionSubmitterIT : EifBaseIntegrationTest() {
         // Deploy validator contract
         val encodedConstructor =
                 FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(BigInteger.ONE))))
-        val contract = Contract.deployRemoteCall(
+        contractAddress = Contract.deployRemoteCall(
                 Validator::class.java,
                 web3j,
                 transactionManager,
                 gasProvider,
                 validatorBinary,
                 encodedConstructor
-        ).send()
-        contractAddress = contract.contractAddress.substring(2)
+        ).sendAsyncAwait().contractAddress.substring(2)
     }
 
     @Test

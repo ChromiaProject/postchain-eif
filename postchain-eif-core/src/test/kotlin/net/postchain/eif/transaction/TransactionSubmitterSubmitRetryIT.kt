@@ -3,6 +3,7 @@ package net.postchain.eif.transaction
 import net.postchain.devtools.getModules
 import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.contracts.Validator
+import net.postchain.eif.sendAsyncAwait
 import org.awaitility.Awaitility.await
 import org.awaitility.Duration
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -38,21 +39,14 @@ class TransactionSubmitterSubmitRetryIT : EifBaseIntegrationTest(
         // Deploy validator contract
         val encodedConstructor =
                 FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(BigInteger.ONE))))
-        val deployFuture = Contract.deployRemoteCall(
+        val contractAddress = Contract.deployRemoteCall(
                 Validator::class.java,
                 web3j,
                 transactionManager,
                 gasProvider,
                 validatorBinary,
                 encodedConstructor
-        ).sendAsync()
-
-        await().atMost(Duration.ONE_MINUTE).until {
-            deployFuture.isDone
-        }
-
-        val contract = deployFuture.get()
-        val contractAddress = contract.contractAddress.substring(2)
+        ).sendAsyncAwait().contractAddress.substring(2)
 
         val nodes = createNodes(1, "/net/postchain/eif/transaction/blockchain_config.xml")
         val node = nodes[0]

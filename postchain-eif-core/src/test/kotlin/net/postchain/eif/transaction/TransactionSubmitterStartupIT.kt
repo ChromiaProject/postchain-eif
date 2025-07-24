@@ -5,6 +5,7 @@ import assertk.assertions.isEqualTo
 import net.postchain.devtools.getModules
 import net.postchain.eif.EifBaseIntegrationTest
 import net.postchain.eif.contracts.Validator
+import net.postchain.eif.sendAsyncAwait
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.UPDATE_EVM_TRANSACTION_STATUS
 import org.awaitility.Awaitility
 import org.awaitility.Duration
@@ -35,7 +36,7 @@ class TransactionSubmitterStartupIT : EifBaseIntegrationTest() {
 
         // Deploy validator contract
         val encodedConstructor = FunctionEncoder.encodeConstructor(listOf(DynamicArray(Address::class.java, Address(BigInteger.ONE))))
-        val contract = Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedConstructor).send()
+        val contract = Contract.deployRemoteCall(Validator::class.java, web3j, transactionManager, gasProvider, validatorBinary, encodedConstructor).sendAsyncAwait()
         contractAddress = contract.contractAddress.substring(2)
     }
 
