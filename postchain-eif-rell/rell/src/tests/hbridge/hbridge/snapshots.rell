@@ -113,7 +113,7 @@ function _register_recovery_contract(brid: byte_array, network_id: integer, cont
             helpers.mock_confirmation_proof_bytes(brid, height), 
             x"", 0, x""
         ))
-        .op(snapshot.core.register_recovery_contract(reg_recovery_contract_tx, 0))
+        .op(core.register_recovery_contract(reg_recovery_contract_tx, 0))
         .nop().run();
     
     return reg_recovery_contract_tx;

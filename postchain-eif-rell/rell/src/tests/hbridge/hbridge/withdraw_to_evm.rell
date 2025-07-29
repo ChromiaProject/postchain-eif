@@ -14,7 +14,7 @@ function test_withdraw_native_asset_to_ethereum_with_already_linked_account_ends
     val erc20 = register_native_asset();
     val withdraw_amount = _withdraw_to_ethereum_with_already_linked_account(erc20.asset);
 
-    val bridge_account = snapshot.core.ensure_bridge_account(erc20.virtual_blockchain_rid);
+    val bridge_account = core.ensure_bridge_account(erc20.virtual_blockchain_rid);
     assert_equals(assets.get_asset_balance(bridge_account, erc20.asset), withdraw_amount);
 }
 

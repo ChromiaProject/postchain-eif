@@ -17,7 +17,8 @@ import common: ^.eif.common;
 import utils: ^.eif.utils;
 import version: ^.eif.version;
 import lib.iccf;
-import snapshot: .erc20;
+import .core;
+import .erc20;
 
 namespace ft4 {
     import lib.ft4.accounts;

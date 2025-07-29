@@ -47,7 +47,7 @@ function test_deposit_foreign_token_from_evm_when_bridge_is_missing() {
             network_id = network_id1,
             token_address = CHR.token_address,
             asset = ft_asset,
-            mode = snapshot.bridge_mode.foreign,
+            mode = erc20.bridge_mode.foreign,
             use_snapshots = false,
             bridge_contract_address = x"01"
         )
@@ -76,7 +76,7 @@ function test_deposit_native_token_from_evm_eoa_with_already_created_and_linked_
     rell.test.tx().op(
         helpers.create_bridge_account_op(erc20.virtual_blockchain_rid)
     ).run();
-    val bridge_account = snapshot.core.ensure_bridge_account(erc20.virtual_blockchain_rid);
+    val bridge_account = core.ensure_bridge_account(erc20.virtual_blockchain_rid);
     val bridge_amount = _mint(bridge_account, erc20.asset);
 
     val deposited_amount = _deposit_token_from_evm_eoa_with_already_created_and_linked_account(erc20.asset);
@@ -163,7 +163,7 @@ function test_deposit_native_token_from_evm_sc_with_already_created_and_linked_a
     rell.test.tx().op(
         helpers.create_bridge_account_op(erc20.virtual_blockchain_rid)
     ).run();
-    val bridge_account = snapshot.core.ensure_bridge_account(erc20.virtual_blockchain_rid);
+    val bridge_account = core.ensure_bridge_account(erc20.virtual_blockchain_rid);
     val bridge_amount = _mint(bridge_account, erc20.asset);
 
     val deposited_amount = _deposit_token_from_evm_sc_with_already_created_and_linked_account(erc20.asset);
@@ -238,7 +238,7 @@ function test_deposit_native_token_from_evm_before_account_creation_deducs_from_
     rell.test.tx().op(
         helpers.create_bridge_account_op(erc20.virtual_blockchain_rid)
     ).run();
-    val bridge_account = snapshot.core.ensure_bridge_account(erc20.virtual_blockchain_rid);
+    val bridge_account = core.ensure_bridge_account(erc20.virtual_blockchain_rid);
     val bridge_amount = _mint(bridge_account, erc20.asset);
 
     val deposited_amount = _deposit_token_from_evm_before_account_creation(erc20.asset);
@@ -417,11 +417,11 @@ function test_deposit_foreign_token_from_evm_will_collect_pending_deposits_when_
     assert_equals(assets.get_asset_balance(ft_account, foo_asset), amount3 + amount4);
 
     // Making sure ft4 and evm accounts are linked
-    assert_equals(snapshot.core.get_account_for_eoa_address(evm_address), ft_account.id);
-    assert_equals(snapshot.core.get_eoa_addresses_for_account(ft_account.id), [evm_address]);
+    assert_equals(core.get_account_for_eoa_address(evm_address), ft_account.id);
+    assert_equals(core.get_eoa_addresses_for_account(ft_account.id), [evm_address]);
 
     // Explicit account linking will fail
-    val op = snapshot.core.link_evm_eoa_account(evm_address);
+    val op = core.link_evm_eoa_account(evm_address);
     val message2 = ft4_test.create_evm_auth_message(op)
         .replace(auth.ACCOUNT_ID_PLACEHOLDER, recipient_id.to_hex().upper_case())
         .replace(auth.AUTH_DESCRIPTOR_ID_PLACEHOLDER, auth_descriptor.hash().to_hex().upper_case());

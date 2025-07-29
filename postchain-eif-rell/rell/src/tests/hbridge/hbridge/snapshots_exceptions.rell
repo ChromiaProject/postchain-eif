@@ -2,10 +2,10 @@ function test_cant_register_erc20_asset_with_snapshots_on_multiple_evm_networks(
     val ft4_asset = register_ft4_asset(CHR);
     
     // Register erc20 asset on network1
-    register_erc20_asset(ft4_asset, CHR, network_id1, enable_snapshots = true, bridge_mode = snapshot.bridge_mode.foreign);
+    register_erc20_asset(ft4_asset, CHR, network_id1, enable_snapshots = true, bridge_mode = bridge_mode.foreign);
     
     // Can't register erc20 asset on network2 for the same ft4 asset
     rell.test.tx().op(
-        helpers.register_erc20_asset_op(network_id2, CHR.token_address, ft4_asset, snapshot.bridge_mode.foreign, enable_snapshots = true)
+        helpers.register_erc20_asset_op(network_id2, CHR.token_address, ft4_asset, erc20.bridge_mode.foreign, enable_snapshots = true)
     ).run_must_fail("Only one ERC-20 asset can be linked to an FT4 asset when snapshots are enabled");
 }

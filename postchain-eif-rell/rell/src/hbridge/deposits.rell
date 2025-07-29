@@ -4,7 +4,7 @@ entity erc20_deposit {
     network_id: integer;
     from_smart_contract: boolean;
     index recipient_id: byte_array;
-    token: snapshot.erc20_asset;
+    token: erc20.erc20_asset;
     amount: big_integer;
     mutable state: deposit_state;
     mutable last_updated: timestamp;
