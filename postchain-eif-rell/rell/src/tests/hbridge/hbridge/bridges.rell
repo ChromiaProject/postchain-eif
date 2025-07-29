@@ -20,8 +20,8 @@ function test_unregister_bridge() {
             )
         ).run();
 
-    assert_equals(snapshot.core.bridge_contract @ {} ( @sum 1 ), 2);
-    assert_equals(snapshot.bridge_erc20_asset @ {} ( @sum 1 ), 2);
+    assert_equals(core.bridge_contract @ {} ( @sum 1 ), 2);
+    assert_equals(erc20.bridge_erc20_asset @ {} ( @sum 1 ), 2);
 
     rell.test.tx().op(
             helpers.unregister_bridge_op(
@@ -30,8 +30,8 @@ function test_unregister_bridge() {
             )
         ).run();
 
-    assert_equals(snapshot.core.bridge_contract @ {} ( @sum 1 ), 1);
-    assert_equals(snapshot.bridge_erc20_asset @ {} ( @sum 1 ), 1);
-    assert_true(empty(snapshot.core.bridge_contract @* { network_id1, bridge_address1 }));
-    assert_true(empty(snapshot.bridge_erc20_asset @* { erc20_chr_asset }));
+    assert_equals(core.bridge_contract @ {} ( @sum 1 ), 1);
+    assert_equals(erc20.bridge_erc20_asset @ {} ( @sum 1 ), 1);
+    assert_true(empty(core.bridge_contract @* { network_id1, bridge_address1 }));
+    assert_true(empty(erc20.bridge_erc20_asset @* { erc20_chr_asset }));
 }

@@ -23,8 +23,4 @@ namespace ft4 {
 
 import utils: ^^.eif.utils;
 import ^.core;
-import ^.*;
-
-struct module_args {
-    evm_read_offsets: gtv = map<text, integer>().to_gtv();
-}
+import ^.{ bridge_mode, state_slot_type };

@@ -9,14 +9,14 @@ function network_contract_discriminator(network_id: integer, contract_address: b
     return network_discriminator + contract_discriminator;
 }
 
-@extend(snapshot.compute_erc20_asset_discriminator) function (snapshot.erc20_asset): big_integer? {
+@extend(erc20.compute_erc20_asset_discriminator) function (erc20.erc20_asset): big_integer? {
     if (chain_context.args.version == 1) {
         return network_discriminator(erc20_asset.network_id);
     }
 
     // Get primary bridge
     val primary_bridge = require(
-        snapshot.bridge_erc20_asset @? { erc20_asset } ( @omit @sort .rowid, .bridge_contract.contract_address ) limit 1,
+        erc20.bridge_erc20_asset @? { erc20_asset } ( @omit @sort .rowid, .bridge_contract.contract_address ) limit 1,
         "Bridge address for ERC-20 token %s not found on network ID %d".format(erc20_asset.token_address, erc20_asset.network_id)
     );
     return network_contract_discriminator(erc20_asset.network_id, primary_bridge);

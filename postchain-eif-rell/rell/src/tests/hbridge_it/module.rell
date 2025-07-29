@@ -11,14 +11,14 @@ operation register_erc20_asset(
     network_id: integer,
     token_address: byte_array,
     asset_id: byte_array,
-    snapshot.bridge_mode,
+    bridge_mode,
     enable_snapshots: boolean
 ) {
     admin.require_admin();
 
     val asset = assets.Asset(asset_id);
 
-    snapshot.register_erc20_asset(
+    erc20.register_erc20_asset(
         network_id,
         token_address,
         asset,
@@ -36,6 +36,6 @@ operation add_contract_config(network_id: integer, contract: byte_array, skip_to
 operation register_bridge_with_erc20_assets(network_id: integer, bridge_address: byte_array) {
     admin.require_admin();
 
-    val erc20_assets = snapshot.erc20_asset @* { network_id };
-    snapshot.register_bridge_with_erc20_assets(network_id, bridge_address, erc20_assets);
+    val erc20_assets = erc20.erc20_asset @* { network_id };
+    erc20.register_bridge_with_erc20_assets(network_id, bridge_address, erc20_assets);
 }

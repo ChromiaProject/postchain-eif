@@ -6,9 +6,11 @@
     ensure_slots_and_emit_state_events_for_account(account, network_id);
 }
 
-// function which deducts balance from the account in a smart way:
-//  * burn when bridge is in foreign mode
-//  * transfer to pool account when bridge is in native mode
+/**
+ * Deducts balance from the account in a smart way:
+ * - Burns tokens when the bridge is in foreign mode.
+ * - Transfers from the given account to the pool account when the bridge is in native mode.
+ */
 function bridge_deduct_balance(ft4.accounts.account, erc20_asset, amount: big_integer) {
     when (erc20_asset.bridge_mode) {
         bridge_mode.foreign ->
@@ -20,9 +22,11 @@ function bridge_deduct_balance(ft4.accounts.account, erc20_asset, amount: big_in
     }
 }
 
-// function which increase balance of the account in a smart way:
-//  * mint when bridge is in foreign mode
-//  * transfer from pool account when bridge is in native mode
+/**
+ * Increase balance of the account in a smart way:
+ * - Mints tokens when the bridge is in foreign mode.
+ * - Transfers from the pool account to the given account when the bridge is in native mode.
+ */
 function bridge_increase_balance(ft4.accounts.account, erc20_asset, amount: big_integer) {
     when (erc20_asset.bridge_mode) {
         bridge_mode.foreign ->

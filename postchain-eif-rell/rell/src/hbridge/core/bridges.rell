@@ -10,7 +10,14 @@ function get_or_create_bridge(network_id: integer, bridge_address: byte_array) {
 }
 
 /**
- * Remove a bridge.
+ * Unregisters (removes) a bridge contract from the system.
+ *
+ * This function deletes the bridge_contract entity identified by the given
+ * network_id and bridge_address. If the bridge exists, it will call the
+ * `before_removing_bridge_contract` hook before deletion, and log the removal.
+ *
+ * @param network_id      The EVM network ID where the bridge contract is deployed.
+ * @param bridge_address  The address of the bridge contract to remove.
  */
 function unregister_bridge(network_id: integer, bridge_address: byte_array) {
     val bridge = bridge_contract @? { network_id, bridge_address };
@@ -28,4 +35,3 @@ function get_evm_read_offset(network_id: integer): integer {
     return map<text, integer>.from_gtv_pretty(chain_context.args.evm_read_offsets)
         .get_or_default("%d".format(network_id), 0);
 }
-

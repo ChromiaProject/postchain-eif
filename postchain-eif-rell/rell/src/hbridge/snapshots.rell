@@ -22,7 +22,7 @@ val ERC20_WITHDRAWAL_STATE_TAG = x"686272696467653a65726332305f77697468647261773
 function add_erc20_withdrawal_to_snapshot(ew: erc20_withdrawal) {
     val withdrawal_info = ew.to_struct();
 
-    val state_slot = snapshot.get_or_create_state_slot(
+    val state_slot = erc20.get_or_create_state_slot(
         network_id = withdrawal_info.network_id,
         token_address = withdrawal_info.token_address,
         beneficiary = withdrawal_info.beneficiary,
@@ -47,7 +47,7 @@ function add_erc20_withdrawal_to_snapshot(ew: erc20_withdrawal) {
     emit_erc20_withdrawal_state_eif_event(state_slot, event_hashes);
 }
 
-function emit_erc20_withdrawal_state_eif_event(state_slot: snapshot.core.state_slot, event_hashes: list<byte_array>) {
+function emit_erc20_withdrawal_state_eif_event(state_slot: core.state_slot, event_hashes: list<byte_array>) {
     val state_slot_data = state_slot.to_struct();
 
     val state_parts = list<gtv>();
@@ -58,5 +58,5 @@ function emit_erc20_withdrawal_state_eif_event(state_slot: snapshot.core.state_s
         state_parts.add(event_hash.to_gtv());
     }
     
-    snapshot.core.emit_state_event(state_slot_data.id, state_parts);
+    core.emit_state_event(state_slot_data.id, state_parts);
 }

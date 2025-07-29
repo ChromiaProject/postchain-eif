@@ -20,26 +20,26 @@ operation bridge_ft4_token_to_evm(network_id: integer, asset_id: byte_array, amo
     );
 
     // In order to not ruin existing bridges we skip validation if no bridge has been defined
-    if (exists(snapshot.core.bridge_contract @* {})) {
-        val network_bridges = snapshot.core.bridge_contract @* { network_id };
+    if (exists(core.bridge_contract @* {})) {
+        val network_bridges = core.bridge_contract @* { network_id };
         require(network_bridges.size() > 0, "No bridges are configured for network ID %d".format(network_id));
         require(network_bridges.size() < 2, "More than one bridge is configured for network ID %d. Use `bridge_ft_asset_to_evm` operation.".format(network_id));
     }
 
     val ft4_asset = ft4.assets.Asset(asset_id);
-    val erc20 = snapshot.erc20_asset @? { .network_id == network_id, .asset == ft4_asset } (@omit @sort_desc .rowid, $) limit 1;
-    require(erc20, "ERC20 token not found for network ID %d and ft4 asset ID %s".format(network_id, asset_id));
+    val erc20_asset = erc20.erc20_asset @? { .network_id == network_id, .asset == ft4_asset } (@omit @sort_desc .rowid, $) limit 1;
+    require(erc20_asset, "ERC20 token not found for network ID %d and ft4 asset ID %s".format(network_id, asset_id));
 
     val from_account = ft4.auth.authenticate();
     require(withdraw_check_access_list(from_account.id), "Account id %s not on access list.".format(from_account.id));
     require(
-        snapshot.core.evm_eoa_account_link @? { from_account, beneficiary } ??
-        or snapshot.core.evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
+        core.evm_eoa_account_link @? { from_account, beneficiary } ??
+        or core.evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
         "Can only withdraw to your own account"
     );
 
-    snapshot.bridge_deduct_balance(from_account, erc20, amount);
-    emit_withdrawal_event(erc20.network_id, erc20.token_address, beneficiary, amount);
+    erc20.bridge_deduct_balance(from_account, erc20_asset, amount);
+    emit_withdrawal_event(erc20_asset.network_id, erc20_asset.token_address, beneficiary, amount);
 }
 
 @extend(ft4.auth.auth_handler)
@@ -69,23 +69,23 @@ operation bridge_ft_asset_to_evm(
     );
 
     val ft4_asset = ft4.assets.Asset(asset_id);
-    val erc20 = snapshot.erc20_asset @? { .network_id == network_id, .asset == ft4_asset } (@omit @sort_desc .rowid, $) limit 1;
-    require(erc20, "ERC20 token not found for network ID %d and ft4 asset ID %s".format(network_id, asset_id));
+    val erc20_asset = erc20.erc20_asset @? { .network_id == network_id, .asset == ft4_asset } (@omit @sort_desc .rowid, $) limit 1;
+    require(erc20_asset, "ERC20 token not found for network ID %d and ft4 asset ID %s".format(network_id, asset_id));
     require(
-        validate_bridge_contract(bridge_address, erc20),
-        "Bridge address %s or ERC-20 token %s are not registered on network ID %d".format(bridge_address, erc20.token_address, network_id)
+        validate_bridge_contract(bridge_address, erc20_asset),
+        "Bridge address %s or ERC-20 token %s are not registered on network ID %d".format(bridge_address, erc20_asset.token_address, network_id)
     );
 
     val from_account = ft4.auth.authenticate();
     require(withdraw_check_access_list(from_account.id), "Account id %s not on access list.".format(from_account.id));
     require(
-        snapshot.core.evm_eoa_account_link @? { from_account, beneficiary } ??
-        or snapshot.core.evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
+        core.evm_eoa_account_link @? { from_account, beneficiary } ??
+        or core.evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
         "Can only withdraw to your own account"
     );
 
-    snapshot.bridge_deduct_balance(from_account, erc20, amount);
-    emit_withdrawal_event(erc20.network_id, erc20.token_address, beneficiary, amount, bridge_address);
+    erc20.bridge_deduct_balance(from_account, erc20_asset, amount);
+    emit_withdrawal_event(erc20_asset.network_id, erc20_asset.token_address, beneficiary, amount, bridge_address);
 }
 
 @extend(ft4.auth.auth_handler)
@@ -104,24 +104,27 @@ function bridge_ft4_token_to_evm_contract_auth_message(gtv) {
 
 operation bridge_ft4_token_to_evm_contract(network_id: integer, asset_id: byte_array, amount: big_integer, beneficiary: byte_array, token_address: byte_array) {
     val ft4_asset = ft4.assets.Asset(asset_id);
-    val erc20 = snapshot.erc20_asset @? { .network_id == network_id, .asset == ft4_asset, .token_address == token_address };
-    require(erc20, "ERC20 token not found for network ID %d, ft4 asset ID %s, and ERC20 token address %s".format(network_id, asset_id, token_address));
+    val erc20_asset = erc20.erc20_asset @? { .network_id == network_id, .asset == ft4_asset, .token_address == token_address };
+    require(erc20_asset, "ERC20 token not found for network ID %d, ft4 asset ID %s, and ERC20 token address %s".format(network_id, asset_id, token_address));
 
     val from_account = ft4.auth.authenticate();
 
     require(
-        snapshot.core.evm_eoa_account_link @? { from_account, beneficiary } ??
-        or snapshot.core.evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
+        core.evm_eoa_account_link @? { from_account, beneficiary } ??
+        or core.evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
         "Can only withdraw to your own account"
     );
 
-    snapshot.bridge_deduct_balance(from_account, erc20, amount);
-    emit_withdrawal_event(erc20.network_id, erc20.token_address, beneficiary, amount);
+    erc20.bridge_deduct_balance(from_account, erc20_asset, amount);
+    emit_withdrawal_event(erc20_asset.network_id, erc20_asset.token_address, beneficiary, amount);
 }
 
-// if account was not created, we can recall the deposit back to EVM
-// note: we do not check authorization. after a time-out the deposit can be recalled by anyone,
-// and it goes back to where it came from. this simplifies the flow
+/**
+ * If the account was not created, the deposit can be recalled back to EVM.
+ *
+ * Note: Authorization is not checked. After a timeout, the deposit can be recalled by anyone,
+ * and it is returned to where it came from. This simplifies the flow.
+ */
 operation recall_pending_deposit(sender_address: byte_array) {
     val pending_deposits = erc20_deposit @* { sender_address, deposit_state.pending };
     for (deposit in pending_deposits) {
@@ -132,7 +135,7 @@ operation recall_pending_deposit(sender_address: byte_array) {
 
         require(asset == deposit.token.asset, "Expected asset %s but was %s".format(asset.symbol, deposit.token.asset.symbol));
 
-        snapshot.bridge_deduct_balance(ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid), deposit.token, amount);
+        erc20.bridge_deduct_balance(ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid), deposit.token, amount);
         emit_withdrawal_event(deposit.token.network_id, deposit.token.token_address, sender_address, amount);
 
         update_deposit_state(deposit, deposit_state.recalled);

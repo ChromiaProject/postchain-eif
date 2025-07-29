@@ -58,11 +58,11 @@ function (evm_block: messaging.evm_block_message) {
 function process_link_account_event(network_id: integer, event: link_account_id_event) {
     if (not event.is_contract) return; // we currently don't allow linking EOA using this method
 
-    if (not empty(snapshot.core.evm_sc_account_link @? { event.sender, network_id })) {
+    if (not empty(core.evm_sc_account_link @? { event.sender, network_id })) {
         // can only link once
         return;
     }
-    if (not empty(snapshot.core.proposed_evm_sc_account_link @? { event.sender, network_id })) {
+    if (not empty(core.proposed_evm_sc_account_link @? { event.sender, network_id })) {
         // can only propose once
         return;
     }
@@ -73,7 +73,7 @@ function process_link_account_event(network_id: integer, event: link_account_id_
         return;
     }
 
-    create snapshot.core.proposed_evm_sc_account_link(event.sender, network_id, account);
+    create core.proposed_evm_sc_account_link(event.sender, network_id, account);
 }
 
 function process_deposit_erc20_event(network_id: integer, event: deposited_erc20_event) {
@@ -83,8 +83,8 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
     var beneficiary = event.beneficiary;
     val deposit_from_smart_contract = beneficiary != zero_beneficiary;
 
-    val erc20 = snapshot.erc20_asset @? { network_id, .token_address == event.token_address };
-    if (erc20 == null) {
+    val erc20_asset = erc20.erc20_asset @? { network_id, .token_address == event.token_address };
+    if (erc20_asset == null) {
         log("Deposit event bounced: ERC20 token %s not found".format(event.token_address));
         bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
         return;
@@ -95,18 +95,18 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
         return;
     }
 
-    if (not validate_bridge_contract(event.bridge_address, erc20)) {
+    if (not validate_bridge_contract(event.bridge_address, erc20_asset)) {
         log("Deposit event bounced: ERC20 token %s is not registered to bridge %s".format(event.token_address, event.bridge_address));
         // TODO: Users can still abuse by claiming this withdraw on actual bridge, must be solved in POS-1583
         bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
         return;
     }
 
-    if (erc20.bridge_mode == bridge_mode.native) {
-        val bridge_account = snapshot.core.ensure_bridge_account(erc20.virtual_blockchain_rid);
-        if (ft4.assets.get_asset_balance(bridge_account, erc20.asset) < event.amount) {
+    if (erc20_asset.bridge_mode == bridge_mode.native) {
+        val bridge_account = core.ensure_bridge_account(erc20_asset.virtual_blockchain_rid);
+        if (ft4.assets.get_asset_balance(bridge_account, erc20_asset.asset) < event.amount) {
             log("Deposit event bounced: insufficient balance of asset %s: ERC20 token %s, sender %s"
-                .format(erc20.asset.symbol, event.token_address, event.sender));
+                .format(erc20_asset.asset.symbol, event.token_address, event.sender));
             bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
             return;
         }
@@ -118,7 +118,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
 
         if (not empty(ft4_account)) {
             // we require explicit link to avoid unwanted deposits
-            if (need_consent_on_deposit and empty(snapshot.core.evm_sc_account_link @? { event.sender, network_id, ft4_account })) {
+            if (need_consent_on_deposit and empty(core.evm_sc_account_link @? { event.sender, network_id, ft4_account })) {
                 bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
                 return;
             }
@@ -126,7 +126,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
 
     } else {
         // compute beneficiary account automatically
-        ft4_account = snapshot.core.find_ft4_account_for_address(event.sender, network_id);
+        ft4_account = core.find_ft4_account_for_address(event.sender, network_id);
         beneficiary = event.sender.hash();
     }
 
@@ -138,12 +138,12 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
         // note: we don't want to call create_on_transfer because it fails when requirements are not met.
         // we want to bounce instead
 
-        val sender_blockchain_rid = erc20.virtual_blockchain_rid;
+        val sender_blockchain_rid = erc20_asset.virtual_blockchain_rid;
         val rules = ft4.transfer_strategy.find_allowed_rules(
             from_chain = sender_blockchain_rid,
             from_id = sender_id,
             to_id = recipient_id,
-            asset = erc20.asset,
+            asset = erc20_asset.asset,
             amount = event.amount
         );
 
@@ -153,21 +153,21 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
             return;
         }
 
-        if (not deposit_from_smart_contract and exists(erc20_deposit @* { .recipient_id == recipient_id, erc20 })) {
+        if (not deposit_from_smart_contract and exists(erc20_deposit @* { .recipient_id == recipient_id, erc20_asset })) {
             log("Deposit event bounced: tokens has already been transferred from EOA account to this recipient, and has not been claimed yet");
             bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
             return;
         }
 
-        snapshot.bridge_increase_balance(
-            ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid), erc20, event.amount);
+        erc20.bridge_increase_balance(
+            ft4.transfer_strategy.ensure_pool_account(chain_context.blockchain_rid), erc20_asset, event.amount);
 
         val deposit = create erc20_deposit(
             sender_address = event.sender,
             network_id,
             deposit_from_smart_contract,
             recipient_id,
-            erc20,
+            erc20_asset,
             event.amount,
             deposit_state.pending,
             last_updated = op_context.last_block_time,
@@ -178,7 +178,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
             sender_blockchain_rid = sender_blockchain_rid,
             sender_id = sender_id,
             recipient_id = recipient_id,
-            asset = erc20.asset,
+            asset = erc20_asset.asset,
             amount = event.amount,
             rules = rules
         );
@@ -192,14 +192,14 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
                 network_id,
                 deposit_from_smart_contract,
                 recipient_id,
-                erc20,
+                erc20_asset,
                 event.amount,
                 deposit_state.completed,
                 last_updated = op_context.last_block_time,
                 evm_tx_hash = event.evm_tx_hash,
             );
 
-            snapshot.bridge_increase_balance(ft4_account, erc20, event.amount);
+            erc20.bridge_increase_balance(ft4_account, erc20_asset, event.amount);
         } else {
             log("Deposit event bounced: Account id %s not on access list.".format(ft4_account.id));
             bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
@@ -232,9 +232,9 @@ function bounce_deposit_event(network_id: integer, token_address: byte_array, be
     emit_withdrawal_event(network_id, token_address, beneficiary, amount);
 }
 
-function validate_bridge_contract(bridge_address: byte_array, snapshot.erc20_asset): boolean {
+function validate_bridge_contract(bridge_address: byte_array, erc20.erc20_asset): boolean {
     // In order to not ruin existing bridges we skip validation if no bridge has been defined
-    if (empty(snapshot.core.bridge_contract @* {})) return true;
+    if (empty(core.bridge_contract @* {})) return true;
 
-    return exists(snapshot.bridge_erc20_asset @? { erc20_asset, .bridge_contract.contract_address == bridge_address });
+    return exists(erc20.bridge_erc20_asset @? { erc20_asset, .bridge_contract.contract_address == bridge_address });
 }

@@ -1,11 +1,13 @@
 
-// link between EVM address and FT4 account, specifically for EOA. (Where user has the private key)
+val ACCOUNT_TYPE_BRIDGE = "EIF_BRIDGE";
+
+// Link between EVM address and FT4 account, specifically for EOA. (Where user has the private key)
 entity evm_eoa_account_link {
     key address: byte_array;
     index ft4.accounts.account;
 }
 
-// for smart contracts we need to keep track of network_id
+// For smart contracts we need to keep track of network_id
 entity evm_sc_account_link {
     key address: byte_array, network_id: integer;
     index ft4.accounts.account;
@@ -52,7 +54,7 @@ function _link_evm_account_if_not_linked(network_id: integer, address: byte_arra
     }
 }
 
-// accounts might be linked explicitly (e.g. when account_id is not derived from EVM address)
+// Accounts might be linked explicitly (e.g. when account_id is not derived from EVM address)
 function _link_evm_eoa_account(address: byte_array, account: ft4.accounts.account) {
     require(empty(evm_eoa_account_link @? { address }), "EVM address %s is already linked to FT4 account".format(address));
     create evm_eoa_account_link(address, account);
@@ -74,8 +76,6 @@ function _unlink_evm_sc_account(address: byte_array, network_id: integer, accoun
     );
     delete link;
 }
-
-val ACCOUNT_TYPE_BRIDGE = "EIF_BRIDGE";
 
 function ensure_bridge_account(blockchain_rid: byte_array) =
    ft4.accounts.ensure_account_without_auth(blockchain_rid, ACCOUNT_TYPE_BRIDGE);

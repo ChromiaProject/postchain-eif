@@ -1,27 +1,34 @@
-
-// link between ERC20 token and FT4 asset
+/**
+ * Link between ERC20 token and FT4 asset.
+ */
 entity erc20_asset {
     network_id: integer;
-    token_address: byte_array; // token contract address
+    /** token contract address */
+    token_address: byte_array;
     key network_id, token_address;
     bridge_mode;
     index ft4.assets.asset;
-    key virtual_blockchain_rid: byte_array; // virtual blockchain RID derived from network_id and token_address
+    /** virtual blockchain RID derived from network_id and token_address */
+    key virtual_blockchain_rid: byte_array;
 }
 
 struct erc20_info {
     network_id: integer;
-    token_address: byte_array; // token contract address
+    /** token contract address */
+    token_address: byte_array;
     bridge_mode;
-    virtual_blockchain_rid: byte_array; // virtual blockchain RID derived from network_id and token_address
+    /** virtual blockchain RID derived from network_id and token_address */
+    virtual_blockchain_rid: byte_array;
 }
 
 struct erc20_asset_info {
     network_id: integer;
-    token_address: byte_array; // token contract address
+    /** token contract address */
+    token_address: byte_array;
     bridge_mode;
     ft_asset_id: byte_array;
-    virtual_blockchain_rid: byte_array; // virtual blockchain RID derived from network_id and token_address
+    /** virtual blockchain RID derived from network_id and token_address */
+    virtual_blockchain_rid: byte_array;
 }
 
 @extendable function compute_erc20_asset_discriminator(erc20_asset): big_integer?;

@@ -1,3 +1,9 @@
+/**
+ * Returns the list of ERC20 assets for a given asset ID.
+ *
+ * @param asset_id The ID of the asset.
+ * @return A list of `erc20_info` objects.
+ */
 query get_erc20_for_asset(asset_id: byte_array): list<erc20_info> {
     val asset = ft4.assets.Asset(asset_id);
     return erc20_asset @* { asset } (erc20_info(
