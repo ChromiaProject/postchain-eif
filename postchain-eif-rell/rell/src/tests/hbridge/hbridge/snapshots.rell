@@ -6,6 +6,7 @@ val island1_chain_rid = x"cc".repeat(32);
 val island2_chain_rid = x"dd".repeat(32);
 
 val hub_chain_recovery_contract = x"01".repeat(20);
+val hub_chain_recovery_contract2 = x"11".repeat(20);
 val island1_chain_recovery_contract = x"02".repeat(20);
 val island2_chain_recovery_contract = x"03".repeat(20);
 
@@ -103,7 +104,7 @@ function _build_tx(blockchain_rid: byte_array, op: rell.test.op) = gtx_transacti
  * 
  * @return The register recovery contract tx on the chain whose RID is brid
  */
-function _register_recovery_contract(brid: byte_array, network_id: integer, contract_address: byte_array, height: integer = 0): gtx_transaction {
+function _register_recovery_contract(brid: byte_array, network_id: integer, contract_address: byte_array, height: integer = 0, replace_existing: boolean = false): gtx_transaction {
     val reg_recovery_contract_tx = _build_tx(brid, helpers.register_recovery_contract_op(network_id, contract_address));
 
     rell.test.tx()
@@ -113,7 +114,7 @@ function _register_recovery_contract(brid: byte_array, network_id: integer, cont
             helpers.mock_confirmation_proof_bytes(brid, height), 
             x"", 0, x""
         ))
-        .op(core.register_recovery_contract(reg_recovery_contract_tx, 0))
+        .op(core.register_recovery_contract(reg_recovery_contract_tx, 0, replace_existing))
         .nop().run();
     
     return reg_recovery_contract_tx;

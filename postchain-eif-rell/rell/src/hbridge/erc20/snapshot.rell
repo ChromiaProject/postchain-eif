@@ -185,7 +185,7 @@ function update_remote_erc20_state_slot(slot: remote_erc20_state_slot, balance: 
 }    
 */
 
-@extend(core.before_removing_recovery_contract) function (core.recovery_contract, blockchain_account: ft4.accounts.account) {
+@extend(core.before_remove_recovery_contract) function (core.recovery_contract, blockchain_account: ft4.accounts.account) {
   // For all existing recovery contract state slots, for all ERC20 assets, emit eif_state events with amount 0
     val erc20_assets = (s: core.state_slot, sl: local_erc20_state_slot_binding) @* {
         sl.account == blockchain_account,
