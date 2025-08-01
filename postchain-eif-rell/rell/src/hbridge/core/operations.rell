@@ -44,12 +44,13 @@ operation link_evm_sc_account(address: byte_array, network_id: integer) {
  * 
  * This operation requires ICCF proof from the source blockchain and validates that:
  * - The operation name matches "register_recovery_contract"
- * - The operation has exactly 2 arguments: network_id: integer and contract_address: byte_array
- * - No recovery contract is already registered for the blockchain
+ * - The operation has exactly 2 arguments: `network_id: integer` and `contract_address: byte_array`
  * 
- * After validation, it:
- * 1. Creates a recovery contract record linking the blockchain RID, network ID and contract address
- * 2. Links the contract address to the source blockchain FT4 account
+ * Then,
+ * - If a recovery contract is already registered, it will be replaced if `replace_existing` is true.
+ * - Before removing the existing recovery contract, the `before_remove_recovery_contract` hook is called.
+ * - A new recovery contract record is created, linking the blockchain RID, network ID, and contract address.
+ * - The contract address is also linked to the source blockchain FT4 account.
  * 
  * @param tx_to_prove       The transaction containing the registration operation to be proven
  * @param op_index          Index of the registration operation within the transaction
@@ -57,7 +58,7 @@ operation link_evm_sc_account(address: byte_array, network_id: integer) {
  * Expected operation signature in tx_to_prove:
  *      operation register_recovery_contract(network_id: integer, contract_address: byte_array)
  */
-operation register_recovery_contract(tx_to_prove: gtx_transaction, op_index: integer) {
+operation register_recovery_contract(tx_to_prove: gtx_transaction, op_index: integer, replace_existing: boolean = false) {
     val iccf_auth_data = require_iccf_auth(tx_to_prove, op_index, rell.meta(register_recovery_contract).simple_name, 2);
     val blockchain_rid = iccf_auth_data.blockchain_rid;
     val network_id = integer.from_gtv(iccf_auth_data.op_args[0]);
@@ -66,26 +67,23 @@ operation register_recovery_contract(tx_to_prove: gtx_transaction, op_index: int
     utils.validate_evm_network_and_address(network_id, contract_address);
     validate_and_update_recovery_contract_auth(iccf_auth_data);
 
-    val recovery_contract = recovery_contract @? { blockchain_rid, network_id };
-    if (exists(recovery_contract)) {
-        require(recovery_contract.contract_address != contract_address, "This recovery contract is already registered");
-        val blockchain_account = ft4.crosschain.ensure_blockchain_account(blockchain_rid);
+    val existing_contract = recovery_contract @? { blockchain_rid, network_id };
+    if (exists(existing_contract)) {
+        require(replace_existing, "Recovery contract is already registered");
+        require(existing_contract.contract_address != contract_address, "This recovery contract is already registered");
         
-        before_removing_recovery_contract(recovery_contract, blockchain_account);
+        val blockchain_account = ft4.crosschain.ensure_blockchain_account(blockchain_rid);
+        before_remove_recovery_contract(existing_contract, blockchain_account);
 
         // Unlink and delete recovery contract
-        _unlink_evm_sc_account(recovery_contract.contract_address, network_id, blockchain_account);
-        delete recovery_contract;
+        _unlink_evm_sc_account(existing_contract.contract_address, network_id, blockchain_account);
+        delete existing_contract;
+    }   
 
-        // (1) Create new recovery contract; (2) link it to the blockchain account; 
-        // (3) create and bind state slots; (4) emit eif_state events.
-        create recovery_contract(blockchain_rid, network_id, contract_address);
-        _link_evm_sc_account(contract_address, network_id, ft4.crosschain.ensure_blockchain_account(blockchain_rid));
-    } else {
-        // Create new recovery contract and link it to the blockchain account
-        create recovery_contract(blockchain_rid, network_id, contract_address);
-        _link_evm_sc_account(contract_address, network_id, ft4.crosschain.ensure_blockchain_account(blockchain_rid));
-    }    
+    // (1) Create new recovery contract; (2) link it to the blockchain account; 
+    // (3) create and bind state slots; (4) emit eif_state events.
+    create recovery_contract(blockchain_rid, network_id, contract_address);
+    _link_evm_sc_account(contract_address, network_id, ft4.crosschain.ensure_blockchain_account(blockchain_rid)); 
 }
 
-@extendable function before_removing_recovery_contract(recovery_contract, blockchain_account: ft4.accounts.account) {}
+@extendable function before_remove_recovery_contract(recovery_contract, blockchain_account: ft4.accounts.account) {}
