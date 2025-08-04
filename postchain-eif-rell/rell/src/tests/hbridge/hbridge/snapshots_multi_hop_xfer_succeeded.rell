@@ -60,7 +60,7 @@ function test_multi_hop_cross_xfer__state_slots_emitted_on_init_transfer_to_orig
         ("eif_state", [
             alice_slots[0].id.to_gtv(),
             [
-                core.ERC20_STATE_TAG.to_gtv(),
+                erc20.ERC20_STATE_TAG.to_gtv(),
                 utils.evm_address_to_32_byte_array(alice.evm_address).to_gtv(),
                 alice_slots[0].discriminator.to_gtv(),
                 utils.evm_address_to_32_byte_array(CHR.token_address).to_gtv(),
@@ -71,7 +71,7 @@ function test_multi_hop_cross_xfer__state_slots_emitted_on_init_transfer_to_orig
         ("eif_state", [
             hub_slots[0].id.to_gtv(),
             [
-                core.ERC20_STATE_TAG.to_gtv(),
+                erc20.ERC20_STATE_TAG.to_gtv(),
                 utils.evm_address_to_32_byte_array(hub_chain_recovery_contract).to_gtv(),
                 hub_slots[0].discriminator.to_gtv(),
                 utils.evm_address_to_32_byte_array(CHR.token_address).to_gtv(),
@@ -113,7 +113,7 @@ function test_multi_hop_cross_xfer__state_slots_emitted_on_apply_transfer_to_int
         ("eif_state", [
             island1_slots[0].id.to_gtv(),
             [
-                core.ERC20_STATE_TAG.to_gtv(),
+                erc20.ERC20_STATE_TAG.to_gtv(),
                 utils.evm_address_to_32_byte_array(island1_chain_recovery_contract).to_gtv(),
                 island1_slots[0].discriminator.to_gtv(),
                 utils.evm_address_to_32_byte_array(CHR.token_address).to_gtv(),
@@ -178,7 +178,7 @@ function test_multi_hop_cross_xfer__state_slots_emitted_on_apply_transfer_to_des
         ("eif_state", [
             bob_slots[0].id.to_gtv(),
             [
-                core.ERC20_STATE_TAG.to_gtv(),
+                erc20.ERC20_STATE_TAG.to_gtv(),
                 utils.evm_address_to_32_byte_array(bob.evm_address).to_gtv(),
                 bob_slots[0].discriminator.to_gtv(),
                 utils.evm_address_to_32_byte_array(CHR.token_address).to_gtv(),
@@ -267,7 +267,7 @@ function test_multi_hop_cross_xfer_via_upstream_chain__state_slots_emitted_on_in
         ("eif_state", [
             bob_slots[0].id.to_gtv(),
             [
-                core.ERC20_STATE_TAG.to_gtv(),
+                erc20.ERC20_STATE_TAG.to_gtv(),
                 utils.evm_address_to_32_byte_array(bob.evm_address).to_gtv(),
                 bob_slots[0].discriminator.to_gtv(),
                 utils.evm_address_to_32_byte_array(CHR.token_address).to_gtv(),
@@ -327,7 +327,7 @@ function test_multi_hop_cross_xfer_via_upstream_chain__state_slots_emitted_on_ap
         ("eif_state", [
             island1_slots[0].id.to_gtv(),
             [
-                core.ERC20_STATE_TAG.to_gtv(),
+                erc20.ERC20_STATE_TAG.to_gtv(),
                 utils.evm_address_to_32_byte_array(island1_chain_recovery_contract).to_gtv(),
                 island1_slots[0].discriminator.to_gtv(),
                 utils.evm_address_to_32_byte_array(CHR.token_address).to_gtv(),
@@ -339,7 +339,7 @@ function test_multi_hop_cross_xfer_via_upstream_chain__state_slots_emitted_on_ap
         ("eif_state", [
             island2_slots[0].id.to_gtv(),
             [
-                core.ERC20_STATE_TAG.to_gtv(),
+                erc20.ERC20_STATE_TAG.to_gtv(),
                 utils.evm_address_to_32_byte_array(island2_chain_recovery_contract).to_gtv(),
                 island2_slots[0].discriminator.to_gtv(),
                 utils.evm_address_to_32_byte_array(CHR.token_address).to_gtv(),
@@ -400,7 +400,7 @@ function test_multi_hop_cross_xfer_via_upstream_chain__state_slots_emitted_on_ap
         ("eif_state", [
             bob_slots[0].id.to_gtv(),
             [
-                core.ERC20_STATE_TAG.to_gtv(),
+                erc20.ERC20_STATE_TAG.to_gtv(),
                 utils.evm_address_to_32_byte_array(bob.evm_address).to_gtv(),
                 bob_slots[0].discriminator.to_gtv(),
                 utils.evm_address_to_32_byte_array(CHR.token_address).to_gtv(),

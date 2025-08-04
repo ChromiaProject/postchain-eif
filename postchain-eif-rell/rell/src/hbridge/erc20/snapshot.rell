@@ -3,10 +3,6 @@ entity erc20_asset_snapshots_enabled {
     key ft4.assets.asset; // only one erc20 asset can be linked to ft4 asset when snapshots are enabled
 }
 
-function enable_erc20_asset_snapshots(erc20_asset) {
-    create erc20_asset_snapshots_enabled(erc20_asset.asset, erc20_asset);
-}
-
 /**
  * This entity is used to track the relationship between accounts, ERC20 tokens,
  * and their corresponding state slots in the Merkle tree.
@@ -19,11 +15,41 @@ entity local_erc20_state_slot_binding {
     index core.state_slot; // slot might collect info from multiple assets
 }
 
-function get_local_erc20_state_slot(ft4.accounts.account, erc20_asset): core.state_slot? {
+struct balance_record {
+    token_address: byte_array;
+    balance: big_integer;
+}
+
+/**
+ * Enables snapshots for the given ERC20 asset.
+ *
+ * @param erc20_asset The ERC20 asset.
+ */
+function enable_erc20_asset_snapshots(erc20_asset) {
+    create erc20_asset_snapshots_enabled(erc20_asset.asset, erc20_asset);
+}
+
+/**
+ * Returns the ERC20 state slot for the given FT4 account and ERC20 asset.
+ *
+ * @param account The FT4 account.
+ * @param erc20_asset The ERC20 asset.
+ * @return The associated core.state_slot, or null if not found.
+ */
+function get_erc20_state_slot(ft4.accounts.account, erc20_asset): core.state_slot? {
     return local_erc20_state_slot_binding @? { account, erc20_asset } .state_slot;
 }
 
-function get_or_create_local_erc20_state_slot(ft4.accounts.account, erc20_asset): core.state_slot? {
+/**
+ * Returns the ERC20 state slot for the given FT4 account and ERC20 asset.
+ *
+ * Note: This function does not check if snapshots are enabled for the asset.
+ *
+ * @param account The FT4 account.
+ * @param erc20_asset The ERC20 asset.
+ * @return The associated core.state_slot, or null if not found.
+ */
+function get_or_create_erc20_state_slot(ft4.accounts.account, erc20_asset): core.state_slot? {
     val network_id = erc20_asset.network_id;
 
     val account_address = core.find_address_for_ft4_account(account, network_id);
@@ -53,11 +79,23 @@ function get_or_create_local_erc20_state_slot(ft4.accounts.account, erc20_asset)
     return existing_slot;
 }
 
-function get_or_create_state_slot(network_id: integer, token_address: byte_array, beneficiary: byte_array, type: state_slot_type): core.state_slot? {
+/**
+ * Returns the ERC20 withdrawal state slot for a given network, token address, and beneficiary.
+ *
+ * If such a slot does not exist and snapshots are enabled for the asset, it creates a new state slot with the appropriate
+ * discriminator and returns it. Otherwise, it returns null.
+ * 
+ * @param network_id The EVM network ID.
+ * @param token_address The ERC20 token contract address.
+ * @param beneficiary The address that will receive the withdrawal.
+ * @return The associated `core.state_slot` if found or created, or `null` if the asset does not exist,
+ *         snapshots are not enabled, or the discriminator cannot be computed.
+ */
+function get_or_create_erc20_withdrawal_state_slot(network_id: integer, token_address: byte_array, beneficiary: byte_array): core.state_slot? {
     val asset = erc20_asset @? { token_address, network_id };
+    if (empty(asset)) return null;
 
-    if (not exists(asset)) return null;
-    if (not exists(erc20_asset_snapshots_enabled @? { .erc20_asset == asset })) return null;
+    if (empty(erc20_asset_snapshots_enabled @? { .erc20_asset == asset })) return null;
 
     val discriminator = compute_erc20_asset_discriminator(asset);
     if (empty(discriminator)) return null;
@@ -65,7 +103,7 @@ function get_or_create_state_slot(network_id: integer, token_address: byte_array
     var state_slot = core.state_slot @? {
         network_id,
         .recipient_address == beneficiary,
-        type,
+        .type == state_slot_type.erc20_withdrawal,
         .local == true,
         discriminator,
     };
@@ -75,7 +113,7 @@ function get_or_create_state_slot(network_id: integer, token_address: byte_array
             id = core.get_next_state_slot_id(),
             network_id,
             recipient_address = beneficiary,
-            type,
+            type = state_slot_type.erc20_withdrawal,
             local = true,
             discriminator,
         );
@@ -84,49 +122,62 @@ function get_or_create_state_slot(network_id: integer, token_address: byte_array
     return state_slot;
 }
 
-function emit_local_erc20_state_slot(core.state_slot) {
-    val balance_records = list<core.balance_record>();
-
+function collect_and_emit_erc20_state_event(core.state_slot) {
     // Note: there must be at least one record per state_slot, otherwise we don't know that slot is erc20_asset
     // @+ ensures there's at least one
+    val balance_records = list<balance_record>();
     for (lss in local_erc20_state_slot_binding @+ { state_slot } (.account, erc20_asset = .erc20_asset.to_struct())) {
         val amount = ft4.assets.get_asset_balance(lss.account, lss.erc20_asset.asset);
-        balance_records.add(core.balance_record(lss.erc20_asset.token_address, amount));
+        balance_records.add(balance_record(lss.erc20_asset.token_address, amount));
     }
 
+    emit_erc20_state_event(state_slot, balance_records);
+}
+
+function emit_erc20_state_event(core.state_slot, balance_records: list<balance_record>) {
     // Note: we must emit it even if there are no records! 
     // It's important to overwrite previous state with empty state to signal that the slot is empty
-    core.emit_erc20_state_eif_event(state_slot, balance_records);
+    val state_parts = list<gtv>();
+    if (exists(balance_records)) {
+        state_parts.add(ERC20_STATE_TAG.to_gtv());
+        state_parts.add(utils.evm_address_to_32_byte_array(state_slot.recipient_address).to_gtv());
+        state_parts.add(state_slot.discriminator.to_gtv()); // discriminator includes (v1) network_id, or (v2) network_id and bridge_address
+        for (balance_record in balance_records) {
+            state_parts.add(utils.evm_address_to_32_byte_array(balance_record.token_address).to_gtv());
+            state_parts.add(balance_record.balance.to_gtv());
+        }
+    }
+    core.emit_state_event(state_slot.id, state_parts);
 }
 
 @extend(ft4.assets.after_transfer) function (from: ft4.accounts.account, to: ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
     val erc20_asset = erc20_asset_snapshots_enabled @? { asset } .erc20_asset;
     if (exists(erc20_asset)) {
-        val from_slot = get_local_erc20_state_slot(from, erc20_asset);
-        if (exists(from_slot)) emit_local_erc20_state_slot(from_slot);
+        val from_slot = get_erc20_state_slot(from, erc20_asset);
+        if (exists(from_slot)) collect_and_emit_erc20_state_event(from_slot);
 
-        val to_slot = get_or_create_local_erc20_state_slot(to, erc20_asset);
-        if (exists(to_slot)) emit_local_erc20_state_slot(to_slot);
+        val to_slot = get_or_create_erc20_state_slot(to, erc20_asset);
+        if (exists(to_slot)) collect_and_emit_erc20_state_event(to_slot);
     }
 }
 
 @extend(ft4.assets.after_mint) function (ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
     val erc20_asset = erc20_asset_snapshots_enabled @? { asset } .erc20_asset;
     if (exists(erc20_asset)) {
-        val slot = get_or_create_local_erc20_state_slot(account, erc20_asset);
-        if (exists(slot)) emit_local_erc20_state_slot(slot);
+        val slot = get_or_create_erc20_state_slot(account, erc20_asset);
+        if (exists(slot)) collect_and_emit_erc20_state_event(slot);
     }
 }
 
 @extend(ft4.assets.after_burn) function (ft4.accounts.account, ft4.assets.asset, amount: big_integer) {
     val erc20_asset = erc20_asset_snapshots_enabled @? { asset } .erc20_asset;
     if (exists(erc20_asset)) {
-        val slot = get_local_erc20_state_slot(account, erc20_asset);
-        if (exists(slot)) emit_local_erc20_state_slot(slot);
+        val slot = get_erc20_state_slot(account, erc20_asset);
+        if (exists(slot)) collect_and_emit_erc20_state_event(slot);
     }
 }
 
-function ensure_slots_and_emit_state_events_for_account(ft4.accounts.account, network_id: integer) {
+function ensure_account_erc20_state_slot_and_emit_state_events(ft4.accounts.account, network_id: integer) {
     val address = core.find_address_for_ft4_account(account, network_id);
     if (empty(address)) return;
 
@@ -134,9 +185,10 @@ function ensure_slots_and_emit_state_events_for_account(ft4.accounts.account, ne
         b.account == account,
         b.asset == e.asset,
     } (.erc20_asset);
+
     for (asset in assets) {
-        val slot = get_or_create_local_erc20_state_slot(account, asset);
-        if (exists(slot)) emit_local_erc20_state_slot(slot);
+        val slot = get_or_create_erc20_state_slot(account, asset);
+        if (exists(slot)) collect_and_emit_erc20_state_event(slot);
     }
 }
 
@@ -186,7 +238,7 @@ function update_remote_erc20_state_slot(slot: remote_erc20_state_slot, balance: 
 */
 
 @extend(core.before_remove_recovery_contract) function (core.recovery_contract, blockchain_account: ft4.accounts.account) {
-  // For all existing recovery contract state slots, for all ERC20 assets, emit eif_state events with amount 0
+    // For all existing recovery contract state slots, for all ERC20 assets, emit eif_state events with amount 0
     val erc20_assets = (s: core.state_slot, sl: local_erc20_state_slot_binding) @* {
         sl.account == blockchain_account,
         sl.state_slot == s,
@@ -197,7 +249,7 @@ function update_remote_erc20_state_slot(slot: remote_erc20_state_slot, balance: 
     } (@group s, @list sl.erc20_asset) @ {} (@map $);
     
     for ((slot, assets) in erc20_assets) {
-        core.emit_erc20_state_eif_event(slot, assets @* {} (core.balance_record(.token_address, 0L)));
+        emit_erc20_state_event(slot, assets @* {} (balance_record(.token_address, 0L)));
         delete local_erc20_state_slot_binding @* { slot }; // Unbind state slots
     }
 }
@@ -214,12 +266,12 @@ function update_remote_erc20_state_slot(slot: remote_erc20_state_slot, balance: 
     if (empty(erc20_asset)) return;
 
     if (has_changed_sender) {
-        val sender_slot = get_or_create_local_erc20_state_slot(sender, erc20_asset);
-        if (exists(sender_slot)) emit_local_erc20_state_slot(sender_slot);
+        val sender_slot = get_or_create_erc20_state_slot(sender, erc20_asset);
+        if (exists(sender_slot)) collect_and_emit_erc20_state_event(sender_slot);
     }
 
     if (has_changed_recipient) {
-        val recipient_slot = get_or_create_local_erc20_state_slot(recipient, erc20_asset);
-        if (exists(recipient_slot)) emit_local_erc20_state_slot(recipient_slot);
+        val recipient_slot = get_or_create_erc20_state_slot(recipient, erc20_asset);
+        if (exists(recipient_slot)) collect_and_emit_erc20_state_event(recipient_slot);
     }
 }
