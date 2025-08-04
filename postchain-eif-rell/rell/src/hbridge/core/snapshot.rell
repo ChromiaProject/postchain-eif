@@ -29,14 +29,6 @@ struct state_data {
     account: list<gtv>;
 }
 
-// Hexadecimal representation of the "hbridge:erc20:v1" string followed by 16x 0x01 bytes, 32 bytes in total.
-val ERC20_STATE_TAG = x"686272696467653a65726332303a763101010101010101010101010101010101";
-
-struct balance_record {
-    token_address: byte_array;
-    balance: big_integer;
-}
-
 function emit_state_event(state_id: integer, state_parts: list<gtv>) {
     op_context.emit_event("eif_state", state_data(state_id, state_parts).to_gtv());
 }
@@ -48,27 +40,6 @@ function get_next_state_slot_id(): integer {
     } else {
         return 0;
     }
-}
-
-function emit_erc20_state_eif_event(state_slot, balance_records: list<balance_record>) {
-    if (empty(balance_records)) {
-        // erase state slot when there are no balances
-        emit_state_event(state_slot.id, list<gtv>());
-        return;
-    }
-
-    val state_slot_data = state_slot.to_struct();
-    val state_parts = list<gtv>();
-    state_parts.add(ERC20_STATE_TAG.to_gtv());
-    state_parts.add(utils.evm_address_to_32_byte_array(state_slot_data.recipient_address).to_gtv());
-    state_parts.add(state_slot_data.discriminator.to_gtv()); // discriminator includes (v1) network_id, or (v2) network_id and bridge_address
-
-    for (balance_record in balance_records) {
-        state_parts.add(utils.evm_address_to_32_byte_array(balance_record.token_address).to_gtv());
-        state_parts.add(balance_record.balance.to_gtv());
-    }
-    
-    emit_state_event(state_slot_data.id, state_parts);
 }
 
 entity recovery_contract {

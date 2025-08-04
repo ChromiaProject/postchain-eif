@@ -125,7 +125,7 @@ function _verify_state_slot(brid: byte_array, network_id: integer, recipient_add
 
 function _verify_state_event(core.state_slot, recipient_address: byte_array, event_index: integer, expected: list<(byte_array, big_integer)>) {
     val state_data = [
-        core.ERC20_STATE_TAG.to_gtv(),
+        erc20.ERC20_STATE_TAG.to_gtv(),
         utils.evm_address_to_32_byte_array(recipient_address).to_gtv(),
         state_slot.discriminator.to_gtv(),
     ];

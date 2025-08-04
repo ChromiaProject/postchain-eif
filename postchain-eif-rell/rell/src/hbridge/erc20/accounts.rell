@@ -3,7 +3,7 @@
     // collect funds from the pool account here
     ft4.transfer_strategy.collect_pooled_assets(account, recipient_id = address.hash());
 
-    ensure_slots_and_emit_state_events_for_account(account, network_id);
+    ensure_account_erc20_state_slot_and_emit_state_events(account, network_id);
 }
 
 /**
