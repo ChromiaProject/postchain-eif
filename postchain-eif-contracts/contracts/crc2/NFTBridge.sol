@@ -32,7 +32,7 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
         bool isAllowed;
     }
         
-    struct NFTWithdraw {
+    struct Withdrawal {
         uint256 protocolId;
         address contractAddress;
         uint256[] tokenIds;
@@ -53,11 +53,10 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
         address beneficiary;
     }
 
-    // allowedContract of allowed token contracts and their types
-    mapping(address => AllowedContract) public AllowedContracts;
+    mapping(address => AllowedContract) public allowedContracts;
     
-    // Withdraw data by hash
-    mapping(bytes32 => NFTWithdraw) public nftWithdraws;
+    // Withdrawal data by hash
+    mapping(bytes32 => Withdrawal) public withdrawals;
 
     IValidator public validator;
     uint256 public networkId;
@@ -97,7 +96,7 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
 
     modifier isAllowedContract(address contractAddress) {
         if (requireAllowedContracts) {
-            AllowedContract memory allowedContract = AllowedContracts[contractAddress];
+            AllowedContract memory allowedContract = allowedContracts[contractAddress];
             require(allowedContract.isAllowed, "NFTBridge: token not allowed");
         }
         _;
@@ -167,7 +166,7 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
         require(contractAddress != address(0), "NFTBridge: contract address is invalid");
         require(protocolId == 721 || protocolId == 1155, "NFTBridge: invalid protocol ID");
         
-        AllowedContracts[contractAddress] = AllowedContract({
+        allowedContracts[contractAddress] = AllowedContract({
             protocolId: protocolId,
             isAllowed: true
         });
@@ -177,7 +176,7 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
 
     function pendingWithdraw(bytes32 _hash) onlyOwner public {
         require(_hash != bytes32(0), "NFTBridge: event hash is invalid");
-        NFTWithdraw storage wd = nftWithdraws[_hash];
+        Withdrawal storage wd = withdrawals[_hash];
         require(wd.status == Status.Withdrawable, "NFTBridge: withdraw request status is not withdrawable");
         wd.status = Status.Pending;
         emit PendingWithdraw(_hash);
@@ -185,7 +184,7 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
 
     function unpendingWithdraw(bytes32 _hash) public onlyOwner {
         require(_hash != bytes32(0), "NFTBridge: event hash is invalid");
-        NFTWithdraw storage wd = nftWithdraws[_hash];
+        Withdrawal storage wd = withdrawals[_hash];
         require(wd.status == Status.Pending, "NFTBridge: withdraw request status is not pending");
         wd.status = Status.Withdrawable;
         emit UnpendingWithdraw(_hash);
@@ -266,7 +265,6 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
         emit DepositedTokens(msg.sender, contractAddress, tokenIds, amounts, accountID, 1155);
         return true;
     }
-    
 
     function linkAccountID(bytes32 accountID) external {
         emit LinkAccountID(msg.sender, accountID, isContract(msg.sender));
@@ -275,7 +273,7 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
     /**
      * @dev signers should be order ascending
      */
-    function nftWithdrawRequest(
+    function requestWithdrawal(
         bytes memory _event,
         Data.Proof memory eventProof,
         bytes memory blockHeader,
@@ -284,7 +282,7 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
         Data.ExtraProofData memory extraProof
     ) external whenNotMassExit whenNotPaused nonReentrant {
         (uint height, bytes32 blockRid) = _verifyWithdrawRequest(eventProof, blockHeader, sigs, signers, extraProof);
-        _events[eventProof.leaf] = _updateWithdraw(eventProof.leaf, _event, height, blockRid); // mark the event hash was already used.
+        _events[eventProof.leaf] = _updateWithdrawal(eventProof.leaf, _event, height, blockRid); // mark the event hash was already used.
     }
 
     function _verifyWithdrawRequest(
@@ -312,14 +310,14 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
         return (height, blockRid);
     }
 
-    function _updateWithdraw(bytes32 hash, bytes memory _event, uint height, bytes32 blockRid) internal returns (bool) {
-        NFTWithdraw storage wd = nftWithdraws[hash];
+    function _updateWithdrawal(bytes32 hash, bytes memory _event, uint height, bytes32 blockRid) internal returns (bool) {
+        Withdrawal storage wd = withdrawals[hash];
         {
             TokenEvent memory evt = abi.decode(_event, (TokenEvent));
             require(keccak256(_event) == hash, "NFTBridge: invalid event");
             Postchain.verifyDiscriminator(networkId, address(this), evt.discriminator);
             
-            AllowedContract memory allowedContract = AllowedContracts[evt.contractAddress];
+            AllowedContract memory allowedContract = allowedContracts[evt.contractAddress];
             require(allowedContract.isAllowed, "NFTBridge: token not allowed");
             require(allowedContract.protocolId == evt.protocolId, "NFTBridge: protocol ID mismatch");
             require(evt.tokenIds.length == evt.amounts.length, "NFTBridge: tokenIds and amounts length mismatch");
@@ -338,8 +336,8 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
         return true;
     }
 
-    function withdrawNFT(bytes32 _hash, address beneficiary) external whenNotMassExit whenNotPaused nonReentrant {
-        NFTWithdraw storage wd = nftWithdraws[_hash];
+    function withdraw(bytes32 _hash, address beneficiary) external whenNotMassExit whenNotPaused nonReentrant {
+        Withdrawal storage wd = withdrawals[_hash];
         require(wd.status != Status.Uninitialized, "NFTBridge: withdraw request not found");
         require(wd.beneficiary == beneficiary, "NFTBridge: no fund for the beneficiary");
         require(wd.blockNumber <= block.number, "NFTBridge: not mature enough to withdraw the fund");
@@ -363,7 +361,7 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
      * @dev user can withdraw token back to postchain if they cannot withdraw on EVM chain
      */
     function withdrawToPostchain(bytes32 _hash) external whenNotPaused nonReentrant {
-        NFTWithdraw storage wd = nftWithdraws[_hash];
+        Withdrawal storage wd = withdrawals[_hash];
         require(wd.status != Status.Uninitialized, "NFTBridge: withdraw request not found");
         require(wd.beneficiary == msg.sender, "NFTBridge: no fund for the beneficiary");
         require(wd.blockNumber <= block.number, "NFTBridge: not mature enough to withdraw the fund");
@@ -389,12 +387,7 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
      * @dev Implementation of {IERC721Receiver-onERC721Received}
      * Always returns `IERC721Receiver.onERC721Received.selector`
      */
-    function onERC721Received(
-        address /* operator */,
-        address /* from */,
-        uint256 /* tokenId */,
-        bytes calldata /* data */
-    ) external pure override returns (bytes4) {
+    function onERC721Received(address, address, uint256, bytes calldata) external pure override returns (bytes4) {
         return IERC721Receiver.onERC721Received.selector;
     }
 
@@ -402,13 +395,7 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
      * @dev Implementation of {IERC1155Receiver-onERC1155Received}
      * Always returns `IERC1155Receiver.onERC1155Received.selector`
      */
-    function onERC1155Received(
-        address /* operator */,
-        address /* from */,
-        uint256 /* id */,
-        uint256 /* value */,
-        bytes calldata /* data */
-    ) external pure override returns (bytes4) {
+    function onERC1155Received(address, address, uint256, uint256, bytes calldata) external pure override returns (bytes4) {
         return IERC1155Receiver.onERC1155Received.selector;
     }
 
@@ -416,13 +403,7 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
      * @dev Implementation of {IERC1155Receiver-onERC1155BatchReceived}
      * Always returns `IERC1155Receiver.onERC1155BatchReceived.selector`
      */
-    function onERC1155BatchReceived(
-        address /* operator */,
-        address /* from */,
-        uint256[] calldata /* ids */,
-        uint256[] calldata /* values */,
-        bytes calldata /* data */
-    ) external pure override returns (bytes4) {
+    function onERC1155BatchReceived(address, address, uint256[] calldata, uint256[] calldata, bytes calldata) external pure override returns (bytes4) {
         return IERC1155Receiver.onERC1155BatchReceived.selector;
     }
 }
