@@ -1,0 +1,43 @@
+entity bridge_contract {
+    network_id: integer;
+    contract_address: byte_array;
+    key network_id, contract_address;
+}
+
+entity bridge_evm_collection {
+    key bridge_contract, evm_collection;
+}
+
+struct bridge_contract_info {
+    contract_address: byte_array;
+    evm_read_offset: integer;
+    evm_collections: list<evm_collection_info>;
+}
+
+
+function register_bridge_and_evm_collection(
+    network_id: integer,
+    contract_address: byte_array,
+    mode: bridge_mode,
+    token_type: evm_token_type,
+    use_snapshots: boolean = false,
+    bridge_address: byte_array
+) {
+    val evm_collection = register_evm_collection(network_id, contract_address, token_type, mode, use_snapshots);
+    val bridge_contract = get_or_create_bridge(network_id, bridge_address);
+    create bridge_evm_collection(bridge_contract, evm_collection);
+}
+
+function register_bridge_with_evm_collections(network_id: integer, bridge_address: byte_array, evm_collections: list<evm_collection>) {
+    val bridge_contract = get_or_create_bridge(network_id, bridge_address);
+
+    for (evm_collection in evm_collections) {
+        require(evm_collection.network_id == bridge_contract.network_id, "Bridge must be part of the same network as the EVM collection");
+        create bridge_evm_collection(bridge_contract, evm_collection);
+    }
+}
+
+function get_or_create_bridge(network_id: integer, bridge_address: byte_array) {
+    return bridge_contract @? { network_id, bridge_address }
+        ?: create bridge_contract(network_id, bridge_address);
+}
