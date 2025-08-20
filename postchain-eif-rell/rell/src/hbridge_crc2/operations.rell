@@ -1,46 +1,5 @@
 @extend(ft4.auth.auth_handler)
 function () = ft4.auth.add_auth_handler(
-    scope = rell.meta(link_evm_eoa_account).mount_name,
-    flags = ["A"],
-    message = link_evm_eoa_account_auth_message(*)
-);
-
-function link_evm_eoa_account_auth_message(gtv) {
-    val args = struct<link_evm_eoa_account>.from_gtv(gtv);
-    return "Please sign the message to link Externally Owned Account %s\nto Chromia account {account_id}".format(args.address);
-}
-
-operation link_evm_eoa_account(address: byte_array) {
-    val account = ft4.auth.authenticate();
-    ft4.auth.verify_signers([address]);
-    _link_evm_eoa_account(address, account);
-}
-
-@extend(ft4.auth.auth_handler)
-function () = ft4.auth.add_auth_handler(
-    scope = rell.meta(link_evm_sc_account).mount_name,
-    flags = ["A"],
-    message = link_evm_sc_account_auth_message(*)
-);
-
-function link_evm_sc_account_auth_message(gtv) {
-    val args = struct<link_evm_sc_account>.from_gtv(gtv);
-    return "Please sign the message to link Smart Contract %s on network %d\nto Chromia account {account_id}".format(
-        args.address, args.network_id
-    );
-}
-
-operation link_evm_sc_account(address: byte_array, network_id: integer) {
-    val account = ft4.auth.authenticate();
-    require(
-        proposed_evm_sc_account_link @? { account, address, network_id },
-        "Proposed EVM SC account link not found for EVM address %s on chain ID %d".format(address, network_id)
-    );
-    _link_evm_sc_account(address, network_id, account);
-}
-
-@extend(ft4.auth.auth_handler)
-function () = ft4.auth.add_auth_handler(
     scope = rell.meta(bridge_erc721_tokens_to_evm).mount_name,
     flags = ["T"],
     message = bridge_erc721_tokens_to_evm_auth_message(*)
@@ -103,7 +62,7 @@ function bridge_tokens_to_evm(
     bridge_address: byte_array,
 ) {
     val from_account = ft4.auth.authenticate();
-    val evm_collection = require(evm_collection @? { network_id, contract_address }, "EVM collection not found for network id %d and contract address %s ".format(network_id, contract_address));
+    val evm_collection = require(evm.evm_collection @? { network_id, contract_address }, "EVM collection not found for network id %d and contract address %s ".format(network_id, contract_address));
 
     require(
         validate_bridge_contract(bridge_address, evm_collection),
@@ -112,12 +71,12 @@ function bridge_tokens_to_evm(
 
     require(withdraw_check_access_list(from_account.id), "Account id %s not on access list.".format(from_account.id));
     require(
-        evm_eoa_account_link @? { from_account, beneficiary } ??
-        or evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
+        evm.core.evm_eoa_account_link @? { from_account, beneficiary } ??
+        or evm.core.evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
         "Can only withdraw to your own account"
     );
 
-    val protocol_id = get_protocol_id_from_token_type(evm_collection.token_type);
+    val protocol_id = evm.get_protocol_id_from_token_type(evm_collection.token_type);
 
     for (token_amount in tokens) {
         require(token_amount.amount > 0, "Amount must be greater than 0");
@@ -125,7 +84,7 @@ function bridge_tokens_to_evm(
             require(token_amount.amount == 1, "ERC721 amount must be 1");
         } 
         val crc2_token = require(crc2.evm.evm_token @? { network_id, contract_address, token_amount.token_id } (.token), "CRC2 token not found for token id %s ".format(token_amount.token_id));
-        bridge_deduct_balance(from_account, evm_collection, crc2_token, token_amount.amount);
+        evm.bridge_deduct_balance(from_account, evm_collection, crc2_token, token_amount.amount);
     }
     emit_withdrawal_event(network_id, contract_address, protocol_id, tokens, beneficiary, bridge_address);
 }

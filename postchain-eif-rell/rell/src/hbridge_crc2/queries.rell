@@ -1,16 +1,5 @@
-
-// query get_evm_collection_for_asset(asset_id: byte_array): list<evm_collection_info> {
-//     val asset = ft4.assets.Asset(asset_id);
-//     return evm_collection @* { asset } (evm_collection_info(
-//         .network_id,
-//         .contract_address,
-//         .bridge_mode,
-//         .virtual_blockchain_rid
-//     ));
-// }
-
 /**
- * Retrieves ERC20 token withdrawals based on a given filter, with pagination options.
+ * Retrieves token withdrawals based on a given filter, with pagination options.
  *
  * @param filter The filter applied to the withdrawal search. See [withdrawal_filter] structure.
  * @param page_size The number of withdrawal records to return per page. Limited by the maximum page size defined in the chain configuration. If not specified, a maximum page size defined in the chain configuration is used.
@@ -22,11 +11,12 @@ query get_token_withdrawals(filter: withdrawal_filter, page_size: integer?, page
 
     val paginated_result = (
         w: token_withdrawal,
+        t: withdrawn_token,
         s: token_withdrawal_status @* { .token_withdrawal == w }
     ) @* {
         filter.network_id == null or w.network_id == filter.network_id,
         filter.contract_address == null or w.contract_address == filter.contract_address,
-       //filter.token_id == null or w.token_id == filter.token_id,
+        filter.token_id == null or (t.token_id == filter.token_id and t.token_withdrawal == w),
         filter.beneficiary == null or w.beneficiary == filter.beneficiary,
         filter.from == null or w.transaction.block.timestamp >= filter.from,
         filter.to == null or w.transaction.block.timestamp < filter.to,
@@ -58,23 +48,6 @@ query get_token_withdrawal_by_event_hash(event_hash: byte_array): token_withdraw
 query get_token_withdrawal_by_id(withdrawal_id: rowid): token_withdrawal_info? =
         token_withdrawal @? { .rowid == withdrawal_id } ( map_withdrawal($) );
 
-query get_account_for_eoa_address(evm_address: byte_array): byte_array? =
-        evm_eoa_account_link @? { .address == evm_address } (.account.id);
-
-query get_account_for_sc_address (evm_address: byte_array, network_id: integer): byte_array? =
-        evm_sc_account_link @? { .address == evm_address, network_id } (.account.id);
-
-query get_eoa_addresses_for_account(account_id: byte_array): list<byte_array> {
-    val account = ft4.accounts.Account(account_id);
-    return evm_eoa_account_link @* { account } (.address);
-}
-
-query get_sc_addresses_for_account(account_id: byte_array): list<(address: byte_array, network_id: integer)> {
-    val account = ft4.accounts.Account(account_id);
-    return evm_sc_account_link @* { account } (.address, .network_id);
-}
-
-
 /**
  * Retrieves ERC20 token deposits based on a given filter, with pagination options.
  *
@@ -86,18 +59,18 @@ query get_sc_addresses_for_account(account_id: byte_array): list<(address: byte_
 query get_token_deposits(filter: deposit_filter, page_size: integer?, page_cursor: text?): ft4.utils.paged_result {
     val before_rowid = ft4.utils.before_rowid(page_cursor);
 
-    val paginated_result = token_deposit @* {
-        filter.network_id == null or .network_id == filter.network_id,
-        filter.contract_address == null or .contract_address == filter.contract_address,
-        //filter.token_id == null or .token_id == filter.token_id,
-        filter.recipient_id == null or .recipient_id == filter.recipient_id,
-        filter.state == null or .state == filter.state,
-        filter.evm_tx_hash == null or .evm_tx_hash == filter.evm_tx_hash,
-        .rowid > (before_rowid ?: rowid(0))
+    val paginated_result = (d: token_deposit, t: deposited_token) @* {
+        filter.network_id == null or d.network_id == filter.network_id,
+        filter.contract_address == null or d.contract_address == filter.contract_address,
+        filter.token_id == null or (t.token_id == filter.token_id and t.token_deposit == d),
+        filter.recipient_id == null or d.recipient_id == filter.recipient_id,
+        filter.state == null or d.state == filter.state,
+        filter.evm_tx_hash == null or d.evm_tx_hash == filter.evm_tx_hash,
+        d.rowid > (before_rowid ?: rowid(0))
     } (
         ft4.utils.pagination_result(
-            data = map_deposit($).to_gtv_pretty(),
-            rowid = .rowid
+            data = map_deposit(d).to_gtv_pretty(),
+            rowid = d.rowid
         )
     ) limit ft4.utils.fetch_data_size(page_size);
 
@@ -153,54 +126,4 @@ query get_token_withdrawal_history(withdrawal_id: rowid): list<token_withdrawal_
     );
 
     return history;
-}
-
-/**
- * Returns the list of registered EVM collections by EVM network ID.
- *
- * @param network_id The ID of the EVM network.
- * @return A list of `evm_collection_info` objects.
- */
-query get_registered_evm_collections(network_id: integer): list<evm_collection_info> {
-    return evm_collection @* { network_id } (map_evm_collection_to_evm_collection_info($));
-}
-
-/**
- * Returns the list of registered EVM collections by EVM network ID and bridge contract address.
- *
- * @param network_id The ID of the EVM network.
- * @param bridge_contract_address The bridge EVM contract address.
- * @return A list of `evm_collection_info` objects.
- */
-query get_registered_bridge_evm_collections(network_id: integer, bridge_contract_address: byte_array): list<evm_collection_info> {
-    return bridge_evm_collection @* {
-        .evm_collection.network_id == network_id,
-        .bridge_contract.contract_address == bridge_contract_address
-    } (map_evm_collection_to_evm_collection_info(.evm_collection));
-}
-
-/**
- * Retrieves a list of bridge contracts associated with the specified EVM network ID,
- * including ERC20 assets associated with each bridge contract.
- *
- * @param network_id The ID of the EVM network.
- *
- * @return A list of `bridge_contract_info` objects containing the bridge `contract_address`, `evm_read_offset`,
- * and the list of ERC20 assets associated with each bridge contract.
- */
-query get_bridge_contracts(network_id: integer): list<bridge_contract_info> {
-    val read_offset = map<text, integer>.from_gtv_pretty(chain_context.args.evm_read_offsets).get_or_null("%d".format(network_id));
-
-    val res = list<bridge_contract_info>();
-    for (bridge_contract_address in bridge_contract @* { network_id } ( .contract_address )) {
-        val evm_collections = get_registered_bridge_evm_collections(network_id, bridge_contract_address);
-
-        res.add(bridge_contract_info(
-            contract_address = bridge_contract_address,
-            evm_read_offset = read_offset ?: 0,
-            evm_collections = evm_collections,
-        ));
-    }
-
-    return res;
 }

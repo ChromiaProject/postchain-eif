@@ -1,4 +1,4 @@
-@mount("eif.hbridge_crc2")
+@mount("eif.hbridge.crc2")
 module;
 
 import messaging: ^.eif.messaging;
@@ -6,12 +6,12 @@ import common: ^.eif.common;
 import utils: ^.eif.utils;
 import version: ^.eif.version;
 
+import .evm;
+
 namespace ft4 {
     import lib.ft4.accounts;
-    import lib.ft4.accounts.strategies;
     import lib.ft4.auth;
     import lib.ft4.utils;
-    import transfer_strategy: lib.ft4.accounts.strategies.transfer;
 }
 
 namespace crc2 {
@@ -19,20 +19,6 @@ namespace crc2 {
     import lib.crc2.balances;
     import lib.crc2.transfers;
     import lib.crc2.evm;
-}
-
-struct module_args {
-    evm_read_offsets: gtv = map<text, integer>().to_gtv();
-}
-
-enum bridge_mode {
-    native,
-    foreign,
-}
-
-enum evm_token_type {
-    erc721,
-    erc1155,
 }
 
 struct token_amount {
@@ -51,10 +37,3 @@ function deposit_check_access_list(account_id: byte_array): boolean = true;
 
 @extendable
 function withdraw_check_access_list(account_id: byte_array): boolean = true;
-
-function get_protocol_id_from_token_type(token_type: evm_token_type): integer {
-    when (token_type) {
-        evm_token_type.erc721 -> return 721;
-        evm_token_type.erc1155 -> return 1155;
-    }
-}

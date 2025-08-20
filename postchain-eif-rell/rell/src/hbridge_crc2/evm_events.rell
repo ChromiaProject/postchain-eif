@@ -1,15 +1,3 @@
-struct link_account_id_event {
-    sender: byte_array;
-    account_id: byte_array;
-    is_contract: boolean;
-}
-
-function create_link_account_id_event(event: messaging.event_data) = link_account_id_event(
-    sender = byte_array.from_gtv(event.indexed_values[0]),
-    account_id = byte_array.from_gtv(event.non_indexed_values[0]),
-    is_contract = boolean.from_gtv(event.non_indexed_values[1])
-);
-
 struct deposited_tokens_event {
     bridge_address: byte_array;
     sender: byte_array;
@@ -56,7 +44,6 @@ function (evm_block: messaging.evm_block_message) {
     for (event in evm_block.events) {
         when (event.name) {
             // deposit
-            "LinkAccountID" -> process_link_account_event(evm_block.network_id, create_link_account_id_event(event));
             "DepositedTokens" -> process_deposit_token_event(evm_block.network_id, create_deposited_tokens_event(event));
             // withdrawal
             "PendingWithdraw" -> process_pending_withdraw_event(evm_block.network_id, create_withdrawal_event(event));
@@ -68,27 +55,6 @@ function (evm_block: messaging.evm_block_message) {
     }
 }
 
-function process_link_account_event(network_id: integer, event: link_account_id_event) {
-    if (not event.is_contract) return; // we currently don't allow linking EOA using this method
-
-    if (not empty(evm_sc_account_link @? { event.sender, network_id })) {
-        // can only link once
-        return;
-    }
-    if (not empty(proposed_evm_sc_account_link @? { event.sender, network_id })) {
-        // can only propose once
-        return;
-    }
-
-    val account = ft4.accounts.account @? { .id == event.account_id };
-    if (empty(account)) {
-        // we can't link to non-existent account
-        return;
-    }
-
-    create proposed_evm_sc_account_link(event.sender, network_id, account);
-}
-
 function process_deposit_token_event(network_id: integer, event: deposited_tokens_event) {
      // normally only smart contracts have non-zero beneficiary
     // given that it's just a flag which enable more complex account registration logic
@@ -97,7 +63,7 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
     val deposit_from_smart_contract = beneficiary != zero_beneficiary;
     val valid_tokens = event.tokens;
 
-    val evm_collection = evm_collection @? { .network_id == network_id, .contract_address == event.contract_address };
+    val evm_collection = evm.evm_collection @? { .network_id == network_id, .contract_address == event.contract_address };
 
     if (empty(evm_collection)) {
         log("Deposit event ignored: EVM collection not found: %s".format(event.contract_address));
@@ -111,7 +77,7 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
 
         if (not empty(ft4_account)) {
             // we require explicit link to avoid unwanted deposits
-            if (need_consent_on_deposit and empty(evm_sc_account_link @? { event.sender, network_id, ft4_account })) {
+            if (need_consent_on_deposit and empty(evm.core.evm_sc_account_link @? { event.sender, network_id, ft4_account })) {
                 bounce_deposit_event(network_id, event.contract_address, event.protocol_id, event.tokens, event.sender, event.bridge_address);
                 return;
             }
@@ -119,7 +85,7 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
 
     } else {
         // compute beneficiary account automatically
-        ft4_account = find_ft4_account_for_address(event.sender, network_id);
+        ft4_account = evm.core.find_ft4_account_for_address(event.sender, network_id);
         beneficiary = event.sender.hash();
     }
 
@@ -149,10 +115,10 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
         }
     }
 
-    if (evm_collection.bridge_mode == bridge_mode.native) {
-        val bridge_account = ensure_bridge_account(evm_collection.virtual_blockchain_rid);
+    if (evm_collection.bridge_mode == evm.bridge_mode.native) {
+        val bridge_account = evm.core.ensure_bridge_account(evm_collection.virtual_blockchain_rid);
         for (token_amounts in event.tokens) {
-            val token = crc2.evm.ensure_evm_token(network_id, event.contract_address, token_amounts.token_id, evm_collection.token_type == evm_token_type.erc721);
+            val token = crc2.evm.ensure_evm_token(network_id, event.contract_address, token_amounts.token_id, evm_collection.token_type == evm.evm_token_type.erc721);
             if (crc2.balances._get_account_balance(bridge_account, token) < token_amounts.amount) {
                 invalid_tokens.add(token_amounts);
                 log("Deposited token bounced: insufficient balance of token %s: CRC2 token %s, sender %s"
@@ -195,8 +161,8 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
     val deposit_tokens = list<struct<deposited_token>>();
     for (token_amounts in valid_tokens) {
         deposit_tokens.add(struct<deposited_token>(deposit, token_id = token_amounts.token_id, amount = token_amounts.amount));
-        val token = crc2.evm.ensure_evm_token(network_id, event.contract_address, token_amounts.token_id, evm_collection.token_type == evm_token_type.erc721);
-        bridge_increase_balance(ft4_account, evm_collection, token, token_amounts.amount);
+        val token = crc2.evm.ensure_evm_token(network_id, event.contract_address, token_amounts.token_id, evm_collection.token_type == evm.evm_token_type.erc721);
+        evm.bridge_increase_balance(ft4_account, evm_collection, token, token_amounts.amount);
     }
     create deposited_token(deposit_tokens);
 }
@@ -226,6 +192,6 @@ function bounce_deposit_event(network_id: integer, contract_address: byte_array,
     emit_withdrawal_event(network_id, contract_address, protocol_id, tokens, beneficiary, bridge_address);
 }
 
-function validate_bridge_contract(bridge_address: byte_array, evm_collection: evm_collection): boolean {
-    return exists(bridge_evm_collection @? { evm_collection, .bridge_contract.contract_address == bridge_address });
+function validate_bridge_contract(bridge_address: byte_array, evm_collection: evm.evm_collection): boolean {
+    return exists(evm.bridge_evm_collection @? { evm_collection, .bridge_contract.contract_address == bridge_address });
 }

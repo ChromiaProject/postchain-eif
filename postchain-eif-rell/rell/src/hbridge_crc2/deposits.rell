@@ -15,6 +15,12 @@ entity deposited_token {
     amount: big_integer;
 }
 
+entity token_deposit_history {
+    index token_deposit;
+    state: deposit_state;
+    timestamp;
+}
+
 struct token_deposit_info {
     id: rowid;
     sender_address: byte_array;
@@ -30,13 +36,8 @@ struct token_deposit_info {
 
 enum deposit_state {
     completed,
+    pending,
     recalled,
-}
-
-entity token_deposit_history {
-    index token_deposit;
-    state: deposit_state;
-    timestamp;
 }
 
 struct token_deposit_history_entry {
