@@ -21,11 +21,17 @@ import net.postchain.eif.config.EifEventConsumerConfig
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvNull
+import net.postchain.gtv.GtvType
 import net.postchain.gtv.mapper.GtvObjectMapper
 import net.postchain.gtv.mapper.Name
 import net.postchain.gtv.mapper.Nullable
 import net.postchain.gtv.mapper.toObject
+import net.postchain.gtx.ArgumentMetadata
+import net.postchain.gtx.GTXModuleMetadata
+import net.postchain.gtx.MetadataProvider
 import net.postchain.gtx.PostchainContextAware
+import net.postchain.gtx.QueryMetadata
+import net.postchain.gtx.ReturnMetadata
 import net.postchain.gtx.SimpleGTXModule
 import net.postchain.gtx.special.GTXSpecialTxExtension
 import org.bouncycastle.jce.provider.BouncyCastleProvider
@@ -46,7 +52,7 @@ class EifGTXModule : SimpleGTXModule<Config>(
         "get_event_block_height" to ::eventBlockHeightQuery,
         "get_event_merkle_proof" to ::eventMerkleProofQuery,
         "get_account_state_merkle_proof" to ::accountStateMerkleProofQuery
-)), PostchainContextAware {
+)), PostchainContextAware, MetadataProvider {
 
     init {
         // We add this provider so that we can get keccak-256 message digest instances
@@ -54,6 +60,27 @@ class EifGTXModule : SimpleGTXModule<Config>(
             Security.addProvider(BouncyCastleProvider())
         }
     }
+
+    override fun getMetadata() = GTXModuleMetadata(
+            operations = mapOf(),
+            queries = mapOf(
+                    "get_event_block_height" to QueryMetadata(args = listOf(
+                            ArgumentMetadata(name = "eventHash", gtvTypes = setOf(GtvType.STRING)),
+                    ), returnType = ReturnMetadata(gtvTypes = setOf(GtvType.INTEGER))),
+                    "get_event_merkle_proof" to QueryMetadata(args = listOf(
+                            ArgumentMetadata(name = "eventHash", gtvTypes = setOf(GtvType.STRING)),
+                            ArgumentMetadata(name = "signers", gtvTypes = setOf(GtvType.ARRAY), required = false),
+                            ArgumentMetadata(name = "signatures", gtvTypes = setOf(GtvType.ARRAY), required = false),
+                    ), returnType = ReturnMetadata(gtvTypes = setOf(GtvType.DICT))),
+                    "get_account_state_merkle_proof" to QueryMetadata(args = listOf(
+                            ArgumentMetadata(name = "blockHeight", gtvTypes = setOf(GtvType.INTEGER)),
+                            ArgumentMetadata(name = "accountNumber", gtvTypes = setOf(GtvType.INTEGER)),
+                            ArgumentMetadata(name = "signers", gtvTypes = setOf(GtvType.ARRAY), required = false),
+                            ArgumentMetadata(name = "signatures", gtvTypes = setOf(GtvType.ARRAY), required = false),
+                    ),
+                            returnType = ReturnMetadata(gtvTypes = setOf(GtvType.DICT))),
+            )
+    )
 
     override fun initializeContext(configuration: BlockchainConfiguration, postchainContext: PostchainContext) {
         val snapshotConfig = configuration.rawConfig["eif"]?.toObject<EifEventConsumerConfig>()?.snapshot

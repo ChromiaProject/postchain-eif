@@ -12,7 +12,13 @@ import net.postchain.eif.transaction.signerupdate.directorychain.EvmSignerUpdate
 import net.postchain.eif.transaction.signerupdate.directorychain.EvmSignerUpdateBlockBuilderExtension.Companion.SIGNER_LIST_UPDATE_TABLE_PREFIX
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvNull
+import net.postchain.gtv.GtvType
 import net.postchain.gtv.mapper.GtvObjectMapper
+import net.postchain.gtx.ArgumentMetadata
+import net.postchain.gtx.GTXModuleMetadata
+import net.postchain.gtx.MetadataProvider
+import net.postchain.gtx.QueryMetadata
+import net.postchain.gtx.ReturnMetadata
 import net.postchain.gtx.SimpleGTXModule
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.security.MessageDigest
@@ -21,8 +27,7 @@ import java.security.Security
 class SignerUpdateGTXModule : SimpleGTXModule<Unit>(
         Unit, mapOf(), mapOf(
         SIGNER_LIST_UPDATE_PROOF_QUERY to { _, ctx, args -> signerListUpdateProofQuery(ctx, args) }
-)
-) {
+)), MetadataProvider {
 
     companion object {
         const val LEVELS_PER_PAGE = 2
@@ -36,6 +41,14 @@ class SignerUpdateGTXModule : SimpleGTXModule<Unit>(
             Security.addProvider(BouncyCastleProvider())
         }
     }
+
+    override fun getMetadata() = GTXModuleMetadata(
+            operations = mapOf(),
+            queries = mapOf(
+                    SIGNER_LIST_UPDATE_PROOF_QUERY to QueryMetadata(args = listOf(
+                            ArgumentMetadata(name = "signerUpdateHash", gtvTypes = setOf(GtvType.BYTEARRAY)),
+                    ), returnType = ReturnMetadata(gtvTypes = setOf(GtvType.DICT))),
+            ))
 
     override fun initializeDB(ctx: EContext) {
         DatabaseAccess.of(ctx).apply {
