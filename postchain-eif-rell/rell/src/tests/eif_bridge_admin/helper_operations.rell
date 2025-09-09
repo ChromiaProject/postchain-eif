@@ -1,6 +1,6 @@
 module;
 
-import ^^.*;
+import eif_bridge_admin.*;
 
 operation register_test_account(pubkey) {
     val auth_descriptor = ft4.accounts.single_sig_auth_descriptor(pubkey, set(["A", "T"]));

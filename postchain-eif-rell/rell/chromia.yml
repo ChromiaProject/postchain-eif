@@ -49,11 +49,11 @@ test:
   modules:
     - tests.utils
     - tests.hbridge.hbridge
-    - eif_event_receiver.test
-    - transaction_submitter.test
-    - transaction_submitter.anchoring.test
-    - transaction_submitter.signer_update.test
-    - eif_bridge_admin.test
+    - test.eif_event_receiver
+    - test.transaction_submitter
+    - test.transaction_submitter.anchoring
+    - test.transaction_submitter.signer_update
+    - test.eif_bridge_admin
   moduleArgs:
     <<: *common_args
     hbridge.core:

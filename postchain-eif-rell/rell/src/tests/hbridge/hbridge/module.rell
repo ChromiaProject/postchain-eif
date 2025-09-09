@@ -16,7 +16,7 @@ import ft4_test: lib.ft4.test.core;
 // event_receiver
 import eif.utils;
 import eif_event_receiver.*;
-import eif_event_receiver.test.helpers.*;
+import tests.eif_event_receiver.helpers.*;
 import eif_event_connector.*;
 
 import eif_utils: eif.utils;
