@@ -1,6 +1,6 @@
 @test module;
 
-import ^^.*;
+import transaction_submitter.anchoring.*;
 import ^.helper_operations.*;
 
 function test_anchoring_operation_enqueues_tx() {

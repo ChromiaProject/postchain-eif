@@ -1,8 +1,8 @@
 @test module;
 
-import ^^.*;
+import transaction_submitter.signer_update.*;
 import ^.helper_operations.*;
-import ^^^.test.helper_operations.*;
+import tests.transaction_submitter.helper_operations.*;
 
 val test_directory_chain_brid = x"00000000000000000000000000000000";
 
