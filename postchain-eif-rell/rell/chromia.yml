@@ -49,11 +49,11 @@ test:
   modules:
     - tests.utils
     - tests.hbridge.hbridge
-    - test.eif_event_receiver
-    - test.transaction_submitter
-    - test.transaction_submitter.anchoring
-    - test.transaction_submitter.signer_update
-    - test.eif_bridge_admin
+    - tests.eif_event_receiver
+    - tests.transaction_submitter
+    - tests.transaction_submitter.anchoring
+    - tests.transaction_submitter.signer_update
+    - tests.eif_bridge_admin
   moduleArgs:
     <<: *common_args
     hbridge.core:
@@ -255,7 +255,7 @@ blockchains:
         bridge_admin_account_signers: [ x"032c0b7cf95324a07d05398b240174dc0c2be444d96b159aa6c7f7b1e668680991" ]
     test:
       modules:
-        - eif_access_list_control.test.whitelist_access_list_control_test
+        - tests.eif_access_list_control.whitelist_access_list_control_test
       moduleArgs:
         eif_access_list_control:
           access_mode: whitelist
@@ -278,7 +278,7 @@ blockchains:
         bridge_admin_account_signers: [ x"032c0b7cf95324a07d05398b240174dc0c2be444d96b159aa6c7f7b1e668680991" ]
     test:
       modules:
-        - eif_access_list_control.test.blacklist_access_list_control_test
+        - tests.eif_access_list_control.blacklist_access_list_control_test
       moduleArgs:
         eif_access_list_control:
           access_mode: blacklist
