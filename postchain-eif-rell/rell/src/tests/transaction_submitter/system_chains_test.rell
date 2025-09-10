@@ -1,6 +1,6 @@
 @test module;
 
-import ^^.*;
+import transaction_submitter.*;
 
 // Based on test module args
 val test_directory_chain_brid = x"00000000000000000000000000000000";

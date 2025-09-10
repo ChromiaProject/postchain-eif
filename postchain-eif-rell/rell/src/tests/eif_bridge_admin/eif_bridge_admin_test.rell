@@ -1,6 +1,6 @@
 @test module;
 
-import ^^.*;
+import eif_bridge_admin.*;
 import ^.helper_operations.*;
 
 val bridge_admin_account_privkey = rell.test.privkeys.charlie;

@@ -1,6 +1,6 @@
 @test module;
 
-import ^^.*;
+import eif_access_list_control.*;
 import eif_bridge_admin: ^^^.eif_bridge_admin.*;
 
 val bridge_admin_account_signer = rell.test.pubkeys.charlie;

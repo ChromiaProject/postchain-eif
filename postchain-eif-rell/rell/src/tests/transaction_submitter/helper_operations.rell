@@ -1,6 +1,6 @@
 module;
 
-import ^^.*;
+import transaction_submitter.*;
 
 operation create_evm_submit_transaction_operation(evm_submit_transaction_message: evm_submit_transaction_message, sender: byte_array){
     create_evm_submit_transaction(evm_submit_transaction_message, sender);

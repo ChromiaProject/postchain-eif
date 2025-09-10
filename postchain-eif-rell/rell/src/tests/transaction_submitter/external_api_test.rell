@@ -1,6 +1,6 @@
 @test module;
 
-import ^^.*;
+import transaction_submitter.*;
 import ^.helper_operations.*;
 
 function test_query_transaction_status() {

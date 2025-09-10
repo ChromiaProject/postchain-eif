@@ -1,6 +1,6 @@
 module;
 
-import ^^.*;
+import transaction_submitter.signer_update.*;
 
 operation enqueue_signer_update_op(update_id: integer) {
     enqueue_signer_update_transaction_impl(update_id, x"", x"", [x""], [x""], x"", x"");
