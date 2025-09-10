@@ -184,6 +184,7 @@ function ensure_account_erc20_state_slot_and_emit_state_events(ft4.accounts.acco
     val assets = (b: ft4.assets.balance, e: erc20_asset_snapshots_enabled) @* {
         b.account == account,
         b.asset == e.asset,
+        e.erc20_asset.network_id == network_id,
     } (.erc20_asset);
 
     for (asset in assets) {
