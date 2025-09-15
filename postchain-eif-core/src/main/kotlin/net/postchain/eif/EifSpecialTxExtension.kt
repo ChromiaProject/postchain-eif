@@ -44,11 +44,23 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
         if (position == SpecialTransactionPosition.Begin && processors.isNotEmpty()) {
             val index = bctx.height.mod(processors.size)
             val proc = processors.values.toList()[index].first
-            val data = proc.getEventData()
-            return data.map { it.toOpData() }.also {
-                bctx.addAfterCommitHook { proc.markAsProcessed(data) }
+            val evmBlocks = proc.getEventData()
+
+            if (evmBlocks.isEmpty()) return listOf()
+
+            val relevantBlocks = evmBlocks.takeIf { config.maxEventsPerBlock == 0L }
+                    ?: evmBlocks.runningFold(0) { acc, b -> acc + b.events.size }
+                            .drop(1)
+                            .zip(evmBlocks)
+                            .takeWhile { (sum, _) -> sum <= config.maxEventsPerBlock }
+                            .map { it.second }
+                            .ifEmpty { listOf(evmBlocks.first()) }
+
+            return relevantBlocks.map { it.toOpData() }.also {
+                bctx.addAfterCommitHook { proc.markAsProcessed(relevantBlocks) }
             }
         }
+
         return listOf()
     }
 
@@ -56,7 +68,7 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
         if (position == SpecialTransactionPosition.Begin && processors.isNotEmpty()) {
             val index = bctx.height.mod(processors.size)
             val (proc, fetcher) = processors.values.toList()[index]
-            val decodedOps = ops.map {
+            val allDecodedOps = ops.map {
                 if (it.opName != EvmBlockOp.OP_NAME) {
                     logger.error("Unknown operation: ${it.opName}")
                     null
@@ -64,12 +76,26 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
                     EvmBlockOp.fromOpData(it)
                 }
             }
-            bctx.addAfterCommitHook { proc.markAsProcessed(decodedOps.filterNotNull()) }
-            if (decodedOps.contains(null)) return false
-            val validationResult = proc.isValidEventData(decodedOps.filterNotNull())
+
+            // Ensure only __evm_block operations are present
+            if (allDecodedOps.contains(null)) return false
+            val decodedOps = allDecodedOps.filterNotNull()
+
+            // Validate that a block does not contain too many events
+            // `maxEventsPerBlock` can be exceeded if all events are from the same EVM block
+            if (config.maxEventsPerBlock > 0 && isSigner()) {
+                val totalEvents = decodedOps.sumOf { it.events.size }
+                if (totalEvents > config.maxEventsPerBlock && decodedOps.map { it.evmBlockHeight }.toSet().count() > 1)
+                    return false
+            }
+
+            // Validate event data
+            val validationResult = proc.isValidEventData(decodedOps)
             if (!validationResult.valid && validationResult.conflictingHeight != null && !isSigner()) {
                 fetcher.flushEvents(validationResult.conflictingHeight - BigInteger.ONE)
             }
+
+            bctx.addAfterCommitHook { proc.markAsProcessed(decodedOps) }
 
             return validationResult.valid
         }
