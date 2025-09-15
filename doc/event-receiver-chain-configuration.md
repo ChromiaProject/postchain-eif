@@ -4,11 +4,12 @@
 
 EVM Event Receiver blockchain configuration has the following configuration properties under `eif`:  
 
-| Name                                         | Description                                                                      | Type | Required           | Default |
-|----------------------------------------------|----------------------------------------------------------------------------------|------|--------------------|---------|
-| `max_event_delay`                            | Trigger block building after this time has passed if there are any queued events | int  |                    | 1000 ms |
-| `number_of_events_to_trigger_block_building` | Trigger block building when there are at least this number of events queued      | int  |                    | 100     |
-| `chains`                                     | Map of EVM chains.                                                               | map  | :white_check_mark: |         |
+| Name                                         | Description                                                                                                                                                                                                     | Type | Required           | Default |
+|----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------|--------------------|---------|
+| `max_event_delay`                            | Trigger block building after this time has passed if there are any queued events                                                                                                                                | int  |                    | 1000 ms |
+| `number_of_events_to_trigger_block_building` | Trigger block building when there are at least this number of events queued                                                                                                                                     | int  |                    | 100     |
+| `max_events_per_block`                       | Maximum number of events that can be included in a single block. The limit may be exceeded if the first EVM block being processed already contains more events than the allowed maximum. Disabled if set to 0.  | int  |                    | 100     |
+| `chains`                                     | Map of EVM chains.                                                                                                                                                                                              | map  | :white_check_mark: |         |
 
 Each entry in `chains` has the following configuration properties:
 

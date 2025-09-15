@@ -45,8 +45,9 @@ class EifSynchronizationInfrastructureExtension(
                 val eventReceiverConfig = cfg.rawConfig["eif"]?.toObject<EifEventReceiverConfig>()
                         ?: throw UserMistake("No EIF config present")
 
-                if (eventReceiverConfig.numberOfEventsToTriggerBlockBuilding < 0) throw UserMistake("numberOfEventsToTriggerBlockBuilding cannot be negative")
                 if (eventReceiverConfig.maxEventDelay < 0) throw UserMistake("maxEventDelay cannot be negative")
+                if (eventReceiverConfig.numberOfEventsToTriggerBlockBuilding < 0) throw UserMistake("numberOfEventsToTriggerBlockBuilding cannot be negative")
+                if (eventReceiverConfig.maxEventsPerBlock < 0) throw UserMistake("maxEventsPerBlock cannot be negative")
 
                 ext.config = eventReceiverConfig
                 ext.isSigner = process::isSigner
