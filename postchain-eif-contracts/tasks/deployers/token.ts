@@ -1,6 +1,8 @@
 import { task } from "hardhat/config";
 import { ALICE, ALICE__factory } from "../../typechain-types";
 import { delay } from "./utils";
+import { ethers } from "ethers";
+import { address } from "hardhat/internal/core/config/config-validation";
 
 /**
  * Deploys the ALICE token.
@@ -27,5 +29,16 @@ task("deploy:alice", "Deploy ALICE token")
                 libraries: {},
                 contract: "contracts/token/AliceToken.sol:ALICE",
             });
+        }
+    });
+
+task("read-storage", "Read storage from contract")
+    .addParam("address", "Address of the token contract")
+    .addParam("slots", "Number of slots to print")
+    .setAction(async ({ address, slots }, hre) => {
+        const provider = new ethers.JsonRpcProvider("https://eth-mainnet.rpc.chromaway.com");
+        for (let slotIndex = 0; slotIndex < slots; slotIndex++) {
+            const raw = await provider.getStorage(ethers.getAddress(address), slotIndex);
+            console.log(`Slot ${slotIndex}:`, raw);
         }
     });

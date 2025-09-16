@@ -38,7 +38,9 @@
 
     "deploy:alice": "npx hardhat deploy:alice",
     "transaction:resubmitSignerUpdate": "npx hardhat transaction:resubmitSignerUpdate",
-    "transaction:resubmitAnchoring": "npx hardhat transaction:resubmitAnchoring"
+    "transaction:resubmitAnchoring": "npx hardhat transaction:resubmitAnchoring",
+
+    "read-storage": "npx hardhat read-storage"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.8",
