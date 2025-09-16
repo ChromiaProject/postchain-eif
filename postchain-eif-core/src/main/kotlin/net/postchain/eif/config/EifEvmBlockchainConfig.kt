@@ -24,9 +24,6 @@ data class EifEvmBlockchainConfig(
         @Name("read_offset")
         @DefaultValue(defaultLong = 2)
         val readOffset: Long,
-        @Name("max_queue_size")
-        @DefaultValue(defaultLong = 2_000)
-        val maxQueueSize: Long,
         @Name("contracts_to_fetch")
         val contractsToFetch: List<EifEvmContractConfig>?,
 ) {
