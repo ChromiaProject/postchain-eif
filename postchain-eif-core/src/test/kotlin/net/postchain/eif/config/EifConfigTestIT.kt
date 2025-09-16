@@ -1,6 +1,8 @@
-package net.postchain.eif
+package net.postchain.eif.config
 
 import net.postchain.config.app.AppConfig
+import net.postchain.eif.EifConfigTest
+import net.postchain.eif.web3j.GethContainer
 import org.apache.commons.configuration2.BaseConfiguration
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -13,7 +15,6 @@ import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.time.Clock
 import java.time.Duration
-
 
 class EifConfigTestIT {
 
@@ -36,8 +37,8 @@ class EifConfigTestIT {
     }
 
     private val evmContainer: DockerComposeContainer<*> = GethContainer().withExposedService(
-        "geth", 8545,
-        Wait.forLogMessage(".*Chain head was updated                   number=2.*\\s", 1).withStartupTimeout(Duration.ofSeconds(10))
+            "geth", 8545,
+            Wait.forLogMessage(".*Chain head was updated                   number=2.*\\s", 1).withStartupTimeout(Duration.ofSeconds(10))
     )
 
 
@@ -49,8 +50,8 @@ class EifConfigTestIT {
         EifConfigTest().test(appConfig)
 
         assertEquals(
-            "Error: EVM chains configuration is missing. Please specify the EVM chains in the configuration.\n",
-            outContent.toString()
+                "Error: EVM chains configuration is missing. Please specify the EVM chains in the configuration.\n",
+                outContent.toString()
         )
     }
 
@@ -64,9 +65,9 @@ class EifConfigTestIT {
         EifConfigTest().test(appConfig)
 
         assertEquals(
-            "Checking ethereum configuration ...\n" +
-                    "Error: No URLs specified for the ethereum node. Please provide a valid URL for the ethereum node in the configuration.\n",
-            outContent.toString()
+                "Checking ethereum configuration ...\n" +
+                        "Error: No URLs specified for the ethereum node. Please provide a valid URL for the ethereum node in the configuration.\n",
+                outContent.toString()
         )
     }
 
@@ -80,11 +81,11 @@ class EifConfigTestIT {
         EifConfigTest().test(appConfig)
 
         assertEquals(
-            "Checking ethereum configuration ...\n" +
-                    "Error: No URLs specified for the ethereum node. Please provide a valid URL for the ethereum node in the configuration.\n" +
-                    "Checking bsc configuration ...\n" +
-                    "Error: No URLs specified for the bsc node. Please provide a valid URL for the bsc node in the configuration.\n",
-            outContent.toString()
+                "Checking ethereum configuration ...\n" +
+                        "Error: No URLs specified for the ethereum node. Please provide a valid URL for the ethereum node in the configuration.\n" +
+                        "Checking bsc configuration ...\n" +
+                        "Error: No URLs specified for the bsc node. Please provide a valid URL for the bsc node in the configuration.\n",
+                outContent.toString()
         )
     }
 
@@ -101,13 +102,13 @@ class EifConfigTestIT {
         EifConfigTest().test(appConfig)
 
         assertEquals(
-            "Checking ethereum configuration ...\n" +
-                    "Checking node: http://localhost:9898\n" +
-                    "Error: Failed to connect. The node did not respond or returned an error. Please check the URL and ensure that the node is online and accessible.\n" +
-                    "Checking bsc configuration ...\n" +
-                    "Checking node: http://localhost:9898\n" +
-                    "Error: Failed to connect. The node did not respond or returned an error. Please check the URL and ensure that the node is online and accessible.\n",
-            outContent.toString()
+                "Checking ethereum configuration ...\n" +
+                        "Checking node: http://localhost:9898\n" +
+                        "Error: Failed to connect. The node did not respond or returned an error. Please check the URL and ensure that the node is online and accessible.\n" +
+                        "Checking bsc configuration ...\n" +
+                        "Checking node: http://localhost:9898\n" +
+                        "Error: Failed to connect. The node did not respond or returned an error. Please check the URL and ensure that the node is online and accessible.\n",
+                outContent.toString()
         )
     }
 
@@ -131,10 +132,10 @@ class EifConfigTestIT {
         eifConfigTest.test(appConfig)
 
         assertEquals(
-            "Checking ethereum-dev configuration ...\n" +
-                    "Checking node: $url\n" +
-                    "Error: The node is out of sync. The latest block timestamp is 11 minutes behind the local time, exceeding the allowed 10-minute threshold. Please ensure the node is fully synchronized before proceeding.\n",
-            outContent.toString()
+                "Checking ethereum-dev configuration ...\n" +
+                        "Checking node: $url\n" +
+                        "Error: The node is out of sync. The latest block timestamp is 11 minutes behind the local time, exceeding the allowed 10-minute threshold. Please ensure the node is fully synchronized before proceeding.\n",
+                outContent.toString()
         )
     }
 
@@ -156,10 +157,10 @@ class EifConfigTestIT {
         EifConfigTest().test(appConfig)
 
         assertEquals(
-            "Checking ethereum-dev configuration ...\n" +
-                    "Checking node: $url\n" +
-                    "Success: The node has successfully passed all integrity checks!\n",
-            outContent.toString()
+                "Checking ethereum-dev configuration ...\n" +
+                        "Checking node: $url\n" +
+                        "Success: The node has successfully passed all integrity checks!\n",
+                outContent.toString()
         )
     }
 
@@ -178,10 +179,10 @@ class EifConfigTestIT {
         EifConfigTest().test(appConfig)
 
         assertEquals(
-            "Checking bsc configuration ...\n" +
-                    "Checking node: https://bsc-dataseed.binance.org/\n" +
-                    "Error: The node does not provide access to full historical state. This may indicate that the node is pruned. Please ensure the node has the full transaction history.\n",
-            outContent.toString()
+                "Checking bsc configuration ...\n" +
+                        "Checking node: https://bsc-dataseed.binance.org/\n" +
+                        "Error: The node does not provide access to full historical state. This may indicate that the node is pruned. Please ensure the node has the full transaction history.\n",
+                outContent.toString()
         )
     }
 
@@ -200,10 +201,10 @@ class EifConfigTestIT {
         EifConfigTest().test(appConfig)
 
         assertEquals(
-            "Checking ethereum configuration ...\n" +
-                    "Checking URL: $url\n" +
-                    "Success: URL is configured correctly!\n",
-            outContent.toString()
+                "Checking ethereum configuration ...\n" +
+                        "Checking URL: $url\n" +
+                        "Success: URL is configured correctly!\n",
+                outContent.toString()
         )
     }
 }

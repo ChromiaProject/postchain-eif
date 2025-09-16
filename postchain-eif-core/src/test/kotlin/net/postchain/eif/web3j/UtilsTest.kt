@@ -1,7 +1,9 @@
-package net.postchain.eif
+package net.postchain.eif.web3j
 
 import assertk.assertThat
 import assertk.assertions.isEqualTo
+import net.postchain.eif.normalizeContractAddress
+import net.postchain.eif.upperCaseHex
 import org.junit.jupiter.api.Test
 
 class Utils {

@@ -1,4 +1,4 @@
-package net.postchain.eif
+package net.postchain.eif.web3j
 
 import org.testcontainers.containers.DockerComposeContainer
 import java.io.File

@@ -1,6 +1,7 @@
-package net.postchain.eif
+package net.postchain.eif.web3j
 
 import net.postchain.common.exception.UserMistake
+import net.postchain.eif.GtvToEventMapper
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.gtvml.GtvMLParser
@@ -12,6 +13,7 @@ import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.Bool
 import org.web3j.abi.datatypes.DynamicArray
 import org.web3j.abi.datatypes.DynamicBytes
+import org.web3j.abi.datatypes.Int
 import org.web3j.abi.datatypes.Type
 import org.web3j.abi.datatypes.Uint
 import org.web3j.abi.datatypes.Utf8String
@@ -54,7 +56,7 @@ class GtvToEventMapperTest {
         assertTypeNameIsSupported("address", Address::class.java)
         assertTypeNameIsSupported("bool", Bool::class.java)
         assertTypeNameIsSupported("bytes", DynamicBytes::class.java)
-        assertTypeNameIsSupported("int", org.web3j.abi.datatypes.Int::class.java)
+        assertTypeNameIsSupported("int", Int::class.java)
         assertTypeNameIsSupported("string", Utf8String::class.java)
         assertTypeNameIsSupported("uint", Uint::class.java)
     }
