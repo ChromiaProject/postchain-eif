@@ -132,12 +132,14 @@ class EvmEventProcessor(
         }
     }
 
-    fun isQueueFull() = numberOfNewEvents() > maxQueueSize
+    fun isQueueFull() = newBlocks().count() > maxQueueSize
 
     @Synchronized
-    override fun numberOfNewEvents(): Long = eventBlocks.stream()
+    private fun newBlocks() = eventBlocks.stream()
             .takeWhile { it.evmBlockHeight <= lastReadLogBlockHeight - readOffset }
-            .count()
+
+    @Synchronized
+    override fun numberOfNewEvents(): Long = newBlocks().flatMap { it.events.stream() }.count()
 
     @Synchronized
     override fun getEventData(): List<EvmBlockOp> = eventBlocks.stream()
