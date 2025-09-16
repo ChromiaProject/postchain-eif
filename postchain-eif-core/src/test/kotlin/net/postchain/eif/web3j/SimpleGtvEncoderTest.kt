@@ -1,7 +1,9 @@
-package net.postchain.eif
+package net.postchain.eif.web3j
 
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
+import net.postchain.eif.SimpleGtvEncoder
+import net.postchain.eif.digest
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvBigInteger

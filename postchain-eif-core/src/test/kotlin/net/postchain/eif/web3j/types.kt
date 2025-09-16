@@ -1,8 +1,11 @@
 @file:Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
 
-package net.postchain.eif
+package net.postchain.eif.web3j
 
 import net.postchain.common.toHex
+import net.postchain.eif.AccountStateMerkleProof
+import net.postchain.eif.EifSignature
+import net.postchain.eif.EventMerkleProof
 import net.postchain.eif.contracts.ChromiaTokenBridge
 import net.postchain.eif.contracts.TokenBridgeWithSnapshotWithdraw
 import org.web3j.abi.datatypes.Address

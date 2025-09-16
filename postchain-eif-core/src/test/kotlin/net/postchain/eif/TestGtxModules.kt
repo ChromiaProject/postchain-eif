@@ -17,10 +17,6 @@ import org.apache.commons.dbutils.QueryRunner
 import org.apache.commons.dbutils.handlers.MapListHandler
 import java.math.BigInteger
 
-private val r = QueryRunner()
-
-private val mapListHandler = MapListHandler()
-
 private fun table_eth_event(ctx: EContext): String {
     val db = DatabaseAccess.of(ctx)
     return db.tableName(ctx, "eth_events")
@@ -77,7 +73,7 @@ class EifTransferOp(u: Unit, opdata: ExtOpData) : GTXOperation(opdata) {
     }
 
     override fun apply(ctx: TxEContext): Boolean {
-        r.update(ctx.conn,
+        QueryRunner().update(ctx.conn,
                 """INSERT INTO ${table_eth_event(ctx)}(block_number, block_hash, tnx_hash, log_index, 
                 |event_signature, contract_address, from_address, to_address, value) 
                 |VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimMargin(),
@@ -117,8 +113,9 @@ class EifTransferTestModule : SimpleGTXModule<Unit>(Unit,
                 "__eth_event" to ::EifTransferOp
         ),
         mapOf("get_last_eth_block" to { _, ctx, _ ->
+            val mapListHandler = MapListHandler()
             val sql = "SELECT LIMIT 1 block_number, block_hash FROM ${table_eth_event(ctx)} ORDER BY block_number DESC"
-            val res = r.query(ctx.conn, sql, mapListHandler)
+            val res = QueryRunner().query(ctx.conn, sql, mapListHandler)
             when (res.size) {
                 1 -> gtv(mutableMapOf(
                         "eth_block_height" to gtv(res[0]["block_number"] as BigInteger),
@@ -144,7 +141,7 @@ class EifTransferTestModule : SimpleGTXModule<Unit>(Unit,
                 |from_address TEXT NOT NULL, 
                 |to_address TEXT NOT NULL, 
                 |value BIGINT)""".trimMargin()
-            r.update(ctx.conn, sql)
+            QueryRunner().update(ctx.conn, sql)
             GTXSchemaManager.setModuleVersion(ctx, moduleName, 0)
         }
     }

@@ -1,6 +1,7 @@
-package net.postchain.eif
+package net.postchain.eif.web3j
 
 import net.postchain.common.hexStringToByteArray
+import net.postchain.eif.getEthereumAddress
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test

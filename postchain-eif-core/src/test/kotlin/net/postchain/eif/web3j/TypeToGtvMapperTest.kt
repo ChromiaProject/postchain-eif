@@ -1,6 +1,7 @@
-package net.postchain.eif
+package net.postchain.eif.web3j
 
 import net.postchain.common.hexStringToByteArray
+import net.postchain.eif.TypeToGtvMapper
 import net.postchain.gtv.GtvBigInteger
 import net.postchain.gtv.GtvInteger
 import org.junit.jupiter.api.Assertions.assertEquals
