@@ -155,6 +155,9 @@ const config: HardhatUserConfig = {
             {
                 version: "0.5.8",
             },
+            {
+                version: "0.5.17",
+            },
         ],
     },
     gasReporter: {
