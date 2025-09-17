@@ -37,6 +37,7 @@
     "finalizeBlockchainRid:recovery": "npx hardhat finalizeBlockchainRid:recovery",
 
     "deploy:alice": "npx hardhat deploy:alice",
+    "deploy:alice:mna": "npx hardhat deploy:alice:mna",
     "transaction:resubmitSignerUpdate": "npx hardhat transaction:resubmitSignerUpdate",
     "transaction:resubmitAnchoring": "npx hardhat transaction:resubmitAnchoring",
 

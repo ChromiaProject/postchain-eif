@@ -775,7 +775,13 @@ contract AliceToken is ERC20 {
         emit TransferFromNative(to, refID, value);
         return true;
     }
-    
+
+    // TODO: just for test
+    function mint(address to, uint256 amount) external {
+        require(_minter == msg.sender, "Only minter can mint");
+        _mint(to, amount);
+    }
+
     function _mint(address account, uint256 value) override internal {
         require(totalSupply().add(value) <= cap(), "ERC20Capped: cap exceeded");
         super._mint(account, value);

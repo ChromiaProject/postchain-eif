@@ -1,5 +1,5 @@
 import { task } from "hardhat/config";
-import { ALICE, ALICE__factory } from "../../typechain-types";
+import { ALICE, ALICE__factory, AliceToken, AliceToken__factory } from "../../typechain-types";
 import { delay } from "./utils";
 import { ethers } from "ethers";
 import { address } from "hardhat/internal/core/config/config-validation";
@@ -32,6 +32,29 @@ task("deploy:alice", "Deploy ALICE token")
         }
     });
 
+task("deploy:alice:mna", "Deploy ALICE token")
+    .addParam("minter", "Minter address")
+    .addFlag("verify", "Verify contracts at Etherscan")
+    .setAction(async ({ minter, verify }, hre) => {
+        const tokenFactory = await hre.ethers.getContractFactory("AliceToken") as AliceToken__factory;
+        const token = await tokenFactory.deploy(ethers.getAddress(minter)) as AliceToken;
+        await token.waitForDeployment();
+        var tokenAddress = await token.getAddress();
+        console.log("AliceToken deployed to: ", tokenAddress);
+
+        if (verify) {
+            // We need to wait a little bit to verify the contract after deployment
+            await delay(30000);
+            await hre.run("verify:verify", {
+                address: tokenAddress,
+                constructorArguments: [ethers.getAddress(minter)],
+                libraries: {},
+                contract: "contracts/mna/AliceTokenEth.sol:AliceToken",
+            });
+        }
+    });
+
+// TODO: move to utils
 task("read-storage", "Read storage from contract")
     .addParam("address", "Address of the token contract")
     .addParam("slots", "Number of slots to print")

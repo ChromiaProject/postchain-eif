@@ -42,6 +42,13 @@ const known_artifacts_by_network: { [key: string]: KnownArtifacts } = {
         "chromiaTokenAddress": "0x1F11F131E0866AaaBfcCaaF350A6c33Abb0308b8", // tCHR
         "networkType": "ETH"
     },
+
+    // MNA
+    "sepolia": {
+        "multiSigOwner": "0x782Ab06A00e04BBb86a819bF527d42290C46B77C", // nonsense
+        "chromiaTokenAddress": "0xAC51066D7BEC65DC4589368DA368B212745D63E8",
+        "networkType": "ETH-MNA"
+    },
 }
 
 /**
@@ -92,8 +99,12 @@ task("deploy:chromiabridge")
         let tokenMinterFactory;
         if (known_artifacts_by_network[hre.network.name].networkType === "ETH") {
             tokenMinterFactory = await hre.ethers.getContractFactory("TokenMinterETH") as TokenMinterETH__factory; // transferFromNative ETH mainnet
-        } else {
+        } else if (known_artifacts_by_network[hre.network.name].networkType === "BSC") {
             tokenMinterFactory = await hre.ethers.getContractFactory("TokenMinterBSC") as TokenMinterBSC__factory;
+        } else if (known_artifacts_by_network[hre.network.name].networkType === "ETH-MNA") {
+            tokenMinterFactory = await hre.ethers.getContractFactory("TokenMinterBSC") as TokenMinterBSC__factory;
+        } else {
+            throw new Error("Unsupported network type");
         }
         const tokenMinter = await tokenMinterFactory.deploy(DAILY_LIMIT, tokenAddress, bridgeAddress, multiSigOwner) as TokenMinterBase;
         await tokenMinter.waitForDeployment();
