@@ -16,7 +16,7 @@ Uses
 Before running any command, make sure to install dependencies:
 
 ```sh
-$ yarn install
+$ yarn install --frozen-lockfile --ignore-scripts
 ```
 
 ### Clean
