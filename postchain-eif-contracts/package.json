@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "license": "MIT",
   "scripts": {
+    "preinstall": "npx -y only-allow yarn",
+
     "clean": "cross-env TS_NODE_TRANSPILE_ONLY=true npx hardhat clean",
     "compile": "cross-env TS_NODE_TRANSPILE_ONLY=true npx hardhat compile",
     "test": "npx hardhat test",
@@ -76,5 +78,26 @@
   },
   "dependencies": {
     "cross-env": "^7.0.3"
+  },
+  "resolutions": {
+    "ansi-regex": "5.0.1",
+    "color-convert": "2.0.1",
+    "color-name": "1.1.4",
+
+    "debug": "4.4.0",
+    "strip-ansi": "6.0.1",
+    "wrap-ansi": "7.0.0",
+    "slice-ansi": "4.0.0",
+
+    "cli-table3/ansi-regex": "3.0.1",
+
+    "command-line-usage/color-convert": "1.9.3",
+    "command-line-usage/color-name": "1.1.3",
+
+    "ghost-testrpc/color-convert": "1.9.3",
+    "ghost-testrpc/color-name": "1.1.3",
+
+    "solidity-coverage/color-convert": "1.9.3",
+    "solidity-coverage/color-name": "1.1.3"
   }
 }
