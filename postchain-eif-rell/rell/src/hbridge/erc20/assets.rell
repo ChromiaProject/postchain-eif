@@ -6,7 +6,7 @@ entity erc20_asset {
     /** token contract address */
     token_address: byte_array;
     key network_id, token_address;
-    bridge_mode;
+    mutable bridge_mode;
     index ft4.assets.asset;
     /** virtual blockchain RID derived from network_id and token_address */
     key virtual_blockchain_rid: byte_array;
