@@ -39,12 +39,15 @@
     "finalizeBlockchainRid:recovery": "npx hardhat finalizeBlockchainRid:recovery",
 
     "deploy:alice": "npx hardhat deploy:alice",
-    "deploy:alice:mna:eth": "npx hardhat deploy:alice:mna:eth",
-    "deploy:alice:mna:bsc": "npx hardhat deploy:alice:mna:bsc",
     "transaction:resubmitSignerUpdate": "npx hardhat transaction:resubmitSignerUpdate",
     "transaction:resubmitAnchoring": "npx hardhat transaction:resubmitAnchoring",
 
-    "read-storage": "npx hardhat read-storage"
+    "read-storage": "npx hardhat read-storage",
+
+    "deploy:alice:mna:eth": "npx hardhat deploy:alice:mna:eth",
+    "deploy:alice:mna:bsc": "npx hardhat deploy:alice:mna:bsc",
+    "deploy:nativebridge:mna:eth": "npx hardhat deploy:nativebridge:mna:eth",
+    "deploy:nativebridge:mna:bsc": "npx hardhat deploy:nativebridge:mna:bsc"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.8",
