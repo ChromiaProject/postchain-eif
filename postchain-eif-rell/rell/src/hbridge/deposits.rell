@@ -22,6 +22,19 @@ struct erc20_deposit_info {
     state: deposit_state;
     last_updated: timestamp;
     evm_tx_hash: byte_array;
+
+    /** Transaction RID of a completed deposit */
+    completed_tx_rid: byte_array?;
+
+    /** Operation index in transaction of a completed deposit */
+    completed_op_index: integer?;
+}
+
+/** Store a reference to when the deposit was completed and where the corresponding FT4 transfer can be found */
+entity erc20_completed_deposit_transaction {
+    key deposit: erc20_deposit;
+    transaction: transaction = op_context.transaction;
+    op_index: integer = op_context.op_index;
 }
 
 entity pending_erc20_deposit {
@@ -62,7 +75,7 @@ struct deposit_filter {
     evm_tx_hash: byte_array? = null;
 }
 
-function map_deposit(deposit: erc20_deposit) = erc20_deposit_info(
+function map_deposit(deposit: erc20_deposit, cdt: erc20_completed_deposit_transaction?) = erc20_deposit_info(
     id = deposit.rowid,
     network_id = deposit.network_id,
     sender_address = deposit.sender_address,
@@ -73,6 +86,8 @@ function map_deposit(deposit: erc20_deposit) = erc20_deposit_info(
     state = deposit.state,
     last_updated = deposit.last_updated,
     evm_tx_hash = deposit.evm_tx_hash,
+    completed_tx_rid = cdt?.transaction?.tx_rid,
+    completed_op_index = cdt?.op_index
 );
 
 function update_deposit_state(deposit: erc20_deposit, state: deposit_state) {
@@ -80,6 +95,10 @@ function update_deposit_state(deposit: erc20_deposit, state: deposit_state) {
 
     if (deposit.state == deposit_state.pending and (state in [deposit_state.completed, deposit_state.recalled])) {
         delete pending_erc20_deposit @ { deposit };
+
+        if (state == deposit_state.completed) {
+            create erc20_completed_deposit_transaction(deposit);
+        }
     }
 
     deposit.state = state;
