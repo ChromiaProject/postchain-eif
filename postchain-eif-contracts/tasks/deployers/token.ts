@@ -38,49 +38,6 @@ task("deploy:alice", "Deploy ALICE token")
         }
     });
 
-task("deploy:alice:mna:eth", "Deploy ALICE token on Ethereum")
-    .addParam("minter", "Minter address")
-    .addFlag("verify", "Verify contracts at Etherscan")
-    .setAction(async ({ minter, verify }, hre) => {
-        const tokenFactory = await hre.ethers.getContractFactory("AliceToken") as AliceToken__factory;
-        const token = await tokenFactory.deploy(ethers.getAddress(minter)) as AliceToken;
-        await token.waitForDeployment();
-        var tokenAddress = await token.getAddress();
-        console.log("AliceToken deployed to: ", tokenAddress);
-
-        if (verify) {
-            // We need to wait a little bit to verify the contract after deployment
-            await delay(30000);
-            await hre.run("verify:verify", {
-                address: tokenAddress,
-                constructorArguments: [ethers.getAddress(minter)],
-                libraries: {},
-                contract: "contracts/mna/AliceTokenEth.sol:AliceToken",
-            });
-        }
-    });
-
-task("deploy:alice:mna:bsc", "Deploy ALICE token on BSC")
-    .addFlag("verify", "Verify contracts at Etherscan")
-    .setAction(async ({ verify }, hre) => {
-        const tokenFactory = await hre.ethers.getContractFactory("BEP20Token") as BEP20Token__factory;
-        const token = await tokenFactory.deploy() as BEP20Token;
-        await token.waitForDeployment();
-        var tokenAddress = await token.getAddress();
-        console.log("BEP20Token deployed to: ", tokenAddress);
-
-        if (verify) {
-            // We need to wait a little bit to verify the contract after deployment
-            await delay(30000);
-            await hre.run("verify:verify", {
-                address: tokenAddress,
-                constructorArguments: [],
-                libraries: {},
-                contract: "contracts/mna/AliceTokenBsc.sol:BEP20Token",
-            });
-        }
-    });
-
 // TODO: move to utils
 task("read-storage", "Read storage from contract")
     .addParam("address", "Address of the token contract")

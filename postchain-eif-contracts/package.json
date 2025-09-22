@@ -38,12 +38,12 @@
     "setBlockchainRid:recovery": "npx hardhat setBlockchainRid:recovery",
     "finalizeBlockchainRid:recovery": "npx hardhat finalizeBlockchainRid:recovery",
 
-    "deploy:alice": "npx hardhat deploy:alice",
     "transaction:resubmitSignerUpdate": "npx hardhat transaction:resubmitSignerUpdate",
     "transaction:resubmitAnchoring": "npx hardhat transaction:resubmitAnchoring",
 
     "read-storage": "npx hardhat read-storage",
 
+    "deploy:alice": "npx hardhat deploy:alice",
     "deploy:alice:mna:eth": "npx hardhat deploy:alice:mna:eth",
     "deploy:alice:mna:bsc": "npx hardhat deploy:alice:mna:bsc",
     "deploy:nativebridge:mna:eth": "npx hardhat deploy:nativebridge:mna:eth",

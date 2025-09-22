@@ -6,3 +6,4 @@ import "./validator";
 import "./token";
 import "./utils";
 import "./recovery";
+import "./mna";
