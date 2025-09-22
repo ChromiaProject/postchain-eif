@@ -175,6 +175,7 @@ contract AliceTokenMinterETH is TokenMinterBase {
 interface IBEP20Token {
     function mint(uint256 amount) external returns (bool);
     function transfer(address recipient, uint256 amount) external returns (bool);
+    function transferOwnership(address newOwner) external;
 }
 
 contract AliceTokenMinterBSC is TokenMinterBase {
@@ -194,5 +195,10 @@ contract AliceTokenMinterBSC is TokenMinterBase {
 
     function burn(uint256 amount) external virtual onlyBridge {
         IBEP20Token(tokenContractAddress).transfer(address(1), amount);
+    }
+
+    // This lets you take back control of the token
+    function transferTokenOwnership(address newOwner) external onlyOwner {
+        IBEP20Token(tokenContractAddress).transferOwnership(newOwner);
     }
 }

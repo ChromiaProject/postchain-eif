@@ -9,7 +9,6 @@ import {
 } from "../../typechain-types";
 import { delay } from "./utils";
 import { ethers } from "ethers";
-import { address } from "hardhat/internal/core/config/config-validation";
 
 /**
  * Deploys the ALICE token.
