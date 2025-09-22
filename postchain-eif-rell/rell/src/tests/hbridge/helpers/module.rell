@@ -92,7 +92,3 @@ function mock_confirmation_proof_bytes(blockchain_rid: byte_array = x"", height:
 
 @mount("register_recovery_contract")
 operation register_recovery_contract_op(network_id: integer, contract_address: byte_array) {}
-
-operation remove_erc20_completed_deposit_transaction(deposit: erc20_deposit) {
-    delete erc20_completed_deposit_transaction @? { deposit };
-}

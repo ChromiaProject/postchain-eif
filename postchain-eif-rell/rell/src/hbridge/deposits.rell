@@ -31,9 +31,9 @@ struct erc20_deposit_info {
 }
 
 /** Store a reference to when the deposit was completed and where the corresponding FT4 transfer can be found */
+@log
 entity erc20_completed_deposit_transaction {
     key deposit: erc20_deposit;
-    transaction: transaction = op_context.transaction;
     op_index: integer = op_context.op_index;
 }
 
