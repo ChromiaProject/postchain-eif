@@ -201,10 +201,6 @@ Since we burned (transfered to 0x1111111111111111111111111111111111111111), we n
     769FF03B1C3B6403B9FDC795F8210F21954D1A2709DC9912488EE6ABF5B41190
     300000
 
-*TODO*: Irakli: https://explorer.chromia.dev/devnet1/335C75E08AFAC7D6678263F1A13D5AFED9CD009344B6349107D7CEEA3A40EA08/account/769FF03B1C3B6403B9FDC795F8210F21954D1A2709DC9912488EE6ABF5B41190
-  The tip window duplicates the `To` field.
-  `769FF03B1C3B6403B9FDC795F8210F21954D1A2709DC9912488EE6ABF5B41190769FF03B1C3B6403B9FDC795F8210F21954D1A2709DC9912488EE6ABF5B41190` instead of `769FF03B1C3B6403B9FDC795F8210F21954D1A2709DC9912488EE6ABF5B41190`
-
 ```shell
 # burn 300 ALICE from bridge account
 chr tx -brid $TC --evm-auth 0x782Ab06A00e04BBb86a819bF527d42290C46B77C update_mna_evm_supply 97 3000000000L 0
@@ -278,12 +274,4 @@ chr tx --secret provider/alpha/.pmc/config -brid $TC make_common_vote 'x"03ECD35
 10. Test withdrawals to EVM
 
 11. Test deposits to TC
-
-
-*TODO*: Irakli
-  https://vault.devnet1.chromia.dev/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/en/transfer/progress/?t=1
-
-*TODO*: Irakli
-  https://explorer.chromia.dev/devnet1/asset/AAFE163D60F3DCD531B263BB0159DA36EE76F1F2FA7AB78D10F15037B3F5028E?issuingBrid=335C75E08AFAC7D6678263F1A13D5AFED9CD009344B6349107D7CEEA3A40EA08&asset-tab=transfers
-  group transfers by tx, or display `out`, `in` in chronological order 
 
