@@ -1,0 +1,261 @@
+@test module;
+
+import transaction_submitter.signer_update.*;
+import ^.helper_operations.*;
+import tests.transaction_submitter.helper_operations.*;
+
+val test_directory_chain_brid = x"00000000000000000000000000000000";
+
+function test_directory_signer_update() {
+    val new_signers = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub];
+    val signer_list_update = trigger_signer_update(new_signers);
+
+    val update_tx = signer_list_update_transaction @ { signer_list_update }.evm_submit_transaction;
+
+    rell.test.tx().op(
+            update_evm_transaction_status_op(update_tx.rowid.to_integer(), transaction_status.TAKEN, x"01"),
+            update_evm_transaction_status_op(
+                update_tx.rowid.to_integer(),
+                transaction_status.PENDING,
+                x"01",
+                tx_hash = "00"
+            ),
+            update_evm_transaction_status_op(
+                update_tx.rowid.to_integer(),
+                transaction_status.SUCCESS,
+                x"01",
+                tx_hash = "00"
+            )
+        ).run();
+
+    assert_equals(latest_signer_list_update_status(test_directory_chain_brid), signer_list_update_status.COMPLETED);
+
+    assert_equals(get_current_evm_signer_list(test_directory_chain_brid), new_signers);
+}
+
+function test_directory_signer_update_failure() {
+    val new_signers = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub];
+    val signer_list_update = trigger_signer_update(new_signers);
+
+    val update_tx = signer_list_update_transaction @ { signer_list_update }.evm_submit_transaction;
+
+    rell.test.tx().op(
+            update_evm_transaction_status_op(update_tx.rowid.to_integer(), transaction_status.TAKEN, x"01"),
+            update_evm_transaction_status_op(
+                update_tx.rowid.to_integer(),
+                transaction_status.PENDING,
+                x"01",
+                tx_hash = "00"
+            ),
+            update_evm_transaction_status_op(
+                update_tx.rowid.to_integer(),
+                transaction_status.FAILURE,
+                x"01",
+                tx_hash = "00"
+            )
+        ).run();
+
+    assert_equals(latest_signer_list_update_status(test_directory_chain_brid), signer_list_update_status.FAILED);
+
+    rell.test.tx().op(
+            manually_resolve_failed_signer_update(test_directory_chain_brid)
+        ).run_must_fail("No signers");
+
+    rell.test.tx().op(
+            manually_resolve_failed_signer_update(test_directory_chain_brid)
+        ).sign(rell.test.keypairs.bob).run_must_fail("Signer is not a manual admin");
+
+    rell.test.tx().op(
+            manually_resolve_failed_signer_update(test_directory_chain_brid)
+        ).sign(rell.test.keypairs.alice).run();
+
+    assert_equals(latest_signer_list_update_status(test_directory_chain_brid), signer_list_update_status.COMPLETED);
+}
+
+function test_directory_parked_signer_update() {
+    val new_signers = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub];
+    val signer_list_update = trigger_signer_update(new_signers);
+
+    val update_tx = signer_list_update_transaction @ { signer_list_update }.evm_submit_transaction;
+
+    val new_parked_signers = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub, rell.test.keypairs.charlie.pub];
+    rell.test.tx().op(
+        signer_update_message_op(
+            signer_list_update_message(
+                serial = 2,
+                blockchain_rid = test_directory_chain_brid,
+                signers = new_parked_signers.to_gtv().to_bytes(),
+                confirmed_in_directory_at_height = 2
+            )
+        )
+    ).run();
+    assert_true(get_queued_signer_updates().empty());
+    assert_not_null(parked_directory_signer_list_update @? {});
+
+    rell.test.tx().op(
+        update_evm_transaction_status_op(update_tx.rowid.to_integer(), transaction_status.TAKEN, x"01"),
+        update_evm_transaction_status_op(
+            update_tx.rowid.to_integer(),
+            transaction_status.PENDING,
+            x"01",
+            tx_hash = "00"
+        ),
+        update_evm_transaction_status_op(
+            update_tx.rowid.to_integer(),
+            transaction_status.SUCCESS,
+            x"01",
+            tx_hash = "00"
+        )
+    ).run();
+
+    assert_equals(signer_list_update.status, signer_list_update_status.COMPLETED);
+    assert_null(parked_directory_signer_list_update @? {});
+
+    val queued_udpates = get_queued_signer_updates();
+    assert_equals(queued_udpates.size(), 1);
+    val queued_update = queued_udpates[0];
+    assert_equals(queued_update.signers, new_parked_signers.to_gtv().to_bytes());
+}
+
+function test_directory_cancelled_signer_update_at_same_height() {
+    val new_signers = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub];
+    val new_signers_at_same_height = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub, rell.test.keypairs.charlie.pub];
+    rell.test.tx().op(
+        signer_update_message_op(
+            signer_list_update_message(
+                serial = 1,
+                blockchain_rid = test_directory_chain_brid,
+                signers = new_signers.to_gtv().to_bytes(),
+                confirmed_in_directory_at_height = 1
+            )
+        ),
+        signer_update_message_op(
+            signer_list_update_message(
+                serial = 2,
+                blockchain_rid = test_directory_chain_brid,
+                signers = new_signers_at_same_height.to_gtv().to_bytes(),
+                confirmed_in_directory_at_height = 1
+            )
+        )
+    ).run();
+
+    val queued_updates = get_queued_signer_updates();
+    assert_equals(queued_updates.size(), 1);
+    assert_equals(queued_updates[0].signers, new_signers_at_same_height.to_gtv().to_bytes());
+    assert_null(parked_directory_signer_list_update @? {});
+
+    val cancelled_update_signers = signer_list_update @ { signer_list_update_status.CANCELLED }.signers;
+    assert_equals(cancelled_update_signers, new_signers.to_gtv().to_bytes());
+}
+
+function test_directory_skip_parked_update_at_same_height() {
+    val initial_signers = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub];
+    val new_signers = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub, rell.test.keypairs.charlie.pub];
+    val new_signers_at_same_height = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub, rell.test.keypairs.charlie.pub, rell.test.keypairs.trudy.pub];
+    rell.test.tx().op(
+        signer_update_message_op(
+            signer_list_update_message(
+                serial = 1,
+                blockchain_rid = test_directory_chain_brid,
+                signers = initial_signers.to_gtv().to_bytes(),
+                confirmed_in_directory_at_height = 1
+            )
+        ),
+        signer_update_message_op(
+            signer_list_update_message(
+                serial = 2,
+                blockchain_rid = test_directory_chain_brid,
+                signers = new_signers.to_gtv().to_bytes(),
+                confirmed_in_directory_at_height = 2
+            )
+        ),
+        signer_update_message_op(
+            signer_list_update_message(
+                serial = 3,
+                blockchain_rid = test_directory_chain_brid,
+                signers = new_signers_at_same_height.to_gtv().to_bytes(),
+                confirmed_in_directory_at_height = 2
+            )
+        )
+    ).run();
+
+    val queued_updates = get_queued_signer_updates();
+    assert_equals(queued_updates.size(), 1);
+    assert_equals(queued_updates[0].signers, initial_signers.to_gtv().to_bytes());
+
+    val parked_update = parked_directory_signer_list_update @ {};
+    assert_equals(parked_update.signers, new_signers_at_same_height.to_gtv().to_bytes());
+}
+
+function test_adding_bridge_mapping_triggers_signer_update() {
+    val unmapped_chain_brid = x"11";
+    val new_signers = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub];
+
+    rell.test.tx().op(
+        signer_update_message_op(
+            signer_list_update_message(
+                serial = 1,
+                blockchain_rid = unmapped_chain_brid,
+                signers = new_signers.to_gtv().to_bytes(),
+                confirmed_in_directory_at_height = 1
+            )
+        )
+    ).run();
+
+    // Assert no updates was queued for the unmapped chain
+    val queued_updates = get_queued_signer_updates();
+    assert_true(queued_updates.empty());
+
+    rell.test.tx().op(
+        bridge_mapping_message_update_op(
+            bridge_mapping_message(
+                blockchain_rid = unmapped_chain_brid,
+                validator_contract = "validator",
+                bridge_contract = "bridge",
+                evm_network_id = 11155111,
+                deleted = false
+            )
+        )
+    ).run();
+
+    val queued_updates2 = get_queued_signer_updates();
+    assert_equals(queued_updates2.size(), 1);
+    val queued_update = queued_updates2[0];
+
+    val signer_list_update_entity = signer_list_update @ { .rowid == rowid(queued_update.rowid) };
+    assert_equals(signer_list_update_entity.status, signer_list_update_status.QUEUED);
+}
+
+function trigger_signer_update(new_signers: list<byte_array>): signer_list_update {
+    rell.test.tx().op(
+            signer_update_message_op(
+                signer_list_update_message(
+                    serial = 1,
+                    blockchain_rid = test_directory_chain_brid,
+                    signers = new_signers.to_gtv().to_bytes(),
+                    confirmed_in_directory_at_height = 1
+                )
+            )
+        ).run();
+
+    val queued_updates = get_queued_signer_updates();
+    assert_equals(queued_updates.size(), 1);
+    val queued_update = queued_updates[0];
+
+    val signer_list_update_entity = signer_list_update @ { .rowid == rowid(queued_update.rowid) };
+    assert_equals(signer_list_update_entity.status, signer_list_update_status.QUEUED);
+
+    rell.test.tx().op(
+            enqueue_signer_update_op(queued_update.rowid)
+        ).run();
+
+    assert_equals(signer_list_update_entity.status, signer_list_update_status.PENDING);
+
+    return signer_list_update_entity;
+}
+
+function test_directory_signer_update_payer_chain_set() {
+    val new_signers = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub];
+    val signer_list_update = trigger_signer_update(new_signers);
+    assert_equals(signer_list_update_transaction @ { signer_list_update }.evm_submit_transaction.payer_chain, test_directory_chain_brid);
+}

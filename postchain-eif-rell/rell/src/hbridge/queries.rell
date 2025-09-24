@@ -71,7 +71,10 @@ query get_erc20_deposits(filter: deposit_filter, from: timestamp? = null, to: ti
         page_size: integer? = null, page_cursor: text? = null): ft4.utils.paged_result {
     val before_rowid = ft4.utils.before_rowid(page_cursor);
 
-    val paginated_result = erc20_deposit @* {
+    val paginated_result = (
+        d: erc20_deposit,
+        @outer ct: erc20_completed_deposit_transaction @* { ct.deposit == d }
+    ) @* {
         filter.network_id == null or .network_id == filter.network_id,
         filter.token_address == null or .token.token_address == filter.token_address,
         filter.recipient_id == null or .recipient_id == filter.recipient_id,
@@ -79,11 +82,11 @@ query get_erc20_deposits(filter: deposit_filter, from: timestamp? = null, to: ti
         filter.evm_tx_hash == null or .evm_tx_hash == filter.evm_tx_hash,
         from == null or .last_updated >= from,
         to == null or .last_updated < to,
-        .rowid > (before_rowid ?: rowid(0))
+        d.rowid > (before_rowid ?: rowid(0)),
     } (
         ft4.utils.pagination_result(
-            data = map_deposit($).to_gtv_pretty(),
-            rowid = .rowid
+            data = map_deposit(d, ct).to_gtv_pretty(),
+            rowid = d.rowid
         )
     ) limit ft4.utils.fetch_data_size(page_size);
 

@@ -1,0 +1,28 @@
+@test module;
+
+import transaction_submitter.anchoring.*;
+import ^.helper_operations.*;
+
+function test_anchoring_operation_enqueues_tx() {
+    rell.test.block().run();
+
+    assert_true(should_anchor_system_anchoring_block());
+    assert_equals(get_previously_anchored_system_anchoring_block_height(), -1);
+
+    rell.test.tx().op(
+        anchor_block_op(x"00".repeat(256), [x""], [x""])
+    ).run();
+
+    val enqueuedTx = evm_submit_transaction @ {};
+
+    assert_equals(enqueuedTx.function_name, "anchorBlock");
+    assert_equals(enqueuedTx.parameter_types.split("."), ["bytes", "bytes[]", "address[]"]);
+    assert_equals(list<gtv>.from_gtv(gtv.from_bytes(enqueuedTx.parameter_values)), [x"00".repeat(256).to_gtv(), [x""].to_gtv(), [x""].to_gtv()]);
+
+    assert_false(should_anchor_system_anchoring_block());
+    assert_equals(get_previously_anchored_system_anchoring_block_height(), 0);
+
+    rell.test.set_next_block_time_delta(3600001);
+    rell.test.block().run();
+    assert_true(should_anchor_system_anchoring_block());
+}

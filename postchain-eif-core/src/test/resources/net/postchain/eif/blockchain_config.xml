@@ -40,6 +40,21 @@
             <bytea>03a301697bdfcd704313ba48e51d567543f2a182031efd6915ddc07bbcc4e16070</bytea>
         </array>
     </entry>
+    <entry key="eif">
+        <dict>
+            <entry key="chains">
+                <dict>
+                    <entry key="ethereum">
+                        <dict>
+                            <entry key="network_id">
+                                <int>1</int>
+                            </entry>
+                        </dict>
+                    </entry>
+                </dict>
+            </entry>
+        </dict>
+    </entry>
     <entry key="gtx">
         <!--
         If multiple GTX modules are used, allowoverrides will decide if query- and operation names of

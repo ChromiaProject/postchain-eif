@@ -4,11 +4,12 @@
 
 EVM Event Receiver blockchain configuration has the following configuration properties under `eif`:  
 
-| Name                                         | Description                                                                      | Type | Required           | Default |
-|----------------------------------------------|----------------------------------------------------------------------------------|------|--------------------|---------|
-| `max_event_delay`                            | Trigger block building after this time has passed if there are any queued events | int  |                    | 1000 ms |
-| `number_of_events_to_trigger_block_building` | Trigger block building when there are at least this number of events queued      | int  |                    | 100     |
-| `chains`                                     | Map of EVM chains.                                                               | map  | :white_check_mark: |         |
+| Name                                         | Description                                                                                                                                                                                                     | Type | Required           | Default |
+|----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------|--------------------|---------|
+| `max_event_delay`                            | Trigger block building after this time has passed if there are any queued events                                                                                                                                | int  |                    | 1000 ms |
+| `number_of_events_to_trigger_block_building` | Trigger block building when there are at least this number of events queued                                                                                                                                     | int  |                    | 100     |
+| `max_events_per_block`                       | Maximum number of events that can be included in a single block. The limit may be exceeded if the first EVM block being processed already contains more events than the allowed maximum. Disabled if set to 0.  | int  |                    | 100     |
+| `chains`                                     | Map of EVM chains.                                                                                                                                                                                              | map  | :white_check_mark: |         |
 
 Each entry in `chains` has the following configuration properties:
 
@@ -21,7 +22,6 @@ Each entry in `chains` has the following configuration properties:
 | `skip_to_height`     | The block number from which the Event Receiver will start querying events. This will be the lower bound for any contract.                                                                                | int           |                    | 0       |
 | `evm_read_offset`    | The number of block confirmations required on the EVM network side to be considered final on the Chromia network side. This offset is used to avoid issues caused by potential EVM chain reorganization. | int           |                    | 100     |
 | `read_offset`        | The processing delay for blocks that have been read. Enables slower nodes to validate blocks.                                                                                                            | int           |                    | 2       |
-| `max_queue_size`     | The size of the internal queue for blocks that have been fetched but not yet processed                                                                                                                   | int           |                    | 2000    |
 
 Each entry in `contracts_to_fetch` has the following configuration properties:
 
@@ -208,7 +208,7 @@ EVM Event Receiver node configuration has the following properties.
 | `evm.maxRetryDelay`        | The maximum allowable delay between retries, limiting the exponential back-off process (milliseconds)                                   | int  | 60 000  | `POSTCHAIN_EIF_EVM_MAX_RETRY_DELAY`          |
 | `evm.delayWhenNoNewBlocks` | Sleep timeout if no blocks received (milliseconds)                                                                                      | int  | 2000    | `POSTCHAIN_EIF_EVM_DELAY_WHEN_NO_NEW_BLOCKS` |
 | `evm.maxTryErrors`         | The maximum number of errors allowed per iteration before switching to an alternate EVM node URL. Used when multiple URLs are provided. | int  | 10      | `POSTCHAIN_EIF_EVM_MAX_TRY_ERRORS`           |
-
+| `evm.maxQueueSize`         | The size of the internal queue for blocks that have been fetched but not yet processed.                                                 | int  | 10 000  | `POSTCHAIN_EIF_EVM_MAX_QUEUE_SIZE`           |
 
 #### EVM chain-specific properties:
 | Name                          | Description                                                                                                                                                                                                                                                                                                                | Type         | Default | Environment Variable                           |

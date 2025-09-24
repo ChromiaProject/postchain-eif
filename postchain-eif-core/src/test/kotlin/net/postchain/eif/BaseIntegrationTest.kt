@@ -4,6 +4,7 @@ import net.postchain.common.hexStringToByteArray
 import net.postchain.crypto.Secp256K1CryptoSystem
 import net.postchain.devtools.ManagedModeTest
 import net.postchain.eif.transaction.TransactionSubmitter
+import net.postchain.eif.web3j.GethContainer
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV2

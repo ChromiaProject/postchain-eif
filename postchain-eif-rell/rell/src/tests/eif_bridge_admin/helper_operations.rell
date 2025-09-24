@@ -1,0 +1,27 @@
+module;
+
+import eif_bridge_admin.*;
+
+operation register_test_account(pubkey) {
+    val auth_descriptor = ft4.accounts.single_sig_auth_descriptor(pubkey, set(["A", "T"]));
+    ft4.accounts.create_account_with_auth(auth_descriptor);
+}
+
+operation mint_to(account: ft4.accounts.account, amount: big_integer) {
+    ft4.assets.Unsafe.mint(account, get_asset(), amount);
+}
+
+operation register_asset() {
+    ft4.assets.Unsafe.register_asset(
+            "Chromia Test",
+            "tCHR",
+            6,
+            chain_context.blockchain_rid,
+            "https://s3.eu-central-1.amazonaws.com/www.chromiadev.net/assets/tCHR.png"
+        );
+}
+
+function get_asset(): ft4.assets.asset {
+    val asset_id = ("Chromia Test", chain_context.blockchain_rid).hash();
+    return ft4.assets.asset @ { .id == asset_id };
+}

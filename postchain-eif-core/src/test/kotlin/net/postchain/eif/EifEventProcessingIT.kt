@@ -5,7 +5,9 @@ import assertk.assertions.containsOnly
 import assertk.assertions.hasSize
 import assertk.assertions.isEqualTo
 import assertk.assertions.isTrue
+import net.postchain.base.snapshot.SimpleDigestSystem
 import net.postchain.common.BlockchainRid
+import net.postchain.common.data.KECCAK256
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.wrap
 import net.postchain.concurrent.util.get
@@ -23,14 +25,29 @@ import net.postchain.gtx.GtxBuilder
 import org.awaitility.Awaitility.await
 import org.awaitility.Duration
 import org.awaitility.kotlin.await
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.junit.jupiter.api.Test
 import java.math.BigInteger
+import java.security.MessageDigest
+import java.security.Security
 
 class EifEventProcessingIT : IntegrationTestSetup() {
 
     private val myCS = Secp256K1CryptoSystem()
+    private val ds: SimpleDigestSystem
     private val merkleHashCalculator = GtvMerkleHashCalculatorV2(myCS)
     private val sigMaker = myCS.buildSigMaker(KeyPair(KeyPairHelper.pubKey(0), KeyPairHelper.privKey(0)))
+    private val contractAddress = "45c4EBd7Ffb86891BA6f9F68452F9F0815AAcD8b".hexStringToByteArray()
+    private val from = "0000000000000000000000000000000000000001".hexStringToByteArray()
+    private val to = "0000000000000000000000000000000000000002".hexStringToByteArray()
+
+    init {
+        // We add this provider so that we can get keccak-256 message digest instances
+        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
+            Security.addProvider(BouncyCastleProvider())
+        }
+        ds = SimpleDigestSystem(MessageDigest.getInstance(KECCAK256))
+    }
 
     @Test
     fun testEifBuildBlock() {
@@ -50,7 +67,7 @@ class EifEventProcessingIT : IntegrationTestSetup() {
         // Posting the tx and the event and waiting for block 1 to be built (see `test_blockchain_config.xml`)
         enqueueTx(node, makeTestTx(1, "true", bcRid))!!
         testProcessor.processLogEventsAndUpdateOffsets(listOf(
-                EvmBlockOp(1, BigInteger.ONE, "01".hexStringToByteArray().wrap(), listOf())
+                depositErc20EventBlockOp(ds, 1L, contractAddress, from, to, 1000L, 1)
         ), BigInteger.valueOf(3L))
 
         await().atMost(Duration.ONE_MINUTE)
@@ -70,7 +87,7 @@ class EifEventProcessingIT : IntegrationTestSetup() {
 
         // Posting the new event and waiting for block 2 to be built
         testProcessor.processLogEventsAndUpdateOffsets(listOf(
-                EvmBlockOp(1, BigInteger.TWO, "02".hexStringToByteArray().wrap(), listOf())
+                depositErc20EventBlockOp(ds, 2L, contractAddress, from, to, 1000L, 2)
         ), BigInteger.valueOf(4L))
 
         await().atMost(Duration.ONE_MINUTE)

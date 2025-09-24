@@ -3,15 +3,12 @@
  *
  *  Token Chain
  *      │
- *      ▼
- *  Hub Chain
+ *      ├───────► Hub Chain
  *      │
- *      ├───────► Island 1 Chain
- *      │
- *      └───────► Island 2 Chain
+ *      └───────► Gov Chain
  */
 
-function test_register_recovery_contract() {
+function test_register_recovery_contracts_with_single_chain() {
     var height = 0;
 
     // Create accounts, asset and deposit tokens from EVM
@@ -20,9 +17,9 @@ function test_register_recovery_contract() {
     val chr_asset = register_foreign_asset(CHR, network_id1);
     val foo_asset = register_foreign_asset(FOO, network_id1);
     val bar_asset = register_foreign_asset(BAR, network_id2);
-    deposit_from_evm(alice.evm_address, 1000, asset = CHR, network_id = network_id1);
-    deposit_from_evm(alice.evm_address, 2000, asset = FOO, network_id = network_id1);
-    deposit_from_evm(alice.evm_address, 3000, asset = BAR, network_id = network_id2);
+    deposit_from_evm(alice.evm_address, 1000, block_height = 1,  asset = CHR, network_id = network_id1);
+    deposit_from_evm(alice.evm_address, 2000, block_height = 2, asset = FOO, network_id = network_id1);
+    deposit_from_evm(alice.evm_address, 3000, block_height = 3, asset = BAR, network_id = network_id2);
 
     // Register the recovery contract and verify that it is registered
     val reg_recovery_contract_tx1 = _register_recovery_contract(hub_chain_rid, network_id1, hub_chain_recovery_contract, height++);
@@ -75,7 +72,12 @@ function test_register_recovery_contract() {
     assert_not_equals(hub_slot1, hub_slot0_chr);
     assert_not_equals(hub_slot1, hub_slot0_foo);
     assert_not_equals(hub_slot1, hub_slot0_bar);
-    // Assert that state events have been emitted for both state slots
+    // slot0 for network_id1 has been unbound, but slot1 for network_id2 is still bound
+    assert_true(empty(erc20.local_erc20_state_slot_binding @* { hub_slot0_chr }));
+    assert_true(empty(erc20.local_erc20_state_slot_binding @* { hub_slot0_foo }));
+    assert_true(exists(erc20.local_erc20_state_slot_binding @* { hub_slot0_bar }));
+    // Assert that state events have been emitted for both old and new state slots
+    assert_equals(rell.test.get_events().size(), 3);
     _verify_state_event(hub_slot0_chr, hub_chain_recovery_contract, 0, [(CHR.token_address, 0L), (FOO.token_address, 0L)]);
     _verify_state_event(hub_slot1, hub_chain_recovery_contract2, 1, [(CHR.token_address, 300L)]);
     _verify_state_event(hub_slot1, hub_chain_recovery_contract2, 2, [(CHR.token_address, 300L), (FOO.token_address, 400L)]);
@@ -89,10 +91,104 @@ function test_register_recovery_contract() {
     assert_equals(hub_slot2, hub_slot0_chr);
     assert_equals(hub_slot2, hub_slot0_foo);
     assert_not_equals(hub_slot2, hub_slot0_bar);
-    // Assert that state events have been emitted for both state slots
+    // slot1 for network_id1 has been unbound, but slot0 for network_id2 is still bound
+    assert_true(empty(erc20.local_erc20_state_slot_binding @* { hub_slot1 }));
+    assert_true(empty(erc20.local_erc20_state_slot_binding @* { hub_slot1 }));
+    assert_true(exists(erc20.local_erc20_state_slot_binding @* { hub_slot0_bar }));
+    // Assert that state events have been emitted for both old and new state slots
+    assert_equals(rell.test.get_events().size(), 3);
     _verify_state_event(hub_slot1, hub_chain_recovery_contract2, 0, [(CHR.token_address, 0L), (FOO.token_address, 0L)]);
     _verify_state_event(hub_slot2, hub_chain_recovery_contract, 1, [(CHR.token_address, 300L)]);
     _verify_state_event(hub_slot2, hub_chain_recovery_contract, 2, [(CHR.token_address, 300L), (FOO.token_address, 400L)]);
+}
+
+function test_register_recovery_contracts_with_multiple_chains() {
+    var height = 0;
+
+    // Create accounts, asset and deposit tokens from EVM
+    val alice = create_and_link_account(rell.test.keypairs.alice, rell.test.keypairs.eve);
+    val bob = create_and_link_account(rell.test.keypairs.bob, rell.test.keypairs.dave);
+    val chr_asset = register_foreign_asset(CHR, network_id1);
+    val foo_asset = register_foreign_asset(FOO, network_id1);
+    val bar_asset = register_foreign_asset(BAR, network_id2);
+    deposit_from_evm(alice.evm_address, 1000, block_height = 1, asset = CHR, network_id = network_id1);
+    deposit_from_evm(alice.evm_address, 2000, block_height = 2, asset = FOO, network_id = network_id1);
+    deposit_from_evm(alice.evm_address, 3000, block_height = 3, asset = BAR, network_id = network_id2);
+
+    // Register the recovery contract for hub_chain and verify that it is registered
+    _register_recovery_contract(hub_chain_rid, network_id1, hub_chain_recovery_contract, height++);
+    _register_recovery_contract(hub_chain_rid, network_id2, hub_chain_recovery_contract, height++);
+    assert_equals(core.get_recovery_contract(hub_chain_rid, network_id1), hub_chain_recovery_contract);
+    assert_equals(core.get_recovery_contract(hub_chain_rid, network_id2), hub_chain_recovery_contract);
+
+    // Register the recovery contract for gov_chain and verify that it is registered
+    _register_recovery_contract(gov_chain_rid, network_id1, gov_chain_recovery_contract, height++);
+    _register_recovery_contract(gov_chain_rid, network_id2, gov_chain_recovery_contract, height++);
+    assert_equals(core.get_recovery_contract(gov_chain_rid, network_id1), gov_chain_recovery_contract);
+    assert_equals(core.get_recovery_contract(gov_chain_rid, network_id2), gov_chain_recovery_contract);
+
+    // Transfer tokens from token_chain to hub_chain and verify state slot and state events
+    // 300 CHR: token_chain -> hub_chain
+    _transfer(alice, bob, hub_chain_rid, chr_asset, 300L);
+    val hub_slot0_chr = _verify_state_slot(hub_chain_rid, network_id1, hub_chain_recovery_contract);
+    _verify_state_event(hub_slot0_chr, hub_chain_recovery_contract, 1, [(CHR.token_address, 300L)]);
+    // 400 FOO: token_chain -> hub_chain
+    _transfer(alice, bob, hub_chain_rid, foo_asset, 400L);
+    val hub_slot0_foo = _verify_state_slot(hub_chain_rid, network_id1, hub_chain_recovery_contract);
+    _verify_state_event(hub_slot0_foo, hub_chain_recovery_contract, 1, [(CHR.token_address, 300L), (FOO.token_address, 400L)]);
+    // 500 BAR: token_chain -> hub_chain
+    _transfer(alice, bob, hub_chain_rid, bar_asset, 500L);
+    val hub_slot0_bar = _verify_state_slot(hub_chain_rid, network_id2, hub_chain_recovery_contract);
+    _verify_state_event(hub_slot0_bar, hub_chain_recovery_contract, 1, [(BAR.token_address, 500L)]);
+ 
+    // Transfer tokens from token_chain to gov_chain and verify state slot and state events
+    // 600 CHR: token_chain -> gov_chain
+    _transfer(alice, bob, gov_chain_rid, chr_asset, 600L);
+    val gov_slot0_chr = _verify_state_slot(gov_chain_rid, network_id1, gov_chain_recovery_contract);
+    _verify_state_event(gov_slot0_chr, gov_chain_recovery_contract, 1, [(CHR.token_address, 600L)]);
+    // 700 FOO: token_chain -> gov_chain
+    _transfer(alice, bob, gov_chain_rid, foo_asset, 700L);
+    val gov_slot0_foo = _verify_state_slot(gov_chain_rid, network_id1, gov_chain_recovery_contract);
+    _verify_state_event(gov_slot0_foo, gov_chain_recovery_contract, 1, [(CHR.token_address, 600L), (FOO.token_address, 700L)]);
+    // 800 BAR: token_chain -> gov_chain
+    _transfer(alice, bob, gov_chain_rid, bar_asset, 800L);
+    val gov_slot0_bar = _verify_state_slot(gov_chain_rid, network_id2, gov_chain_recovery_contract);
+    _verify_state_event(gov_slot0_bar, gov_chain_recovery_contract, 1, [(BAR.token_address, 800L)]);
+
+    // Replace recovery contract for hub_chain and verify that state slot and state events have been updated
+    _register_recovery_contract(hub_chain_rid, network_id1, hub_chain_recovery_contract2, height++, true);
+    assert_equals(core.get_recovery_contract(hub_chain_rid, network_id1), hub_chain_recovery_contract2);
+    // Assert that the chain account state slot has changed
+    val hub_slot1 = _verify_state_slot(hub_chain_rid, network_id1, hub_chain_recovery_contract2);
+    assert_not_equals(hub_slot1, hub_slot0_chr);
+    assert_not_equals(hub_slot1, hub_slot0_foo);
+    assert_not_equals(hub_slot1, hub_slot0_bar);
+    // slot0 for network_id1 has been unbound, but slot0 for network_id2 is still bound
+    assert_true(empty(erc20.local_erc20_state_slot_binding @* { hub_slot0_chr }));
+    assert_true(empty(erc20.local_erc20_state_slot_binding @* { hub_slot0_foo }));
+    assert_true(exists(erc20.local_erc20_state_slot_binding @* { hub_slot0_bar }));
+    // Assert that state events have been emitted for both old and new state slots
+    assert_equals(rell.test.get_events().size(), 3);
+    _verify_state_event(hub_slot0_chr, hub_chain_recovery_contract, 0, [(CHR.token_address, 0L), (FOO.token_address, 0L)]);
+    _verify_state_event(hub_slot1, hub_chain_recovery_contract2, 1, [(CHR.token_address, 300L)]);
+    _verify_state_event(hub_slot1, hub_chain_recovery_contract2, 2, [(CHR.token_address, 300L), (FOO.token_address, 400L)]);
+
+    // Replace recovery contract for gov_chain and verify that state slot and state events have been updated
+    _register_recovery_contract(gov_chain_rid, network_id2, gov_chain_recovery_contract2, height++, true);
+    assert_equals(core.get_recovery_contract(gov_chain_rid, network_id2), gov_chain_recovery_contract2);
+    // Assert that the chain account state slot has changed
+    val gov_slot1 = _verify_state_slot(gov_chain_rid, network_id2, gov_chain_recovery_contract2);
+    assert_not_equals(gov_slot1, gov_slot0_chr);
+    assert_not_equals(gov_slot1, gov_slot0_foo);
+    assert_not_equals(gov_slot1, gov_slot0_bar);
+    // slot0 for network_id2 has been unbound, but slot1 for network_id1 is still bound
+    assert_true(exists(erc20.local_erc20_state_slot_binding @* { gov_slot0_chr }));
+    assert_true(exists(erc20.local_erc20_state_slot_binding @* { gov_slot0_foo }));
+    assert_true(empty(erc20.local_erc20_state_slot_binding @* { gov_slot0_bar }));
+    // Assert that state events have been emitted for both old and new state slots
+    assert_equals(rell.test.get_events().size(), 2);
+    _verify_state_event(gov_slot0_bar, gov_chain_recovery_contract, 0, [(BAR.token_address, 0L)]);
+    _verify_state_event(gov_slot1, gov_chain_recovery_contract2, 1, [(BAR.token_address, 800L)]);
 }
 
 function _transfer(from: account_data, to: account_data, to_chain_rid: byte_array, asset: ft4.assets.asset, amount: big_integer) {

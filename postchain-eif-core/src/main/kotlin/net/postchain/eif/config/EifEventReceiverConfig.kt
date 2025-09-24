@@ -10,6 +10,9 @@ data class EifEventReceiverConfig(
         @Name("number_of_events_to_trigger_block_building")
         @DefaultValue(defaultLong = 100)
         val numberOfEventsToTriggerBlockBuilding: Long,
+        @Name("max_events_per_block")
+        @DefaultValue(defaultLong = 100)
+        val maxEventsPerBlock: Long,
         @Name("chains")
         val chains: Map<String, EifEvmBlockchainConfig>,
 )

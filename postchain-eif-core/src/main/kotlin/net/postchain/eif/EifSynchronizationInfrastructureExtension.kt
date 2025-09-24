@@ -45,8 +45,9 @@ class EifSynchronizationInfrastructureExtension(
                 val eventReceiverConfig = cfg.rawConfig["eif"]?.toObject<EifEventReceiverConfig>()
                         ?: throw UserMistake("No EIF config present")
 
-                if (eventReceiverConfig.numberOfEventsToTriggerBlockBuilding < 0) throw UserMistake("numberOfEventsToTriggerBlockBuilding cannot be negative")
                 if (eventReceiverConfig.maxEventDelay < 0) throw UserMistake("maxEventDelay cannot be negative")
+                if (eventReceiverConfig.numberOfEventsToTriggerBlockBuilding < 0) throw UserMistake("numberOfEventsToTriggerBlockBuilding cannot be negative")
+                if (eventReceiverConfig.maxEventsPerBlock < 0) throw UserMistake("maxEventsPerBlock cannot be negative")
 
                 ext.config = eventReceiverConfig
                 ext.isSigner = process::isSigner
@@ -58,6 +59,7 @@ class EifSynchronizationInfrastructureExtension(
                         if (evmConfig.urls.isEmpty()) {
                             throw UserMistake("Node does not have any URLs configured for EVM network: $evmBlockchainName")
                         }
+                        if (eventReceiverConfig.maxEventsPerBlock > evmConfig.maxQueueSize) throw UserMistake("maxEventsPerBlock cannot be larger than maxQueueSize")
 
                         val hasLastEvmEventHeightQuery = (cfg.module as? CompositeGTXModule)?.let { compositeModule ->
                             ("get_last_evm_event_height" in compositeModule.getQueries())
@@ -117,12 +119,12 @@ class EifSynchronizationInfrastructureExtension(
                                          hasDynamicEvents: Boolean, hasLastEvmEventHeightQuery: Boolean): Pair<EventProcessor, EventFetcher> {
         if (evmBlockchainConfig.readOffset < 0) throw UserMistake("readOffset cannot be negative")
         if (evmBlockchainConfig.evmReadOffset < 0) throw UserMistake("evmReadOffset cannot be negative")
-        if (evmBlockchainConfig.maxQueueSize < 0) throw UserMistake("maxQueueSize cannot be negative")
+        if (evmConfig.maxQueueSize < 0) throw UserMistake("maxQueueSize cannot be negative")
 
         val eventProcessor = EvmEventProcessor(
                 evmBlockchainConfig.networkId,
                 BigInteger.valueOf(evmBlockchainConfig.readOffset),
-                evmBlockchainConfig.maxQueueSize,
+                evmConfig.maxQueueSize,
         )
         return if ("ignore".equals(evmConfig.urls.first(), ignoreCase = true)) {
             logger.warn("EIF is running in disconnected mode. No events will be fetched from or validated against ethereum.")
