@@ -47,13 +47,13 @@ definitions:
 test:
   failOnError: false
   modules:
-    # - tests.utils
-    # - tests.hbridge.hbridge
-    # - eif_event_receiver.test
-    # - transaction_submitter.test
-    # - transaction_submitter.anchoring.test
-    # - transaction_submitter.signer_update.test
-    # - eif_bridge_admin.test
+    - tests.utils
+    - tests.hbridge.hbridge
+    - tests.eif_event_receiver
+    - tests.transaction_submitter
+    - tests.transaction_submitter.anchoring
+    - tests.transaction_submitter.signer_update
+    - tests.eif_bridge_admin
     - tests.hbridge_crc2.hbridge_crc2
 
   moduleArgs:
