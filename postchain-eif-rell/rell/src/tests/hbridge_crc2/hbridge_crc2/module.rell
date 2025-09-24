@@ -19,7 +19,7 @@ namespace crc2 {
 
 // event_receiver
 import eif_event_receiver.*;
-import eif_event_receiver.test.helpers.*;
+import ^^.eif_event_receiver.helpers.*;
 import eif_event_connector.*;
 
 import eif_utils: eif.utils;

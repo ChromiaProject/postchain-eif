@@ -26,73 +26,8 @@ operation register_bridge_with_evm_collections_op(network_id: integer, bridge_co
     evm.register_bridge_with_evm_collections(network_id, bridge_contract_address, evm_collections);
 }
 
-operation unregister_bridge_op(network_id: integer, bridge_contract_address: byte_array) {
-    evm.core.unregister_bridge(network_id, bridge_contract_address);
-}
-
-operation get_or_create_bridge_op(
-    network_id: integer, bridge_contract_address: byte_array
-) {
-    evm.core.get_or_create_bridge(network_id, bridge_contract_address);
-}
-
-operation create_bridge_account_op(blockchain_rid: byte_array) {
-    evm.core.ensure_bridge_account(blockchain_rid);
-}
-
 operation mint_evm_token_op(account: ft4.accounts.account, network_id: integer, token_address: byte_array, token_ids: list<big_integer>, amounts: list<big_integer>, is_nft: boolean = false) {
     for (i in range(0, token_ids.size())) {
         crc2.mint(crc2.evm.ensure_evm_token(network_id, token_address, token_ids[i], is_nft), account, amounts[i]);
     }
 }
-
-// ICCF proof mock operation to use in cross-chain tests
-operation iccf_proof(
-    blockchain_rid: byte_array,
-    tx_hash: byte_array,
-    tx_proof: byte_array,
-    tx_data: byte_array,
-    tx_index: integer,
-    anchoring_proof: byte_array
-) {}
-
-// NOTE: Non-camel case is necessary to decode properly
-struct confirmation_proof {
-    hash: byte_array;
-    blockHeader: byte_array;
-    witness: byte_array;
-    merkleProofTree: list<gtv>;
-    txIndex: integer;
-}
-
-struct block_header {
-    blockchain_rid: byte_array;
-    previous_block_rid: byte_array;
-    merkle_root_hash: byte_array;
-    timestamp: integer;
-    height: integer;
-    dependencies: gtv; // Can be either GtvNull or GtvArray
-    extra: map<text,gtv>;
-}
-
-function mock_blockheader_bytes(blockchain_rid: byte_array, height: integer = 0) = block_header(
-    blockchain_rid = blockchain_rid,
-    previous_block_rid = x"",
-    merkle_root_hash = x"",
-    timestamp = 0,
-    height = height,
-    dependencies = null.to_gtv(),
-    extra = ["merkle_hash_version" : (2).to_gtv()] // TODO: why it only works with 2?
-).to_gtv().to_bytes();
-
-function mock_confirmation_proof_bytes(blockchain_rid: byte_array = x"", height: integer = 0, tx_index: integer = 0) = confirmation_proof(
-    hash = x"",
-    blockHeader = mock_blockheader_bytes(blockchain_rid, height),
-    witness = x"",
-    merkleProofTree = list<gtv>(),
-    txIndex = tx_index
-).to_gtv_pretty().to_bytes();
-
-
-@mount("register_recovery_contract")
-operation register_recovery_contract_op(network_id: integer, contract_address: byte_array) {}
