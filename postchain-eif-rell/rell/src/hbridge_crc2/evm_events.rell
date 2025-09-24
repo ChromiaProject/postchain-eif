@@ -66,7 +66,7 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
     val evm_collection = evm.evm_collection @? { .network_id == network_id, .contract_address == event.contract_address };
 
     if (empty(evm_collection)) {
-        log("Deposit event ignored: EVM collection not found: %s".format(event.contract_address));
+        log("Deposit event bounced: EVM collection not found: %s".format(event.contract_address));
         bounce_deposit_event(network_id, event.contract_address, event.protocol_id, event.tokens, event.sender, event.bridge_address);
         return;
     }
@@ -101,7 +101,7 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
             evm_tx_hash = event.evm_tx_hash,
         );
         bounce_deposit_event(network_id, event.contract_address, event.protocol_id, event.tokens, event.sender, event.bridge_address);
-        log("Deposit event recalled: no FT4 account found for deposit from sender %s".format(event.sender));
+        log("Deposit event bounced: no FT4 account found for deposit from sender %s".format(event.sender));
         return;
     }
 
@@ -119,7 +119,7 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
         val bridge_account = evm.core.ensure_bridge_account(evm_collection.virtual_blockchain_rid);
         for (token_amounts in event.tokens) {
             val token = crc2.evm.ensure_evm_token(network_id, event.contract_address, token_amounts.token_id, evm_collection.token_type == evm.evm_token_type.erc721);
-            if (crc2.balances._get_account_balance(bridge_account, token) < token_amounts.amount) {
+            if (crc2._get_account_balance(bridge_account, token) < token_amounts.amount) {
                 invalid_tokens.add(token_amounts);
                 log("Deposited token bounced: insufficient balance of token %s: CRC2 token %s, sender %s"
                     .format(token.id, event.contract_address, event.sender));

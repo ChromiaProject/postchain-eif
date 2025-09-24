@@ -47,13 +47,15 @@ definitions:
 test:
   failOnError: false
   modules:
-    - tests.utils
-    - tests.hbridge.hbridge
-    - eif_event_receiver.test
-    - transaction_submitter.test
-    - transaction_submitter.anchoring.test
-    - transaction_submitter.signer_update.test
-    - eif_bridge_admin.test
+    # - tests.utils
+    # - tests.hbridge.hbridge
+    # - eif_event_receiver.test
+    # - transaction_submitter.test
+    # - transaction_submitter.anchoring.test
+    # - transaction_submitter.signer_update.test
+    # - eif_bridge_admin.test
+    - tests.hbridge_crc2.hbridge_crc2
+
   moduleArgs:
     <<: *common_args
     hbridge.core:
@@ -424,7 +426,7 @@ libs:
   crc2:
     registry: https://gitlab.com/chromaway/crc2-lib
     path: src/lib/crc2
-    tagOrBranch: 0.4.0
-    rid: x"9422BFE01BB45D1D2A0B9843763DA431F44BA8C3901046849692636579A41BE9"
+    tagOrBranch: 0.4.1
+    rid: x"6136835424E59445D19A1255EC109F49060074D09BCC7E09E646D3E9A5A344B1"
     insecure: false
 

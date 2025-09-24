@@ -15,6 +15,16 @@ function emit_withdrawal_event(network_id: integer, contract_address: byte_array
         event_hash
     );
 
+    val withdrawn_tokens = list<struct<withdrawn_token>>();
+    for (token in tokens) {
+        withdrawn_tokens.add(struct<withdrawn_token>(
+            token_withdrawal = withdrawal,
+            token_id = token.token_id,
+            amount = token.amount
+        ));
+    }
+    create withdrawn_token(withdrawn_tokens);
+
     update_withdrawal_status(event_hash, withdrawal_status.created);
     op_context.emit_event("eif_event", event_gtv);
 }

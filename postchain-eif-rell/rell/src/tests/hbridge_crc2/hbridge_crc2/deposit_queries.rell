@@ -1,0 +1,19 @@
+function test_get_token_deposits() {
+    val evm_collection = register_collection(BAR);
+    val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
+    deposit_from_evm(evm_address, evm_collection.contract_address, [123L, 456L], [1L, 2L], 1155L);
+    val token_deposits = hbridge_crc2.get_token_deposits(hbridge_crc2.deposit_filter(network_id = network_id1, contract_address = evm_collection.contract_address, token_id = 123L), 10, null);
+    val deposit = hbridge_crc2.token_deposit_info.from_gtv_pretty(token_deposits.data[0]);
+    assert_equals(token_deposits.data.size(), 1);
+    assert_equals(deposit.sender_address, evm_address);
+    assert_equals(deposit.network_id, network_id1);
+    assert_equals(deposit.contract_address, evm_collection.contract_address);
+    assert_equals(deposit.from_smart_contract, false);
+    assert_equals(deposit.state, hbridge_crc2.deposit_state.completed);
+    assert_equals(deposit.evm_tx_hash, ("TX", 1).hash());
+    assert_equals(deposit.tokens[0].token_id, 123L);
+    assert_equals(deposit.tokens[0].amount, 1L);
+    assert_equals(deposit.tokens[1].token_id, 456L);
+    assert_equals(deposit.tokens[1].amount, 2L);
+    assert_equals(deposit.recipient_id, account.id);
+}
