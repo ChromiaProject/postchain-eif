@@ -112,6 +112,16 @@ query get_system_anchoring_blockchain_rid(): byte_array? {
     else null;
 }
 
+query get_directory_chain_validator_contracts(): list<directory_chain_validator_contract> =
+    directory_chain_config.from_gtv_pretty(chain_context.args.directory_chain_config).validator_contracts;
+
+query get_system_anchoring_chain_contracts(): list<system_anchoring_chain_contracts> {
+    val system_anchoring_config_args = chain_context.args.system_anchoring_chain_config;
+    return if (system_anchoring_config_args != null)
+        system_anchoring_chain_config.from_gtv_pretty(system_anchoring_config_args).anchoring_contracts
+    else [];
+}
+
 function text_without_0x(value: text) {
     if (value.starts_with("0x")) {
         return value.sub(2);
