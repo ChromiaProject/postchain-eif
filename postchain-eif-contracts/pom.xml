@@ -42,7 +42,7 @@
                         <configuration>
                             <executable>yarn</executable>
                             <arguments>
-                                <argument>exec</argument>
+                                <argument>run</argument>
                                 <argument>hardhat</argument>
                                 <argument>compile</argument>
                             </arguments>
@@ -58,7 +58,7 @@
                         <configuration>
                             <executable>yarn</executable>
                             <arguments>
-                                <argument>exec</argument>
+                                <argument>run</argument>
                                 <argument>hardhat</argument>
                                 <argument>test</argument>
                             </arguments>
