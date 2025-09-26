@@ -29,7 +29,6 @@
                             <arguments>
                                 <argument>install</argument>
                                 <argument>--frozen-lockfile</argument>
-                                <argument>--ignore-scripts</argument>
                             </arguments>
                         </configuration>
                     </execution>
