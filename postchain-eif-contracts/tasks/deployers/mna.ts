@@ -20,13 +20,13 @@ interface AliceKnownArtifacts {
 
 const mna_known_artifacts_by_network: { [key: string]: AliceKnownArtifacts } = {
     "sepolia": {
-        "multiSigOwner": "0x782Ab06A00e04BBb86a819bF527d42290C46B77C", // nonsense
-        "chromiaTokenAddress": "0x0000000000000000000000000000000000000000", // nonsense
+        "multiSigOwner": "0x65ABaD3F987ad9a21EFFE98Af08D4093eAa3599E", //MNA Testnet Multi-Sig
+        "chromiaTokenAddress": "0xA770448e5A86c7FE467F8F369d3ed2f6fac573eF", //ChromaToken Template ERC20
         "networkType": "ETH"
     },
     "bsc_testnet": {
-        "multiSigOwner": "0x782Ab06A00e04BBb86a819bF527d42290C46B77C", // nonsense
-        "chromiaTokenAddress": "0x0000000000000000000000000000000000000000", // nonsense
+        "multiSigOwner": "0x65ABaD3F987ad9a21EFFE98Af08D4093eAa3599E", //MNA Testnet Multi-Sig
+        "chromiaTokenAddress": "0x2a9164df52aae0e9d08d6a4e87bd89b263e68ef9", //Unchanged BEP20 Contract
         "networkType": "BSC"
     },
 }
@@ -51,10 +51,11 @@ const mna_known_artifacts_by_network: { [key: string]: AliceKnownArtifacts } = {
  */
 task("deploy:nativebridge:mna:eth")
     .addParam("validatorAddress", "Validator contract address")
+    .addParam("blockchainRid", "Blockchain RID of bridge chain")
     .addOptionalParam("offset", "withdraw time offset in seconds")
     .addOptionalParam("chromiaTokenAddress", "Chromia Token address")
     .addFlag("verify", "Verify contracts at Etherscan")
-    .setAction(async ({ validatorAddress, offset, chromiaTokenAddress, verify }, hre) => {
+    .setAction(async ({ validatorAddress, blockchainRid, offset, chromiaTokenAddress, verify }, hre) => {
         let multiSigOwner = mna_known_artifacts_by_network[hre.network.name].multiSigOwner;
 
         const withdrawTimeOffset = offset === undefined ? 0 : parseInt(offset);
@@ -87,6 +88,9 @@ task("deploy:nativebridge:mna:eth")
 
         console.log('bridge.setTokenMinter');
         console.log(await bridge.setTokenMinter(tokenMinterAddress));
+
+        console.log('bridge.setBlockchainRid');
+        console.log(await bridge.setBlockchainRid(blockchainRid));
 
         console.log('bridge.allowToken');
         console.log(await bridge.allowToken(tokenAddress));
