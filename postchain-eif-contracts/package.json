@@ -2,6 +2,8 @@
   "name": "postchain-eif-contracts",
   "version": "1.0.0",
   "license": "MIT",
+  "engines": { "node": "24.x" },
+  "packageManager": "yarn@1.22.22",
   "scripts": {
     "preinstall": "npx -y only-allow yarn",
 
