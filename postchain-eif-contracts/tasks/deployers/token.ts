@@ -20,8 +20,8 @@ import { ethers } from "ethers";
 task("deploy:alice", "Deploy ALICE token")
     .addFlag("verify", "Verify contracts at Etherscan")
     .setAction(async ({ verify }, hre) => {
-        const tokenFactory = await hre.ethers.getContractFactory("ALICE") as ALICE__factory;
-        const token = await tokenFactory.deploy() as ALICE;
+        const tokenFactory = await hre.ethers.getContractFactory("BEP20Token") as BEP20Token__factory;
+        const token = await tokenFactory.deploy() as BEP20Token;
         await token.waitForDeployment();
         var tokenAddress = await token.getAddress();
         console.log("ALICE token deployed to: ", tokenAddress);
@@ -33,7 +33,7 @@ task("deploy:alice", "Deploy ALICE token")
                 address: tokenAddress,
                 constructorArguments: [],
                 libraries: {},
-                contract: "contracts/token/AliceToken.sol:ALICE",
+                contract: "contracts/mna/AliceTokenBsc.sol:BEP20Token",
             });
         }
     });
