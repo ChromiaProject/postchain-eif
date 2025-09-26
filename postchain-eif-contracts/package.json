@@ -2,22 +2,23 @@
   "name": "postchain-eif-contracts",
   "version": "1.0.0",
   "license": "MIT",
+  "engines": {
+    "node": "24.x"
+  },
+  "packageManager": "yarn@4.10.1",
   "scripts": {
     "preinstall": "npx -y only-allow yarn",
-
     "clean": "cross-env TS_NODE_TRANSPILE_ONLY=true npx hardhat clean",
     "compile": "cross-env TS_NODE_TRANSPILE_ONLY=true npx hardhat compile",
     "test": "npx hardhat test",
     "typechain": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat typechain",
     "coverage": "cross-env CODE_COVERAGE=true hardhat coverage --solcoverjs ./.solcover.js --temp artifacts --testfiles \"./test/**/*.ts\"",
-    
     "deploy:directoryValidator": "npx hardhat deploy:directoryValidator",
     "deploy:anchoring": "npx hardhat deploy:anchoring",
     "deploy:validator": "npx hardhat deploy:validator",
     "inspect:managedValidator": "npx hardhat inspect:managedValidator",
     "inspect:directoryValidator": "npx hardhat inspect:directoryValidator",
     "inspect:validator": "npx hardhat inspect:validator",
-
     "deploy": "npx hardhat deploy:bridge",
     "deploy:native": "npx hardhat deploy:chromiabridge",
     "deploy:snapshots": "npx hardhat deploy:snapshots",
@@ -33,11 +34,9 @@
     "inspect:chromiabridge": "npx hardhat inspect:chromiabridge",
     "pause:bridge": "npx hardhat pause:bridge",
     "unpause:bridge": "npx hardhat unpause:bridge",
-
     "deploy:recovery": "npx hardhat deploy:recovery",
     "setBlockchainRid:recovery": "npx hardhat setBlockchainRid:recovery",
     "finalizeBlockchainRid:recovery": "npx hardhat finalizeBlockchainRid:recovery",
-
     "deploy:alice": "npx hardhat deploy:alice",
     "transaction:resubmitSignerUpdate": "npx hardhat transaction:resubmitSignerUpdate",
     "transaction:resubmitAnchoring": "npx hardhat transaction:resubmitAnchoring"
@@ -79,20 +78,15 @@
     "ansi-regex": "5.0.1",
     "color-convert": "2.0.1",
     "color-name": "1.1.4",
-
     "debug": "4.4.0",
     "strip-ansi": "6.0.1",
     "wrap-ansi": "7.0.0",
     "slice-ansi": "4.0.0",
-
     "cli-table3/ansi-regex": "3.0.1",
-
     "command-line-usage/color-convert": "1.9.3",
     "command-line-usage/color-name": "1.1.3",
-
     "ghost-testrpc/color-convert": "1.9.3",
     "ghost-testrpc/color-name": "1.1.3",
-
     "solidity-coverage/color-convert": "1.9.3",
     "solidity-coverage/color-name": "1.1.3"
   }
