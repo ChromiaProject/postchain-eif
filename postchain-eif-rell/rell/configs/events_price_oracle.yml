@@ -13,67 +13,7 @@
   name: Sync
   type: event
 
-# Price oracle - eventsUniswapV3.yaml
-- anonymous: 0
-  inputs:
-    - indexed: 1
-      internalType: address
-      name: owner
-      type: address
-    - indexed: 1
-      internalType: int24
-      name: tickLower
-      type: int24
-    - indexed: 1
-      internalType: int24
-      name: tickUpper
-      type: int24
-    - indexed: 0
-      internalType: uint128
-      name: amount
-      type: uint128
-    - indexed: 0
-      internalType: uint256
-      name: amount0
-      type: uint256
-    - indexed: 0
-      internalType: uint256
-      name: amount1
-      type: uint256
-  name: Burn
-  type: event
-- anonymous: 0
-  inputs:
-    - indexed: 0
-      internalType: address
-      name: sender
-      type: address
-    - indexed: 1
-      internalType: address
-      name: owner
-      type: address
-    - indexed: 1
-      internalType: int24
-      name: tickLower
-      type: int24
-    - indexed: 1
-      internalType: int24
-      name: tickUpper
-      type: int24
-    - indexed: 0
-      internalType: uint128
-      name: amount
-      type: uint128
-    - indexed: 0
-      internalType: uint256
-      name: amount0
-      type: uint256
-    - indexed: 0
-      internalType: uint256
-      name: amount1
-      type: uint256
-  name: Mint
-  type: event
+# Price oracle - Uniswap V3 Swap
 - anonymous: 0
   inputs:
     - indexed: 1
@@ -104,5 +44,13 @@
       internalType: int24
       name: tick
       type: int24
+    - indexed: 0
+      internalType: uint128
+      name: protocolFeesToken0
+      type: uint128
+    - indexed: 0
+      internalType: uint128
+      name: protocolFeesToken1
+      type: uint128
   name: Swap
   type: event
