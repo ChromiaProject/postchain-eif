@@ -77,6 +77,7 @@ query get_erc20_deposits(filter: deposit_filter, from: timestamp? = null, to: ti
     ) @* {
         filter.network_id == null or .network_id == filter.network_id,
         filter.token_address == null or .token.token_address == filter.token_address,
+        filter.sender_address == null or .sender_address == filter.sender_address,
         filter.recipient_id == null or .recipient_id == filter.recipient_id,
         filter.state == null or .state == filter.state,
         filter.evm_tx_hash == null or .evm_tx_hash == filter.evm_tx_hash,
