@@ -73,6 +73,8 @@ struct deposit_filter {
     state: deposit_state? = null;
     /** EVM transaction hash */
     evm_tx_hash: byte_array? = null;
+    /** EVM sender address. If null, all sender_address values are considered. */
+    sender_address: byte_array? = null;
 }
 
 function map_deposit(deposit: erc20_deposit, cdt: erc20_completed_deposit_transaction?) = erc20_deposit_info(

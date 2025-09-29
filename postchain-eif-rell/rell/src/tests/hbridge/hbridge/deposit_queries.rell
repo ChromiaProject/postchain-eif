@@ -215,6 +215,10 @@ function test_get_erc20_deposits() {
     assert_equals(dep6 @ {} (@set .asset_id), set([chr_asset.id, foo_asset.id, bar_asset.id]));
     assert_equals(dep6 @ {} (@set .state), set([deposit_state.completed]));
 
+    // Verify sender_address filter
+    assert_equals(parse_paged_deposits(get_erc20_deposits(deposit_filter(sender_address = bob_evm_address), null, null, null, null))
+        @ {} (@set .sender_address), set([bob_evm_address]));
+
     // Getting all network_id1's deposits
     val res7 = get_erc20_deposits(deposit_filter(network_id = network_id1), null, null, null, null);
     val dep7 = parse_paged_deposits(res7);
