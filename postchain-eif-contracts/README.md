@@ -58,3 +58,19 @@ $ yarn coverage
 - Gas reporter [hardhat-gas-reporter](https://hardhat.org/plugins/hardhat-gas-reporter.html)
 - Etherscan [hardhat-etherscan](https://hardhat.org/plugins/nomiclabs-hardhat-etherscan.html)
 
+### Etherscan V2
+
+To migrate to Etherscan V2, update the hardhat, and add the hardhat-verify plugin:
+
+```shell
+yarn add -D hardhat@^2 @nomicfoundation/hardhat-verify@^2.0.14
+```
+
+Then, in `hardhat.config.js`, use the single API key for all networks:
+
+```json
+etherscan: {
+  apiKey: process.env.ETHERSCAN_API_KEY
+}
+```
+

@@ -2,6 +2,7 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 import "@nomicfoundation/hardhat-toolbox";
+import "@nomicfoundation/hardhat-verify";
 import "@openzeppelin/hardhat-upgrades";
 import "hardhat-abi-exporter";
 import "hardhat-gas-reporter";
@@ -89,17 +90,18 @@ const config: HardhatUserConfig = {
         */
     },
     etherscan: {
-        apiKey: {
+        apiKey: process.env.ETHERSCAN_API_KEY
+        // apiKey: {
             // Ethereum
-            mainnet: process.env.ETHERSCAN_API_KEY,
-            sepolia: process.env.ETHERSCAN_API_KEY,
+            // mainnet: process.env.ETHERSCAN_API_KEY,
+            // sepolia: process.env.ETHERSCAN_API_KEY,
             // BSC
-            bsc: process.env.BSCSCAN_API_KEY,
-            bscTestnet: process.env.BSCSCAN_API_KEY,
+            // bsc: process.env.BSCSCAN_API_KEY,
+            // bscTestnet: process.env.BSCSCAN_API_KEY,
             // BASE
-            base: process.env.BASESCAN_API_KEY,
-            baseSepolia: process.env.BASESCAN_API_KEY,
-        }
+            // base: process.env.BASESCAN_API_KEY,
+            // baseSepolia: process.env.BASESCAN_API_KEY,
+        // }
     },
     paths: {
         artifacts: "./src/artifacts",
