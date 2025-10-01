@@ -8,14 +8,17 @@ import org.awaitility.Duration
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Timeout
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.DynamicArray
 import org.web3j.tx.Contract
 import java.math.BigInteger
+import java.util.concurrent.TimeUnit
 
 @Testcontainers(disabledWithoutDocker = true)
+@Timeout(value = 5, unit = TimeUnit.MINUTES)
 class TransactionSubmitterSubmitRetryIT : EifBaseIntegrationTest(
         prependUrls = listOf("http://127.0.0.1:1", "http://127.0.0.1:2")
 ) {

@@ -6,8 +6,11 @@ import org.awaitility.Awaitility
 import org.awaitility.Duration
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Timeout
 import org.testcontainers.junit.jupiter.Testcontainers
+import java.util.concurrent.TimeUnit
 
+@Timeout(value = 5, unit = TimeUnit.MINUTES)
 @Testcontainers(disabledWithoutDocker = true)
 class TransactionSubmitterRPCIssuesIT : ManagedModeTest() {
 

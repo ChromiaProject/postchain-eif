@@ -56,6 +56,7 @@ class EvmSignerUpdateIT : EifBaseIntegrationTest() {
         val directoryChainConfig = readBlockchainConfig("/net/postchain/eif/transaction/signerupdate/blockchain_config_directory_mock.xml")
         addDappBlockchainConfiguration(0, GtvEncoder.encodeGtv(directoryChainConfig), 2)
         buildBlock(0, 1)
+        awaitChainRestarted(0, 1)
 
         directoryChainBrid = ChainUtil.ridOf(0)
 

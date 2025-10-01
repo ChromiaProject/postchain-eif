@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Timeout
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.eq
@@ -30,7 +31,9 @@ import org.web3j.protocol.Web3j
 import org.web3j.tx.Contract.deployRemoteCall
 import java.math.BigInteger
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 
+@Timeout(value = 5, unit = TimeUnit.MINUTES)
 @Testcontainers(disabledWithoutDocker = true)
 class EthereumEventProcessorIT : EifBaseIntegrationTest(
         prependUrls = listOf("http://127.0.0.1:8888", "http://127.0.0.1:9999")
