@@ -347,7 +347,7 @@ function register_evm_account(keypair: rell.test.keypair, link: boolean = true):
 
     if (link) {
         link_eoa_account(
-            rell.test.keypairs.alice,
+            keypair,
             account_id,
             auth_descriptor.hash()
         );

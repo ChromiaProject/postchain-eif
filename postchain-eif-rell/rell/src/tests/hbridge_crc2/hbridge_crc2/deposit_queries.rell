@@ -2,7 +2,7 @@ function test_get_token_deposits() {
     val evm_collection = register_collection(BAR);
     val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
     deposit_from_evm(evm_address, evm_collection.contract_address, [123L, 456L], [1L, 2L], 1155L);
-    val token_deposits = hbridge_crc2.get_token_deposits(hbridge_crc2.deposit_filter(network_id = network_id1, contract_address = evm_collection.contract_address, token_id = 123L), 10, null);
+    val token_deposits = hbridge_crc2.get_token_deposits(hbridge_crc2.deposit_filter(network_id = network_id1, contract_address = evm_collection.contract_address), 10, null);
     val deposit = hbridge_crc2.token_deposit_info.from_gtv_pretty(token_deposits.data[0]);
     assert_equals(token_deposits.data.size(), 1);
     assert_equals(deposit.sender_address, evm_address);
@@ -16,4 +16,27 @@ function test_get_token_deposits() {
     assert_equals(deposit.tokens[1].token_id, 456L);
     assert_equals(deposit.tokens[1].amount, 2L);
     assert_equals(deposit.recipient_id, account.id);
+}
+
+function test_get_token_deposits_with_filter() {
+    val erc721_evm_collection = register_collection(FOO);
+    val erc1155_evm_collection = register_collection(BAR);
+    val (alice_account, alice_evm_address) = register_evm_account(rell.test.keypairs.alice);
+    val (bob_account, bob_evm_address) = register_evm_account(rell.test.keypairs.bob);
+
+    deposit_from_evm(alice_evm_address, erc721_evm_collection.contract_address, [7211L], [1L], 721L);
+    deposit_from_evm(alice_evm_address, erc1155_evm_collection.contract_address, [11551L, 11552L], [1L, 2L], 1155L);
+    deposit_from_evm(bob_evm_address, erc721_evm_collection.contract_address, [7212L, 7213L], [1L, 1L], 721L);
+    deposit_from_evm(bob_evm_address, erc1155_evm_collection.contract_address, [11551L, 11552L, 11553L], [1L, 2L, 3L], 1155L);
+    deposit_from_evm(bob_evm_address, erc1155_evm_collection.contract_address, [11551L], [1L], 1155L);
+
+    val alice_token_deposits = hbridge_crc2.get_token_deposits(hbridge_crc2.deposit_filter(sender_address = alice_evm_address), 10, null);
+    val bob_token_deposits = hbridge_crc2.get_token_deposits(hbridge_crc2.deposit_filter(sender_address = bob_evm_address), 10, null);
+
+    assert_equals(alice_token_deposits.data.size(), 2);
+    assert_equals(bob_token_deposits.data.size(), 3);
+
+    val deposits_11551 = hbridge_crc2.get_token_deposits(hbridge_crc2.deposit_filter(contract_address = erc1155_evm_collection.contract_address, token_id = 11551L), 10, null);
+    assert_equals(deposits_11551.data.size(), 3);
+
 }

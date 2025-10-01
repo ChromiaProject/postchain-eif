@@ -55,18 +55,19 @@ query get_token_withdrawal_by_id(withdrawal_id: rowid): token_withdrawal_info? =
 query get_token_deposits(filter: deposit_filter, page_size: integer?, page_cursor: text?): ft4.utils.paged_result {
     val before_rowid = ft4.utils.before_rowid(page_cursor);
 
-    val paginated_result = (d: token_deposit, t: deposited_token) @* {
-        filter.network_id == null or d.network_id == filter.network_id,
-        filter.contract_address == null or d.contract_address == filter.contract_address,
-        filter.token_id == null or (t.token_id == filter.token_id and t.token_deposit == d),
-        filter.recipient_id == null or d.recipient_id == filter.recipient_id,
-        filter.state == null or d.state == filter.state,
-        filter.evm_tx_hash == null or d.evm_tx_hash == filter.evm_tx_hash,
-        d.rowid > (before_rowid ?: rowid(0))
+    val paginated_result = (d: token_deposit) @* {
+        filter.network_id == null or .network_id == filter.network_id,
+        filter.contract_address == null or .contract_address == filter.contract_address,
+        filter.sender_address == null or .sender_address == filter.sender_address,
+        filter.token_id == null or exists(deposited_token @* { .token_deposit == d, .token_id == filter.token_id }),
+        filter.recipient_id == null or .recipient_id == filter.recipient_id,
+        filter.state == null or .state == filter.state,
+        filter.evm_tx_hash == null or .evm_tx_hash == filter.evm_tx_hash,
+        .rowid > (before_rowid ?: rowid(0))
     } (
         ft4.utils.pagination_result(
             data = map_deposit(d).to_gtv_pretty(),
-            rowid = d.rowid
+            rowid = .rowid
         )
     ) limit ft4.utils.fetch_data_size(page_size);
 
