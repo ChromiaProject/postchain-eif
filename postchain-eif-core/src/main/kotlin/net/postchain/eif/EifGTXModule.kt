@@ -185,7 +185,7 @@ fun accountStateMerkleProofQuery(config: Config, ctx: EContext, args: Gtv): Gtv 
 
     val cs = Secp256K1CryptoSystem()
     val db = DatabaseAccess.of(ctx)
-    val accountState = db.getAccountState(ctx, PREFIX, blockHeight, accountNumber) ?: return GtvNull
+    val accountState = db.getState(ctx, PREFIX, blockHeight, accountNumber) ?: return GtvNull
     val blockRid = db.getBlockRID(ctx, blockHeight)
             ?: throw UserMistake("No block at height $blockHeight")
     val signatures = validateSignatures(blockRid, argsDict["signers"]?.asArray(), argsDict["signatures"]?.asArray(), cs)

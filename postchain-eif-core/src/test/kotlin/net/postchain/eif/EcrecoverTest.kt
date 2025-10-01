@@ -38,7 +38,7 @@ class EcrecoverTest {
 
         val sha256 = MessageDigest.getInstance("SHA-256")
         val digest = sha256.digest("Test".toByteArray())
-        val signer = Secp256k1SigMaker(pubKey, privKey, ::digest)
+        val signer = Secp256k1SigMaker("", pubKey, privKey, ::digest)
         val signature = signer.signDigest(digest)
 
         val signatureWithV = encodeSignatureWithV(digest, signature)
