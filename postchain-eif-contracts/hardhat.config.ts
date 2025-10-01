@@ -103,6 +103,9 @@ const config: HardhatUserConfig = {
             // baseSepolia: process.env.BASESCAN_API_KEY,
         // }
     },
+    sourcify: {
+        enabled: true
+    },
     paths: {
         artifacts: "./src/artifacts",
         cache: "./cache",
