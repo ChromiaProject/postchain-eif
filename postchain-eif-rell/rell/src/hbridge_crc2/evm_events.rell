@@ -8,12 +8,31 @@ struct deposited_tokens_event {
     evm_tx_hash: byte_array;
 }
 
-function create_deposited_tokens_event(event: messaging.event_data) { 
-    val token_ids = list<big_integer>.from_gtv(event.non_indexed_values[0]);
+function create_deposited_tokens_event(event: messaging.event_data): deposited_tokens_event? { 
+    var token_ids = list<big_integer>.from_gtv(event.non_indexed_values[0]);
     val amounts = list<big_integer>.from_gtv(event.non_indexed_values[1]);
     val protocol_id = big_integer.from_gtv(event.non_indexed_values[3]);
 
     val tokens = list<token_amount>();
+
+    if (token_ids.size() == 0) {
+        log("Deposit event ignored: Missing token IDs");
+        return null;
+    }
+
+    if (protocol_id != 721 and protocol_id != 1155) {
+        log("Deposit event ignored: Invalid protocol ID: %s".format(protocol_id));
+        return null;
+    }
+
+    if (protocol_id == 1155 and  amounts.size() == 0 ) {
+        log("Deposit event ignored: Missing ERC1155 token amounts");
+        return null;
+    }
+
+    if (protocol_id == 1155 and  amounts.size() < token_ids.size() ) {
+        token_ids = token_ids.sub(0, amounts.size());
+    }
 
     for (i in range(token_ids.size())) {
         tokens.add(token_amount(token_id = token_ids[i], amount =  if (protocol_id == 721) 1 else amounts[i]));
@@ -55,7 +74,10 @@ function (evm_block: messaging.evm_block_message) {
     }
 }
 
-function process_deposit_token_event(network_id: integer, event: deposited_tokens_event) {
+function process_deposit_token_event(network_id: integer, event: deposited_tokens_event?) {
+    if (empty(event)) {
+        return;
+    }
      // normally only smart contracts have non-zero beneficiary
     // given that it's just a flag which enable more complex account registration logic
     // it's OK if it's not 100% reliable -- it only needs to be true in a specific case
