@@ -20,13 +20,16 @@ import org.jooq.impl.DSL
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Timeout
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.DynamicArray
 import org.web3j.tx.Contract
 import java.math.BigInteger
+import java.util.concurrent.TimeUnit
 
+@Timeout(value = 5, unit = TimeUnit.MINUTES)
 @Testcontainers(disabledWithoutDocker = true)
 class TransactionSubmitterIT : EifBaseIntegrationTest() {
 
