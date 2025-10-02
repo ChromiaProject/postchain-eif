@@ -1,0 +1,367 @@
+@test module;
+
+import lib.icmf.test.{ test_icmf_message };
+import lib.ft4.auth;
+import lib.ft4.admin;
+import lib.ft4.accounts;
+import ft4_utils: lib.ft4.utils;
+import lib.ft4.accounts.strategies;
+import create_on_transfer: lib.ft4.accounts.strategies.transfer;
+import lib.ft4.accounts.strategies.transfer.open;
+import lib.ft4.crosschain;
+import admin_crosschain: lib.ft4.external.admin.crosschain;
+import ft4_test: lib.ft4.test.core;
+
+namespace crc2 {
+    import lib.crc2.*;
+    import lib.crc2.evm;
+}
+
+// event_receiver
+import eif_event_receiver.*;
+import ^^.eif_event_receiver.helpers.*;
+import eif_event_connector.*;
+
+import eif_utils: eif.utils;
+import eif.common;
+import eif.messaging;
+import hbridge_crc2;
+
+import ^.helpers;
+
+val admin_privkey = x"3132333435363738393031323334353637383930313233343536373839303131";
+
+namespace evm_events {
+    val link_account_id_name = "LinkAccountId";
+    val deposited_tokens_name = "DepositedTokens";
+    val pending_withdraw_event = "PendingWithdraw";
+    val unpending_withdraw_event = "UnpendingWithdraw";
+    val withdraw_request_event = "WithdrawRequestHash";
+    val withdrawal_hash_event = "WithdrawalHash";
+    val withdrawal_to_postchain_event = "WithdrawalToPostchain";
+}
+
+val contract_address = x"b7eB5d60Dd5610A82A4844Beb3F7d750316d3D32";
+val network_id1 = 1;
+val network_id2 = 2;
+val bridge_address1 = x"b7eB5d60Dd5610A82A4844Beb3F7d75030000001";
+val bridge_address2 = x"b7eB5d60Dd5610A82A4844Beb3F7d75030000002";
+val bridge_address3 = x"b7eB5d60Dd5610A82A4844Beb3F7d75030000003";
+
+struct asset_info {
+    token_address: byte_array;
+    token_name: text;
+    token_symbol: text;
+    token_type: hbridge_crc2.evm.evm_token_type;
+}
+
+val FOO = asset_info(
+    token_address = x"39615b16b74589919c9ce1ea73f1fc5d53141a79",
+    token_name = "FOO Token",
+    token_symbol = "FOO",
+    token_type = hbridge_crc2.evm.evm_token_type.erc721,
+);
+
+val BAR = asset_info(
+    token_address = x"39615b16b74589919c9ce1ea73f1fc5d53141a70",
+    token_name = "BAR Token",
+    token_symbol = "BAR",
+    token_type = hbridge_crc2.evm.evm_token_type.erc1155,
+);
+
+
+function register_evm_collection(
+    contract_address: byte_array,
+    token_type: hbridge_crc2.evm.evm_token_type,
+    network_id: integer,
+    bridge_mode: hbridge_crc2.evm.bridge_mode,
+    enable_snapshots: boolean = false,
+): hbridge_crc2.evm.evm_collection {
+    rell.test.tx().op(
+        helpers.register_evm_collection_op(network_id, contract_address, token_type)
+    ).run();
+
+    return hbridge_crc2.evm.evm_collection @ { network_id, .contract_address == contract_address };
+}
+
+function register_bridge_and_evm_collection(
+    contract_address: byte_array,
+    token_type: hbridge_crc2.evm.evm_token_type,
+    network_id: integer,
+    bridge_mode: hbridge_crc2.evm.bridge_mode,
+    enable_snapshots: boolean = false,
+    bridge_contract_address: byte_array,
+): hbridge_crc2.evm.evm_collection {
+    rell.test.tx().op(
+        helpers.register_bridge_and_evm_collection_op(network_id, contract_address, token_type, bridge_mode, bridge_contract_address)
+    ).run();
+
+    return hbridge_crc2.evm.evm_collection @ { network_id, .contract_address == contract_address };
+}
+
+function register_bridge_with_evm_collections(network_id: integer, bridge_address: byte_array, evm_collections: list<hbridge_crc2.evm.evm_collection>) {
+    rell.test.tx().op(
+        helpers.register_bridge_with_evm_collections_op(
+            network_id = network_id,
+            bridge_contract_address = bridge_address,
+            evm_collections = evm_collections
+        )
+    ).run();
+}
+
+function link_eoa_account(
+        evm_keypair: rell.test.keypair,
+        account_id: byte_array,
+        auth_descriptor_id: byte_array
+) {
+    val evm_address = crypto.eth_pubkey_to_address(evm_keypair.pub);
+    val op = hbridge_crc2.evm.core.link_evm_eoa_account(evm_address);
+    val message = ft4_test.create_evm_auth_message(op)
+        .replace(auth.ACCOUNT_ID_PLACEHOLDER, account_id.to_hex().upper_case())
+        .replace(auth.AUTH_DESCRIPTOR_ID_PLACEHOLDER, auth_descriptor_id.to_hex().upper_case());
+    val signature = ft4_test.evm_sign(message, evm_keypair.priv);
+    rell.test.tx()
+        .op(auth.evm_signatures([evm_address], [signature]))
+        .op(ft4_test.evm_auth_operation_for(evm_keypair.priv, op))
+        .op(op)
+        .nop().run();
+    assert_not_null(hbridge_crc2.evm.core.evm_eoa_account_link @? { .address == evm_address });
+
+    assert_equals(hbridge_crc2.evm.core.get_account_for_eoa_address(evm_address), account_id);
+    assert_equals(hbridge_crc2.evm.core.get_eoa_addresses_for_account(account_id), [evm_address]);
+}
+
+function link_sc_account_id_event(
+    evm_address: byte_array,
+    account_id: byte_array,
+    block_height: integer = 1,
+    network_id: integer = network_id1
+) {
+    val events = [
+        event_data(
+            tnx_hash = ("TX", block_height).hash(),
+            log_index = 1,
+            signature = ("SIG", block_height).hash(),
+            contract_address = contract_address,
+            name = evm_events.link_account_id_name,
+            indexed_values = [evm_address.to_gtv()],
+            non_indexed_values = [account_id.to_gtv(), true.to_gtv()]
+        )
+    ];
+    val block_hash = ("BLOCK", block_height).hash();
+    rell.test.tx().nop().op(
+        evm_block_op(network_id, block_height, block_hash, events)
+    ).run();
+}
+
+function link_sc_account(
+        evm_keypair: rell.test.keypair,
+        ft_keypair: rell.test.keypair,
+        account_id: byte_array,
+        auth_descriptor_id: byte_array,
+        network_id: integer = network_id1
+) {
+    val evm_address = crypto.eth_pubkey_to_address(evm_keypair.pub);
+    val op = hbridge_crc2.evm.core.link_evm_sc_account(evm_address, network_id);
+    val message = ft4_test.create_evm_auth_message(op)
+        .replace(auth.ACCOUNT_ID_PLACEHOLDER, account_id.to_hex().upper_case())
+        .replace(auth.AUTH_DESCRIPTOR_ID_PLACEHOLDER, auth_descriptor_id.to_hex().upper_case());
+    val signature = ft4_test.evm_sign(message, evm_keypair.priv);
+    rell.test.tx()
+        .op(auth.external.ft_auth(account_id, auth_descriptor_id))
+        .op(op)
+        .nop()
+        .sign(ft_keypair).run();
+    assert_not_null(hbridge_crc2.evm.core.evm_sc_account_link @? { .address == evm_address });
+
+    assert_equals(hbridge_crc2.evm.core.get_account_for_sc_address(evm_address, network_id), account_id);
+    assert_equals(hbridge_crc2.evm.core.get_sc_addresses_for_account(account_id), [(address = evm_address, network_id = network_id)]);
+}
+
+function deposit_from_evm(
+    sender_address: byte_array,
+    token_address: byte_array,
+    token_ids: list<big_integer>,
+    amounts: list<big_integer>,
+    protocol_id: big_integer,
+    block_height: integer = 1,
+    account_id: byte_array = hbridge_crc2.zero_beneficiary,
+    network_id: integer = network_id1,
+    contract_address: byte_array = contract_address
+) {
+    val events = [
+        event_data(
+            tnx_hash = ("TX", block_height).hash(),
+            log_index = 1,
+            signature = ("SIG", block_height).hash(),
+            contract_address = contract_address,
+            name = evm_events.deposited_tokens_name,
+            indexed_values = [sender_address.to_gtv(), token_address.to_gtv()],
+            non_indexed_values = [token_ids.to_gtv(), amounts.to_gtv(), account_id.to_gtv(), protocol_id.to_gtv()]
+        )
+    ];
+    val block_hash = ("BLOCK", block_height).hash();
+    rell.test.tx().nop().op(
+        evm_block_op(network_id, block_height, block_hash, events)
+    ).run();
+}
+
+function trigger_withdrawal_status_on_evm(
+    withdrawal_event_hash: byte_array,
+    event_name: text,
+    block_height: integer = 1,
+    network_id: integer = network_id1,
+) {
+    val events = [
+        event_data(
+            tnx_hash = ("TX", block_height).hash(),
+            log_index = 1,
+            signature = ("SIG", block_height).hash(),
+            contract_address = contract_address,
+            name = event_name,
+            indexed_values = [withdrawal_event_hash.to_gtv()],
+            non_indexed_values = []
+        )
+    ];
+    val block_hash = ("BLOCK", block_height).hash();
+    rell.test.tx().nop().op(
+        evm_block_op(network_id, block_height, block_hash, events)
+    ).run();
+}
+
+function run_block_after_timeout() {
+    rell.test.set_next_block_time(rell.test.last_block_time + (ft4_utils.MILLISECONDS_PER_DAY * 10) + 1);
+    rell.test.block().run();
+}
+
+function assert_withdraw(
+    serial: integer,
+    evm_address: byte_array,
+    contract_address: byte_array,
+    tokens: list<hbridge_crc2.token_amount>,
+    protocol_id: integer,
+    expected_nr_withdrawals: integer = 1,
+    network_id: integer = network_id1,
+    bridge_address: byte_array = x"",
+) {
+    val timestamp = rell.test.last_block_time_or_null ?: 0;
+    val events = rell.test.get_events();
+
+    val event_data = if (events.size() > 1)
+        events @* { $[0] == "eif_event" } [0]
+    else
+        events[0];
+
+    val withdraw_info = hbridge_crc2.pack_withdrawal_event(serial, network_id, contract_address, protocol_id, tokens, evm_address, bridge_address);
+
+    assert_equals(event_data, ("eif_event", withdraw_info[0]));
+
+    val wdrs_gtv =hbridge_crc2.get_token_withdrawals(hbridge_crc2.withdrawal_filter(network_id = network_id, contract_address = contract_address, beneficiary = evm_address), 10, null);
+    print("wdrs_gtv: ", wdrs_gtv);
+    val wdrs = list<hbridge_crc2.token_withdrawal_info>();
+    for (wdr_gtv in wdrs_gtv.data) {
+        wdrs.add(hbridge_crc2.token_withdrawal_info.from_gtv_pretty(wdr_gtv));
+    }
+    assert_equals(wdrs.size(), expected_nr_withdrawals);
+    val wdr = wdrs @ {} (@omit @sort_desc .serial, $) limit 1;
+    assert_equals(
+        (wdr.serial, wdr.network_id, wdr.contract_address, wdr.beneficiary, wdr.tokens, timestamp),
+        (serial, network_id, contract_address, evm_address, wdr.tokens, timestamp)
+    );
+}
+
+function create_ft4_account(pubkey: byte_array) {
+    val auth_descriptor = ft4_test.create_auth_descriptor(pubkey, ["A", "T"]);
+
+    rell.test.tx().op(
+        admin.external.register_account(auth_descriptor)
+    ).sign(admin_privkey).run();
+
+    val account_id = pubkey.hash();
+    val ft_account = accounts.Account(account_id);
+
+    return (
+        ft_account, auth_descriptor
+    );
+}
+
+function mint_evm_token(account: accounts.account, network_id: integer, token_address: byte_array, token_ids: list<big_integer>, amounts: list<big_integer>, is_nft: boolean = false) {
+    rell.test.tx().op(
+        helpers.mint_evm_token_op(account, network_id, token_address, token_ids, amounts, is_nft)
+    ).sign(admin_privkey).run();
+}
+
+struct account_data {
+    accounts.account;
+    auth_descriptor_id: byte_array;
+    rell.test.keypair;
+    evm_address: byte_array;
+    ft_auth: () -> rell.test.op;
+}
+
+function create_and_link_account(ft_keypair: rell.test.keypair, evm_keypair: rell.test.keypair): account_data {
+    // Auth descriptor
+    val account_id = ft_keypair.pub.hash();
+    val auth_descriptor = ft4_test.create_auth_descriptor(ft_keypair.pub, ["A", "T"]);
+    val auth_descriptor_id = auth_descriptor.hash();
+
+    // Register account
+    rell.test.tx().op(
+        admin.external.register_account(auth_descriptor)
+    ).sign(admin_privkey).run();
+    val ft_account = accounts.Account(account_id);
+
+    // Link account
+    link_eoa_account(
+        evm_keypair,
+        account_id,
+        auth_descriptor_id
+    );
+
+    return account_data(
+        account = accounts.account @ { .id == account_id },
+        auth_descriptor_id = auth_descriptor_id,
+        keypair = ft_keypair,
+        evm_address = crypto.eth_pubkey_to_address(evm_keypair.pub),
+        ft_auth = auth.external.ft_auth(account_id, auth_descriptor_id, *),
+    );
+}
+
+function get_account_id_and_auth_descriptor_id(ft_keypair: rell.test.keypair): (byte_array, byte_array) {
+    val account_id = ft_keypair.pub.hash();
+    val auth_descriptor = ft4_test.create_auth_descriptor(ft_keypair.pub, ["A", "T"]);
+    val auth_descriptor_id = auth_descriptor.hash();
+    return (account_id, auth_descriptor_id);
+}
+
+
+function register_evm_account(keypair: rell.test.keypair, link: boolean = true): (accounts.account, byte_array) {
+    val evm_address = crypto.eth_pubkey_to_address(keypair.pub);
+    val auth_descriptor = ft4_test.create_auth_descriptor(evm_address, ["A", "T"]);
+    val account_id = evm_address.hash();
+
+      // Register account
+    rell.test.tx().op(
+        admin.external.register_account(auth_descriptor)
+    ).sign(admin_privkey).run();
+
+    if (link) {
+        link_eoa_account(
+            keypair,
+            account_id,
+            auth_descriptor.hash()
+        );
+    }
+
+    return (accounts.Account(account_id), evm_address);
+}
+
+// // Helper functions for CRC2 token operations
+function register_collection(asset: asset_info = FOO): hbridge_crc2.evm.evm_collection {
+    return register_evm_collection(
+        contract_address = asset.token_address,
+        token_type = asset.token_type,
+        network_id = network_id1,
+        bridge_mode = hbridge_crc2.evm.bridge_mode.foreign
+    );
+}

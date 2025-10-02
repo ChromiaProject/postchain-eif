@@ -1,0 +1,155 @@
+function emit_withdrawal_event(network_id: integer, contract_address: byte_array, protocol_id: big_integer, tokens: list<token_amount>, beneficiary: byte_array, bridge_address: byte_array) {
+    val next_serial = common.event_counter.counter + 1;
+    common.event_counter.counter = next_serial;
+
+    val (event_gtv, event_hash) = pack_withdrawal_event(next_serial, network_id, contract_address, protocol_id, tokens, beneficiary, bridge_address);
+
+    val withdrawal = create token_withdrawal(
+        serial = next_serial,
+        network_id,
+        contract_address,
+        protocol_id,
+        beneficiary,
+        bridge_address,
+        timestamp = op_context.last_block_time,
+        event_hash
+    );
+
+    val withdrawn_tokens = list<struct<withdrawn_token>>();
+    for (token in tokens) {
+        withdrawn_tokens.add(struct<withdrawn_token>(
+            token_withdrawal = withdrawal,
+            token_id = token.token_id,
+            amount = token.amount
+        ));
+    }
+    create withdrawn_token(withdrawn_tokens);
+
+    update_withdrawal_status(event_hash, withdrawal_status.created);
+    op_context.emit_event("eif_event", event_gtv);
+}
+
+function pack_withdrawal_event(
+    serial: integer,
+    network_id: integer,
+    contract_address: byte_array,
+    protocol_id: big_integer,
+    tokens: list<token_amount>,
+    beneficiary: byte_array,
+    bridge_address: byte_array
+): (gtv, byte_array) {
+
+    val discriminator = network_contract_discriminator(network_id, bridge_address);
+    val token_ids = list<big_integer>();
+    val amounts = list<big_integer>();
+    for (token in tokens) {
+        token_ids.add(token.token_id);
+        amounts.add(token.amount);
+    }
+    
+    // Get the chunks for the event
+    val event_chunks = encode_nft_event(
+        big_integer(serial),
+        discriminator,
+        protocol_id,
+        contract_address,
+        token_ids,
+        amounts,
+        beneficiary
+    );
+    
+    // Convert chunks to GTV
+    val event_gtv_chunks = list<gtv>();
+    for (chunk in event_chunks) {
+        event_gtv_chunks.add(chunk.to_gtv());
+    }
+    
+    // Create the GTV representation
+    val event = event_gtv_chunks.to_gtv();
+    
+    // Combine all chunks to calculate the hash
+    var full_event = x"";
+    for (chunk in event_chunks) {
+        full_event += chunk;
+    }
+    
+    // Calculate hash from the full event
+    val hash = crypto.keccak256(full_event);
+
+    return (event, hash);
+}
+
+/**
+ * Creates an ABI-encoded byte array for an NFTEvent structure that can be decoded in Solidity.
+ * Returns the data in a format compatible with the TokenEvent struct in the NFTBridge contract.
+ * 
+ * @param serial_number The serial number of the event
+ * @param discriminator The discriminator value
+ * @param protocol_id The protocol ID (721 or 1155)
+ * @param contract_address The EVM contract address (20 bytes)
+ * @param token_ids Array of token IDs
+ * @param amounts Array of token amounts (used for ERC1155)
+ * @param beneficiary The beneficiary address (20 bytes)
+ * @return A list of 32-byte chunks that can be used with SimpleGtvEncoder
+ */
+function encode_nft_event(
+    serial_number: big_integer,
+    discriminator: big_integer,
+    protocol_id: big_integer, 
+    contract_address: byte_array,
+    token_ids: list<big_integer>,
+    amounts: list<big_integer>,
+    beneficiary: byte_array
+): list<byte_array> {
+    // Create a list to hold all 32-byte chunks
+    val chunks = list<byte_array>();
+    
+    // Add the pointer to the start of the data (32 bytes)
+    // This is needed for top-level complex types in Solidity ABI encoding
+    chunks.add(utils.integer_to_32_byte_array(32));
+    
+    // The structure needs to match the Solidity ABI encoding for:
+    // tuple(uint256 serialNumber, uint256 discriminator, uint256 protocolId, address contractAddress, uint256[] tokenIds, uint256[] amounts, address beneficiary)
+    
+    // 1. serialNumber (fixed 32 bytes)
+    chunks.add(utils.big_integer_to_32_byte_array(serial_number));
+    
+    // 2. discriminator (fixed 32 bytes)
+    chunks.add(utils.big_integer_to_32_byte_array(discriminator));
+    
+    // 3. protocolId (fixed 32 bytes)
+    chunks.add(utils.big_integer_to_32_byte_array(protocol_id));
+    
+    // 4. contractAddress (address padded to 32 bytes)
+    chunks.add(utils.evm_address_to_32_byte_array(contract_address));
+    
+    // 5. tokenIds offset (fixed 32 bytes) - points to where the tokenIds array starts
+    // First 4 fixed fields (32*4=128) + 3 offsets (32*3=96) = 224 bytes offset
+    chunks.add(utils.integer_to_32_byte_array(224));
+    
+    // 6. amounts offset (fixed 32 bytes) - points to where the amounts array starts
+    // tokenIds offset (224) + tokenIds length (32) + tokenIds data (token_ids.size()*32)
+    val amounts_offset = 224 + 32 + (token_ids.size() * 32);
+    chunks.add(utils.integer_to_32_byte_array(amounts_offset));
+    
+    // 7. beneficiary (address padded to 32 bytes)
+    chunks.add(utils.evm_address_to_32_byte_array(beneficiary));
+    
+    // 8. tokenIds length (fixed 32 bytes)
+    chunks.add(utils.integer_to_32_byte_array(token_ids.size()));
+    
+    // 9. tokenIds values (each 32 bytes)
+    for (token_id in token_ids) {
+        chunks.add(utils.big_integer_to_32_byte_array(token_id));
+    }
+    
+    // 10. amounts length (fixed 32 bytes)
+    chunks.add(utils.integer_to_32_byte_array(amounts.size()));
+    
+    // 11. amounts values (each 32 bytes)
+    for (amount in amounts) {
+        chunks.add(utils.big_integer_to_32_byte_array(amount));
+    }
+    
+    return chunks;
+}

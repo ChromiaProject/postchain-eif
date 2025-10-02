@@ -1,0 +1,110 @@
+function test_deposit_bounce_on_no_collection() {
+    val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
+    deposit_from_evm(evm_address, FOO.token_address, [123L], [1L], 721L);
+    assert_withdraw(1, evm_address, FOO.token_address, [hbridge_crc2.token_amount(token_id = 123L, amount = 1L)], 721, 1, network_id1, contract_address);
+}
+
+function test_deposit_bounce_on_no_account() {
+    val evm_collection = register_collection();
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.keypairs.alice.pub);
+    deposit_from_evm(evm_address, FOO.token_address, [123L], [1L], 721L);
+    assert_withdraw(1, evm_address, FOO.token_address, [hbridge_crc2.token_amount(token_id = 123L, amount = 1L)], 721, 1, network_id1, contract_address);
+}
+
+function test_deposit_erc721() {
+    val evm_collection = register_collection();
+    val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
+    deposit_from_evm(evm_address, evm_collection.contract_address, [123L], [1L], 721L);
+    val token = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, 123L);
+    assert_not_null(token);
+    assert_equals(crc2._get_account_balance(account, token), 1L);
+}
+
+function test_deposit_erc721_many() {
+    val evm_collection = register_collection();
+    val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
+    val token_ids = [100L, 200L, 300L, 400L, 500L];
+    val token_amounts = [1L, 1L, 1L, 1L, 1L];
+    deposit_from_evm(evm_address, evm_collection.contract_address, token_ids, token_amounts, 721L);
+    for (token_id in token_ids) {
+        val token = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, token_id);
+        assert_not_null(token);
+        assert_equals(crc2._get_account_balance(account, token), 1L);
+    }
+}
+
+function test_deposit_erc1155() {
+    val evm_collection = register_collection(BAR);
+    val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
+    deposit_from_evm(evm_address, evm_collection.contract_address, [123L], [5L], 1155L);
+    val token = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, 123L);
+    assert_not_null(token);
+    assert_equals(crc2._get_account_balance(account, token), 5L);
+}
+
+function test_deposit_erc1155_many() {
+    val evm_collection = register_collection(BAR);
+    val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
+    val token_ids = [100L, 200L, 300L, 400L, 500L];
+    val token_amounts = [1L, 2L, 3L, 4L, 5L];
+    deposit_from_evm(evm_address, evm_collection.contract_address, token_ids, token_amounts, 1155L);
+    for (token_id in token_ids) {
+        val token = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, token_id);
+        assert_not_null(token);
+        assert_equals(crc2._get_account_balance(account, token), token_id/100);
+    }
+}
+
+function test_deposit_erc1155_many_with_no_amounts() {
+    val evm_collection = register_collection(BAR);
+    val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
+    val token_ids = [100L, 200L, 300L, 400L, 500L];
+    val token_amounts: list<big_integer> = [];
+    deposit_from_evm(evm_address, evm_collection.contract_address, token_ids, token_amounts, 1155L);
+    for (token_id in token_ids) {
+        val token = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, token_id);
+        assert_null(token);
+    }
+}
+
+function test_deposit_erc1155_many_with_missing_amounts() {
+    val evm_collection = register_collection(BAR);
+    val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
+    val token_ids = [100L, 200L, 300L, 400L, 500L];
+    val token_amounts = [1L, 2L, 3L];
+    deposit_from_evm(evm_address, evm_collection.contract_address, token_ids, token_amounts, 1155L);
+    for (i in range(3)) {
+        val token = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, token_ids[i]);
+        assert_not_null(token);
+        assert_equals(crc2._get_account_balance(account, token), 1+i*1L);
+    }
+    for (i in range(3, 5)) {
+        val token = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, token_ids[i]);
+        assert_null(token);
+    }
+}
+
+function test_deposit_erc721_many_with_missing_amounts() {
+    val evm_collection = register_collection(FOO);
+    val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
+    val token_ids = [100L, 200L, 300L, 400L, 500L];
+    val token_amounts: list<big_integer> = [];
+    deposit_from_evm(evm_address, evm_collection.contract_address, token_ids, token_amounts, 721L);
+    for (token_id in token_ids) {
+        val token = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, token_id);
+        assert_not_null(token);
+        assert_equals(crc2._get_account_balance(account, token), 1L);
+    }
+}
+
+function test_deposit_with_invalid_protocol_id() {
+    val evm_collection = register_collection(FOO);
+    val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
+    val token_ids = [100L, 200L, 300L, 400L, 500L];
+    val token_amounts: list<big_integer> = [1L, 2L, 3L, 4L, 5L];
+    deposit_from_evm(evm_address, evm_collection.contract_address, token_ids, token_amounts, 123L);
+    for (token_id in token_ids) {
+        val token = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, token_id);
+        assert_null(token);
+    }
+}

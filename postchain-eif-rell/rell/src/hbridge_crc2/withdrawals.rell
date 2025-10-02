@@ -1,0 +1,131 @@
+
+@log entity token_withdrawal {
+    op_index: integer = op_context.op_index;
+    index transaction, op_index;
+    key serial: integer;
+    index network_id: integer, contract_address: byte_array;
+    index beneficiary: byte_array;
+    index bridge_address: byte_array;
+    index event_hash: byte_array;
+    index timestamp;
+    protocol_id: big_integer;
+}
+
+entity withdrawn_token {
+    index token_withdrawal;
+    token_id: big_integer;
+    amount: big_integer;
+    index token_withdrawal, token_id;
+}
+
+entity token_withdrawal_status {
+    index token_withdrawal;
+    mutable status: withdrawal_status;
+    index token_withdrawal, status;
+}
+
+@log entity token_withdrawal_history {
+    op_index: integer = op_context.op_index;
+    index transaction, op_index;
+
+    index token_withdrawal;
+    withdrawal_status;
+}
+
+struct token_withdrawal_history_entry {
+    withdrawal_id: integer;
+    status: withdrawal_status;
+    timestamp;
+}
+
+/**
+    +-----------------------------------+---------------------------------+
+    |             Chromia               |               EVM               |
+    +-----------------------------------+---------------------------------+
+    |                                   |  Uninitialized                  |
+    | created                           |                                 |
+    | requested                         |  Withdrawable                   |
+    | pending <-> requested             |  Pending <-> Withdrawable       |
+    | withdrawn | withdrawn_to_chromia  |  Withdrawn | PostchainWithdrawn |
+    +-----------------------------------+---------------------------------+
+ */
+enum withdrawal_status {
+    created,
+    requested,
+    pending,
+    withdrawn,
+    withdrawn_to_chromia,
+}
+
+struct token_withdrawal_info {
+    id: rowid;
+    serial: integer;
+    network_id: integer;
+    contract_address: byte_array;
+    tokens: list<token_amount>;
+    beneficiary: byte_array;
+    bridge_address: byte_array;
+    timestamp;
+    event_hash: byte_array;
+    status: withdrawal_status;
+}
+
+/**
+ * Withdrawal filter for get_token_withdrawals()
+ */
+struct withdrawal_filter {
+    /** EVM network ID. If null, all networks are considered. */
+    network_id: integer? = null;
+    /** EVM token address. If null, all token addresses are considered. */
+    contract_address: byte_array? = null;
+    /** EVM token ID. If null, all token IDs are considered. */
+    token_id: big_integer? = null;
+    /** EVM beneficiary address. If null, all beneficiaries are considered. */
+    beneficiary: byte_array? = null;
+    /** Marks the beginning of a time interval. If not null, withdrawals occurring before `from` are excluded. */
+    from: timestamp? = null;
+    /** Marks the end of a time interval. If not null, withdrawals occurring at `to` and after `to` are excluded. */
+    to: timestamp? = null;
+    /** Transaction RID in which the withdrawals were initiated */
+    tx_rid: byte_array? = null;
+    /** Withdrawal status list. If null or empty, all status are considered. */
+    statuses: list<withdrawal_status>? = null;
+}
+
+function map_withdrawal(withdrawal: token_withdrawal, status: withdrawal_status? = null) {
+    val tokens = withdrawn_token @* { withdrawal } ( token_amount(token_id = .token_id, amount = .amount) );
+    return token_withdrawal_info(
+        id = withdrawal.rowid,
+        serial = withdrawal.serial,
+        network_id = withdrawal.network_id,
+        contract_address = withdrawal.contract_address,
+        tokens = tokens,
+        beneficiary = withdrawal.beneficiary,
+        bridge_address = withdrawal.bridge_address,
+        timestamp = withdrawal.transaction.block.timestamp,
+        event_hash = withdrawal.event_hash,
+        status = token_withdrawal_status @ { withdrawal } (.status),
+    );
+}
+
+function update_withdrawal_status(withdrawal_event_hash: byte_array, status: withdrawal_status) {
+    val withdrawal = token_withdrawal @? { .event_hash == withdrawal_event_hash };
+    if (empty(withdrawal)) {
+        log("Withdrawal event with hash %s not found".format(withdrawal_event_hash));
+        return;
+    }
+
+    if (empty(token_withdrawal_status @? { withdrawal })) {
+        create token_withdrawal_status(
+            token_withdrawal = withdrawal,
+            status = status
+        );
+    } else {
+        update token_withdrawal_status @ { withdrawal } ( .status = status );
+    }
+
+    create token_withdrawal_history(
+        token_withdrawal = withdrawal,
+        withdrawal_status = status
+    );
+}

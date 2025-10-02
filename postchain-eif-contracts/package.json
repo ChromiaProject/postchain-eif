@@ -38,6 +38,8 @@
     "setBlockchainRid:recovery": "npx hardhat setBlockchainRid:recovery",
     "finalizeBlockchainRid:recovery": "npx hardhat finalizeBlockchainRid:recovery",
 
+    "deploy:nftbridge": "npx hardhat deploy:nftBridge",
+
     "deploy:alice": "npx hardhat deploy:alice",
     "transaction:resubmitSignerUpdate": "npx hardhat transaction:resubmitSignerUpdate",
     "transaction:resubmitAnchoring": "npx hardhat transaction:resubmitAnchoring"

@@ -1,0 +1,126 @@
+/**
+ * Retrieves token withdrawals based on a given filter, with pagination options.
+ *
+ * @param filter The filter applied to the withdrawal search. See [withdrawal_filter] structure.
+ * @param page_size The number of withdrawal records to return per page. Limited by the maximum page size defined in the chain configuration. If not specified, a maximum page size defined in the chain configuration is used.
+ * @param page_cursor A cursor for pagination, typically pointing to the start of the next page of results. If not specified, the first page will be returned.
+ * @return A `ft4.utils.paged_result` containing the filtered results and pagination data. This result includes data such as the list of withdrawals (see [erc20_withdrawal_info]), and the next page cursor (`next_cursor`). If `next_cursor` is null, there are no more pages to fetch.
+ */
+query get_token_withdrawals(filter: withdrawal_filter, page_size: integer?, page_cursor: text?): ft4.utils.paged_result {
+    val before_rowid = ft4.utils.before_rowid(page_cursor);
+
+    val paginated_result = (w: token_withdrawal, s: token_withdrawal_status @* { .token_withdrawal == w }) @* {
+        filter.network_id == null or w.network_id == filter.network_id,
+        filter.contract_address == null or w.contract_address == filter.contract_address,
+        filter.token_id == null or exists(withdrawn_token @* { .token_withdrawal == w, .token_id == filter.token_id }),
+        filter.beneficiary == null or w.beneficiary == filter.beneficiary,
+        filter.from == null or w.transaction.block.timestamp >= filter.from,
+        filter.to == null or w.transaction.block.timestamp < filter.to,
+        filter.tx_rid == null or w.transaction.tx_rid == filter.tx_rid,
+        empty(filter.statuses) or s.status in filter.statuses,
+        w.rowid > (before_rowid ?: rowid(0))
+    } (
+        ft4.utils.pagination_result(
+            data = map_withdrawal(w, s.status).to_gtv_pretty(),
+            rowid = w.rowid
+        )
+    ) limit ft4.utils.fetch_data_size(page_size);
+
+    return ft4.utils.make_page(paginated_result, page_size);
+}
+
+/**
+ * Retrieves ERC20 token withdrawal based on a transaction RID and operation index.
+ *
+ * @param tx_rid transaction RID in which the withdrawal was initiated
+ * @param op_index index of the operation within the transaction in which the withdrawal was initiated
+ */
+query get_token_withdrawal_by_tx(tx_rid: byte_array, op_index: integer): token_withdrawal_info? =
+        token_withdrawal @? { .transaction.tx_rid == tx_rid, op_index } ( map_withdrawal($) );
+
+query get_token_withdrawal_by_event_hash(event_hash: byte_array): token_withdrawal_info? =
+        token_withdrawal @? { .event_hash == event_hash } ( map_withdrawal($) );
+
+query get_token_withdrawal_by_id(withdrawal_id: rowid): token_withdrawal_info? =
+        token_withdrawal @? { .rowid == withdrawal_id } ( map_withdrawal($) );
+
+/**
+ * Retrieves ERC20 token deposits based on a given filter, with pagination options.
+ *
+ * @param filter The filter applied to the deposit search. See [deposit_filter] structure.
+ * @param page_size The number of deposit records to return per page. Limited by the maximum page size defined in the chain configuration. If not specified, a maximum page size defined in the chain configuration is used.
+ * @param page_cursor A cursor for pagination, typically pointing to the start of the next page of results. If not specified, the first page will be returned.
+ * @return A `ft4.utils.paged_result` containing the filtered results and pagination data. This result includes data such as the list of deposits (see [erc20_deposit_info]), and the next page cursor (`next_cursor`). If `next_cursor` is null, there are no more pages to fetch.
+ */
+query get_token_deposits(filter: deposit_filter, page_size: integer?, page_cursor: text?): ft4.utils.paged_result {
+    val before_rowid = ft4.utils.before_rowid(page_cursor);
+
+    val paginated_result = (d: token_deposit) @* {
+        filter.network_id == null or .network_id == filter.network_id,
+        filter.contract_address == null or .contract_address == filter.contract_address,
+        filter.sender_address == null or .sender_address == filter.sender_address,
+        filter.token_id == null or exists(deposited_token @* { .token_deposit == d, .token_id == filter.token_id }),
+        filter.recipient_id == null or .recipient_id == filter.recipient_id,
+        filter.state == null or .state == filter.state,
+        filter.evm_tx_hash == null or .evm_tx_hash == filter.evm_tx_hash,
+        .rowid > (before_rowid ?: rowid(0))
+    } (
+        ft4.utils.pagination_result(
+            data = map_deposit(d).to_gtv_pretty(),
+            rowid = .rowid
+        )
+    ) limit ft4.utils.fetch_data_size(page_size);
+
+    return ft4.utils.make_page(paginated_result, page_size);
+}
+
+/**
+ * Retrieves the history of an token deposit based on the specified deposit ID.
+ *
+ * @param deposit_id A `rowid` type identifier for the deposit.
+ *
+ * @return A list of `token_deposit_history_entry` objects, each representing a record in the
+ * history of the specified deposit.
+ */
+query get_token_deposit_history(deposit_id: rowid): list<token_deposit_history_entry> {
+    val deposit = require(token_deposit @? { .rowid == deposit_id }, "Deposit not found: " + deposit_id);
+
+    val history = token_deposit_history @* { deposit } (
+        @sort @omit .rowid,
+        token_deposit_history_entry(
+            deposit_id = deposit.rowid.to_integer(),
+            state = .state,
+            timestamp = .timestamp
+    ));
+
+    history.add(token_deposit_history_entry(
+        deposit_id = deposit.rowid.to_integer(),
+        state = deposit.state,
+        timestamp = deposit.last_updated
+    ));
+
+    return history;
+}
+
+/**
+ * Retrieves the history of an ERC20 withdrawal based on the specified withdrawal ID.
+ *
+ * @param withdrawal_id A `rowid` type identifier for the withdrawal.
+ *
+ * @return A list of `erc20_withdrawal_history_entry` objects, each representing a record in the
+ * history of the specified withdrawal.
+ */
+query get_token_withdrawal_history(withdrawal_id: rowid): list<token_withdrawal_history_entry> {
+    val withdrawal = require(token_withdrawal @? { .rowid == withdrawal_id }, "Withdrawal not found: " + withdrawal_id);
+
+    val history = token_withdrawal_history @* { withdrawal } (
+        @sort @omit .rowid,
+        token_withdrawal_history_entry(
+            withdrawal_id = withdrawal.rowid.to_integer(),
+            status = .withdrawal_status,
+            timestamp = .transaction.block.timestamp
+        )
+    );
+
+    return history;
+}

@@ -1,0 +1,27 @@
+// function which deducts balance from the account in a smart way:
+//  * burn when bridge is in foreign mode
+//  * transfer to pool account when bridge is in native mode
+function bridge_deduct_balance(ft4.accounts.account, evm_collection, crc2.token, amount: big_integer) {
+    when (evm_collection.bridge_mode) {
+        bridge_mode.foreign ->
+            crc2.burn(token, account, amount);
+        bridge_mode.native -> {
+            val bridge_account = core.ensure_bridge_account(evm_collection.virtual_blockchain_rid);
+            crc2._transfer(account, bridge_account, token, amount);
+        }
+    }
+}
+
+// function which increase balance of the account in a smart way:
+//  * mint when bridge is in foreign mode
+//  * transfer from pool account when bridge is in native mode
+function bridge_increase_balance(ft4.accounts.account, evm_collection, crc2.token, amount: big_integer) {
+    when (evm_collection.bridge_mode) {
+        bridge_mode.foreign ->
+            crc2.mint(token, account, amount);
+        bridge_mode.native -> {
+            val bridge_account = core.ensure_bridge_account(evm_collection.virtual_blockchain_rid);
+            crc2._transfer(bridge_account, account, token, amount);
+        }
+    }
+}
