@@ -94,7 +94,7 @@ $ yarn deploy:native --network sepolia --verify --validator-address {VALIDATOR_C
 For `NFTBridge` contract:
 
 ```sh
-$ yarn deploy:nftbridge --network sepolia --verify --validator {VALIDATOR_CONTRACT_ADDRESS} --offset 2
+$ yarn deploy:nftbridge --network sepolia --verify --validator-address {VALIDATOR_CONTRACT_ADDRESS} --offset 2
 ```
 
 Note: If you want to inspect the bridge contract, you can use the following commands:
@@ -119,6 +119,19 @@ $ yarn setBlockchainRid:bridge --network sepolia --address {BRIDGE_CONTRACT_ADDR
 Then allow a token to be bridged on the bridge contract:
 ```sh
 $ yarn allowToken:bridge --network sepolia --bridge-address {BRIDGE_CONTRACT_ADDRESS} --token-address {TOKEN_CONTRACT_ADDRESS}
+```
+
+# Configuring NFT bridge
+
+After deploying the NFT bridge chain on Chromia, retrieve the blockchain RID of that chain and run the following command (omit `--managed-validator` if you have a manually updated validator contract or already set it when deploying the managed validator contract):
+
+```sh
+$ yarn setBlockchainRid:nftbridge --network sepolia --address {BRIDGE_CONTRACT_ADDRESS} --blockchain-rid {BRIDGE_BLOCKCHAIN_RID} --managed-validator {MANAGED_VALIDATOR_CONTRACT_ADDRESS}
+```
+
+Then allow a token to be bridged on the bridge contract:
+```sh
+$ yarn allowToken:bridge --network sepolia --bridge-address {BRIDGE_CONTRACT_ADDRESS} --token-address {TOKEN_CONTRACT_ADDRESS} --protocol-id {1155/721}
 ```
 
 # Upgrading token bridge contract

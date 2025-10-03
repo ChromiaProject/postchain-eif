@@ -22,13 +22,13 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
  * @param verify - Optional flag. If set, verifies the deployed contract on Etherscan.
  */
 task("deploy:nftbridge")
-    .addParam("validator", "Validator contract address")
+    .addParam("validatorAddress", "Validator contract address")
     .addOptionalParam('offset', 'withdraw offset')
     .addFlag('verify', 'Verify contracts at Etherscan')
-    .setAction(async ({ validator, offset, verify }, hre) => {
+    .setAction(async ({ validatorAddress, offset, verify }, hre) => {
         const withdrawOffset = offset === undefined ? 0 : parseInt(offset)
         const factory = await hre.ethers.getContractFactory("NFTBridge") as NFTBridge__factory;
-        const bridge = await hre.upgrades.deployProxy(factory, [validator, withdrawOffset]) as NFTBridge;
+        const bridge = await hre.upgrades.deployProxy(factory, [validatorAddress, withdrawOffset]) as NFTBridge;
         await bridge.waitForDeployment();
         const bridgeAddress = await bridge.getAddress();
         console.log("Token bridge deployed to: ", bridgeAddress);
@@ -136,14 +136,14 @@ task("setBlockchainRid:nftbridge")
  * @param tokenAddress - The address of the token contract to be allowed.
  */
 task("allowToken:nftbridge")
-    .addParam("bridgeaddress", "Bridge contract address")
-    .addParam("tokenaddress", "NFT contract address")
-    .addParam("protocolid", "Protocol ID")
-    .setAction(async ({ bridgeaddress, tokenaddress, protocolid }, hre) => {
+    .addParam("bridgeAddress", "Bridge contract address")
+    .addParam("tokenAddress", "NFT contract address")
+    .addParam("protocolId", "Protocol ID")
+    .setAction(async ({ bridgeAddress, tokenAddress, protocolId }, hre) => {
         const factory = await hre.ethers.getContractFactory("NFTBridge") as NFTBridge__factory;
-        const bridge = factory.attach(bridgeaddress) as NFTBridge;
+        const bridge = factory.attach(bridgeAddress) as NFTBridge;
         console.log("bridge.allowContract");
-        console.log(await bridge.allowContract(tokenaddress, protocolid));
+        console.log(await bridge.allowContract(tokenAddress, protocolId));
     });
 
 /**
