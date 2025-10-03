@@ -1,16 +1,19 @@
 # Token Bridge Contract Deployment Guide
 
-There are three types of bridge contracts:
+There are four types of bridge contracts:
 
 1. Standard token bridge
 2. Token bridge with snapshots
 3. Chromia token bridge
+4. NFT bridge
 
 The standard [TokenBridge](./contracts/TokenBridge.sol) is the most basic bridge contract, and is used for depositing and withdrawing ERC20 tokens. When tokens are deposited to the TokenBridge, they are locked in the contract and minted on the Chromia side. When the user withdraws the tokens from Chromia back to EVM, the tokens are burned on the Chromia side and unlocked / transfered back to the user on the EVM side. 
 
 The [TokenBridgeWithSnapshotWithdraw](./contracts/TokenBridgeWithSnapshotWithdraw.sol) extends the TokenBridge contract by adding support for mass exits using snapshots. This allows users to withdraw their tokens even if the Chromia validators become unavailable or considered compromised, by using a snapshot of token balances that was recorded on-chain.
 
 The [ChromiaTokenBridge](./contracts/ChromiaTokenBridge.sol) is meant to be used for tokens that are native to Chromia. This contract overrides the deposit/withdraw functions to burn the ERC20 tokens on deposit and mint them on withdraw. This is done since the total available supply of tokens should be handled on the Chromia side, and to enable users to directly withdraw FT4 tokens to EVM without the need for tokens already being held in the contract.
+
+The [NFTBridge](./contracts/crc2/NFTBridge.sol) is a version of the bridge contract for depositing and withdrawing ERC721 and ERC1155 tokens. It is using the same lock/unlock logic as the basic token bridge.
 
 Each version of the bridge contract requires a validator contract to be deployed first. There are three types of validator contracts:
 
@@ -88,6 +91,12 @@ For `ChromiaTokenBridge` contract:
 $ yarn deploy:native --network sepolia --verify --validator-address {VALIDATOR_CONTRACT_ADDRESS} --offset 2
 ```
 
+For `NFTBridge` contract:
+
+```sh
+$ yarn deploy:nftbridge --network sepolia --verify --validator {VALIDATOR_CONTRACT_ADDRESS} --offset 2
+```
+
 Note: If you want to inspect the bridge contract, you can use the following commands:
 
 ```sh
@@ -95,6 +104,8 @@ Note: If you want to inspect the bridge contract, you can use the following comm
 $ yarn inspect:bridge --network sepolia --bridge-address {BRIDGE_CONTRACT_ADDRESS}
 # For Chromia token bridge
 $ yarn inspect:chromiabridge --network sepolia --chromia-network {CHROMIA_NETWORK}
+# For NFT bridge
+$ yarn inspect:nftbridge --network sepolia --chromia-network {CHROMIA_NETWORK}
 ```
 
 # Configuring token bridge
