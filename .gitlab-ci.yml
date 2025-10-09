@@ -31,8 +31,6 @@ include:
     - corepack enable
     - corepack prepare yarn@4.10.1 --activate
     - yarn -v
-    # --- Install JS deps for CI (reproducible; no scripts) ---
-    - YARN_ENABLE_SCRIPTS=false yarn install --immutable --immutable-cache --check-cache
 
 stages:
   - build
