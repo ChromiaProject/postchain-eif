@@ -23,7 +23,7 @@
                         <goals>
                             <goal>exec</goal>
                         </goals>
-                        <phase>generate-resources</phase>
+                        <phase>generate-sources</phase>
                         <configuration>
                             <executable>yarn</executable>
                             <arguments>
