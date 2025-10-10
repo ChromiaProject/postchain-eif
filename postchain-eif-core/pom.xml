@@ -220,44 +220,13 @@
                 <artifactId>web3j-maven-plugin</artifactId>
                 <configuration>
                     <packageName>net.postchain.eif.contracts</packageName>
-                    <nativeJavaType>false</nativeJavaType>
-                    <contract>
+                    <abiSourceFiles>
+                        <directory>${project.parent.basedir}/postchain-eif-contracts/abi</directory>
                         <includes>
-                            <include>TokenMinterTest</include>
-                            <include>TokenBridge</include>
-                            <include>TokenBridgeWithSnapshotWithdraw</include>
-                            <include>ChromiaTokenBridge</include>
-                            <include>TestToken</include>
-                            <include>ChromiaTestToken</include>
-                            <include>Validator</include>
-                            <include>Anchoring</include>
-                            <include>DirectoryChainValidator</include>
-                            <include>ManagedValidator</include>
+                            <include>**/*.json</include>
                         </includes>
-                    </contract>
-                    <pathPrefixes>
-                        <pathPrefix>@openzeppelin=../node_modules/@openzeppelin</pathPrefix>
-                    </pathPrefixes>
-                    <soliditySourceFiles>
-                        <directory>${project.parent.basedir}/postchain-eif-contracts/contracts</directory>
-                        <includes>
-                            <include>**/TokenMinterTest.sol</include>
-                            <include>TokenBridge.sol</include>
-                            <include>TokenBridgeWithSnapshotWithdraw.sol</include>
-                            <include>ChromiaTokenBridge.sol</include>
-                            <include>**/TestToken.sol</include>
-                            <include>**/ChromiaTestToken.sol</include>
-                            <include>**/Validator.sol</include>
-                            <include>**/Anchoring.sol</include>
-                            <include>**/DirectoryChainValidator.sol</include>
-                            <include>**/ManagedValidator.sol</include>
-                        </includes>
-                    </soliditySourceFiles>
-                    <outputDirectory>
-                        <bin>${project.basedir}/target/generated-test-resources</bin>
-                        <java>${project.basedir}/target/generated-test-sources</java>
-                    </outputDirectory>
-                    <outputFormat>java,bin</outputFormat>
+                    </abiSourceFiles>
+                    <outputDirectory>${project.build.directory}/generated-sources/web3j</outputDirectory>
                 </configuration>
                 <executions>
                     <execution>
