@@ -69,7 +69,10 @@ contracts-build:
   artifacts:
     when: always
     paths:
-      - postchain-eif-contracts/target/*.tar.gz
+      - postchain-eif-contracts/contracts
+      - postchain-eif-contracts/abi
+      - postchain-eif-contracts/src/artifacts
+      - postchain-eif-contracts/typechain-types
 
 build:
   extends:
