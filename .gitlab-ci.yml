@@ -80,6 +80,9 @@ build:
     - main
     - tags
     - /^support\/.*$/
+  needs:
+    - job: contracts-build
+      artifacts: true
   script:
     - mvn $MAVEN_CLI_OPTS verify --activate-profiles ci,coverage
   artifacts:
