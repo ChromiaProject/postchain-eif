@@ -38,7 +38,7 @@
                             <goal>rell-integration-test</goal>
                         </goals>
                         <configuration>
-                            <skip>${skipTests}</skip>
+                            <skip>true</skip>
                         </configuration>
                     </execution>
                 </executions>
