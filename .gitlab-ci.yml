@@ -65,6 +65,7 @@ contracts-build:
     - node -v && npm -v && yarn -v
     - ./scripts/build.sh
     - ./scripts/test.sh
+    - ls
   artifacts:
     when: always
     paths:
