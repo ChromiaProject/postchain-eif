@@ -84,6 +84,8 @@ build:
     - job: contracts-build
       artifacts: true
   script:
+    - echo "=== Checking artifacts from contracts-build ==="
+    - ls -R postchain-eif-contracts/target || echo "No target folder"
     - mvn $MAVEN_CLI_OPTS verify --activate-profiles ci,coverage
   artifacts:
     when: always
