@@ -226,7 +226,7 @@
                             <include>**/*.json</include>
                         </includes>
                     </abiSourceFiles>
-                    <outputDirectory>${project.build.directory}/generated-sources/web3j</outputDirectory>
+                    <outputDirectory>${project.build.directory}/generated-test-sources/</outputDirectory>
                 </configuration>
                 <executions>
                     <execution>
