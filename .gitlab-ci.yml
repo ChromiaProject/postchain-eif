@@ -19,6 +19,7 @@ include:
     - git config --global url."https://".insteadOf ssh://
 
 stages:
+  - contracts
   - build
   - code-coverage
   - deploy
@@ -54,6 +55,23 @@ deploy:
       -Drevision=$CI_COMMIT_TAG
       clean source:jar deploy
 
+contracts-build:
+  stage: contracts
+  image: registry.gitlab.com/chromaway/core-tools/chromia-images/node24:1.0.0@sha256:7f079fc923460b117fc7bb4b506139e4cde4c0c32b81fb3fec323d4858d36ee7
+  script:
+    - cd postchain-eif-contracts
+    - node -v && npm -v && yarn -v
+    - ./scripts/build.sh
+    - ./scripts/test.sh
+  artifacts:
+    when: always
+    paths:
+      - postchain-eif-contracts/contracts
+      - postchain-eif-contracts/abi
+      - postchain-eif-contracts/src/artifacts
+      - postchain-eif-contracts/typechain-types
+      - postchain-eif-contracts/node_modules/@openzeppelin
+
 build:
   extends:
     - .setup
@@ -64,6 +82,9 @@ build:
     - main
     - tags
     - /^support\/.*$/
+  needs:
+    - job: contracts-build
+      artifacts: true
   script:
     - mvn $MAVEN_CLI_OPTS verify --activate-profiles ci,coverage
   artifacts:

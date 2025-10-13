@@ -34,10 +34,20 @@ mkdir -p ${HOME}/.local/share/buidler-nodejs
 
 ### Pre Requisites
 
-Before running any command, make sure to install dependencies:
+Before running any command, make sure dependencies are installed in a reproducible way:
 
 ```sh
-$ yarn install --frozen-lockfile --ignore-scripts
+$ YARN_ENABLE_SCRIPTS=false yarn install --immutable
+```
+
+* `YARN_ENABLE_SCRIPTS=false` -- skips lifecycle scripts (preinstall, postinstall, etc.).
+
+* `--immutable` -- ensures the lockfile (yarn.lock) isn't modified.
+
+If you already have the `enableScripts` and `enableImmutableInstalls` set in your `.yarnrc.yml`, you can simply run:
+
+```sh
+$ yarn install
 ```
 
 ### Clean
