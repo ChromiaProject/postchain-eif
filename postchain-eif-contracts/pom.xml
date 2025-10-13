@@ -15,58 +15,6 @@
     <build>
         <plugins>
             <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>yarn install</id>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <phase>generate-sources</phase>
-                        <configuration>
-                            <executable>yarn</executable>
-                            <arguments>
-                                <argument>install</argument>
-                            </arguments>
-                        </configuration>
-                    </execution>
-
-                    <execution>
-                        <id>yarn hardhat compile</id>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <phase>generate-sources</phase>
-                        <configuration>
-                            <executable>yarn</executable>
-                            <arguments>
-                                <argument>run</argument>
-                                <argument>hardhat</argument>
-                                <argument>compile</argument>
-                            </arguments>
-                        </configuration>
-                    </execution>
-
-                    <execution>
-                        <id>yarn hardhat test</id>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <phase>test</phase>
-                        <configuration>
-                            <executable>yarn</executable>
-                            <arguments>
-                                <argument>run</argument>
-                                <argument>hardhat</argument>
-                                <argument>test</argument>
-                            </arguments>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <executions>

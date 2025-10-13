@@ -33,7 +33,6 @@
         <junit.pioneer.version>2.2.0</junit.pioneer.version>
         <rell.maven.plugin.version>0.14.9</rell.maven.plugin.version>
         <web3j.version>4.13.0</web3j.version>
-        <maven.exec.plugin.version>3.5.1</maven.exec.plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -108,11 +107,6 @@
                     <groupId>org.web3j</groupId>
                     <artifactId>web3j-maven-plugin</artifactId>
                     <version>${web3j.version}</version>
-                </plugin>
-                <plugin>
-                    <groupId>org.codehaus.mojo</groupId>
-                    <artifactId>exec-maven-plugin</artifactId>
-                    <version>${maven.exec.plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.owasp</groupId>

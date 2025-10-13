@@ -17,20 +17,6 @@ include:
     expire_in: 1 week
   before_script:
     - git config --global url."https://".insteadOf ssh://
-    # --- Node 24 (official tarball, checksum verified) ---
-    - apt-get update -y && apt-get install -y --no-install-recommends ca-certificates curl xz-utils
-    - export NODE_VERSION=24.10.0
-    - export ARCH="$(uname -m)"; if [ "$ARCH" = "x86_64" ]; then ARCH="x64"; elif [ "$ARCH" = "aarch64" ]; then ARCH="arm64"; fi
-    - curl -fsSLO "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-$ARCH.tar.xz"
-    - curl -fsSLO "https://nodejs.org/dist/v$NODE_VERSION/SHASUMS256.txt"
-    - grep " node-v$NODE_VERSION-linux-$ARCH.tar.xz\$" SHASUMS256.txt | sha256sum -c -
-    - mkdir -p /opt/node && tar -xJf "node-v$NODE_VERSION-linux-$ARCH.tar.xz" -C /opt/node --strip-components=1
-    - export PATH="/opt/node/bin:$PATH"
-    - node -v && npm -v
-    # --- Yarn via Corepack (bundled with Node) ---
-    - corepack enable
-    - corepack prepare yarn@4.10.1 --activate
-    - yarn -v
 
 stages:
   - build
@@ -69,6 +55,7 @@ deploy:
       clean source:jar deploy
 
 build:
+  image: registry.gitlab.com/chromaway/core-tools/chromia-images/node24:1.0.0@sha256:7f079fc923460b117fc7bb4b506139e4cde4c0c32b81fb3fec323d4858d36ee7
   extends:
     - .setup
     - .visualise-test-coverage
@@ -79,12 +66,20 @@ build:
     - tags
     - /^support\/.*$/
   script:
+    - cd postchain-eif-contracts
+    - corepack enable
+    - corepack prepare yarn@4.10.1 --activate
+    - node -v && npm -v && yarn -v
+    - ./scripts/build.sh
+    - ./scripts/test.sh
+    - cd ../
     - mvn $MAVEN_CLI_OPTS verify --activate-profiles ci,coverage
   artifacts:
     when: always
     paths:
       - $JACOCO_REPORT_DIR/*
       - postchain-eif-core/logs/
+      - postchain-eif-contracts/target/*.tar.gz
 
 gitlab-release:
   extends: .gitlab-release-with-notes
