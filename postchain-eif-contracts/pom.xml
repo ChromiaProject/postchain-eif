@@ -15,52 +15,6 @@
     <build>
         <plugins>
             <plugin>
-                <groupId>com.github.eirslett</groupId>
-                <artifactId>frontend-maven-plugin</artifactId>
-
-                <configuration>
-                    <installDirectory>target</installDirectory>
-                    <environmentVariables>
-                        <TS_NODE_TRANSPILE_ONLY>true</TS_NODE_TRANSPILE_ONLY>
-                    </environmentVariables>
-                </configuration>
-
-                <executions>
-                    <execution>
-                        <id>yarn install</id>
-                        <goals>
-                            <goal>yarn</goal>
-                        </goals>
-                        <configuration>
-                            <arguments>install --frozen-lockfile --ignore-scripts</arguments>
-                        </configuration>
-                    </execution>
-
-                    <execution>
-                        <id>yarn hardhat compile</id>
-                        <goals>
-                            <goal>yarn</goal>
-                        </goals>
-                        <configuration>
-                            <arguments>exec hardhat compile</arguments>
-                        </configuration>
-                    </execution>
-
-                    <execution>
-                        <id>yarn hardhat test</id>
-                        <phase>test</phase>
-                        <goals>
-                            <goal>yarn</goal>
-                        </goals>
-                        <configuration>
-                            <arguments>exec hardhat test</arguments>
-                        </configuration>
-                    </execution>
-
-                </executions>
-            </plugin>
-
-            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <executions>
