@@ -73,6 +73,7 @@ contracts-build:
       - postchain-eif-contracts/abi
       - postchain-eif-contracts/src/artifacts
       - postchain-eif-contracts/typechain-types
+      - postchain-eif-contracts/node_modules/@openzeppelin
 
 build:
   extends:
