@@ -187,7 +187,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
 
     } else {
         if (deposit_check_access_list(ft4_account.id)) {
-            create erc20_deposit(
+            val deposit = create erc20_deposit(
                 sender_address = event.sender,
                 network_id,
                 deposit_from_smart_contract,
@@ -198,6 +198,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
                 last_updated = op_context.last_block_time,
                 evm_tx_hash = event.evm_tx_hash,
             );
+            create erc20_completed_deposit_transaction(deposit);
 
             erc20.bridge_increase_balance(ft4_account, erc20_asset, event.amount);
         } else {

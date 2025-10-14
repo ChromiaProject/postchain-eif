@@ -1,0 +1,47 @@
+entity evm_collection {
+    network_id: integer;
+    contract_address: byte_array;
+    bridge_mode: bridge_mode;
+    token_type: evm_token_type;
+    key network_id, contract_address;
+    virtual_blockchain_rid: byte_array; // virtual blockchain RID derived from network_id and address
+}
+
+struct evm_collection_info {
+    network_id: integer;
+    contract_address: byte_array; // contract address
+    bridge_mode: bridge_mode;
+    token_type: evm_token_type;
+    virtual_blockchain_rid: byte_array; // virtual blockchain RID derived from network_id and address
+}
+
+function register_evm_collection(
+    network_id: integer,
+    contract_address: byte_array,
+    token_type: evm_token_type,
+    mode: bridge_mode,
+    use_snapshots: boolean = false
+): evm_collection {
+    require(empty(evm_collection @? { network_id, contract_address }), "EVM Collection already exists: %s".format(contract_address));
+    require(mode == bridge_mode.foreign, "Native mode not supported yet");
+    val evm_collection = create evm_collection (
+        network_id,
+        contract_address = contract_address,
+        mode,
+        token_type,
+        virtual_blockchain_rid = compute_virtual_blockchain_rid(network_id, contract_address)
+    );
+
+    return evm_collection;
+}
+
+function compute_virtual_blockchain_rid(network_id: integer, token_address: byte_array): byte_array =
+        ("EVM", network_id, token_address).hash();
+
+function map_evm_collection_to_evm_collection_info(evm_collection) = evm_collection_info(
+    network_id = evm_collection.network_id,
+    contract_address = evm_collection.contract_address,
+    bridge_mode = evm_collection.bridge_mode,
+    token_type = evm_collection.token_type,
+    virtual_blockchain_rid = evm_collection.virtual_blockchain_rid
+);

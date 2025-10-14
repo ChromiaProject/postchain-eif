@@ -7,3 +7,4 @@ import "./token";
 import "./utils";
 import "./recovery";
 import "./mna";
+import "./nftBridge";

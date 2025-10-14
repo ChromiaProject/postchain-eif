@@ -12,8 +12,6 @@ Before deploying any contracts, make sure to set up your environment:
    MNEMONIC=your mnemonic phrase here
    PRIVATE_KEY=your private key here
    ETHERSCAN_API_KEY=your_etherscan_api_key
-   BSCSCAN_API_KEY=your_bscscan_api_key
-   BASESCAN_API_KEY=your_basescan_api_key
    ```
 
 Specify either MNEMONIC or PRIVATE_KEY; not both.

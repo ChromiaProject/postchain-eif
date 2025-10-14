@@ -1,0 +1,52 @@
+function test_withdraw_erc721() {
+    val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
+    mint_evm_token(account, network_id1, FOO.token_address, [123L], [1L], true);
+    val token = crc2.evm._get_token_by_evm_token(network_id1, FOO.token_address, 123L);
+    assert_not_null(token);
+    assert_equals(crc2._get_account_balance(account, token), 1L);
+
+    val evm_collection = register_bridge_and_evm_collection(FOO.token_address, FOO.token_type, network_id1, hbridge_crc2.evm.bridge_mode.foreign, false, contract_address);
+    val op = hbridge_crc2.bridge_erc721_tokens_to_evm(network_id1, evm_collection.contract_address, [123L], evm_address, contract_address);
+
+    rell.test.tx().op(ft4_test.evm_auth_operation_for(rell.test.keypairs.alice.priv, op)).op(op).run();
+    assert_withdraw(1, evm_address, FOO.token_address, [hbridge_crc2.token_amount(token_id = 123L, amount = 1L)], 721, 1, network_id1, contract_address);
+    assert_equals(crc2._get_account_balance(account, token), 0L);
+}
+
+function test_withdraw_erc721_many() {
+    val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
+    mint_evm_token(account, network_id1, FOO.token_address, [1L, 2L, 3L], [1L, 1L, 1L], true);
+    val token1 = crc2.evm._get_token_by_evm_token(network_id1, FOO.token_address, 1L);
+    val token2 = crc2.evm._get_token_by_evm_token(network_id1, FOO.token_address, 2L);
+    val token3 = crc2.evm._get_token_by_evm_token(network_id1, FOO.token_address, 3L);
+    assert_not_null(token1);
+    assert_not_null(token2);
+    assert_not_null(token3);
+    assert_equals(crc2._get_account_balance(account, token1), 1L);
+    assert_equals(crc2._get_account_balance(account, token2), 1L);
+    assert_equals(crc2._get_account_balance(account, token3), 1L);
+
+    val evm_collection = register_bridge_and_evm_collection(FOO.token_address, FOO.token_type, network_id1, hbridge_crc2.evm.bridge_mode.foreign, false, contract_address);
+    val op = hbridge_crc2.bridge_erc721_tokens_to_evm(network_id1, evm_collection.contract_address, [1L, 2L, 3L], evm_address, contract_address);
+
+    rell.test.tx().op(ft4_test.evm_auth_operation_for(rell.test.keypairs.alice.priv, op)).op(op).run();
+    assert_withdraw(1, evm_address, FOO.token_address, [hbridge_crc2.token_amount(token_id = 1L, amount = 1L), hbridge_crc2.token_amount(token_id = 2L, amount = 1L), hbridge_crc2.token_amount(token_id = 3L, amount = 1L)], 721, 1, network_id1, contract_address);
+    assert_equals(crc2._get_account_balance(account, token1), 0L);
+    assert_equals(crc2._get_account_balance(account, token2), 0L);
+    assert_equals(crc2._get_account_balance(account, token3), 0L);
+}
+
+function test_withdraw_erc1155() {
+    val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
+    mint_evm_token(account, network_id1, BAR.token_address, [123L], [1000L], false);
+    val token = crc2.evm._get_token_by_evm_token(network_id1, BAR.token_address, 123L);
+    assert_not_null(token);
+    assert_equals(crc2._get_account_balance(account, token), 1000L);
+
+    val evm_collection = register_bridge_and_evm_collection(BAR.token_address, BAR.token_type, network_id1, hbridge_crc2.evm.bridge_mode.foreign, false, contract_address);
+    val op = hbridge_crc2.bridge_erc1155_tokens_to_evm(network_id1, evm_collection.contract_address, [(token_id = 123L, amount = 100L)], evm_address, contract_address);
+
+    rell.test.tx().op(ft4_test.evm_auth_operation_for(rell.test.keypairs.alice.priv, op)).op(op).run();
+    assert_withdraw(1, evm_address, BAR.token_address, [hbridge_crc2.token_amount(token_id = 123L, amount = 100L)], 1155, 1, network_id1, contract_address);
+    assert_equals(crc2._get_account_balance(account, token), 900L);
+}

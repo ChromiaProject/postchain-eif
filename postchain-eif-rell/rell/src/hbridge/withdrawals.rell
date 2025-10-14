@@ -63,6 +63,12 @@ struct erc20_withdrawal_info {
     timestamp;
     event_hash: byte_array;
     status: withdrawal_status;
+
+    /** The transaction RID of when the withdrawal was initiated and makes the FT4 transfers */
+    transaction_rid: byte_array;
+
+    /** The operation index in the transaction of when the withdrawal was initiated and makes the FT4 transfers */
+    op_index: integer;
 }
 
 /**
@@ -96,6 +102,8 @@ function map_withdrawal(withdrawal: erc20_withdrawal, status: withdrawal_status?
     timestamp = withdrawal.transaction.block.timestamp,
     event_hash = withdrawal.event_hash,
     status = status ?: erc20_withdrawal_status @ { withdrawal } ( .withdrawal_status ),
+    transaction_rid = withdrawal.transaction.tx_rid,
+    op_index = withdrawal.op_index,
 );
 
 function update_withdrawal_status(withdrawal_event_hash: byte_array, status: withdrawal_status) {

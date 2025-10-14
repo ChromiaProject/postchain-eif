@@ -1,0 +1,90 @@
+@extend(ft4.auth.auth_handler)
+function () = ft4.auth.add_auth_handler(
+    scope = rell.meta(bridge_erc721_tokens_to_evm).mount_name,
+    flags = ["T"],
+    message = bridge_erc721_tokens_to_evm_auth_message(*)
+);
+
+function bridge_erc721_tokens_to_evm_auth_message(gtv) {
+    val args = struct<bridge_erc721_tokens_to_evm>.from_gtv(gtv);
+    return "Please sign the message to bridge the following tokens from Chromia account {account_id} for beneficiary %s on network %d\n\nContract Address: %s\nTokens: %s".format(
+        args.beneficiary, args.network_id, args.contract_address, args.token_ids
+    );
+}
+
+operation bridge_erc721_tokens_to_evm(
+    network_id: integer,
+    contract_address: byte_array,
+    token_ids: list<big_integer>,
+    beneficiary: byte_array,
+    bridge_address: byte_array,
+) {
+    val tokens = list<token_amount>();
+    for (token_id in token_ids) {
+        tokens.add(token_amount(token_id = token_id, amount = 1L));
+    }
+    bridge_tokens_to_evm(network_id, contract_address, tokens, beneficiary, bridge_address);
+}
+
+@extend(ft4.auth.auth_handler)
+function () = ft4.auth.add_auth_handler(
+    scope = rell.meta(bridge_erc1155_tokens_to_evm).mount_name,
+    flags = ["T"],
+    message = bridge_erc1155_tokens_to_evm_auth_message(*)
+);
+
+function bridge_erc1155_tokens_to_evm_auth_message(gtv) {
+    val args = struct<bridge_erc1155_tokens_to_evm>.from_gtv(gtv);
+    return "Please sign the message to bridge the following tokens from Chromia account {account_id} for beneficiary %s on network %d\n\nContract Address: %s\nTokens: %s".format(
+        args.beneficiary, args.network_id, args.contract_address, args.token_amounts
+    );
+}
+
+operation bridge_erc1155_tokens_to_evm(
+    network_id: integer,
+    contract_address: byte_array,
+    token_amounts: list<(token_id: big_integer, amount: big_integer)>,
+    beneficiary: byte_array,
+    bridge_address: byte_array,
+) {
+    val tokens = list<token_amount>();
+    for (token_amount in token_amounts) {
+        tokens.add(token_amount(token_id = token_amount.token_id, amount = token_amount.amount));
+    }
+    bridge_tokens_to_evm(network_id, contract_address, tokens, beneficiary, bridge_address);
+}
+
+function bridge_tokens_to_evm(
+    network_id: integer,
+    contract_address: byte_array,
+    tokens: list<token_amount>,
+    beneficiary: byte_array,
+    bridge_address: byte_array,
+) {
+    val from_account = ft4.auth.authenticate();
+    val evm_collection = require(evm.evm_collection @? { network_id, contract_address }, "EVM collection not found for network id %d and contract address %s ".format(network_id, contract_address));
+
+    require(
+        validate_bridge_contract(bridge_address, evm_collection),
+        "Bridge address %s or contract address %s are not registered on network ID %d".format(bridge_address, contract_address, network_id)
+    );
+
+    require(withdraw_check_access_list(from_account.id), "Account id %s not on access list.".format(from_account.id));
+    require(
+        evm.core.evm_eoa_account_link @? { from_account, beneficiary } ??
+        or evm.core.evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
+        "Can only withdraw to your own account"
+    );
+
+    val protocol_id = evm.get_protocol_id_from_token_type(evm_collection.token_type);
+
+    for (token_amount in tokens) {
+        require(token_amount.amount > 0, "Amount must be greater than 0");
+        if(protocol_id == 721) {
+            require(token_amount.amount == 1, "ERC721 amount must be 1");
+        } 
+        val crc2_token = require(crc2.evm.evm_token @? { network_id, contract_address, token_amount.token_id } (.token), "CRC2 token not found for token id %s ".format(token_amount.token_id));
+        evm.bridge_deduct_balance(from_account, evm_collection, crc2_token, token_amount.amount);
+    }
+    emit_withdrawal_event(network_id, contract_address, protocol_id, tokens, beneficiary, bridge_address);
+}

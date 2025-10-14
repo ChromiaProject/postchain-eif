@@ -62,6 +62,8 @@ function test_get_erc20_deposits() {
         state = deposit_state.pending,
         last_updated = rell.test.last_block_time - rell.test.block_interval,
         evm_tx_hash = ("TX", 1).hash(),
+        completed_tx_rid = null,
+        completed_op_index = null
     );
     assert_equals(dep2, expected_deposit2);
     // Retrieving the deposit by evm_tx_hash
@@ -127,6 +129,8 @@ function test_get_erc20_deposits() {
         state = deposit_state.completed,
         last_updated = rell.test.last_block_time - rell.test.block_interval,
         evm_tx_hash = ("TX", 1).hash(),
+        completed_tx_rid = x"d6a0c4ea484ad59f9061b392065660b91435b1d25c0dd70d8bc969eb75448ae6",
+        completed_op_index = 2
     );
     assert_equals(dep4, expected_deposit4);
     // History entries
@@ -163,6 +167,8 @@ function test_get_erc20_deposits() {
         state = deposit_state.pending,
         last_updated = rell.test.last_block_time - 2 * rell.test.block_interval,
         evm_tx_hash = ("TX", 3).hash(),
+        completed_tx_rid = null,
+        completed_op_index = null
     );
     val expected_deposit52 = erc20_deposit_info(
         id = dep5[2].id,
@@ -175,6 +181,8 @@ function test_get_erc20_deposits() {
         state = deposit_state.pending,
         last_updated = rell.test.last_block_time - rell.test.block_interval,
         evm_tx_hash = ("TX", 4).hash(),
+        completed_tx_rid = null,
+        completed_op_index = null
     );
     assert_equals(dep5, [expected_deposit4, expected_deposit51, expected_deposit52]);
     // Checking all `pending` deposits
@@ -206,6 +214,10 @@ function test_get_erc20_deposits() {
     assert_equals(dep6 @ {} (@set .recipient_id), set([alice_evm_deposit_recipient_id, bob_evm_deposit_recipient_id]));
     assert_equals(dep6 @ {} (@set .asset_id), set([chr_asset.id, foo_asset.id, bar_asset.id]));
     assert_equals(dep6 @ {} (@set .state), set([deposit_state.completed]));
+
+    // Verify sender_address filter
+    assert_equals(parse_paged_deposits(get_erc20_deposits(deposit_filter(sender_address = bob_evm_address), null, null, null, null))
+        @ {} (@set .sender_address), set([bob_evm_address]));
 
     // Getting all network_id1's deposits
     val res7 = get_erc20_deposits(deposit_filter(network_id = network_id1), null, null, null, null);

@@ -128,6 +128,7 @@ class EvmEventFetcher(
         logger.debug { "Contracts: $contracts" }
         if (contracts.isEmpty()) {
             logger.warn { "No contracts configured, trying again later" }
+            previousContracts = setOf()
             delay(delayWhenNoNewBlocks)
             return
         }
@@ -170,7 +171,7 @@ class EvmEventFetcher(
         } else {
             staticEvents.associateBy(EventEncoder::encode)
         }
-        logger.debug { "Events: ${eventMap.values}" }
+        logger.debug { "Events: ${eventMap.values.map { it.name }}" }
         if (eventMap.isEmpty()) {
             logger.warn { "No events configured, trying again later" }
             delay(delayWhenNoNewBlocks)
@@ -262,7 +263,7 @@ class EvmEventFetcher(
         getLastCommittedEvmBlockHeightQuery(networkId)
 
     fun getLastCommittedEvmEventHeightQuery(networkId: Long, contractAddress: ByteArray): BigInteger? {
-        val eventHeight = blockchainEngine.getBlockQueries().query("get_last_evm_event_height",
+        val eventHeight = blockchainEngine.getBlockQueries().query(EIF_LAST_EVM_EVENT_HEIGHT_QUERY,
                 gtv("network_id" to gtv(networkId), "contract_address" to gtv(contractAddress))).get()
         if (eventHeight == GtvNull) {
             return null
@@ -283,7 +284,7 @@ class EvmEventFetcher(
     }
 
     fun getLastCommittedEvmBlockHeightQuery(networkId: Long): BigInteger? {
-        val block = blockchainEngine.getBlockQueries().query("get_last_evm_block", gtv("network_id" to gtv(networkId))).get()
+        val block = blockchainEngine.getBlockQueries().query(EIF_LAST_EVM_BLOCK_QUERY, gtv("network_id" to gtv(networkId))).get()
         if (block == GtvNull) {
             return null
         }

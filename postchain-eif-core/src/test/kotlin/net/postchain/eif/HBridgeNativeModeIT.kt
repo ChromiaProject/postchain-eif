@@ -34,6 +34,7 @@ import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.TestMethodOrder
+import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.assertThrows
 import org.junitpioneer.jupiter.DisableIfTestFails
 import org.testcontainers.junit.jupiter.Testcontainers
@@ -53,11 +54,13 @@ import org.web3j.tx.response.PollingTransactionReceiptProcessor
 import org.web3j.utils.Convert
 import java.math.BigDecimal
 import java.math.BigInteger
+import java.util.concurrent.TimeUnit
 
 @Testcontainers(disabledWithoutDocker = true)
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Timeout(value = 5, unit = TimeUnit.MINUTES)
 class HBridgeNativeModeIT : HBridgeBaseIntegrationTest() {
     private val logger = KotlinLogging.logger("test_logger")
 

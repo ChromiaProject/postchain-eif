@@ -1,0 +1,37 @@
+@mount("eif.hbridge.crc2")
+module;
+
+import messaging: ^.eif.messaging;
+import common: ^.eif.common;
+import utils: ^.eif.utils;
+import version: ^.eif.version;
+
+import .evm;
+
+namespace ft4 {
+    import lib.ft4.accounts;
+    import lib.ft4.auth;
+    import lib.ft4.utils;
+}
+
+namespace crc2 {
+    import lib.crc2.*;
+    import lib.crc2.evm;
+}
+
+struct token_amount {
+    token_id: big_integer;
+    amount: big_integer;
+}
+
+// Nothing really stops us from accepting deposits from any EVM address,
+// except that it might be icky and easier to exploit via client (front-end) attacks.
+val need_consent_on_deposit = true;
+
+val zero_beneficiary = x"0000000000000000000000000000000000000000000000000000000000000000";
+
+@extendable
+function deposit_check_access_list(account_id: byte_array): boolean = true;
+
+@extendable
+function withdraw_check_access_list(account_id: byte_array): boolean = true;

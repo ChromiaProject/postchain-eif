@@ -54,6 +54,7 @@ test:
     - tests.transaction_submitter.anchoring
     - tests.transaction_submitter.signer_update
     - tests.eif_bridge_admin
+    - tests.hbridge_crc2.hbridge_crc2
   moduleArgs:
     <<: *common_args
     hbridge.core:
@@ -216,6 +217,17 @@ blockchains:
 
   hbridge:
     module: hbridge
+    config:
+      <<: *common_hbridge_config
+    moduleArgs:
+      <<: *common_args
+      <<: *rell_test_args
+      chain_version: *chain_version
+      eif_bridge_admin:
+        bridge_admin_account_signers: [ ] # TODO replace with real signers
+
+  hbridge_crc2:
+    module: hbridge_crc2
     config:
       <<: *common_hbridge_config
     moduleArgs:
@@ -410,3 +422,10 @@ libs:
     tagOrBranch: 1.82.4
     rid: x"1A4B3C3A1325DEF2C426C4F0F93F7444BB074373A24367DAA958C32F21B2EA1D"
     insecure: false
+  crc2:
+    registry: https://gitlab.com/chromaway/crc2-lib
+    path: src/lib/crc2
+    tagOrBranch: 0.4.1
+    rid: x"6136835424E59445D19A1255EC109F49060074D09BCC7E09E646D3E9A5A344B1"
+    insecure: false
+

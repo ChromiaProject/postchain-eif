@@ -1,0 +1,5 @@
+function network_contract_discriminator(network_id: integer, contract_address: byte_array): big_integer {
+    val network_discriminator = big_integer(network_id) * (2L).pow(160);
+    val contract_discriminator = big_integer.from_bytes_unsigned(contract_address);
+    return network_discriminator + contract_discriminator;
+}
