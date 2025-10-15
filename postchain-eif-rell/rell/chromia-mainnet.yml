@@ -53,13 +53,23 @@ blockchains:
         chains:
           bsc:
             network_id: 56
-            evm_read_offset: 10
+            evm_read_offset: 100 # Block time 0.75s = 75s
             skip_to_height: 7743093
             events: !include configs/events.yml
           ethereum:
             network_id: 1
-            evm_read_offset: 50
+            evm_read_offset: 50 # Block time 12s = 600s
             skip_to_height: 11223368
+            events: !include configs/events.yml
+          base:
+            network_id: 8453
+            evm_read_offset: 10 # Block time 2s = 20s (no risk of reorgs)
+            skip_to_height: 36870953
+            events: !include configs/events.yml
+          arbitrum:
+            network_id: 42161
+            evm_read_offset: 10 # Block time 0.25s = 2.5s (no risk of reorgs)
+            skip_to_height: 389787350
             events: !include configs/events.yml
       icmf:
         receiver:
