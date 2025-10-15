@@ -73,6 +73,11 @@ blockchains:
             evm_read_offset: 10
             skip_to_height: 20000000 # TODO: Set to current height
             events: !include configs/events.yml
+          arbitrum:
+            network_id: 421614
+            evm_read_offset: 10
+            skip_to_height: 204879964
+            events: !include configs/events.yml
       icmf:
         receiver:
           directory-chain:
