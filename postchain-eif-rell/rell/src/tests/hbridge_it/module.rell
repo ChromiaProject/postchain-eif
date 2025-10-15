@@ -37,5 +37,5 @@ operation register_bridge_with_erc20_assets(network_id: integer, bridge_address:
     admin.require_admin();
 
     val erc20_assets = erc20.erc20_asset @* { network_id };
-    erc20.register_bridge_with_erc20_assets(network_id, bridge_address, erc20_assets);
+    erc20.register_bridge_with_erc20_assets(network_id, bridge_address, 0, erc20_assets);
 }

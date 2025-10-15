@@ -1,6 +1,7 @@
 struct bridge_contract_info {
     contract_address: byte_array;
     evm_read_offset: integer;
+    skip_to_height: integer = 0;
     erc20_assets: list<erc20_asset_info>;
 }
 
@@ -17,6 +18,7 @@ entity bridge_erc20_asset {
  * @param mode The mode of the bridge.
  * @param use_snapshots Whether to use snapshots.
  * @param bridge_address The address of the bridge contract.
+ * @param skip_to_height The height to skip to.
  */
 function register_bridge_and_erc20_asset(
     network_id: integer,
@@ -24,10 +26,11 @@ function register_bridge_and_erc20_asset(
     ft4.assets.asset,
     mode: bridge_mode,
     use_snapshots: boolean = false,
-    bridge_address: byte_array
+    bridge_address: byte_array,
+    skip_to_height: integer,
 ) {
     val erc20_asset = register_erc20_asset(network_id, token_address, asset, mode, use_snapshots);
-    val bridge_contract = core.get_or_create_bridge(network_id, bridge_address);
+    val bridge_contract = core.get_or_create_bridge(network_id, bridge_address, skip_to_height);
     create bridge_erc20_asset(bridge_contract, erc20_asset);
 }
 
@@ -36,10 +39,13 @@ function register_bridge_and_erc20_asset(
  *
  * @param network_id The ID of the EVM network.
  * @param bridge_address The address of the bridge contract.
+ * @param skip_to_height The height to skip to.
  * @param erc20_assets The list of ERC20 assets to register.
  */
-function register_bridge_with_erc20_assets(network_id: integer, bridge_address: byte_array, erc20_assets: list<erc20_asset>) {
-    val bridge_contract = core.get_or_create_bridge(network_id, bridge_address);
+function register_bridge_with_erc20_assets(
+    network_id: integer, bridge_address: byte_array, skip_to_height: integer, erc20_assets: list<erc20_asset>
+) {
+    val bridge_contract = core.get_or_create_bridge(network_id, bridge_address, skip_to_height);
 
     for (erc20_asset in erc20_assets) {
         require(erc20_asset.network_id == bridge_contract.network_id, "Bridge must be part of the same network as the asset");
