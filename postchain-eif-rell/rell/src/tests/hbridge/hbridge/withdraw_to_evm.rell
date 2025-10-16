@@ -101,6 +101,7 @@ function test_can_not_withdraw_if_no_bridges_are_configured_for_this_network_but
         helpers.register_bridge_with_erc20_assets_op(
             network_id = network_id2,
             bridge_contract_address = bridge_address2,
+            skip_to_height = 123,
             erc20_assets = [erc20_foo_asset]
         )
     ).run();
@@ -129,11 +130,13 @@ function test_can_not_withdraw_if_more_than_one_bridge_is_configured_for_this_ne
         helpers.register_bridge_with_erc20_assets_op(
             network_id = network_id1,
             bridge_contract_address = bridge_address1,
+            skip_to_height = 123,
             erc20_assets = [erc20_chr_asset]
         ),
         helpers.register_bridge_with_erc20_assets_op(
             network_id = network_id1,
             bridge_contract_address = bridge_address2,
+            skip_to_height = 456,
             erc20_assets = [erc20_foo_asset]
         )
     ).run();
@@ -165,6 +168,7 @@ function test_withdraw_if_only_one_bridge_is_configured_for_the_network() {
         helpers.register_bridge_with_erc20_assets_op(
             network_id = network_id1,
             bridge_contract_address = bridge_address1,
+            skip_to_height = 123,
             erc20_assets = [erc20_chr_asset]
         )
     ).run();
