@@ -88,75 +88,146 @@ function test_get_bridge_contracts_when_registered_erc20_assets_exist() {
     val erc20_bar_info = erc20.map_erc20_asset_to_erc20_asset_info(erc20_bar);
     val erc20_abc_info = erc20.map_erc20_asset_to_erc20_asset_info(erc20_abc);
 
+    // Register bridge contracts with ERC20 assets
     rell.test.tx().op(
         helpers.register_bridge_with_erc20_assets_op(
             sepolia,
             x"2Cf48D2891CC286d18596Df1261D011d1B78E04E",
+            123,
             [erc20_chr, erc20_foo]
         ),
         helpers.register_bridge_with_erc20_assets_op(
             sepolia,
             x"2Cf48D2891CC286d18596Df1261D011d1B78E04F",
+            456,
             [erc20_foo, erc20_bar]
         ),
         helpers.register_bridge_with_erc20_assets_op(
             bsc_testnet,
             x"2Cf48D2891CC286d18596Df1261D011d1B78E04E", // same as sepolia
+            789,
             [erc20_abc]
         ),
     ).run();
 
+    // Test get_bridge_contracts query
     assert_equals(
         erc20.get_bridge_contracts(network_id = sepolia),
         [
             erc20.bridge_contract_info(
                 contract_address = x"2Cf48D2891CC286d18596Df1261D011d1B78E04E",
                 evm_read_offset = 20,
+                skip_to_height = 123,
                 erc20_assets = [erc20_chr_info, erc20_foo_info]
             ),
             erc20.bridge_contract_info(
                 contract_address = x"2Cf48D2891CC286d18596Df1261D011d1B78E04F",
                 evm_read_offset = 20,
+                skip_to_height = 456,
                 erc20_assets = [erc20_foo_info, erc20_bar_info]
             ),
         ]
     );
-
     assert_equals(
         erc20.get_bridge_contracts(network_id = bsc_testnet),
         [
             erc20.bridge_contract_info(
                 contract_address = x"2Cf48D2891CC286d18596Df1261D011d1B78E04E",
                 evm_read_offset = 10,
+                skip_to_height = 789,
                 erc20_assets = [erc20_abc_info]
             ),
         ]
     );
 
+    // Test get_bridge_contract_info query
     assert_equals(
         erc20.get_bridge_contract_info(sepolia, x"2Cf48D2891CC286d18596Df1261D011d1B78E04E"),
         erc20.bridge_contract_info(
             contract_address = x"2Cf48D2891CC286d18596Df1261D011d1B78E04E",
             evm_read_offset = 20,
+            skip_to_height = 123,
             erc20_assets = [erc20_chr_info, erc20_foo_info]
         )
     );
-
     assert_equals(
         erc20.get_bridge_contract_info(sepolia, x"2Cf48D2891CC286d18596Df1261D011d1B78E04F"),
         erc20.bridge_contract_info(
             contract_address = x"2Cf48D2891CC286d18596Df1261D011d1B78E04F",
             evm_read_offset = 20,
+            skip_to_height = 456,
             erc20_assets = [erc20_foo_info, erc20_bar_info]
         )
     );
-
     assert_equals(
         erc20.get_bridge_contract_info(bsc_testnet, x"2Cf48D2891CC286d18596Df1261D011d1B78E04E"),
         erc20.bridge_contract_info(
             contract_address = x"2Cf48D2891CC286d18596Df1261D011d1B78E04E",
             evm_read_offset = 10,
+            skip_to_height = 789,
             erc20_assets = [erc20_abc_info]
         )
+    );
+
+    // Test get_erc20_bridges_for_asset query
+    // - CHR
+    assert_equals(
+        erc20.get_erc20_bridges_for_asset(erc20_chr.asset.id),
+        [
+            erc20.bridge_contract_info(
+                contract_address = x"2Cf48D2891CC286d18596Df1261D011d1B78E04E",
+                evm_read_offset = 20,
+                skip_to_height = 123,
+                erc20_assets = [erc20_chr_info, erc20_foo_info]
+            ),
+            erc20.bridge_contract_info(
+                contract_address = x"2Cf48D2891CC286d18596Df1261D011d1B78E04F",
+                evm_read_offset = 20,
+                skip_to_height = 456,
+                erc20_assets = [erc20_foo_info]
+            )
+        ]
+    );
+    // - FOO
+    assert_equals(
+        erc20.get_erc20_bridges_for_asset(erc20_foo.asset.id),
+        [
+            erc20.bridge_contract_info(
+                contract_address = x"2Cf48D2891CC286d18596Df1261D011d1B78E04E",
+                evm_read_offset = 20,
+                skip_to_height = 123,
+                erc20_assets = [erc20_chr_info, erc20_foo_info]
+            ),
+            erc20.bridge_contract_info(
+                contract_address = x"2Cf48D2891CC286d18596Df1261D011d1B78E04F",
+                evm_read_offset = 20,
+                skip_to_height = 456,
+                erc20_assets = [erc20_foo_info]
+            )
+        ]
+    );
+    // - BAR
+    assert_equals(
+        erc20.get_erc20_bridges_for_asset(erc20_bar.asset.id),
+        [
+            erc20.bridge_contract_info(
+                contract_address = x"2Cf48D2891CC286d18596Df1261D011d1B78E04F",
+                evm_read_offset = 20,
+                skip_to_height = 456,
+                erc20_assets = [erc20_bar_info]
+            )
+        ]
+    );
+    // - ABC
+    assert_equals(
+        erc20.get_erc20_bridges_for_asset(erc20_abc.asset.id),
+        [
+            erc20.bridge_contract_info(
+                contract_address = x"2Cf48D2891CC286d18596Df1261D011d1B78E04E",
+                evm_read_offset = 10,
+                skip_to_height = 789,
+                erc20_assets = [erc20_abc_info]
+            )
+        ]
     );
 }

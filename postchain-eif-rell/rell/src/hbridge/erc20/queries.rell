@@ -86,6 +86,36 @@ query get_bridge_contract_info(network_id: integer, contract_address: byte_array
     );
 }
 
+/**
+ * Retrieves a list of bridge contracts that include the ERC20 asset corresponding to the specified asset ID.
+ * The asset ID is associated with an ERC20 asset, and ERC20 assets are linked to bridges.
+ *
+ * @param asset_id The ID of the asset.
+ *
+ * @return A list of `bridge_contract_info` objects, where each object represents 
+ * a bridge contract and includes `contract_address`, `evm_read_offset`, `skip_to_height`, and `erc20_assets`.
+ * The `erc20_assets` list contains the `erc20_asset_info` objects for the ERC20 assets that are bridged through the bridge.
+ */
+query get_erc20_bridges_for_asset(asset_id: byte_array) : list<bridge_contract_info> {
+    val asset = ft4.assets.Asset(asset_id);
+    return (a: erc20_asset, b: bridge_erc20_asset) @* {
+        a.asset == asset,
+        b.erc20_asset == a
+    } (
+        @group bridge = b.bridge_contract,
+        @list erc20 = map_erc20_asset_to_erc20_asset_info(a)
+    ) @* {} (
+        @omit @sort .bridge.network_id,
+        @omit @sort .bridge.contract_address,
+        bridge_contract_info(
+            contract_address = .bridge.contract_address,
+            evm_read_offset = core.get_evm_read_offset(.bridge.network_id),
+            skip_to_height = .bridge.skip_to_height,
+            erc20_assets = .erc20
+        )
+    );
+}
+
 // Snapshot queries
 
 query are_snapshots_enabled_for_asset(asset_id: byte_array): boolean {
