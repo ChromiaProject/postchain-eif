@@ -33,7 +33,7 @@ blockchains:
             evm_read_offset: 10
             skip_to_height: 2000000 # Oct-01-2022 05:06:12 PM +UTC
             events: !include configs/events.yml
-          base_sepolia:
+          base:
             network_id: 84532
             contracts:
               - "0x050c4a184c47AFAc1B606E75fF8E11AABeF9B362" # TransparentUpgradeableProxy / bridge contract
@@ -68,7 +68,7 @@ blockchains:
             evm_read_offset: 10
             skip_to_height: 2000000 # TODO: Set to current height
             events: !include configs/events.yml
-          base_sepolia:
+          base:
             network_id: 84532
             evm_read_offset: 10
             skip_to_height: 20000000 # TODO: Set to current height
@@ -160,7 +160,7 @@ blockchains:
           - "net.postchain.d1.icmf.IcmfSenderGTXModule"
       transaction_submitter:
         chains:
-          base_sepolia:
+          base:
             network_id: 84532
             max_gas_price: 30000000000000000
             min_wallet_balance: 1000000000000000
