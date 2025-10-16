@@ -32,6 +32,6 @@ function test_unregister_bridge() {
 
     assert_equals(core.bridge_contract @ {} ( @sum 1 ), 1);
     assert_equals(erc20.bridge_erc20_asset @ {} ( @sum 1 ), 1);
-    assert_true(empty(core.bridge_contract @* { network_id1, bridge_address1 }));
+    assert_true(empty(core.bridge_contract @* { .network_id == network_id1, bridge_address1 }));
     assert_true(empty(erc20.bridge_erc20_asset @* { erc20_chr_asset }));
 }
