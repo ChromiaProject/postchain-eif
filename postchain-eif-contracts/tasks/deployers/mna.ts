@@ -19,6 +19,11 @@ interface AliceKnownArtifacts {
 }
 
 const mna_known_artifacts_by_network: { [key: string]: AliceKnownArtifacts } = {
+    "ethereum": {
+        "multiSigOwner": "0x65ABaD3F987ad9a21EFFE98Af08D4093eAa3599E", //MNA Testnet Multi-Sig
+        "chromiaTokenAddress": "0xA770448e5A86c7FE467F8F369d3ed2f6fac573eF", //ChromaToken Template ERC20
+        "networkType": "ETH"
+    },
     "sepolia": {
         "multiSigOwner": "0x65ABaD3F987ad9a21EFFE98Af08D4093eAa3599E", //MNA Testnet Multi-Sig
         "chromiaTokenAddress": "0xA770448e5A86c7FE467F8F369d3ed2f6fac573eF", //ChromaToken Template ERC20
