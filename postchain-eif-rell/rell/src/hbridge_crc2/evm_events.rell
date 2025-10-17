@@ -25,12 +25,12 @@ function create_deposited_tokens_event(event: messaging.event_data): deposited_t
         return null;
     }
 
-    if (protocol_id == 1155 and  amounts.size() == 0 ) {
+    if (protocol_id == 1155 and amounts.size() == 0) {
         log("Deposit event ignored: Missing ERC1155 token amounts");
         return null;
     }
 
-    if (protocol_id == 1155 and  amounts.size() < token_ids.size() ) {
+    if (protocol_id == 1155 and amounts.size() < token_ids.size()) {
         token_ids = token_ids.sub(0, amounts.size());
     }
 
