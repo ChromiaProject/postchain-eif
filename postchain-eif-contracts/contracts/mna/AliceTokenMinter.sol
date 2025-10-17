@@ -31,6 +31,8 @@ interface IBEP20Token {
 
 contract AliceTokenMinterBSC is TokenMinterBase {
 
+    address public pendingTokenOwner;
+
     constructor(
         uint _dayLimit,
         address _tokenContractAddress,
@@ -49,10 +51,27 @@ contract AliceTokenMinterBSC is TokenMinterBase {
     }
 
     /**
-     * Transfers token contract ownership to a new address.
-     * @param newOwner Address of the new owner.
+     * @notice Initiates the token ownership transfer process
+     * @dev Can only be called by the contract owner. This starts a two-week delay period
+     * before the ownership transfer can be completed
+     * @param newOwner The address that will become the new token owner
      */
     function transferTokenOwnership(address newOwner) external onlyOwner {
-        IBEP20Token(tokenContractAddress).transferOwnership(newOwner);
+        resetDelayForFunction(this.transferTokenOwnership.selector);
+        startDelayedAction(this.transferTokenOwnership.selector);
+        pendingTokenOwner = newOwner;
+    }
+
+    /**
+     * @notice Completes the token ownership transfer process after the delay period
+     * @dev Can only be called by the contract owner after transferTokenOwnership has been called
+     * and the delay period has passed. The function will revert if there is no pending token owner
+     * or if the delay period has not elapsed.
+     */
+    function finishTransferTokenOwnership() external onlyOwner {
+        require(pendingTokenOwner != address(0), "TokenMinter: No pending token owner");
+        finishDelayedAction(this.transferTokenOwnership.selector);
+        IBEP20Token(tokenContractAddress).transferOwnership(pendingTokenOwner);
+        delete pendingTokenOwner;
     }
 }
