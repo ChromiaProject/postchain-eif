@@ -24,12 +24,12 @@ query get_registered_bridge_evm_collections(network_id: integer, bridge_contract
 
 /**
  * Retrieves a list of bridge contracts associated with the specified EVM network ID,
- * including ERC20 assets associated with each bridge contract.
+ * including EVM collections associated with each bridge contract.
  *
  * @param network_id The ID of the EVM network.
  *
  * @return A list of `bridge_contract_info` objects containing the bridge `contract_address`, `evm_read_offset`,
- * and the list of ERC20 assets associated with each bridge contract.
+ * and the list of EVM collections associated with each bridge contract.
  */
 query get_bridge_contracts(network_id: integer): list<bridge_contract_info> {
     val read_offset = map<text, integer>.from_gtv_pretty(chain_context.args.evm_read_offsets).get_or_null("%d".format(network_id));
