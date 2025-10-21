@@ -49,7 +49,8 @@
     "deploy:alice:mna:eth": "npx hardhat deploy:alice:mna:eth",
     "deploy:alice:mna:bsc": "npx hardhat deploy:alice:mna:bsc",
     "deploy:nativebridge:mna:eth": "npx hardhat deploy:nativebridge:mna:eth",
-    "deploy:nativebridge:mna:bsc": "npx hardhat deploy:nativebridge:mna:bsc"
+    "deploy:nativebridge:mna:bsc": "npx hardhat deploy:nativebridge:mna:bsc",
+    "deploy:minter:mna:bsc": "npx hardhat deploy:minter:mna:bsc"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.8",

@@ -1,5 +1,7 @@
 import { task } from "hardhat/config";
 import {
+    AliceToken,
+    AliceToken__factory,
     AliceTokenMinterBSC__factory,
     AliceTokenMinterETH__factory,
     BEP20Token, BEP20Token__factory,
@@ -31,6 +33,11 @@ const mna_known_artifacts_by_network: { [key: string]: AliceKnownArtifacts } = {
     },
     "bsc_testnet": {
         "multiSigOwner": "0x65ABaD3F987ad9a21EFFE98Af08D4093eAa3599E", //MNA Testnet Multi-Sig
+        "chromiaTokenAddress": "0x2a9164df52aae0e9d08d6a4e87bd89b263e68ef9", //Unchanged BEP20 Contract
+        "networkType": "BSC"
+    },
+    "bsc": {
+        "multiSigOwner": "0x77f1139cf06A97576de566B779e72D679156378F", //MNA Testnet Multi-Sig
         "chromiaTokenAddress": "0x2a9164df52aae0e9d08d6a4e87bd89b263e68ef9", //Unchanged BEP20 Contract
         "networkType": "BSC"
     },
@@ -210,6 +217,38 @@ task("deploy:nativebridge:mna:bsc")
 
             try {
                 await verifyProxyContract(hre, bridgeAddress, 0);
+            } catch (e) {
+                console.log(e);
+            }
+        }
+    });
+
+task("deploy:minter:mna:bsc")
+    .addOptionalParam("tokenAddress", "Chromia Token address")
+    .addOptionalParam("bridgeAddress", "Chromia Token Bridge address")
+    .addFlag("verify", "Verify contracts at Etherscan")
+    .setAction(async ({ tokenAddress, bridgeAddress, verify }, hre) => {
+        let multiSigOwner = mna_known_artifacts_by_network[hre.network.name].multiSigOwner;
+
+        const DAILY_LIMIT = 1000000 * 1000000; // agreed on weekly meeting 2024-06-19
+        let tokenMinterFactory = await hre.ethers.getContractFactory("AliceTokenMinterBSC") as AliceTokenMinterBSC__factory;
+        const tokenMinter = await tokenMinterFactory.deploy(DAILY_LIMIT, tokenAddress, bridgeAddress, multiSigOwner) as TokenMinterBase;
+        await tokenMinter.waitForDeployment();
+        const tokenMinterAddress = await tokenMinter.getAddress();
+        console.log("Token Minter deployed to: ", tokenMinterAddress);
+
+        if (verify) {
+            await delay(30000);
+            // When redeploy new smart contracts, etherscan can automatically verify the smart contract
+            // with the similar code, then calling verify will return error.
+            // We add try/catch to handle the error and continue to verify the main bridge smart contract.
+            try {
+                console.log("Verifying token minter contract...");
+                await hre.run("verify:verify", {
+                    address: tokenMinterAddress,
+                    constructorArguments: [DAILY_LIMIT, tokenAddress, bridgeAddress, multiSigOwner],
+                    contract: "contracts/mna/AliceTokenMinter.sol:AliceTokenMinterBSC"
+                });
             } catch (e) {
                 console.log(e);
             }
