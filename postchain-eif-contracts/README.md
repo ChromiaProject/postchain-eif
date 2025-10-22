@@ -50,6 +50,16 @@ If you already have the `enableScripts` and `enableImmutableInstalls` set in you
 $ yarn install
 ```
 
+To audit the dependencies, disable `enableImmutableInstalls` in your `.yarnrc.yml` and run:
+```sh
+$ yarn npm audit
+```
+
+To apply automatic version bumps where possible, run:
+```sh
+$ yarn npm audit fix
+```
+
 ### Clean
 
 ```sh
