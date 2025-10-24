@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- Copyright (c) 2020 ChromaWay AB. See README for license information. -->
+
+<dict>
+    <entry key="config_consensus_strategy">
+        <string>HEADER_HASH</string>
+    </entry>
+    <entry key="features">
+        <dict>
+            <entry key="merkle_hash_version"><int>2</int></entry>
+        </dict>
+    </entry>
+    <entry key="configurationfactory">
+        <string>net.postchain.gtx.GTXBlockchainConfigurationFactory</string>
+    </entry>
+    <entry key="sync_ext">
+        <array><string>net.postchain.eif.EifSynchronizationInfrastructureExtension</string></array>
+    </entry>
+    <entry key="signers">
+        <array>
+            <!-- Key0 -->
+            <bytea>03a301697bdfcd704313ba48e51d567543f2a182031efd6915ddc07bbcc4e16070</bytea>
+        </array>
+    </entry>
+    <entry key="gtx">
+        <dict>
+            <entry key="modules">
+                <array>
+                    <string>net.postchain.configurations.GTXTestModule</string>
+                    <string>net.postchain.gtx.StandardOpsGTXModule</string>
+                    <string>net.postchain.eif.EifGTXModule</string>
+                </array>
+            </entry>
+        </dict>
+    </entry>
+    <entry key="eif">
+        <dict>
+            <entry key="chains">
+                <dict>
+                    <entry key="ethereum">
+                        <dict>
+                            <entry key="contracts">
+                                <array>
+                                    <string>0x39615b16b74589919c9ce1ea73f1fc5d53141a78</string>
+                                </array>
+                            </entry>
+                            <entry key="events">
+                                <array>
+                                    <dict>
+                                        <entry key="anonymous">
+                                            <int>0</int>
+                                        </entry>
+                                        <entry key="inputs">
+                                            <array>
+                                                <dict>
+                                                    <entry key="indexed">
+                                                        <int>1</int>
+                                                    </entry>
+                                                    <entry key="internalType">
+                                                        <string>address</string>
+                                                    </entry>
+                                                    <entry key="name">
+                                                        <string>sender</string>
+                                                    </entry>
+                                                    <entry key="type">
+                                                        <string>address</string>
+                                                    </entry>
+                                                </dict>
+                                                <dict>
+                                                    <entry key="indexed">
+                                                        <int>1</int>
+                                                    </entry>
+                                                    <entry key="internalType">
+                                                        <string>contract IERC20</string>
+                                                    </entry>
+                                                    <entry key="name">
+                                                        <string>token</string>
+                                                    </entry>
+                                                    <entry key="type">
+                                                        <string>address</string>
+                                                    </entry>
+                                                </dict>
+                                                <dict>
+                                                    <entry key="indexed">
+                                                        <int>0</int>
+                                                    </entry>
+                                                    <entry key="internalType">
+                                                        <string>uint256</string>
+                                                    </entry>
+                                                    <entry key="name">
+                                                        <string>networkId</string>
+                                                    </entry>
+                                                    <entry key="type">
+                                                        <string>uint256</string>
+                                                    </entry>
+                                                </dict>
+                                                <dict>
+                                                    <entry key="indexed">
+                                                        <int>0</int>
+                                                    </entry>
+                                                    <entry key="internalType">
+                                                        <string>uint256</string>
+                                                    </entry>
+                                                    <entry key="name">
+                                                        <string>amount</string>
+                                                    </entry>
+                                                    <entry key="type">
+                                                        <string>uint256</string>
+                                                    </entry>
+                                                </dict>
+                                                <dict>
+                                                    <entry key="indexed">
+                                                        <int>0</int>
+                                                    </entry>
+                                                    <entry key="internalType">
+                                                        <string>string</string>
+                                                    </entry>
+                                                    <entry key="name">
+                                                        <string>name</string>
+                                                    </entry>
+                                                    <entry key="type">
+                                                        <string>string</string>
+                                                    </entry>
+                                                </dict>
+                                                <dict>
+                                                    <entry key="indexed">
+                                                        <int>0</int>
+                                                    </entry>
+                                                    <entry key="internalType">
+                                                        <string>string</string>
+                                                    </entry>
+                                                    <entry key="name">
+                                                        <string>symbol</string>
+                                                    </entry>
+                                                    <entry key="type">
+                                                        <string>string</string>
+                                                    </entry>
+                                                </dict>
+                                                <dict>
+                                                    <entry key="indexed">
+                                                        <int>0</int>
+                                                    </entry>
+                                                    <entry key="internalType">
+                                                        <string>uint8</string>
+                                                    </entry>
+                                                    <entry key="name">
+                                                        <string>decimals</string>
+                                                    </entry>
+                                                    <entry key="type">
+                                                        <string>uint8</string>
+                                                    </entry>
+                                                </dict>
+                                            </array>
+                                        </entry>
+                                        <entry key="name">
+                                            <string>DepositedERC20</string>
+                                        </entry>
+                                        <entry key="type">
+                                            <string>event</string>
+                                        </entry>
+                                    </dict>
+                                </array>
+                            </entry>
+                            <entry key="network_id">
+                                <int>1</int>
+                            </entry>
+                        </dict>
+                    </entry>
+                    <entry key="bsc">
+                        <dict>
+                            <entry key="contracts">
+                                <array>
+                                    <string>0x39615b16b74589919c9ce1ea73f1fc5d53141a78</string>
+                                </array>
+                            </entry>
+                            <entry key="events">
+                                <array>
+                                    <dict>
+                                        <entry key="anonymous">
+                                            <int>0</int>
+                                        </entry>
+                                        <entry key="inputs">
+                                            <array>
+                                                <dict>
+                                                    <entry key="indexed">
+                                                        <int>1</int>
+                                                    </entry>
+                                                    <entry key="internalType">
+                                                        <string>address</string>
+                                                    </entry>
+                                                    <entry key="name">
+                                                        <string>sender</string>
+                                                    </entry>
+                                                    <entry key="type">
+                                                        <string>address</string>
+                                                    </entry>
+                                                </dict>
+                                                <dict>
+                                                    <entry key="indexed">
+                                                        <int>1</int>
+                                                    </entry>
+                                                    <entry key="internalType">
+                                                        <string>contract IERC20</string>
+                                                    </entry>
+                                                    <entry key="name">
+                                                        <string>token</string>
+                                                    </entry>
+                                                    <entry key="type">
+                                                        <string>address</string>
+                                                    </entry>
+                                                </dict>
+                                                <dict>
+                                                    <entry key="indexed">
+                                                        <int>0</int>
+                                                    </entry>
+                                                    <entry key="internalType">
+                                                        <string>uint256</string>
+                                                    </entry>
+                                                    <entry key="name">
+                                                        <string>networkId</string>
+                                                    </entry>
+                                                    <entry key="type">
+                                                        <string>uint256</string>
+                                                    </entry>
+                                                </dict>
+                                                <dict>
+                                                    <entry key="indexed">
+                                                        <int>0</int>
+                                                    </entry>
+                                                    <entry key="internalType">
+                                                        <string>uint256</string>
+                                                    </entry>
+                                                    <entry key="name">
+                                                        <string>amount</string>
+                                                    </entry>
+                                                    <entry key="type">
+                                                        <string>uint256</string>
+                                                    </entry>
+                                                </dict>
+                                                <dict>
+                                                    <entry key="indexed">
+                                                        <int>0</int>
+                                                    </entry>
+                                                    <entry key="internalType">
+                                                        <string>string</string>
+                                                    </entry>
+                                                    <entry key="name">
+                                                        <string>name</string>
+                                                    </entry>
+                                                    <entry key="type">
+                                                        <string>string</string>
+                                                    </entry>
+                                                </dict>
+                                                <dict>
+                                                    <entry key="indexed">
+                                                        <int>0</int>
+                                                    </entry>
+                                                    <entry key="internalType">
+                                                        <string>string</string>
+                                                    </entry>
+                                                    <entry key="name">
+                                                        <string>symbol</string>
+                                                    </entry>
+                                                    <entry key="type">
+                                                        <string>string</string>
+                                                    </entry>
+                                                </dict>
+                                                <dict>
+                                                    <entry key="indexed">
+                                                        <int>0</int>
+                                                    </entry>
+                                                    <entry key="internalType">
+                                                        <string>uint8</string>
+                                                    </entry>
+                                                    <entry key="name">
+                                                        <string>decimals</string>
+                                                    </entry>
+                                                    <entry key="type">
+                                                        <string>uint8</string>
+                                                    </entry>
+                                                </dict>
+                                            </array>
+                                        </entry>
+                                        <entry key="name">
+                                            <string>DepositedERC20</string>
+                                        </entry>
+                                        <entry key="type">
+                                            <string>event</string>
+                                        </entry>
+                                    </dict>
+                                </array>
+                            </entry>
+                            <entry key="network_id">
+                                <int>56</int>
+                            </entry>
+                        </dict>
+                    </entry>
+                </dict>
+            </entry>
+            <entry key="disable_event_stubbing">
+                <int>1</int>
+            </entry>
+        </dict>
+    </entry>
+</dict>

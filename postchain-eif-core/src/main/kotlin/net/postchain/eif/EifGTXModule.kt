@@ -18,6 +18,8 @@ import net.postchain.crypto.CryptoSystem
 import net.postchain.crypto.Secp256K1CryptoSystem
 import net.postchain.crypto.Signature
 import net.postchain.eif.config.EifEventConsumerConfig
+import net.postchain.eif.config.EifEventReceiverConfig
+import net.postchain.eif.config.EvmConfig
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvNull
@@ -45,13 +47,17 @@ class Config(
         var levelsPerPage: Int = 2,
         var snapshotsToKeep: Int = 0,
         var version: Int = 1,
+        var configuredNetworks: Map<String, Long> = emptyMap(),
+        var postchainContext: PostchainContext? = null,
 )
 
 class EifGTXModule : SimpleGTXModule<Config>(
         Config(), mapOf(), mapOf(
         "get_event_block_height" to ::eventBlockHeightQuery,
         "get_event_merkle_proof" to ::eventMerkleProofQuery,
-        "get_account_state_merkle_proof" to ::accountStateMerkleProofQuery
+        "get_account_state_merkle_proof" to ::accountStateMerkleProofQuery,
+        "get_configured_networks" to ::getConfiguredNetworks,
+        "is_network_supported_on_node" to ::isNetworkSupportedOnNode,
 )), PostchainContextAware, MetadataProvider {
 
     init {
@@ -77,18 +83,30 @@ class EifGTXModule : SimpleGTXModule<Config>(
                             ArgumentMetadata(name = "accountNumber", gtvTypes = setOf(GtvType.INTEGER)),
                             ArgumentMetadata(name = "signers", gtvTypes = setOf(GtvType.ARRAY), required = false),
                             ArgumentMetadata(name = "signatures", gtvTypes = setOf(GtvType.ARRAY), required = false),
-                    ),
+                    ), returnType = ReturnMetadata(gtvTypes = setOf(GtvType.DICT))),
+                    "get_configured_networks" to QueryMetadata(args = listOf(),
                             returnType = ReturnMetadata(gtvTypes = setOf(GtvType.DICT))),
+                    "is_network_supported_on_node" to QueryMetadata(args = listOf(
+                            ArgumentMetadata(name = "networks", gtvTypes = setOf(GtvType.ARRAY))
+                    ), returnType = ReturnMetadata(gtvTypes = setOf(GtvType.DICT)))
             )
     )
 
     override fun initializeContext(configuration: BlockchainConfiguration, postchainContext: PostchainContext) {
-        val snapshotConfig = configuration.rawConfig["eif"]?.toObject<EifEventConsumerConfig>()?.snapshot
+        val eifGtv = configuration.rawConfig["eif"]
+        val snapshotConfig = eifGtv?.toObject<EifEventConsumerConfig>()?.snapshot
         if (snapshotConfig != null) {
             conf.levelsPerPage = snapshotConfig.levelsPerPage.toInt()
             conf.snapshotsToKeep = snapshotConfig.snapshotsToKeep.toInt()
             conf.version = snapshotConfig.version.toInt()
         }
+
+        if (eifGtv?.get("chains") != null) {
+            conf.configuredNetworks = eifGtv.toObject<EifEventReceiverConfig>().chains
+                    .map { it.key to it.value.networkId }.toMap()
+        }
+
+        conf.postchainContext = postchainContext
     }
 
     override fun initializeDB(ctx: EContext) {
@@ -195,6 +213,55 @@ fun accountStateMerkleProofQuery(config: Config, ctx: EContext, args: Gtv): Gtv 
     val accountStateMerkleProof = EvmMerkleProofBuilder(snapshotPageStore, cs, listOf(EIF))
             .build(ctx, blockHeight, blockRid, accountState.data, ds.digest(accountState.data), accountState.stateN, signatures)
     return GtvObjectMapper.toGtvDictionary(AccountStateMerkleProof.fromEvmMerkleProof(accountStateMerkleProof))
+}
+
+/**
+ * The `get_configured_networks()` query returns a dictionary of configured networks and their corresponding network IDs.
+ *
+ * This query reads from the `eif.chains` subsection of the EIF configuration, which defines
+ * networks relevant to the **Event Receiver** chain.
+ *
+ * Query parameters:
+ *  - none
+ * Query returns:
+ *  - map<text, integer> -- a dictionary where keys are network names and values are their network IDs
+ *
+ * @param config The EIF module internal configuration
+ * @param ctx The execution context
+ * @param args Query arguments (not used)
+ * @return GTV dictionary where keys are network names and values are their network IDs
+ */
+fun getConfiguredNetworks(config: Config, ctx: EContext, args: Gtv): Gtv = gtv(
+        config.configuredNetworks.map { it.key to gtv(it.value) }.toMap()
+)
+
+/**
+ * The `is_network_supported_on_node()` query checks if a given network is configured on the node
+ *
+ * This query reads from the `<network>.urls` node config file
+ *
+ * Query parameters:
+ *  - networks: list<text> -- list of network names to check
+ * Query returns:
+ *  - map<text, boolean> -- a dictionary where keys are network names and values are booleans indicating if the network is supported
+ *
+ * @param config The EIF module internal configuration
+ * @param ctx The execution context
+ * @param args Query arguments
+ * @return GTV dictionary where keys are network names and values are booleans indicating if the network is supported
+ */
+fun isNetworkSupportedOnNode(config: Config, ctx: EContext, args: Gtv): Gtv {
+    if (config.postchainContext == null) return gtv(mapOf())
+
+    val networks = args.asDict()["networks"]?.asArray()
+            ?: throw UserMistake("Query is missing required input argument 'networks'")
+
+    return gtv(
+            networks.associate {
+                val urls = EvmConfig.getNetworkUrls(it.asString(), config.postchainContext!!.appConfig)
+                it.asString() to gtv(urls.isNotEmpty())
+            }
+    )
 }
 
 @Suppress("ArrayInDataClass")
