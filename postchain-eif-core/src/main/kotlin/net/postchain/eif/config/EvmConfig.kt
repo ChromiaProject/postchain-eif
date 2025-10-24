@@ -43,6 +43,11 @@ data class EvmConfig(
                     config.getEnvOrLong(EVM_MAX_QUEUE_SIZE, "evm.maxQueueSize", 10_000L)
             )
         }
+
+        @JvmStatic
+        fun getNetworkUrls(chain: String, config: AppConfig): List<String> {
+            return config.getEnvOrListProperty(chainProperty(chain, "URLS"), "$chain.urls", listOf())
+        }
     }
 
     fun toEnvironmentKeyValueMap(chain: String): Map<String, String> = buildMap {
