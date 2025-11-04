@@ -69,7 +69,7 @@ const config: HardhatUserConfig = {
         bsc_testnet: { // BSC testnet
             accounts: accounts,
             chainId: 97,
-            url: "https://data-seed-prebsc-1-s1.binance.org:8545/",
+            url: "https://data-seed-prebsc-1-s1.bnbchain.org:8545/",
         },
         base: { // BASE Mainnet
             accounts: accounts,
