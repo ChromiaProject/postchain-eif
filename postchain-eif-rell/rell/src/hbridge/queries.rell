@@ -177,3 +177,10 @@ query get_erc20_withdrawal_history(withdrawal_id: rowid): list<erc20_withdrawal_
 
     return history;
 }
+
+/**
+ * Retrieves the current version of the HBridge module.
+ *
+ * @return An integer representing the version number of the HBridge module as specified in chain context arguments.
+ */
+query get_hbridge_version() = chain_context.args.version;
