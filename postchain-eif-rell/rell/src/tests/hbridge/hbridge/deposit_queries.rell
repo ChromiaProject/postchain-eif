@@ -243,7 +243,7 @@ function test_get_erc20_deposits() {
     assert_equals(dep9 @ {} (@set .recipient_id), set([bob_evm_deposit_recipient_id]));
     assert_equals(dep9 @ {} (@set .asset_id), set([bar_asset.id]));
 
-    // Asserting a pagination
+    // Asserting pagination / @sort
     val res10 = try_call(
         get_erc20_deposits(deposit_filter(network_id = network_id1, token_address = CHR.token_address), null, null, 8, "sort of cursor", *)
     );
@@ -276,6 +276,32 @@ function test_get_erc20_deposits() {
     val dep15 = parse_paged_deposits(res15);
     assert_equals(dep15.size(), 2);
     assert_equals((dep14 @ {} (@max .amount) ?: 0L) + 1L, dep15 @ {} (@min .amount));
+
+    // Asserting pagination and @sort_desc order
+    val res10_desc = try_call(
+        get_erc20_deposits(deposit_filter(network_id = network_id1, token_address = CHR.token_address), null, null, 8, "sort of cursor", sort_desc = true, *)
+    );
+    assert_null(res10_desc);
+    // Getting all CHR deposits
+    val res11_desc = get_erc20_deposits(deposit_filter(token_address = CHR.token_address), null, null, null, null, sort_desc = true);
+    assert_null(res11.next_cursor);
+    val dep11_desc = parse_paged_deposits(res11_desc);
+    assert_equals(dep11_desc, dep11.reversed());
+    // - page_size 8, page 0
+    val res12_desc = get_erc20_deposits(deposit_filter(token_address = CHR.token_address), null, null, 8, null, sort_desc = true);
+    assert_not_null(res12_desc.next_cursor);
+    val dep12_desc = parse_paged_deposits(res12_desc);
+    assert_equals(dep12_desc, [dep13[6], dep13[7], dep14[0], dep14[1], dep14[2], dep14[3], dep15[0], dep15[1]].reversed());
+    // - page_size 8, page 0
+    val res13_desc = get_erc20_deposits(deposit_filter(token_address = CHR.token_address), null, null, 8, res12_desc.next_cursor, sort_desc = true);
+    assert_not_null(res13_desc.next_cursor);
+    val dep13_desc = parse_paged_deposits(res13_desc);
+    assert_equals(dep13_desc, [dep12[6], dep12[7], dep13[0], dep13[1], dep13[2], dep13[3], dep13[4], dep13[5]].reversed());
+    // - page_size 8, page 0
+    val res14_desc = get_erc20_deposits(deposit_filter(token_address = CHR.token_address), null, null, 8, res13_desc.next_cursor, sort_desc = true);
+    assert_null(res14_desc.next_cursor);
+    val dep14_desc = parse_paged_deposits(res14_desc);
+    assert_equals(dep14_desc, dep12.sub(0, 6).reversed());
 
     // last_update filter
     val res16 = get_erc20_deposits(deposit_filter(token_address = CHR.token_address),

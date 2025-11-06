@@ -15,9 +15,10 @@ query get_erc20_withdrawal(network_id: integer, token_address: byte_array, benef
  * @param filter The filter applied to the withdrawal search. See [withdrawal_filter] structure.
  * @param page_size The number of withdrawal records to return per page. Limited by the maximum page size defined in the chain configuration. If not specified, a maximum page size defined in the chain configuration is used.
  * @param page_cursor A cursor for pagination, typically pointing to the start of the next page of results. If not specified, the first page will be returned.
+ * @param sort_desc Controls the sorting order of results. If true, results are sorted in descending order by `rowid` (newest first). If false, results are sorted in ascending order (oldest first). Defaults to false.
  * @return A `ft4.utils.paged_result` containing the filtered results and pagination data. This result includes data such as the list of withdrawals (see [erc20_withdrawal_info]), and the next page cursor (`next_cursor`). If `next_cursor` is null, there are no more pages to fetch.
  */
-query get_erc20_withdrawals(filter: withdrawal_filter, page_size: integer? = null, page_cursor: text? = null): ft4.utils.paged_result {
+query get_erc20_withdrawals(filter: withdrawal_filter, page_size: integer? = null, page_cursor: text? = null, sort_desc: boolean = false): ft4.utils.paged_result {
     val before_rowid = ft4.utils.before_rowid(page_cursor);
 
     val paginated_result = (
@@ -31,8 +32,12 @@ query get_erc20_withdrawals(filter: withdrawal_filter, page_size: integer? = nul
         filter.to == null or w.transaction.block.timestamp < filter.to,
         filter.tx_rid == null or w.transaction.tx_rid == filter.tx_rid,
         empty(filter.statuses) or s.withdrawal_status in filter.statuses,
-        w.rowid > (before_rowid ?: rowid(0))
+        if (sort_desc)
+            w.rowid < (before_rowid ?: rowid(integer.MAX_VALUE))
+        else
+            w.rowid > (before_rowid ?: rowid(0))
     } (
+        @omit @sort_desc if (sort_desc) w.rowid else rowid(0),
         ft4.utils.pagination_result(
             data = map_withdrawal(w, s.withdrawal_status).to_gtv_pretty(),
             rowid = w.rowid
@@ -65,10 +70,11 @@ query get_erc20_withdrawal_by_id(withdrawal_id: rowid): erc20_withdrawal_info? =
  * @param to Marks the end of a time interval. If not null, deposits last updated at `to` and after `to` are excluded.
  * @param page_size The number of deposit records to return per page. Limited by the maximum page size defined in the chain configuration. If not specified, a maximum page size defined in the chain configuration is used.
  * @param page_cursor A cursor for pagination, typically pointing to the start of the next page of results. If not specified, the first page will be returned.
+ * @param sort_desc Controls the sorting order of results. If true, results are sorted in descending order by `rowid` (newest first). If false, results are sorted in ascending order (oldest first). Defaults to false.
  * @return A `ft4.utils.paged_result` containing the filtered results and pagination data. This result includes data such as the list of deposits (see [erc20_deposit_info]), and the next page cursor (`next_cursor`). If `next_cursor` is null, there are no more pages to fetch.
  */
 query get_erc20_deposits(filter: deposit_filter, from: timestamp? = null, to: timestamp? = null,
-        page_size: integer? = null, page_cursor: text? = null): ft4.utils.paged_result {
+        page_size: integer? = null, page_cursor: text? = null, sort_desc: boolean = false): ft4.utils.paged_result {
     val before_rowid = ft4.utils.before_rowid(page_cursor);
 
     val paginated_result = (
@@ -83,15 +89,19 @@ query get_erc20_deposits(filter: deposit_filter, from: timestamp? = null, to: ti
         filter.evm_tx_hash == null or .evm_tx_hash == filter.evm_tx_hash,
         from == null or .last_updated >= from,
         to == null or .last_updated < to,
-        d.rowid > (before_rowid ?: rowid(0)),
+        if (sort_desc)
+            d.rowid < (before_rowid ?: rowid(integer.MAX_VALUE))
+        else
+            d.rowid > (before_rowid ?: rowid(0))
     } (
+        @omit @sort_desc if (sort_desc) d.rowid else rowid(0),
         ft4.utils.pagination_result(
             data = map_deposit(d, ct).to_gtv_pretty(),
             rowid = d.rowid
         )
     ) limit ft4.utils.fetch_data_size(page_size);
 
-    return ft4.utils.make_page(paginated_result, page_size);
+   return ft4.utils.make_page(paginated_result, page_size);
 }
 
 /**
