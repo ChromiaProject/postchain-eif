@@ -147,6 +147,11 @@ function test_get_erc20_deposits() {
             timestamp = rell.test.last_block_time - rell.test.block_interval
         )
     ]);
+    //  - get deposit by tx rid
+    val dep4_by_tx = get_erc20_deposit_by_tx(dep4.completed_tx_rid!!, dep4.completed_op_index!!);
+    assert_equals(dep4_by_tx, expected_deposit4);
+    //  - get deposit by unknown tx rid
+    assert_null(get_erc20_deposit_by_tx(x"0123", -1));
 
     // Bob is making a deposit of CHR and FOO tokens
     deposit_from_evm(bob_evm_address, amount, asset = CHR, block_height = 3);
@@ -214,6 +219,10 @@ function test_get_erc20_deposits() {
     assert_equals(dep6 @ {} (@set .recipient_id), set([alice_evm_deposit_recipient_id, bob_evm_deposit_recipient_id]));
     assert_equals(dep6 @ {} (@set .asset_id), set([chr_asset.id, foo_asset.id, bar_asset.id]));
     assert_equals(dep6 @ {} (@set .state), set([deposit_state.completed]));
+
+    // Get deposit by tx rid
+    val dep6_by_tx = get_erc20_deposit_by_tx(dep6[0].completed_tx_rid!!, dep6[0].completed_op_index!!);
+    assert_equals(dep6_by_tx, dep6[0]);
 
     // Verify sender_address filter
     assert_equals(parse_paged_deposits(get_erc20_deposits(deposit_filter(sender_address = bob_evm_address), null, null, null, null))

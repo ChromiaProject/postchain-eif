@@ -52,13 +52,26 @@ query get_erc20_withdrawals(filter: withdrawal_filter, page_size: integer? = nul
  *
  * @param tx_rid transaction RID in which the withdrawal was initiated
  * @param op_index index of the operation within the transaction in which the withdrawal was initiated
+ * @return An optional erc20_withdrawal_info containing the withdrawal details if found, null otherwise
  */
 query get_erc20_withdrawal_by_tx(tx_rid: byte_array, op_index: integer): erc20_withdrawal_info? =
         erc20_withdrawal @? { .transaction.tx_rid == tx_rid, op_index } ( map_withdrawal($) );
 
+/**
+ * Retrieves ERC20 token withdrawal based on event hash.
+ *
+ * @param event_hash The hash of the withdrawal event
+ * @return An optional erc20_withdrawal_info containing the withdrawal details if found, null otherwise
+ */
 query get_erc20_withdrawal_by_event_hash(event_hash: byte_array): erc20_withdrawal_info? =
         erc20_withdrawal @? { .event_hash == event_hash } ( map_withdrawal($) );
 
+/**
+ * Retrieves ERC20 token withdrawal based on withdrawal ID.
+ *
+ * @param withdrawal_id The unique identifier of the withdrawal
+ * @return An optional erc20_withdrawal_info containing the withdrawal details if found, null otherwise
+ */
 query get_erc20_withdrawal_by_id(withdrawal_id: rowid): erc20_withdrawal_info? =
         erc20_withdrawal @? { .rowid == withdrawal_id } ( map_withdrawal($) );
 
@@ -131,6 +144,16 @@ query get_erc20_deposit_history(deposit_id: rowid): list<erc20_deposit_history_e
 
     return history;
 }
+
+/**
+ * Retrieves ERC20 token deposit based on a transaction RID and operation index in which the deposit was completed.
+ *
+ * @param tx_rid transaction RID in which the deposit was completed
+ * @param op_index index of the operation within the transaction in which the deposit was completed
+ * @return An optional erc20_deposit_info containing the deposit details if found, null otherwise
+ */
+query get_erc20_deposit_by_tx(tx_rid: byte_array, op_index: integer): erc20_deposit_info? =
+        erc20_completed_deposit_transaction @? { .transaction.tx_rid == tx_rid, op_index } ( map_deposit($.deposit, $) );
 
 /**
  * Retrieves the history of an ERC20 withdrawal based on the specified withdrawal ID.
