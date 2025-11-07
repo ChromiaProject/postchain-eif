@@ -92,7 +92,7 @@ class EifGTXModule : SimpleGTXModule<Config>(
             )
     )
 
-    override fun initializeContext(configuration: BlockchainConfiguration, postchainContext: PostchainContext) {
+    override fun initializeContext(configuration: BlockchainConfiguration, postchainContext: PostchainContext, ctx: EContext) {
         val eifGtv = configuration.rawConfig["eif"]
         val snapshotConfig = eifGtv?.toObject<EifEventConsumerConfig>()?.snapshot
         if (snapshotConfig != null) {
