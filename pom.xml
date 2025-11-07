@@ -24,14 +24,14 @@
 
     <properties>
         <revision>dev</revision>
-        <postchain.version>3.45.6</postchain.version>
-        <rell.version>0.14.14</rell.version>
+        <postchain.version>3.46.2</postchain.version>
+        <rell.version>0.14.15</rell.version>
+        <rell.maven.plugin.version>0.15.1</rell.maven.plugin.version>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <kotlin.compiler.jvmTarget>21</kotlin.compiler.jvmTarget>
         <testcontainers.version>1.20.3</testcontainers.version>
         <junit.pioneer.version>2.2.0</junit.pioneer.version>
-        <rell.maven.plugin.version>0.14.9</rell.maven.plugin.version>
         <web3j.version>4.13.0</web3j.version>
     </properties>
 
@@ -126,6 +126,9 @@
                     <groupId>net.postchain.rell</groupId>
                     <artifactId>rell-maven-plugin</artifactId>
                     <version>${rell.maven.plugin.version}</version>
+                    <configuration>
+                        <hideLibWarnings>true</hideLibWarnings>
+                    </configuration>
                 </plugin>
             </plugins>
         </pluginManagement>
