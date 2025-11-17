@@ -5,7 +5,6 @@ include:
     file:
       - templates/release.yml
       - templates/maven-dependency-scanning.yml
-      - templates/report-code-coverage.yml
 
 .setup:
   artifacts:
@@ -21,7 +20,6 @@ include:
 stages:
   - contracts
   - build
-  - code-coverage
   - deploy
   - dependency-check
   - release
@@ -75,7 +73,6 @@ contracts-build:
 build:
   extends:
     - .setup
-    - .visualise-test-coverage
   stage: build
   except:
     - dev
@@ -86,7 +83,7 @@ build:
     - job: contracts-build
       artifacts: true
   script:
-    - mvn $MAVEN_CLI_OPTS verify --activate-profiles ci,coverage
+    - mvn $MAVEN_CLI_OPTS verify --activate-profiles ci
   artifacts:
     when: always
     paths:
@@ -110,16 +107,6 @@ dependency-check:
   interruptible: true
   rules:
     - if: $RUN_DEPENDENCY_CHECK == "true"
-
-test-coverage-report:
-  stage: code-coverage
-  except:
-    - dev
-    - main
-    - tags
-    - /^support\/.*$/
-  dependencies:
-    - build
 
 variables:
   # This will suppress any download for dependencies and plugins or upload messages which would clutter the console log.
