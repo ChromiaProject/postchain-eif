@@ -145,7 +145,7 @@ export async function inspectManagedValidatorContract(validatorAddress: string, 
 
     const directoryValidator = await hre.ethers.getContractAt(
         "DirectoryChainValidator",
-        validatorAddress
+        directoryValidatorAddress
     ) as DirectoryChainValidator;
 
     // Log directory chain validators
