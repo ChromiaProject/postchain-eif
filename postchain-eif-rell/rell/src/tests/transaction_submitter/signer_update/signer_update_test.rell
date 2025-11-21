@@ -5,6 +5,8 @@ import ^.helper_operations.*;
 import tests.transaction_submitter.helper_operations.*;
 
 val test_directory_chain_brid = x"00000000000000000000000000000000";
+val test_system_anchoring_chain_brid = x"11111111111111111111111111111111";
+val test_network_id = 11155111;
 
 function test_directory_signer_update() {
     val new_signers = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub];
@@ -212,7 +214,7 @@ function test_adding_bridge_mapping_triggers_signer_update() {
                 blockchain_rid = unmapped_chain_brid,
                 validator_contract = "validator",
                 bridge_contract = "bridge",
-                evm_network_id = 11155111,
+                evm_network_id = test_network_id,
                 deleted = false
             )
         )
@@ -226,12 +228,94 @@ function test_adding_bridge_mapping_triggers_signer_update() {
     assert_equals(signer_list_update_entity.status, signer_list_update_status.QUEUED);
 }
 
-function trigger_signer_update(new_signers: list<byte_array>): signer_list_update {
+function test_adding_new_system_network_contracts() {
+    // First ensure we have an initial update of directory chain
+    val new_signers = [rell.test.keypairs.alice.pub, rell.test.keypairs.bob.pub];
+    val signer_list_update = trigger_signer_update(new_signers);
+
+    val update_tx = signer_list_update_transaction @ { signer_list_update }.evm_submit_transaction;
+
+    rell.test.tx().op(
+            update_evm_transaction_status_op(update_tx.rowid.to_integer(), transaction_status.TAKEN, x"01"),
+            update_evm_transaction_status_op(
+                update_tx.rowid.to_integer(),
+                transaction_status.PENDING,
+                x"01",
+                tx_hash = "00"
+            ),
+            update_evm_transaction_status_op(
+                update_tx.rowid.to_integer(),
+                transaction_status.SUCCESS,
+                x"01",
+                tx_hash = "00"
+            )
+        ).run();
+
+    assert_equals(latest_signer_list_update_status(test_directory_chain_brid), signer_list_update_status.COMPLETED);
+    // And system anchoring chain...
+    val signer_list_update_sac = trigger_signer_update(new_signers, test_system_anchoring_chain_brid, 2);
+
+    val sac_update_tx = signer_list_update_transaction @ { signer_list_update_sac }.evm_submit_transaction;
+
+    rell.test.tx().op(
+            update_evm_transaction_status_op(sac_update_tx.rowid.to_integer(), transaction_status.TAKEN, x"01"),
+            update_evm_transaction_status_op(
+                sac_update_tx.rowid.to_integer(),
+                transaction_status.PENDING,
+                x"01",
+                tx_hash = "00"
+            ),
+            update_evm_transaction_status_op(
+                sac_update_tx.rowid.to_integer(),
+                transaction_status.SUCCESS,
+                x"01",
+                tx_hash = "00"
+            )
+        ).run();
+
+    // Now let's mock adding a new network with directory chain validator and system anchoring chain validator
+    val new_network_id = 1;
+    val new_network_directory_validator = "02";
+    val new_network_system_anchoring_chain_validator = "02";
+    rell.test.tx().op(
+        mock_system_validator_contract_update(test_directory_chain_brid, new_network_id, new_network_directory_validator),
+        mock_system_validator_contract_update(test_system_anchoring_chain_brid, new_network_id, new_network_system_anchoring_chain_validator),
+    ).run();
+
+    // We should have 2 queued updates
+    val queued_updates = get_queued_signer_updates();
+    assert_equals(queued_updates.size(), 2);
+
+    // Assert that we only consider directory chain updatable
+    assert_true(is_chain_updatable_at_height(test_directory_chain_brid, 1));
+    assert_false(is_chain_updatable_at_height(test_system_anchoring_chain_brid, 2));
+
+    // Now ensure that we don't resubmit previous txs
+    val directory_chain_resubmit_update = queued_updates @ { .blockchain_rid == test_directory_chain_brid };
+    rell.test.tx().op(
+        enqueue_signer_update_op(directory_chain_resubmit_update.rowid)
+    ).nop().run();
+
+    val test_network_updates = signer_list_update_transaction @* {
+        .signer_list_update.rowid == rowid(directory_chain_resubmit_update.rowid),
+        .evm_submit_transaction.network_id == test_network_id
+    };
+    assert_equals(test_network_updates.size(), 1);
+    assert_equals(test_network_updates[0].evm_submit_transaction.status, transaction_status.SUCCESS);
+
+    // We don't actually have the new contracts in module args so update will be considered complete
+    assert_equals(latest_signer_list_update_status(test_directory_chain_brid), signer_list_update_status.COMPLETED);
+
+    // Now assert SAC update can be taken
+    assert_true(is_chain_updatable_at_height(test_system_anchoring_chain_brid, 2));
+}
+
+function trigger_signer_update(new_signers: list<byte_array>, blockchain_rid: byte_array = test_directory_chain_brid, confirmed_at_height: integer = 1): signer_list_update {
     rell.test.tx().op(
             signer_update_message_op(
                 signer_list_update_message(
                     serial = 1,
-                    blockchain_rid = test_directory_chain_brid,
+                    blockchain_rid = blockchain_rid,
                     signers = new_signers.to_gtv().to_bytes(),
                     confirmed_in_directory_at_height = 1
                 )

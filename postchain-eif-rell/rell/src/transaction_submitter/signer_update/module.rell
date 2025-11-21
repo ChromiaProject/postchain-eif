@@ -86,7 +86,17 @@ function enqueue_signer_update_transaction_impl(
 
     val contracts = get_validator_contracts(signer_list_update.blockchain_rid);
 
+    var submitted_txs = false;
     for (contract in contracts) {
+        // Check if this is a resubmission, in that case the contract might already have been updated
+        if (exists(signer_list_update_transaction @? {
+            .evm_submit_transaction.contract_address == contract.validator_contract,
+            .evm_submit_transaction.network_id == contract.network_id,
+            signer_list_update
+        })) {
+            continue;
+        }
+
         val transaction = add_transaction_to_queue(
             contract.validator_contract,
             "updateValidators",
@@ -114,11 +124,12 @@ function enqueue_signer_update_transaction_impl(
                 contract.network_id
             )
         );
+        submitted_txs = true;
     }
 
-    if (contracts.empty()) {
+    if (not submitted_txs) {
         log(
-            "No contracts are configured for blockchain %s, completing update"
+            "No contracts needed to be updated for blockchain %s, completing update"
                 .format(
                     signer_list_update
                         .blockchain_rid
@@ -364,32 +375,14 @@ function check_and_resubmit_latest_update_if_needed(network_id: integer, validat
             }
         }
 
-        // Resubmission is necessary, just copy any of the old txs
-        if (empty(transactions)) {
-            // Weird, but ok, let's just queue it again then
+        // Resubmission is necessary but let's not do it in case the previous update is still marked as failed
+        // We need to take manual action in that case anyway so let's not build an automated flow for this
+        if (signer_list_update.status != signer_list_update_status.FAILED) {
             signer_list_update.status = signer_list_update_status.QUEUED;
         } else {
-            val old_transaction = transactions[0];
-
-            val new_transaction = add_transaction_to_queue(
-                validator_contract,
-                old_transaction.function_name,
-                old_transaction.parameter_types.split("."),
-                list<gtv>.from_gtv(gtv.from_bytes(old_transaction.parameter_values)),
-                network_id,
-                get_system_max_priority_fee_per_gas(),
-                get_system_max_fee_per_gas(),
-                chain_context.blockchain_rid
-            );
-
-            create signer_list_update_transaction ( new_transaction, signer_list_update );
-
-            log(
-                "Submitting signer update tx for blockchain %s on network %s.".format(
-                    signer_list_update.blockchain_rid,
-                    network_id
-                )
-            );
+            log("New validator contract on %s on network %s will not receive any signer update since the previous update is in FAILED state, please submit manually.".format(
+                validator_contract, network_id
+            ));
         }
     }
 }

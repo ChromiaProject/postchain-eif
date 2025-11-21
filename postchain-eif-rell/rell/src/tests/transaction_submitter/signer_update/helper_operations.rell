@@ -13,3 +13,7 @@ operation signer_update_message_op(signer_list_update_message) {
 operation bridge_mapping_message_update_op(bridge_mapping_message) {
     handle_bridge_mapping_updates(x"", bridge_mapping_topic, bridge_mapping_message.to_gtv());
 }
+
+operation mock_system_validator_contract_update(blockchain_rid: byte_array, network_id: integer, validator_contract: text) {
+    handle_new_validator_contract(blockchain_rid, network_id, validator_contract);
+}
