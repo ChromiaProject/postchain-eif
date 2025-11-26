@@ -1,5 +1,6 @@
 package net.postchain.eif.transaction.signerupdate
 
+import net.postchain.gtv.mapper.DefaultValue
 import net.postchain.gtv.mapper.Name
 
 data class EvmSignerUpdate(
@@ -12,5 +13,8 @@ data class EvmSignerUpdate(
         @Name("signers")
         val signers: ByteArray,
         @Name("confirmed_in_directory_at_height")
-        val confirmedInDirectoryAtHeight: Long
+        val confirmedInDirectoryAtHeight: Long,
+        @Name("historical")
+        @DefaultValue(defaultBoolean = false)
+        val historical: Boolean
 )

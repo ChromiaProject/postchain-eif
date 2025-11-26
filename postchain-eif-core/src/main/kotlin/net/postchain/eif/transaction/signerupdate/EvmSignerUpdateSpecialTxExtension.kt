@@ -10,12 +10,14 @@ import net.postchain.concurrent.util.get
 import net.postchain.core.BlockEContext
 import net.postchain.core.block.BlockQueriesProvider
 import net.postchain.crypto.CryptoSystem
+import net.postchain.eif.EifSignature
 import net.postchain.eif.EvmMerkleProof
 import net.postchain.eif.MerkleProofUtil
 import net.postchain.eif.decodeBlockHeaderDataFromEVM
 import net.postchain.eif.getEthereumAddress
 import net.postchain.eif.transaction.EvmBlockHeaderValidator
 import net.postchain.eif.transaction.signerupdate.directorychain.SignerUpdateGTXModule.Companion.SIGNER_LIST_UPDATE_PROOF_QUERY
+import net.postchain.getBFTRequiredSignatureCount
 import net.postchain.gtv.GtvDecoder
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.mapper.toObject
@@ -24,6 +26,7 @@ import net.postchain.gtx.data.OpData
 import net.postchain.gtx.special.GTXSpecialTxExtension
 import org.web3j.abi.datatypes.Address
 import java.security.MessageDigest
+import java.util.concurrent.ExecutionException
 
 class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
 
@@ -33,6 +36,8 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
     private lateinit var module: GTXModule
     private lateinit var cryptoSystem: CryptoSystem
 
+    lateinit var witnessFetcher: EvmSignerUpdateBlockWitnessFetcher
+
     private val evmBlockHeaderValidator = EvmBlockHeaderValidator("Validation of signer update failed:")
     private val keccakDigest = SimpleDigestSystem(MessageDigest.getInstance(KECCAK256))
 
@@ -40,12 +45,15 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
         const val ENQUEUE_SIGNER_UPDATE_TRANSACTION_OP = "__enqueue_signer_update_transaction"
 
         const val GET_QUEUED_SIGNER_UPDATES_QUERY = "get_queued_signer_updates"
-        const val IS_CHAIN_UPDATABLE_AT_HEIGHT = "is_chain_updatable_at_height"
+        const val IS_CHAIN_UPDATABLE_AT_HEIGHT_QUERY = "is_chain_updatable_at_height"
+        const val CURRENT_EVM_SIGNERS_QUERY = "get_current_evm_signer_list"
+        const val LATEST_UPDATE_STATUS = "latest_signer_list_update_status"
     }
 
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
         val queuedSignerUpdatesResult = module.query(bctx, GET_QUEUED_SIGNER_UPDATES_QUERY, gtv(mapOf()))
         val evmSignerUpdates = queuedSignerUpdatesResult.asArray().map { it.toObject<EvmSignerUpdate>() }
+        if (evmSignerUpdates.isEmpty()) return listOf()
 
         val directoryChainQueries = blockQueriesProvider.getBlockQueries(directoryChainBrid)
                 ?: return listOf<OpData>().also {
@@ -54,6 +62,14 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
 
         val ops = mutableListOf<OpData>()
         for (update in evmSignerUpdates) {
+            if (!update.blockchainRid.contentEquals(directoryChainBrid.data) && update.historical &&
+                    module.query(bctx, LATEST_UPDATE_STATUS, gtv(mapOf("blockchain_rid" to gtv(directoryChainBrid))))
+                            .asString() != "COMPLETED"
+            ) {
+                logger.warn("Unable to process historical updates while latest directory chain update is incomplete")
+                continue
+            }
+
             if (!readyForUpdate(bctx, update.blockchainRid, update.confirmedInDirectoryAtHeight)) {
                 if (update.blockchainRid.contentEquals(directoryChainBrid.data)) {
                     logger.warn("Unable to perform signer update for directory chain since dependent updates are still queued")
@@ -77,12 +93,43 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
             }
             val signerUpdateProof = queryResponse.toObject<EvmMerkleProof>()
 
+            var blockWitness = signerUpdateProof.blockWitness
+            if (update.historical) {
+                if (witnessFetcher.hasWitnessJob(update.rowId)) {
+                    val jobResult = try {
+                        witnessFetcher.getWitnessJobResult(update.rowId)
+                    } catch (e: ExecutionException) {
+                        logger.error("Witness fetch job failed: ${e.message}")
+                        witnessFetcher.removeWitnessJob(update.rowId)
+                        continue
+                    }
+
+                    if (jobResult == null) {
+                        logger.warn("Unable to process historical signer update since witness fetch job is not done yet")
+                        continue
+                    } else {
+                        blockWitness = jobResult
+                    }
+                } else {
+                    val currentDirectoryChainSigners = module.query(bctx, CURRENT_EVM_SIGNERS_QUERY, gtv(mapOf("blockchain_rid" to gtv(directoryChainBrid))))
+                            .asArray().map { it.asByteArray() }
+                    val (validWitness, witnessWithoutOldSigners) = verifyHistoricalWitness(signerUpdateProof.blockWitness, currentDirectoryChainSigners)
+                    if (!validWitness) {
+                        logger.warn("Unable to process historical signer update without gathering additional signatures")
+                        witnessFetcher.fetchMissingWitnessesForBlock(update, witnessWithoutOldSigners, currentDirectoryChainSigners)
+                        continue
+                    } else {
+                        blockWitness = witnessWithoutOldSigners
+                    }
+                }
+            }
+
             ops.add(OpData(ENQUEUE_SIGNER_UPDATE_TRANSACTION_OP, arrayOf(
                     gtv(update.rowId),
                     gtv(signerUpdateEvent),
                     gtv(signerUpdateProof.blockHeader),
-                    gtv(signerUpdateProof.blockWitness.map { gtv(it.sig) }),
-                    gtv(signerUpdateProof.blockWitness.map { gtv(it.pubkey) }),
+                    gtv(blockWitness.map { gtv(it.sig) }),
+                    gtv(blockWitness.map { gtv(it.pubkey) }),
                     gtv(EvmTypeEncoder.encodeExtraMerkleProof(signerUpdateProof.extraMerkleProof)),
                     gtv(EvmTypeEncoder.encodeProof(signerUpdateProof.proof))
             )))
@@ -91,8 +138,17 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
         return ops
     }
 
+    private fun verifyHistoricalWitness(blockWitness: List<EifSignature>, currentDirectoryChainSigners: List<ByteArray>): Pair<Boolean, List<EifSignature>> {
+        val currentDirectoryChainEvmSigners = currentDirectoryChainSigners.map { getEthereumAddress(it) }
+
+        val witnessWithoutOldSigners = blockWitness.filter { signature ->
+            currentDirectoryChainEvmSigners.any { it.contentEquals(signature.pubkey) }
+        }
+        return (witnessWithoutOldSigners.size >= getBFTRequiredSignatureCount(currentDirectoryChainEvmSigners.size)) to witnessWithoutOldSigners
+    }
+
     private fun readyForUpdate(bctx: BlockEContext, blockchainRID: ByteArray, updateHeight: Long): Boolean =
-            module.query(bctx, IS_CHAIN_UPDATABLE_AT_HEIGHT, gtv(mapOf("blockchain_rid" to gtv(blockchainRID), "update_height" to gtv(updateHeight))))
+            module.query(bctx, IS_CHAIN_UPDATABLE_AT_HEIGHT_QUERY, gtv(mapOf("blockchain_rid" to gtv(blockchainRID), "update_height" to gtv(updateHeight))))
                     .asBoolean()
 
     override fun getRelevantOps() = setOf(ENQUEUE_SIGNER_UPDATE_TRANSACTION_OP)
@@ -111,6 +167,8 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
         val queuedEvmSignerUpdates = module.query(bctx, GET_QUEUED_SIGNER_UPDATES_QUERY, gtv(mapOf())).asArray()
                 .map { it.toObject<EvmSignerUpdate>() }
 
+        val enqueuedHistoricalUpdates = mutableListOf<EvmSignerUpdate>()
+        var enqueuedDirectoryChainUpdate = false
         for (op in ops) {
             val rowId = op.args[0].asInteger()
 
@@ -120,6 +178,8 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
                 logger.warn("Validation failed. Trying to inject a transaction for a signer update that is not queued")
                 return false
             }
+
+            if (correspondingUpdate.historical) enqueuedHistoricalUpdates.add(correspondingUpdate)
 
             if (!readyForUpdate(bctx, correspondingUpdate.blockchainRid, correspondingUpdate.confirmedInDirectoryAtHeight)) {
                 if (correspondingUpdate.blockchainRid.contentEquals(directoryChainBrid.data)) {
@@ -189,8 +249,19 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
                 logger.warn("Validation failed. Calculated proof root mismatch")
                 return false
             }
+
+            if (!correspondingUpdate.blockchainRid.contentEquals(directoryChainBrid.data)) enqueuedDirectoryChainUpdate = true
         }
 
+        if (enqueuedDirectoryChainUpdate) {
+            bctx.addAfterCommitHook {
+                witnessFetcher.removeAllWitnessJobs()
+            }
+        } else if (enqueuedHistoricalUpdates.isNotEmpty()) {
+            bctx.addAfterCommitHook {
+                enqueuedHistoricalUpdates.forEach { witnessFetcher.removeWitnessJob(it.rowId) }
+            }
+        }
         return true
     }
 }

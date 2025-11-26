@@ -2,8 +2,8 @@ module;
 
 import transaction_submitter.signer_update.*;
 
-operation enqueue_signer_update_op(update_id: integer) {
-    enqueue_signer_update_transaction_impl(update_id, x"", x"", [x""], [x""], x"", x"");
+operation enqueue_signer_update_op(update_id: integer, new_signers: list<byte_array>) {
+    enqueue_signer_update_transaction_impl(update_id, x"", x"", [x""], new_signers, x"", x"");
 }
 
 operation signer_update_message_op(signer_list_update_message) {
