@@ -47,7 +47,7 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
         const val GET_QUEUED_SIGNER_UPDATES_QUERY = "get_queued_signer_updates"
         const val IS_CHAIN_UPDATABLE_AT_HEIGHT_QUERY = "is_chain_updatable_at_height"
         const val CURRENT_EVM_SIGNERS_QUERY = "get_current_evm_signer_list"
-        const val LATEST_UPDATE_STATUS = "latest_signer_list_update_status"
+        const val LATEST_UPDATE_STATUS_QUERY = "latest_signer_list_update_status"
     }
 
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
@@ -63,7 +63,7 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
         val ops = mutableListOf<OpData>()
         for (update in evmSignerUpdates) {
             if (!update.blockchainRid.contentEquals(directoryChainBrid.data) && update.historical &&
-                    module.query(bctx, LATEST_UPDATE_STATUS, gtv(mapOf("blockchain_rid" to gtv(directoryChainBrid))))
+                    module.query(bctx, LATEST_UPDATE_STATUS_QUERY, gtv(mapOf("blockchain_rid" to gtv(directoryChainBrid))))
                             .asString() != "COMPLETED"
             ) {
                 logger.warn("Unable to process historical updates while latest directory chain update is incomplete")
@@ -105,7 +105,7 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
                     }
 
                     if (jobResult == null) {
-                        logger.warn("Unable to process historical signer update since witness fetch job is not done yet")
+                        logger.debug("Unable to process historical signer update since witness fetch job is not done yet")
                         continue
                     } else {
                         blockWitness = jobResult

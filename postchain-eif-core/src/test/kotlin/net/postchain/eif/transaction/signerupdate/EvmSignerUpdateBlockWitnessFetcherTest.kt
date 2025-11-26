@@ -147,8 +147,8 @@ class EvmSignerUpdateBlockWitnessFetcherTest {
                     cf(gtv(mapOf("api_url" to gtv(apiUrl))))
             )
 
-            // Build a valid signature from otherSigner1 over blockRid
-            val sig = crypto.buildSigMaker(otherSigner1).signDigest(blockRid)
+            // Build a valid signature from otherSigner2 over blockRid
+            val sig = crypto.buildSigMaker(otherSigner2).signDigest(blockRid)
 
             // Stub the HTTP endpoint that PostchainClient will call
             val bridHex = directoryChainBrid.toHex()
