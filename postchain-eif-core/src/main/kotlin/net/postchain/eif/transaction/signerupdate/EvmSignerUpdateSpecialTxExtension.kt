@@ -66,15 +66,15 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
                     module.query(bctx, LATEST_UPDATE_STATUS_QUERY, gtv(mapOf("blockchain_rid" to gtv(directoryChainBrid))))
                             .asString() != "COMPLETED"
             ) {
-                logger.warn("Unable to process historical updates while latest directory chain update is incomplete")
+                logger.info("Unable to process historical update for ${update.blockchainRid.toHex()} while latest directory chain update is incomplete")
                 continue
             }
 
             if (!readyForUpdate(bctx, update.blockchainRid, update.confirmedInDirectoryAtHeight)) {
                 if (update.blockchainRid.contentEquals(directoryChainBrid.data)) {
-                    logger.warn("Unable to perform signer update for directory chain since dependent updates are still queued")
+                    logger.info("Unable to perform signer update for directory chain since dependent updates are still queued")
                 } else {
-                    logger.warn("Unable to perform signer update for blockchain since dependent directory chain updates are still queued")
+                    logger.info("Unable to perform signer update for blockchain ${update.blockchainRid.toHex()} since dependent directory chain updates are still queued")
                 }
                 continue
             }
@@ -99,13 +99,13 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
                     val jobResult = try {
                         witnessFetcher.getWitnessJobResult(update.rowId)
                     } catch (e: ExecutionException) {
-                        logger.error("Witness fetch job failed: ${e.message}")
+                        logger.error("Witness fetch job for blockchain ${update.blockchainRid.toHex()} failed: ${e.message}")
                         witnessFetcher.removeWitnessJob(update.rowId)
                         continue
                     }
 
                     if (jobResult == null) {
-                        logger.debug("Unable to process historical signer update since witness fetch job is not done yet")
+                        logger.debug { "Unable to process historical signer update for blockchain ${update.blockchainRid.toHex()} since witness fetch job is not done yet" }
                         continue
                     } else {
                         blockWitness = jobResult
@@ -115,7 +115,7 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
                             .asArray().map { it.asByteArray() }
                     val (validWitness, witnessWithoutOldSigners) = verifyHistoricalWitness(signerUpdateProof.blockWitness, currentDirectoryChainSigners)
                     if (!validWitness) {
-                        logger.warn("Unable to process historical signer update without gathering additional signatures")
+                        logger.info { "Unable to process historical signer update for blockchain ${update.blockchainRid.toHex()} without gathering additional signatures. Starting fetch job." }
                         witnessFetcher.fetchMissingWitnessesForBlock(update, witnessWithoutOldSigners, currentDirectoryChainSigners)
                         continue
                     } else {
