@@ -44,12 +44,8 @@ blockchains:
         admin_pubkey: x"02a829e1d7fffbd856a04b53ec7d478d8896803b571c7700ec464d6a9d4f0e3bbd"
 
 libs:
-  ft4:
-    registry: https://gitlab.com/chromaway/ft4-lib.git
-    path: rell/src/lib/ft4
-    tagOrBranch: v1.1.0r
-    rid: x"FEEB0633698E7650D29DCCFE2996AD57CDC70AA3BDF770365C3D442D9DFC2A5E"
-    insecure: false
+  com.chromia.ft4:
+    version: 1.1.0
   iccf:
     registry: https://gitlab.com/chromaway/core/directory-chain
     path: src/lib/iccf
