@@ -87,7 +87,6 @@ build:
   artifacts:
     when: always
     paths:
-      - $JACOCO_REPORT_DIR/*
       - postchain-eif-core/logs/
 
 gitlab-release:
@@ -131,7 +130,6 @@ variables:
   DOCKER_TLS_CERTDIR: ""
   # Improve performance with overlayfs.
   DOCKER_DRIVER: overlay2
-  JACOCO_REPORT_DIR: postchain-eif-core/target/site/jacoco
 
 services:
   - postgres
