@@ -21,6 +21,7 @@ import net.postchain.eif.transaction.anchoring.EvmAnchoringSpecialTxExtension.Co
 import net.postchain.eif.transaction.config.EvmTransactionSubmitterConfig
 import net.postchain.eif.transaction.config.TransactionSubmitterBlockchainConfig
 import net.postchain.eif.transaction.gas.EIP1559FeeEstimatorFactory
+import net.postchain.eif.transaction.signerupdate.EvmSignerUpdateBlockWitnessFetcher
 import net.postchain.eif.transaction.signerupdate.EvmSignerUpdateSpecialTxExtension
 import net.postchain.eif.web3j.Web3jRawTransactionHandler
 import net.postchain.eif.web3j.Web3jRequestHandler
@@ -34,6 +35,7 @@ import java.math.BigInteger
 class TransactionSubmitterSynchronizationInfrastructureExtension(private val postchainContext: PostchainContext) : SynchronizationInfrastructureExtension {
 
     private val transactionSubmitters = mutableMapOf<Long, TransactionSubmitter>()
+    private var blockWitnessFetcher: EvmSignerUpdateBlockWitnessFetcher? = null
 
     override fun connectProcess(process: BlockchainProcess) {
         val databaseOperations = TransactionSubmitterDatabaseOperationsImpl()
@@ -131,6 +133,8 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
                     val db = DatabaseAccess.of(it)
                     db.getBlockchainRid(it) ?: throw ProgrammerMistake("No blockchain-rid found for chain 0")
                 }
+                signerUpdateExt.witnessFetcher = EvmSignerUpdateBlockWitnessFetcher(signerUpdateExt.blockQueriesProvider, signerUpdateExt.directoryChainBrid, blockchainConfig.getBlockHeaderValidator(), postchainContext.appConfig.pubKeyByteArray)
+                blockWitnessFetcher = signerUpdateExt.witnessFetcher
             }
         }
     }
@@ -156,10 +160,12 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
 
     override fun disconnectProcess(process: BlockchainProcess) {
         transactionSubmitters.values.forEach { it.shutdown() }
+        blockWitnessFetcher?.shutdown()
     }
 
     override fun shutdown() {
         transactionSubmitters.values.forEach { it.shutdown() }
+        blockWitnessFetcher?.shutdown()
     }
 
     private fun txTakenByThisNode(module: GTXModule, eContext: EContext, requestId: Long): Boolean {

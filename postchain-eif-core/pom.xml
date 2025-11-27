@@ -12,6 +12,8 @@
     <artifactId>postchain-eif-core</artifactId>
 
     <properties>
+        <postchain.client.version>3.38.0</postchain.client.version>
+
         <executable-classifier>jar-with-dependencies</executable-classifier>
         <dist-classifier>dist</dist-classifier>
     </properties>
@@ -51,6 +53,11 @@
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk18on</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>net.postchain.client</groupId>
+            <artifactId>postchain-client</artifactId>
+            <version>${postchain.client.version}</version>
         </dependency>
 
         <dependency>

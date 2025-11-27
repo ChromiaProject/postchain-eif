@@ -8,7 +8,7 @@ import net.postchain.eif.transaction.TransactionSubmitterTestContext
 import net.postchain.eif.transaction.TransactionSubmitterTestGTXModule
 import net.postchain.eif.transaction.signerupdate.EvmSignerUpdateSpecialTxExtension.Companion.ENQUEUE_SIGNER_UPDATE_TRANSACTION_OP
 import net.postchain.eif.transaction.signerupdate.EvmSignerUpdateSpecialTxExtension.Companion.GET_QUEUED_SIGNER_UPDATES_QUERY
-import net.postchain.eif.transaction.signerupdate.EvmSignerUpdateSpecialTxExtension.Companion.IS_CHAIN_UPDATABLE_AT_HEIGHT
+import net.postchain.eif.transaction.signerupdate.EvmSignerUpdateSpecialTxExtension.Companion.IS_CHAIN_UPDATABLE_AT_HEIGHT_QUERY
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.mapper.GtvObjectMapper
 import net.postchain.gtx.GTXOperation
@@ -26,7 +26,7 @@ class TransactionSubmitterSignerUpdateGTXModule : TransactionSubmitterTestGTXMod
                 GET_QUEUED_SIGNER_UPDATES_QUERY to { conf, _, _ ->
                     gtv(conf.signerUpdates.map { GtvObjectMapper.toGtvDictionary(it) })
                 },
-                IS_CHAIN_UPDATABLE_AT_HEIGHT to { _, _, _ ->
+                IS_CHAIN_UPDATABLE_AT_HEIGHT_QUERY to { _, _, _ ->
                     gtv(true)
                 }
         )

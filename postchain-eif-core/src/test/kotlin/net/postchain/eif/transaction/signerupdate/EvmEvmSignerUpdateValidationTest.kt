@@ -62,10 +62,11 @@ class EvmEvmSignerUpdateValidationTest {
                         1,
                         updatedBrid.data,
                         GtvEncoder.encodeGtv(GtvFactory.gtv(GtvFactory.gtv(udpatedSigner.pubKey.data))),
-                        0
+                        0,
+                        false
                 )
         ))
-        on { query(mockContext, EvmSignerUpdateSpecialTxExtension.IS_CHAIN_UPDATABLE_AT_HEIGHT, GtvFactory.gtv(mapOf("blockchain_rid" to GtvFactory.gtv(updatedBrid), "update_height" to GtvFactory.gtv(0)))) } doReturn GtvFactory.gtv(true)
+        on { query(mockContext, EvmSignerUpdateSpecialTxExtension.IS_CHAIN_UPDATABLE_AT_HEIGHT_QUERY, GtvFactory.gtv(mapOf("blockchain_rid" to GtvFactory.gtv(updatedBrid), "update_height" to GtvFactory.gtv(0)))) } doReturn GtvFactory.gtv(true)
     }
     private val keccakDigest: SimpleDigestSystem
 
@@ -227,7 +228,8 @@ class EvmEvmSignerUpdateValidationTest {
                         1,
                         updatedBrid.data,
                         GtvEncoder.encodeGtv(GtvFactory.gtv(GtvFactory.gtv(cryptoSystem.generateKeyPair().pubKey.data))),
-                        0
+                        0,
+                        false
                 )))
         )
         assertThat(sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(

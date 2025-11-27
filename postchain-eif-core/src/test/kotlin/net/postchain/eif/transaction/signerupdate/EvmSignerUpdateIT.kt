@@ -98,7 +98,8 @@ class EvmSignerUpdateIT : EifBaseIntegrationTest() {
                 2,
                 chainToUpdateBrid.data,
                 GtvEncoder.encodeGtv(gtv(gtv(updatedSigner.pubKey.data))),
-                4
+                4,
+                false
         ))
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
@@ -129,6 +130,7 @@ class EvmSignerUpdateIT : EifBaseIntegrationTest() {
                 directoryChainBrid.data,
                 GtvEncoder.encodeGtv(gtv(gtv(updatedSigner.pubKey.data))),
                 4,
+                false
         ))
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
@@ -153,7 +155,8 @@ class EvmSignerUpdateIT : EifBaseIntegrationTest() {
                 1,
                 directoryChainBrid.data,
                 GtvEncoder.encodeGtv(gtv(gtv(node.appConfig.pubKeyByteArray))),
-                3
+                3,
+                false
         ))
 
         Awaitility.await().atMost(Duration.ONE_MINUTE).untilAsserted {
