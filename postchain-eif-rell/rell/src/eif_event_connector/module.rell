@@ -7,6 +7,5 @@ import ^.eif.messaging.*;
 function (sender: byte_array, topic: text, body: gtv) {
     when (topic) {
         evm_block_events_topic -> handle_evm_block(evm_block_message.from_gtv(body));
-        else -> log("Unexpected ICMF topic %s".format(topic));
     }
 }

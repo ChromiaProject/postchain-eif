@@ -48,7 +48,7 @@ blockchains:
             evm_read_offset: 10
             skip_to_height: 5801241
             events: !include configs/events.yml
-          base_sepolia:
+          base:
             network_id: 84532
             evm_read_offset: 10
             skip_to_height: 27469403
@@ -119,7 +119,7 @@ blockchains:
           - "net.postchain.d1.icmf.IcmfSenderGTXModule"
       transaction_submitter:
         chains:
-          base_sepolia:
+          base:
             network_id: 84532
             max_gas_price: 30000000000000000
             min_wallet_balance: 1000000000000000

@@ -56,7 +56,7 @@ function test_get_erc20_withdrawals() {
     withdraw(rell.test.keypairs.bob, bob_account, bob_auth_descriptor, network_id2, bar_asset.id, 700, bob_evm_address);
     withdraw(rell.test.keypairs.bob, bob_account, bob_auth_descriptor, network_id2, bar_asset.id, 800, bob_evm_address);
 
-    // Getting all withdrawals
+    // Getting all withdrawals / @sort
     val res1 = get_erc20_withdrawals(withdrawal_filter(), null, null);
     assert_null(res1.next_cursor);
     val wdr1 = parse_paged_withdrawals(res1);
@@ -64,6 +64,13 @@ function test_get_erc20_withdrawals() {
     assert_equals(wdr1 @ {} (@set .network_id), set([network_id1, network_id2]));
     assert_equals(wdr1 @ {} (@set .token_address), set([CHR.token_address, FOO.token_address, BAR.token_address]));
     assert_equals(wdr1 @ {} (@set .beneficiary), set([alice_evm_address, bob_evm_address]));
+
+    // Getting all withdrawals / @sort_desc
+    val res1_desc = get_erc20_withdrawals(withdrawal_filter(), null, null, sort_desc = true);
+    assert_null(res1_desc.next_cursor);
+    val wdr1_desc = parse_paged_withdrawals(res1_desc);
+    // Assert sorting order
+    assert_equals(wdr1_desc, wdr1.reversed());
 
     // Getting all withdrawals to network_id1
     val res2 = get_erc20_withdrawals(withdrawal_filter(network_id = network_id1), null, null);
@@ -113,7 +120,7 @@ function test_get_erc20_withdrawals() {
     assert_equals(wdr7 @ {} (@set .token_address), set([CHR.token_address, FOO.token_address]));
     assert_equals(wdr7 @ {} (@set .beneficiary), set([alice_evm_address]));
 
-    // Asserting pagination
+    // Asserting pagination / @sort
     //  - page_size 4, page 0
     val res8 = get_erc20_withdrawals(withdrawal_filter(network_id = network_id1, token_address = FOO.token_address, from = t0), 4, null);
     assert_not_null(res8.next_cursor);
@@ -138,6 +145,23 @@ function test_get_erc20_withdrawals() {
     assert_equals(wdr10 @ {} (@set .network_id), set([network_id1]));
     assert_equals(wdr10 @ {} (@set .token_address), set([FOO.token_address]));
     assert_equals(wdr10 @ {} (@set .beneficiary), set([bob_evm_address]));
+
+    // Asserting pagination and @sort_desc order
+    //  - page_size 4, page 0
+    val res8_desc = get_erc20_withdrawals(withdrawal_filter(network_id = network_id1, token_address = FOO.token_address, from = t0), 4, null, sort_desc = true);
+    assert_not_null(res8_desc.next_cursor);
+    val wdr8_desc = parse_paged_withdrawals(res8_desc);
+    assert_equals(wdr8_desc, [wdr9[2], wdr9[3], wdr10[0], wdr10[1]].reversed());
+    //  - page_size 4, page 1
+    val res9_desc = get_erc20_withdrawals(withdrawal_filter(network_id = network_id1, token_address = FOO.token_address, from = t0), 4, res8_desc.next_cursor, sort_desc = true);
+    assert_not_null(res9_desc.next_cursor);
+    val wdr9_desc = parse_paged_withdrawals(res9_desc);
+    assert_equals(wdr9_desc, [wdr8[2], wdr8[3], wdr9[0], wdr9[1]].reversed());
+    //  - page_size 4, page 2
+    val res10_desc = get_erc20_withdrawals(withdrawal_filter(network_id = network_id1, token_address = FOO.token_address, from = t0), 4, res9_desc.next_cursor, sort_desc = true);
+    assert_null(res10_desc.next_cursor);
+    val wdr10_desc = parse_paged_withdrawals(res10_desc);
+    assert_equals(wdr10_desc, [wdr8[0], wdr8[1]].reversed());
 
     // Getting withdrawal by tx1.tx_rid
     val wdr1_tx_rid = erc20_withdrawal @ {} (@omit @sort .rowid, .transaction.tx_rid) limit 1;

@@ -2,11 +2,12 @@ entity bridge_contract {
     network_id: integer;
     contract_address: byte_array;
     key network_id, contract_address;
+    skip_to_height: integer = 0;
 }
 
-function get_or_create_bridge(network_id: integer, bridge_address: byte_array) {
+function get_or_create_bridge(network_id: integer, bridge_address: byte_array, skip_to_height: integer) {
     return bridge_contract @? { network_id, bridge_address }
-        ?: create bridge_contract(network_id, bridge_address);
+        ?: create bridge_contract(network_id, bridge_address, skip_to_height);
 }
 
 /**

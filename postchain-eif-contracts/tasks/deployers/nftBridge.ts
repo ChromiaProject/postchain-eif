@@ -21,14 +21,14 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
  * @param offset - Optional. The withdraw offset value for the bridge. Defaults to 0 if not provided.
  * @param verify - Optional flag. If set, verifies the deployed contract on Etherscan.
  */
-task("deploy:nftBridge")
-    .addParam("validator", "Validator contract address")
+task("deploy:nftbridge")
+    .addParam("validatorAddress", "Validator contract address")
     .addOptionalParam('offset', 'withdraw offset')
     .addFlag('verify', 'Verify contracts at Etherscan')
-    .setAction(async ({ validator, offset, verify }, hre) => {
+    .setAction(async ({ validatorAddress, offset, verify }, hre) => {
         const withdrawOffset = offset === undefined ? 0 : parseInt(offset)
         const factory = await hre.ethers.getContractFactory("NFTBridge") as NFTBridge__factory;
-        const bridge = await hre.upgrades.deployProxy(factory, [validator, withdrawOffset]) as NFTBridge;
+        const bridge = await hre.upgrades.deployProxy(factory, [validatorAddress, withdrawOffset]) as NFTBridge;
         await bridge.waitForDeployment();
         const bridgeAddress = await bridge.getAddress();
         console.log("Token bridge deployed to: ", bridgeAddress);
@@ -52,7 +52,7 @@ task("deploy:nftBridge")
  * 
  * @param address - The address of the TokenBridge contract to be upgraded.
  */
-task("prepare:nftBridge")
+task("prepare:nftbridge")
     .addParam("address", "")
     .setAction(async ({ address }, hre) => {
         const factory = await hre.ethers.getContractFactory("NFTBridge") as NFTBridge__factory;
@@ -69,7 +69,7 @@ task("prepare:nftBridge")
  * @param address - The address of the TokenBridge contract to be upgraded.
  * @param verify - Optional flag. If set, verifies the upgraded contract on Etherscan.
  */
-task("upgrade:nftBridge")
+task("upgrade:nftbridge")
     .addParam("address", "")
     .addFlag("verify", "Verify contracts at Etherscan")
     .setAction(async ({ address, verify }, hre) => {
@@ -89,7 +89,7 @@ task("upgrade:nftBridge")
  * 
  * @param address - The address of the TokenBridge contract to be imported.
  */
-task("import:nftBridge")
+task("import:nftbridge")
     .addParam("address", "")
     .setAction(async ({ address }, hre) => {
         const factory = await hre.ethers.getContractFactory("NFTBridge") as NFTBridge__factory;
@@ -107,7 +107,7 @@ task("import:nftBridge")
  * @param blockchainRid - The blockchain RID of the bridge chain to be set.
  * @param managedValidator - Optional. The address of the managed validator contract for the bridge.
  */
-task("setBlockchainRid:nftBridge")
+task("setBlockchainRid:nftbridge")
     .addParam("address", "Bridge contract address")
     .addParam("blockchainRid", "Blockchain RID of bridge chain")
     .addOptionalParam("managedValidator", "Contract address of managed validator for bridge (if any)")
@@ -135,7 +135,7 @@ task("setBlockchainRid:nftBridge")
  * @param bridgeAddress - The address of the TokenBridge contract.
  * @param tokenAddress - The address of the token contract to be allowed.
  */
-task("allowToken:nftBridge")
+task("allowToken:nftbridge")
     .addParam("bridgeAddress", "Bridge contract address")
     .addParam("tokenAddress", "NFT contract address")
     .addParam("protocolId", "Protocol ID")
@@ -160,7 +160,7 @@ task("allowToken:nftBridge")
  * 
  * @param bridgeAddress - The address of the Token Bridge contract to be inspected.
  */
-task("inspect:nftBridge", "Inspect token bridge contract")
+task("inspect:nftbridge", "Inspect token bridge contract")
     .addParam("bridgeAddress", "Bridge contract address")
     .setAction(async ({ bridgeAddress }, hre) => {
         await inspectTokenBridgeContract(bridgeAddress, hre);
@@ -193,7 +193,7 @@ async function inspectTokenBridgeContract(bridgeAddress: string, hre: HardhatRun
  * 
  * @param address - The address of the Token Bridge contract to be paused.
  */
-task("pause:nftBridge")
+task("pause:nftbridge")
     .addParam("address", "Bridge contract address")
     .setAction(async ({address}, hre) => {
         const factory = await hre.ethers.getContractFactory("NFTBridge") as NFTBridge__factory;
@@ -214,7 +214,7 @@ task("pause:nftBridge")
  * 
  * @param address - The address of the Token Bridge contract to be unpaused.
  */
-task("unpause:nftBridge")
+task("unpause:nftbridge")
     .addParam("address", "Bridge contract address")
     .setAction(async ({address}, hre) => {
         const factory = await hre.ethers.getContractFactory("NFTBridge") as NFTBridge__factory;

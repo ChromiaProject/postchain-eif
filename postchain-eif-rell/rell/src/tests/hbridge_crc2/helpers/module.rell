@@ -19,11 +19,11 @@ operation register_bridge_and_evm_collection_op(
     bridge_contract_address: byte_array,
     use_snapshots: boolean = false,
 ) {
-    evm.register_bridge_and_evm_collection(network_id, token_address, mode, token_type, use_snapshots, bridge_contract_address);
+    evm.register_bridge_and_evm_collection(network_id, token_address, mode, token_type, use_snapshots, bridge_contract_address, 0);
 }
 
 operation register_bridge_with_evm_collections_op(network_id: integer, bridge_contract_address: byte_array, evm_collections: list<evm.evm_collection>) {
-    evm.register_bridge_with_evm_collections(network_id, bridge_contract_address, evm_collections);
+    evm.register_bridge_with_evm_collections(network_id, bridge_contract_address, 0, evm_collections);
 }
 
 operation mint_evm_token_op(account: ft4.accounts.account, network_id: integer, token_address: byte_array, token_ids: list<big_integer>, amounts: list<big_integer>, is_nft: boolean = false) {

@@ -158,6 +158,7 @@ function register_bridge_and_foreign_asset(asset: asset_info, network_id: intege
         helpers.register_bridge_with_erc20_assets_op(
             network_id = network_id,
             bridge_contract_address = bridge_address,
+            skip_to_height = 123,
             erc20_assets = [erc20_asset]
         )
     ).run();
@@ -170,6 +171,7 @@ function register_bridge_with_erc20_assets(network_id: integer, bridge_address: 
         helpers.register_bridge_with_erc20_assets_op(
             network_id = network_id,
             bridge_contract_address = bridge_address,
+            skip_to_height = 456,
             erc20_assets = erc20_assets
         )
     ).run();

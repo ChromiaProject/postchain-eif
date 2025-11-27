@@ -4,12 +4,16 @@
  * @param filter The filter applied to the withdrawal search. See [withdrawal_filter] structure.
  * @param page_size The number of withdrawal records to return per page. Limited by the maximum page size defined in the chain configuration. If not specified, a maximum page size defined in the chain configuration is used.
  * @param page_cursor A cursor for pagination, typically pointing to the start of the next page of results. If not specified, the first page will be returned.
- * @return A `ft4.utils.paged_result` containing the filtered results and pagination data. This result includes data such as the list of withdrawals (see [erc20_withdrawal_info]), and the next page cursor (`next_cursor`). If `next_cursor` is null, there are no more pages to fetch.
+ * @param sort_desc Controls the sorting order of results. If true, results are sorted in descending order by `rowid` (newest first). If false, results are sorted in ascending order (oldest first). Defaults to false.
+ * @return A `ft4.utils.paged_result` containing the filtered results and pagination data. This result includes data such as the list of withdrawals (see [token_withdrawal_info]), and the next page cursor (`next_cursor`). If `next_cursor` is null, there are no more pages to fetch.
  */
-query get_token_withdrawals(filter: withdrawal_filter, page_size: integer?, page_cursor: text?): ft4.utils.paged_result {
+query get_token_withdrawals(filter: withdrawal_filter, page_size: integer? = null, page_cursor: text? = null, sort_desc: boolean = false): ft4.utils.paged_result {
     val before_rowid = ft4.utils.before_rowid(page_cursor);
 
-    val paginated_result = (w: token_withdrawal, s: token_withdrawal_status @* { .token_withdrawal == w }) @* {
+    val paginated_result = (
+        w: token_withdrawal,
+        s: token_withdrawal_status @* { .token_withdrawal == w }
+    ) @* {
         filter.network_id == null or w.network_id == filter.network_id,
         filter.contract_address == null or w.contract_address == filter.contract_address,
         filter.token_id == null or exists(withdrawn_token @* { .token_withdrawal == w, .token_id == filter.token_id }),
@@ -18,8 +22,12 @@ query get_token_withdrawals(filter: withdrawal_filter, page_size: integer?, page
         filter.to == null or w.transaction.block.timestamp < filter.to,
         filter.tx_rid == null or w.transaction.tx_rid == filter.tx_rid,
         empty(filter.statuses) or s.status in filter.statuses,
-        w.rowid > (before_rowid ?: rowid(0))
+        if (sort_desc)
+            w.rowid < (before_rowid ?: rowid(integer.MAX_VALUE))
+        else
+            w.rowid > (before_rowid ?: rowid(0))
     } (
+        @omit @sort_desc if (sort_desc) w.rowid else rowid(0),
         ft4.utils.pagination_result(
             data = map_withdrawal(w, s.status).to_gtv_pretty(),
             rowid = w.rowid
@@ -30,7 +38,7 @@ query get_token_withdrawals(filter: withdrawal_filter, page_size: integer?, page
 }
 
 /**
- * Retrieves ERC20 token withdrawal based on a transaction RID and operation index.
+ * Retrieves token withdrawal based on a transaction RID and operation index.
  *
  * @param tx_rid transaction RID in which the withdrawal was initiated
  * @param op_index index of the operation within the transaction in which the withdrawal was initiated
@@ -45,14 +53,15 @@ query get_token_withdrawal_by_id(withdrawal_id: rowid): token_withdrawal_info? =
         token_withdrawal @? { .rowid == withdrawal_id } ( map_withdrawal($) );
 
 /**
- * Retrieves ERC20 token deposits based on a given filter, with pagination options.
+ * Retrieves token deposits based on a given filter, with pagination options.
  *
  * @param filter The filter applied to the deposit search. See [deposit_filter] structure.
  * @param page_size The number of deposit records to return per page. Limited by the maximum page size defined in the chain configuration. If not specified, a maximum page size defined in the chain configuration is used.
  * @param page_cursor A cursor for pagination, typically pointing to the start of the next page of results. If not specified, the first page will be returned.
- * @return A `ft4.utils.paged_result` containing the filtered results and pagination data. This result includes data such as the list of deposits (see [erc20_deposit_info]), and the next page cursor (`next_cursor`). If `next_cursor` is null, there are no more pages to fetch.
+ * @param sort_desc Controls the sorting order of results. If true, results are sorted in descending order by `rowid` (newest first). If false, results are sorted in ascending order (oldest first). Defaults to false.
+ * @return A `ft4.utils.paged_result` containing the filtered results and pagination data. This result includes data such as the list of deposits (see [token_deposit_info]), and the next page cursor (`next_cursor`). If `next_cursor` is null, there are no more pages to fetch.
  */
-query get_token_deposits(filter: deposit_filter, page_size: integer?, page_cursor: text?): ft4.utils.paged_result {
+query get_token_deposits(filter: deposit_filter, page_size: integer? = null, page_cursor: text? = null, sort_desc: boolean = false): ft4.utils.paged_result {
     val before_rowid = ft4.utils.before_rowid(page_cursor);
 
     val paginated_result = (d: token_deposit) @* {
@@ -63,8 +72,12 @@ query get_token_deposits(filter: deposit_filter, page_size: integer?, page_curso
         filter.recipient_id == null or .recipient_id == filter.recipient_id,
         filter.state == null or .state == filter.state,
         filter.evm_tx_hash == null or .evm_tx_hash == filter.evm_tx_hash,
-        .rowid > (before_rowid ?: rowid(0))
+        if (sort_desc)
+            .rowid < (before_rowid ?: rowid(integer.MAX_VALUE))
+        else
+            .rowid > (before_rowid ?: rowid(0))
     } (
+        @omit @sort_desc if (sort_desc) .rowid else rowid(0),
         ft4.utils.pagination_result(
             data = map_deposit(d).to_gtv_pretty(),
             rowid = .rowid
@@ -103,11 +116,11 @@ query get_token_deposit_history(deposit_id: rowid): list<token_deposit_history_e
 }
 
 /**
- * Retrieves the history of an ERC20 withdrawal based on the specified withdrawal ID.
+ * Retrieves the history of an token withdrawal based on the specified withdrawal ID.
  *
  * @param withdrawal_id A `rowid` type identifier for the withdrawal.
  *
- * @return A list of `erc20_withdrawal_history_entry` objects, each representing a record in the
+ * @return A list of `token_withdrawal_history_entry` objects, each representing a record in the
  * history of the specified withdrawal.
  */
 query get_token_withdrawal_history(withdrawal_id: rowid): list<token_withdrawal_history_entry> {

@@ -21,11 +21,11 @@ operation register_bridge_and_erc20_asset_op(
     use_snapshots: boolean = false,
     bridge_contract_address: byte_array
 ) {
-    erc20.register_bridge_and_erc20_asset(network_id, token_address, asset, mode, use_snapshots, bridge_contract_address);
+    erc20.register_bridge_and_erc20_asset(network_id, token_address, asset, mode, use_snapshots, bridge_contract_address, 0);
 }
 
-operation register_bridge_with_erc20_assets_op(network_id: integer, bridge_contract_address: byte_array, erc20_assets: list<erc20.erc20_asset>) {
-    erc20.register_bridge_with_erc20_assets(network_id, bridge_contract_address, erc20_assets);
+operation register_bridge_with_erc20_assets_op(network_id: integer, bridge_contract_address: byte_array, skip_to_height: integer, erc20_assets: list<erc20.erc20_asset>) {
+    erc20.register_bridge_with_erc20_assets(network_id, bridge_contract_address, skip_to_height, erc20_assets);
 }
 
 operation unregister_bridge_op(network_id: integer, bridge_contract_address: byte_array) {
@@ -35,7 +35,7 @@ operation unregister_bridge_op(network_id: integer, bridge_contract_address: byt
 operation get_or_create_bridge_op(
     network_id: integer, bridge_contract_address: byte_array
 ) {
-    core.get_or_create_bridge(network_id, bridge_contract_address);
+    core.get_or_create_bridge(network_id, bridge_contract_address, 0);
 }
 
 operation create_bridge_account_op(blockchain_rid: byte_array) {

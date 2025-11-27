@@ -35,6 +35,7 @@ struct erc20_deposit_info {
 entity erc20_completed_deposit_transaction {
     key deposit: erc20_deposit;
     op_index: integer = op_context.op_index;
+    index transaction, op_index;
 }
 
 entity pending_erc20_deposit {

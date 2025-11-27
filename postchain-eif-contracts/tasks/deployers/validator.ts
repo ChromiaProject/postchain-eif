@@ -110,8 +110,13 @@ task("inspect:managedValidator", "Inspect ManagedValidator contract")
     });
 
 export async function inspectManagedValidatorContract(validatorAddress: string, hre: HardhatRuntimeEnvironment) {
-    const validatorFactory = await hre.ethers.getContractFactory("ManagedValidator") as ManagedValidator__factory;
-    const validator = validatorFactory.attach(validatorAddress) as ManagedValidator;
+    const validator = await hre.ethers.getContractAt(
+        "ManagedValidator",
+        validatorAddress
+    ) as ManagedValidator;
+
+    // Log blockchain RID
+    console.log(`Validator blockchain RID: ${await validator.blockchainRid()}`);
 
     // Log validators
     const count = await validator.getValidatorCount();
@@ -138,8 +143,10 @@ export async function inspectManagedValidatorContract(validatorAddress: string, 
         process.exit(1);
     }
 
-    const directoryValidatorFactory = await hre.ethers.getContractFactory("DirectoryChainValidator") as DirectoryChainValidator__factory;
-    const directoryValidator = directoryValidatorFactory.attach(directoryValidatorAddress) as DirectoryChainValidator;
+    const directoryValidator = await hre.ethers.getContractAt(
+        "DirectoryChainValidator",
+        directoryValidatorAddress
+    ) as DirectoryChainValidator;
 
     // Log directory chain validators
     const directoryValidatorCount = await directoryValidator.getValidatorCount();

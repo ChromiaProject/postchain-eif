@@ -237,12 +237,6 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
             }
         }
 
-        bctx.addAfterCommitHook {
-            hasQueuedTxs.set(
-                    blockQueries.query(FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT, gtv("exclude_taken_by_key" to gtv(pubKey))).get()
-                            .asArray().isNotEmpty()
-            )
-        }
         return true
     }
 
@@ -561,7 +555,12 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
         }
     }
 
-    override fun blockCommitted(blockData: BlockData) {}
+    override fun blockCommitted(blockData: BlockData) {
+        hasQueuedTxs.set(
+                blockQueries.query(FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT, gtv("exclude_taken_by_key" to gtv(pubKey))).get()
+                        .asArray().isNotEmpty()
+        )
+    }
 
     override fun shouldBuildBlock(): Boolean = hasQueuedTxs.get() ||
             transactionSubmitters.values.any { txSubmitter ->
