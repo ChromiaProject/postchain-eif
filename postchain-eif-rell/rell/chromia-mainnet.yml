@@ -51,6 +51,11 @@ blockchains:
         - "net.postchain.d1.icmf.IcmfReceiverSynchronizationInfrastructureExtension"
       eif:
         chains:
+          base:
+            network_id: 8453 # Base
+            evm_read_offset: 50
+            skip_to_height: 35000000 # Sep-02-2025 05:02:27 AM +UTC
+            events: !include configs/events.yml
           bsc:
             network_id: 56
             evm_read_offset: 100 # Block time 0.75s = 75s
@@ -123,6 +128,8 @@ blockchains:
         directory_chain_config:
           blockchain_rid: x"7E5BE539EF62E48DDA7035867E67734A70833A69D2F162C457282C319AA58AE4"
           validator_contracts:
+            - address: "967fA187309f4B175e35e2c6c843c0F9a94CFC5e"
+              network_id: 8453 # Base
             - address: "c755927508b7Ac3f7B31c9Ed396F3bE91C723d00"
               network_id: 1
             - address: "c755927508b7Ac3f7B31c9Ed396F3bE91C723d00"
@@ -152,6 +159,9 @@ blockchains:
               - address: ""
                 validator_contract: "F7D91fD7316891e22fF16493e219939BB9901FB5"
                 network_id: 56
+              - address: ""
+                validator_contract: "445D203F46fB91B79Af30f8Bf5F779C91e941aCb"
+                network_id: 8453 # Base
         contract_tx_rate_limit: 60000
         tx_node_submit_timeout: 1800000 # 30m
         tx_verification_timeout: 5400000 # 90 min - from the time a TX was TAKEN
@@ -161,6 +171,8 @@ blockchains:
           - id: 56
             currency_symbol: "BNB"
           - id: 1
+            currency_symbol: "ETH"
+          - id: 8453 # Base
             currency_symbol: "ETH"
         system_max_priority_fee_per_gas: 25000000000
         system_max_fee_per_gas: 180000000000
@@ -177,10 +189,20 @@ blockchains:
           - "net.postchain.d1.icmf.IcmfSenderGTXModule"
       transaction_submitter:
         chains:
+          base:
+            network_id: 8453
+            max_gas_price: 20000000000000000 # Total gas cost per transaction, 2024-10-11: 0.02 ETH / 53 USD
+            min_wallet_balance: 100000000000000
+            gas_limit: 10000000 # 300 000 was too low
+            gas_limit_margin: "0.2" # 20%
+            base_fee_per_gas_margin: "0.85" # +85% (base_fee + base_fee * 0.85)
+            priority_fee_per_gas_margin: "0.000001" # 0.00001% # Small margin to pass the default priority fees
+            node_tx_verification_evm_blocks: 50
+            tx_verification_time: 20000
           bsc:
             network_id: 56
             max_gas_price: 10000000000000000 # Total gas cost per transaction
-            min_wallet_balance: 10000000000000000
+            min_wallet_balance: 100000000000000
             gas_limit: 10000000 # 300 000 was too low
             gas_limit_margin: "0.2" # 20%
             base_fee_per_gas_margin: "0.85" # +85% (base_fee + base_fee * 0.85)
