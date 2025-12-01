@@ -53,11 +53,11 @@ test:
     - tests.transaction_submitter
     - tests.transaction_submitter.anchoring
     - tests.transaction_submitter.signer_update
-    - tests.eif_bridge_admin
+    - tests.hbridge_admin
     - tests.hbridge_crc2.hbridge_crc2
   moduleArgs:
     <<: *common_args
-    hbridge.core:
+    lib.hbridge.core:
       evm_read_offsets:
         "97": 10
         "11155111": 20
@@ -116,12 +116,12 @@ test:
       system_max_fee_per_gas: 4000000000
     transaction_submitter.anchoring:
       anchoring_interval: 3600000
-    eif_event_receiver:
+    lib.eif_event_receiver:
       enable_icmf: false
-    eif_access_list_control:
-      access_mode: blacklist
-    eif_bridge_admin:
+    lib.hbridge_admin:
       bridge_admin_account_signers: [ x"032c0b7cf95324a07d05398b240174dc0c2be444d96b159aa6c7f7b1e668680991" ]
+    lib.hbridge_admin.access_list_control:
+      access_mode: blacklist
 
 blockchains:
   eif_event_receiver_test:
@@ -155,7 +155,7 @@ blockchains:
     moduleArgs:
       chain_version: *chain_version
 
-  eif_event_receiver:
+  eif_event_receiver_chain:
     module: eif_event_receiver_chain_common
     config:
       features:
@@ -215,31 +215,9 @@ blockchains:
     moduleArgs:
       chain_version: *chain_version
 
-  hbridge:
-    module: hbridge
-    config:
-      <<: *common_hbridge_config
-    moduleArgs:
-      <<: *common_args
-      <<: *rell_test_args
-      chain_version: *chain_version
-      eif_bridge_admin:
-        bridge_admin_account_signers: [ ] # TODO replace with real signers
-
-  hbridge_crc2:
-    module: hbridge_crc2
-    config:
-      <<: *common_hbridge_config
-    moduleArgs:
-      <<: *common_args
-      <<: *rell_test_args
-      chain_version: *chain_version
-      eif_bridge_admin:
-        bridge_admin_account_signers: [ ] # TODO replace with real signers
-
   # Tests the `withdraw_to_multiple_bridges_test` module with HBridge version 2
   withdraw_to_multiple_bridges_test:
-    module: hbridge
+    module: lib.hbridge
     config:
       <<: *common_hbridge_config
     moduleArgs:
@@ -250,49 +228,53 @@ blockchains:
         # Move these tests to the `<root>.test.modules` branch once HBridge v2 becomes the default version
         - tests.hbridge.hbridge_v2.withdraw_to_multiple_bridges
       moduleArgs:
-        hbridge:
+        lib.hbridge:
           version: 2
 
   hbridge_whitelist_test:
-    module: eif_access_list_control
+    module: lib.hbridge_admin
     config:
       <<: *common_hbridge_config
     moduleArgs:
       <<: *common_args
       <<: *rell_test_args
       chain_version: *chain_version
-      eif_access_list_control:
-        access_mode: whitelist
-      eif_bridge_admin:
+      lib.hbridge_admin:
         bridge_admin_account_signers: [ x"032c0b7cf95324a07d05398b240174dc0c2be444d96b159aa6c7f7b1e668680991" ]
+      lib.hbridge_admin.access_list_control:
+        access_mode: whitelist
     test:
       modules:
-        - tests.eif_access_list_control.whitelist_access_list_control_test
+        - tests.hbridge_admin_access_list.whitelist_access_list_control_test
       moduleArgs:
-        eif_access_list_control:
+        lib.hbridge_admin:
+          bridge_admin_account_signers: [ x"032c0b7cf95324a07d05398b240174dc0c2be444d96b159aa6c7f7b1e668680991" ]
+        lib.hbridge_admin.access_list_control:
           access_mode: whitelist
 
   hbridge_blacklist_test:
-    module: eif_access_list_control
+    module: lib.hbridge_admin.access_list_control
     config:
       <<: *common_hbridge_config
     moduleArgs:
       <<: *common_args
-      hbridge.core:
+      lib.hbridge.core:
         evm_read_offsets: # See test moduleArgs
       <<: *rell_test_args
       lib.ft4.core.accounts.strategies.transfer:
         rules: [ ] # TODO specify transfer strategy rules
       chain_version: *chain_version
-      eif_access_list_control:
-        access_mode: blacklist
-      eif_bridge_admin:
+      lib.hbridge_admin:
         bridge_admin_account_signers: [ x"032c0b7cf95324a07d05398b240174dc0c2be444d96b159aa6c7f7b1e668680991" ]
+      lib.hbridge_admin.access_list_control:
+        access_mode: blacklist
     test:
       modules:
-        - tests.eif_access_list_control.blacklist_access_list_control_test
+        - tests.hbridge_admin_access_list.blacklist_access_list_control_test
       moduleArgs:
-        eif_access_list_control:
+        lib.hbridge_admin:
+          bridge_admin_account_signers: [ x"032c0b7cf95324a07d05398b240174dc0c2be444d96b159aa6c7f7b1e668680991" ]
+        lib.hbridge_admin.access_list_control:
           access_mode: blacklist
 
   eif_event_receiver_token_chain:
@@ -322,7 +304,7 @@ blockchains:
               - "L_blockchain_rid_topic"
     moduleArgs:
       chain_version: *chain_version
-      eif_event_receiver_dynamic_icmf_config:
+      lib.eif_event_receiver_dynamic_icmf_config:
         configuration_chain: "token_chain"
 
   transaction_submitter:
@@ -397,6 +379,31 @@ blockchains:
           global:
             topics:
               - G_evm_submit_transaction
+
+  # Library modules
+  eif:
+    module: lib.eif
+    type: library
+
+  eif_event_receiver:
+    module: lib.eif_event_receiver
+    type: library
+
+  eif_event_receiver_dynamic_icmf_config:
+    module: lib.eif_event_receiver_dynamic_icmf_config
+    type: library
+
+  hbridge:
+    module: lib.hbridge
+    type: library
+
+  hbridge_crc2:
+    module: lib.hbridge_crc2
+    type: library
+
+  hbridge_admin:
+    module: lib.hbridge_admin
+    type: library
 
 compile:
   source: src

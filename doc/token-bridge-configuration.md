@@ -5,7 +5,10 @@ The Token Bridge enables interoperability between the Chromia network and variou
 ### Dual-Chain Configuration
 For enhanced modularity and robustness, we recommend a dual-chain setup that includes the _Event Receiver chain_ and the _Token Bridge chain_.
 * Event Receiver chain configuration: Details can be found in the [event-receiver-chain-configuration](event-receiver-chain-configuration.md) document. This configuration requires the `eif` and `eif_event_receiver` Rell modules.
-* Token Bridge chain configuration: Details can be found in the [token-bridge-chain-configuration](token-bridge-chain-configuration.md) document. This configuration requires the `eif`, `eif_event_connector`, and `hbridge` Rell modules.
+* Token Bridge chain configuration: Details can be found in
+  the [token-bridge-chain-configuration](token-bridge-chain-configuration-and-setup.md) document. This configuration
+  requires the
+  `eif` and `hbridge` Rell modules.
 
 An example of the dual-chain configuration can be found in the [el2-testnode](https://gitlab.com/chromaway/el2-testnode) repository.
 
@@ -17,7 +20,7 @@ Disable ICMF communication with the following configuration snippet:
 
 ```yaml
 moduleArgs:
-  eif_event_receiver:
+  lib.eif_event_receiver:
     enable_icmf: false
 ```
 
@@ -26,8 +29,8 @@ To integrate the Token Bridge into your Rell DApp, include the following import 
 ```rell
 module;
 
-import eif_event_receiver.*;
-import hbridge;
+import lib.eif_event_receiver.*;
+import lib.hbridge;
 ```
 
 An example of the single-chain configuration can be found in the [chromia.yml](/postchain-eif-core/src/test/resources/net/postchain/eif/chromia.yml) file of the current repository.

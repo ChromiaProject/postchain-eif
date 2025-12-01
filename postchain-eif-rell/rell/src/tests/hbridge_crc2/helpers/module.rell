@@ -1,7 +1,7 @@
 module;
 
 import lib.ft4.assets;
-import hbridge_crc2.*;
+import lib.hbridge_crc2.*;
 
 operation register_evm_collection_op(
     network_id: integer,

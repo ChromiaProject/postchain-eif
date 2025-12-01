@@ -14,15 +14,15 @@ import admin_crosschain: lib.ft4.external.admin.crosschain;
 import ft4_test: lib.ft4.test.core;
 
 // event_receiver
-import eif.utils;
-import eif_event_receiver.*;
+import lib.eif.utils;
+import lib.eif_event_receiver.*;
 import tests.eif_event_receiver.helpers.*;
-import eif_event_connector.*;
+import lib.eif.event_connector.*;
 
-import eif_utils: eif.utils;
-import eif.common;
-import eif.messaging;
-import hbridge;
+import eif_utils: lib.eif.utils;
+import lib.eif.common;
+import lib.eif.messaging;
+import lib.hbridge;
 
 import ^.helpers;
 

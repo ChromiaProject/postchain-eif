@@ -1,2 +1,5 @@
 # Rell libs
-src/lib/
+src/lib/ft4
+src/lib/crc2
+src/lib/iccf
+src/lib/icmf

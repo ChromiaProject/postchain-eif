@@ -8,7 +8,7 @@
 
 import lib.ft4.auth;
 import lib.ft4.assets;
-import hbridge;
+import lib.hbridge;
 import ^^.hbridge.{
     // Constants
     network_id1, network_id2, evm_address, asset_info, CHR, FOO, BAR, bridge_address1, bridge_address2, bridge_address3,

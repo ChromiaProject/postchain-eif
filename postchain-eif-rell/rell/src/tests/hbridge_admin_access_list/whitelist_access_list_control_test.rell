@@ -1,0 +1,56 @@
+@test module;
+
+import lib.hbridge_admin.*;
+
+val bridge_admin_account_signer = rell.test.pubkeys.charlie;
+val bridge_admin_account_privkey = rell.test.privkeys.charlie;
+
+function test_check_access_list_whitelist_block() {
+    assert_false(access_list_control.is_account_on_access_list(x""));
+}
+
+function test_check_access_list_whitelist_pass() {
+    rell.test.tx().op(register_bridge_admin_account()).run();
+    rell.test.tx().op(
+        ft_auth_operation_for(bridge_admin_account_signer),
+        access_list_control.add_account_id_to_whitelist(x"")
+    ).sign(bridge_admin_account_privkey).run();
+
+    assert_true(access_list_control.is_account_on_access_list(x""));
+}
+
+function test_check_access_list_whitelist_same_account_id() {
+    rell.test.tx().op(register_bridge_admin_account()).run();
+    rell.test.tx().op(
+        ft_auth_operation_for(bridge_admin_account_signer),
+        access_list_control.add_account_id_to_whitelist(x""),
+        ft_auth_operation_for(bridge_admin_account_signer),
+        access_list_control.add_account_id_to_whitelist(x"")
+    ).sign(bridge_admin_account_privkey).run_must_fail("The account id 0x is already whitelisted.");
+}
+
+function test_whitelist_history() {
+    rell.test.tx().op(register_bridge_admin_account()).run();
+    rell.test.tx().op(
+        ft_auth_operation_for(bridge_admin_account_signer),
+        access_list_control.add_account_id_to_whitelist(x""),
+        ft_auth_operation_for(bridge_admin_account_signer),
+        access_list_control.remove_account_id_from_whitelist(x"")
+    ).sign(bridge_admin_account_privkey).run();
+
+    assert_false(access_list_control.is_account_on_access_list(x""));
+
+    val history = access_list_control.get_whitelist_history(x"");
+    assert_true(history.size() == 2);
+    assert_equals(history[0], access_list_control.whitelist_history_entry(x"", access_list_control.action.add, 1577836810000));
+    assert_equals(history[1], access_list_control.whitelist_history_entry(x"", access_list_control.action.remove, 1577836810000));
+}
+
+function ft_auth_operation_for(signer: byte_array) {
+    val descriptor = require(
+    ft4.accounts.auth_descriptor_signer @? { signer }.account_auth_descriptor limit 1,
+        "No auth descriptor found for signer %s".format(signer)
+    );
+
+    return ft4.auth.external.ft_auth(descriptor.account.id, descriptor.id);
+}

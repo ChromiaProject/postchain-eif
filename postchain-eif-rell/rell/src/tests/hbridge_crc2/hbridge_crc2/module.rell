@@ -18,14 +18,14 @@ namespace crc2 {
 }
 
 // event_receiver
-import eif_event_receiver.*;
+import lib.eif_event_receiver.*;
 import ^^.eif_event_receiver.helpers.*;
-import eif_event_connector.*;
+import lib.eif.event_connector.*;
 
-import eif_utils: eif.utils;
-import eif.common;
-import eif.messaging;
-import hbridge_crc2;
+import eif_utils: lib.eif.utils;
+import lib.eif.common;
+import lib.eif.messaging;
+import lib.hbridge_crc2;
 
 import ^.helpers;
 

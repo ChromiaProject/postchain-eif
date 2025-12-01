@@ -1,9 +1,9 @@
 module;
 
-import eif_event_receiver.*;
-import eif.messaging.*;
-import eif_event_receiver.dynamic_config.*;
-import eif_event_receiver.model.*;
+import lib.eif_event_receiver.*;
+import lib.eif.messaging.*;
+import lib.eif_event_receiver.dynamic_config.*;
+import lib.eif_event_receiver.model.*;
 
 operation evm_block_op(
     network_id: integer,

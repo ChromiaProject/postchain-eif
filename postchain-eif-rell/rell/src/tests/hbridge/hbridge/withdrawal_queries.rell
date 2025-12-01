@@ -1,4 +1,4 @@
-import hbridge.*;
+import lib.hbridge.*;
 
 function test_get_erc20_withdrawals() {
     // FT4 assets

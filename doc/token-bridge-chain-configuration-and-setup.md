@@ -47,41 +47,22 @@ libs:
   com.chromia.ft4:
     version: 1.1.0
   iccf:
-    registry: https://gitlab.com/chromaway/core/directory-chain
-    path: src/lib/iccf
-    tagOrBranch: 1.82.4
-    rid: x"9C359787B75927733034EA1CEE74EEC8829D2907E4FC94790B5E9ABE4396575D"
-    insecure: false
+    version: 1.90.1
   icmf:
-    registry: https://gitlab.com/chromaway/core/directory-chain
-    path: src/lib/icmf
-    tagOrBranch: 1.82.4
-    rid: x"1A4B3C3A1325DEF2C426C4F0F93F7444BB074373A24367DAA958C32F21B2EA1D"
-    insecure: false
+    version: 1.102.2
   eif:
-    registry: https://gitlab.com/chromaway/postchain-eif
-    path: postchain-eif-rell/rell/src/eif
-    tagOrBranch: 0.13.1
-    rid: x"AB40EDB0B534726B5F3AA288A5D31BE840B24BA670775E4F95C1B2512F5B8F22"
-    insecure: false
-  eif_event_connector:
-    registry: https://gitlab.com/chromaway/postchain-eif
-    path: postchain-eif-rell/rell/src/eif_event_connector
-    tagOrBranch: 0.13.1
-    rid: x"4A669C5F98AEE970FECD5B77116E737196C7D3C7C6217DFD7EAC2F9317FC9461"
-    insecure: false
+    version: 1.0.0
   hbridge:
-    registry: https://gitlab.com/chromaway/postchain-eif
-    path: postchain-eif-rell/rell/src/hbridge
-    tagOrBranch: 0.13.1
-    rid: x"3DE398220EF81C16C4ACD8FE93DC39943FE253AEC79358D9231CC4D1968FEAA1"
-    insecure: false
+    version: 1.0.0
 ```
 
 
 ## Setup
 
-First, the ERC-20 token must be properly registered on the chain. After that, the bridge contract and its associated ERC-20 assets must also be registered. This setup enables the chain to expose bridge information via queries such as [`get_bridge_contracts()`](../postchain-eif-rell/rell/src/hbridge/queries.rell#get_bridge_contracts), which is essential for bridge discovery within the Chromia ecosystem.
+First, the ERC-20 token must be properly registered on the chain. After that, the bridge contract and its associated
+ERC-20 assets must also be registered. This setup enables the chain to expose bridge information via queries such as [
+`get_bridge_contracts()`](../postchain-eif-rell/rell/src/lib/hbridge/queries.rell#get_bridge_contracts), which is
+essential for bridge discovery within the Chromia ecosystem.
 
 There are two main functions for registering ERC-20 tokens and bridge contracts:
 

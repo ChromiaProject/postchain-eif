@@ -1,0 +1,59 @@
+@mount("eif.hbridge")
+module;
+
+/**
+ * Main HBridge module.
+ *
+ * Depends on the `core` and `erc20` modules to provide full support for
+ * bridging ERC20 tokens between EVM and FT4.
+ *
+ * Supports EVM event processing, account linking, snapshot management,
+ * and ERC20 token registration. Also handles deposit and withdrawal flows.
+ */
+import messaging: lib.eif.messaging;
+import common: lib.eif.common;
+import utils: lib.eif.utils;
+import version: lib.eif.version;
+import lib.iccf;
+import .core;
+import .erc20;
+
+namespace ft4 {
+    import lib.ft4.accounts;
+    import lib.ft4.accounts.strategies;
+    import lib.ft4.assets;
+    import lib.ft4.crosschain;
+    import lib.ft4.auth;
+    import lib.ft4.utils;
+    import transfer_strategy: lib.ft4.accounts.strategies.transfer;
+}
+
+
+struct module_args {
+    /**
+     * HBridge versions:
+     *
+     * - Version 1: Initial HBridge implementation.
+     *
+     * - Version 2: Adds multi-bridge support via the `discriminator` field in withdrawal events and account state snapshots.
+     *   The `discriminator` field encodes the EVM network ID and the destination bridge contract address.
+     */
+    version: integer = 1;
+}
+
+enum bridge_mode {
+    native,
+    foreign,
+}
+
+// Nothing really stops us from accepting deposits from any EVM address,
+// except that it might be icky and easier to exploit via client (front-end) attacks.
+val need_consent_on_deposit = true;
+
+val zero_beneficiary = x"0000000000000000000000000000000000000000000000000000000000000000";
+
+@extendable
+function deposit_check_access_list(account_id: byte_array): boolean = true;
+
+@extendable
+function withdraw_check_access_list(account_id: byte_array): boolean = true;

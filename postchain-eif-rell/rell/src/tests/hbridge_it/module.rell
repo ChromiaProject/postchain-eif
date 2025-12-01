@@ -2,7 +2,7 @@
 module;
 
 import eif_event_receiver_with_dynamic_config.*;
-import hbridge.*;
+import lib.hbridge.*;
 
 import lib.ft4.admin;
 import lib.ft4.assets;
