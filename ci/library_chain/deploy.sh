@@ -20,7 +20,7 @@ if [ -n "${LIBRARY_DESCRIPTION+x}" ]; then
 fi
 echo
 
-XML_CONF="postchain-eif-rell/rell/target/$LIBRARY_NAME.xml"
+XML_CONF="target/$LIBRARY_NAME.xml"
 if [ ! -f "$XML_CONF" ]; then
   echo "Missing configuration: $XML_CONF"
   exit 1
@@ -44,7 +44,6 @@ if [ "$RID_EXISTING" = "null" ]; then
   echo "RID: $RID_NEW"
 
   chr library create \
-    --settings "postchain-eif-rell/rell/chromia.yml" \
     --url "$LIBRARY_CHAIN_API_URL" \
     --brid "$LIBRARY_CHAIN_BRID" \
     --library "$LIBRARY_NAME" \
@@ -91,7 +90,6 @@ else
   echo "new RID: $RID_NEW"
 
   chr library deploy \
-    --settings "postchain-eif-rell/rell/chromia.yml" \
     --url "$LIBRARY_CHAIN_API_URL" \
     --brid "$LIBRARY_CHAIN_BRID" \
     --library "$LIBRARY_NAME" \
