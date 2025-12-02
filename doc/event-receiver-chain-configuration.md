@@ -79,11 +79,11 @@ blockchains:
         release_version: "dev" # Replace
         release_commit: "dev" # Replace
 libs:
-  icmf:
+  com.chromia.icmf:
     version: 1.102.2
-  eif:
+  com.chromia.eif:
     version: 1.0.0
-  eif_event_receiver:
+  com.chromia.eif_event_receiver:
     version: 1.0.0
 ```
 

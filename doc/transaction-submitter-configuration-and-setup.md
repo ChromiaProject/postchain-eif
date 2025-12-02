@@ -114,7 +114,7 @@ Example:
               - G_evm_submit_transaction
 
   libs:
-    icmf:
+    com.chromia.icmf:
       version: 1.102.2
 ```
 

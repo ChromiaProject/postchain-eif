@@ -46,13 +46,13 @@ blockchains:
 libs:
   com.chromia.ft4:
     version: 1.1.0
-  iccf:
+  com.chromia.iccf:
     version: 1.90.1
-  icmf:
+  com.chromia.icmf:
     version: 1.102.2
-  eif:
+  com.chromia.eif:
     version: 1.0.0
-  hbridge:
+  com.chromia.hbridge:
     version: 1.0.0
 ```
 
