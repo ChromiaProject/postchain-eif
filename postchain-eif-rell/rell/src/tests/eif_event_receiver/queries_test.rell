@@ -1,7 +1,7 @@
 @test module;
 
 import ^.helpers.*;
-import ^^^.eif.messaging.*;
+import lib.eif.messaging.*;
 
 function setup_test_data() {
     log("A few of the following `Withdrawal event with hash <hash> not found` messages are not relevant to Event Receiver");

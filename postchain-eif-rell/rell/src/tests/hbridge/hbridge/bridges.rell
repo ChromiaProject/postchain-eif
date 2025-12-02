@@ -1,4 +1,4 @@
-import hbridge.*;
+import lib.hbridge.*;
 
 function test_unregister_bridge() {
     // CHR

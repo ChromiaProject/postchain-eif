@@ -1,0 +1,8 @@
+// Collects all modules so we can publish as common library
+
+import .common;
+import .dynamic_config_common;
+import .event_connector;
+import .messaging;
+import .utils;
+import .version;

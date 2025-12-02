@@ -114,12 +114,8 @@ Example:
               - G_evm_submit_transaction
 
   libs:
-    icmf:
-      registry: https://gitlab.com/chromaway/core/directory-chain
-      path: src/lib/icmf
-      tagOrBranch: 1.82.4
-      rid: x"1A4B3C3A1325DEF2C426C4F0F93F7444BB074373A24367DAA958C32F21B2EA1D"
-      insecure: false
+    com.chromia.icmf:
+      version: 1.102.2
 ```
 
 ## Transaction Submitter Node Configuration
