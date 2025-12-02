@@ -1,8 +1,7 @@
 module;
 
-import lib.eif.dynamic_config_common.*;
-import lib.eif_event_receiver.*;
-import lib.eif_event_receiver.dynamic_config.*;
+import ^.*;
+import ^.dynamic_config.*;
 import lib.icmf.constants.*;
 import lib.icmf.receiver.*;
 
@@ -21,15 +20,15 @@ struct module_args {
 function eif_event_reciever_dynamic_config_message(sender: byte_array, topic: text, body: gtv) {
 
     when (topic) {
-        eif_event_receiver_dynamic_config_topic -> handle_dynamic_config_message(body);
-        eif_event_receiver_dynamic_config_topic_v2 -> handle_dynamic_config_message_v2(body);
-        eif_event_receiver_dynamic_remove_topic -> handle_dynamic_remove_message(body);
+        dynamic_config_common.eif_event_receiver_dynamic_config_topic -> handle_dynamic_config_message(body);
+        dynamic_config_common.eif_event_receiver_dynamic_config_topic_v2 -> handle_dynamic_config_message_v2(body);
+        dynamic_config_common.eif_event_receiver_dynamic_remove_topic -> handle_dynamic_remove_message(body);
         blockchain_rid_topic -> handle_blockchain_rid_message(body);
     }
 }
 
 function handle_dynamic_config_message(body: gtv) {
-    val configs = map<integer, eif_event_receiver_dynamic_config_message>.from_gtv(body);
+    val configs = map<integer, dynamic_config_common.eif_event_receiver_dynamic_config_message>.from_gtv(body);
 
     for ((network_id, config) in configs) {
         for (contract in config.contracts) {
@@ -48,7 +47,7 @@ function handle_dynamic_config_message(body: gtv) {
 }
 
 function handle_dynamic_config_message_v2(body: gtv) {
-    val configs = map<integer, eif_event_receiver_dynamic_config_message_v2>.from_gtv(body);
+    val configs = map<integer, dynamic_config_common.eif_event_receiver_dynamic_config_message_v2>.from_gtv(body);
 
     for ((network_id, config) in configs) {
         for (contract in config.contracts) {
@@ -67,7 +66,7 @@ function handle_dynamic_config_message_v2(body: gtv) {
 }
 
 function handle_dynamic_remove_message(body: gtv) {
-    val message = eif_event_receiver_dynamic_remove_message.from_gtv(body);
+    val message = dynamic_config_common.eif_event_receiver_dynamic_remove_message.from_gtv(body);
     for (bridge in message.bridges) {
         delete contract_config @* { .network_id == bridge.network_id, .address == bridge.address };
     }
@@ -80,9 +79,9 @@ function handle_blockchain_rid_message(body: gtv) {
     if (message.name == chain_context.args.configuration_chain) {
         receiver_icmf_update_topics(
             [
-                icmf_receiver_topic(topic = eif_event_receiver_dynamic_config_topic, bc_rid = message.rid),
-                icmf_receiver_topic(topic = eif_event_receiver_dynamic_config_topic_v2, bc_rid = message.rid),
-                icmf_receiver_topic(topic = eif_event_receiver_dynamic_remove_topic, bc_rid = message.rid),
+                icmf_receiver_topic(topic = dynamic_config_common.eif_event_receiver_dynamic_config_topic, bc_rid = message.rid),
+                icmf_receiver_topic(topic = dynamic_config_common.eif_event_receiver_dynamic_config_topic_v2, bc_rid = message.rid),
+                icmf_receiver_topic(topic = dynamic_config_common.eif_event_receiver_dynamic_remove_topic, bc_rid = message.rid),
             ],
             false);
     }

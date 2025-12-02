@@ -304,7 +304,7 @@ blockchains:
               - "L_blockchain_rid_topic"
     moduleArgs:
       chain_version: *chain_version
-      lib.eif_event_receiver_dynamic_icmf_config:
+      lib.eif_event_receiver.dynamic_icmf_config:
         configuration_chain: "token_chain"
 
   transaction_submitter:
@@ -387,10 +387,6 @@ blockchains:
 
   eif_event_receiver:
     module: lib.eif_event_receiver
-    type: library
-
-  eif_event_receiver_dynamic_icmf_config:
-    module: lib.eif_event_receiver_dynamic_icmf_config
     type: library
 
   hbridge:

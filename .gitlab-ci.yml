@@ -120,7 +120,6 @@ deploy_library_chain:
     - chr build
     - ci/library_chain/deploy.sh -n eif --major 1 --minor 0 --library-description "Common EIF library utilities"
     - ci/library_chain/deploy.sh -n eif_event_receiver --major 1 --minor 0 --library-description "EIF event receiver"
-    - ci/library_chain/deploy.sh -n eif_event_receiver_dynamic_icmf_config --major 1 --minor 0 --library-description "EIF event receiver configurable via ICMF"
     - ci/library_chain/deploy.sh -n hbridge --major 1 --minor 0 --library-description "Bridge library"
     - ci/library_chain/deploy.sh -n hbridge_crc2 --major 1 --minor 0 --library-description "NFT bridge library"
     - ci/library_chain/deploy.sh -n hbridge_admin --major 1 --minor 0 --library-description "Bridge admin utilities"

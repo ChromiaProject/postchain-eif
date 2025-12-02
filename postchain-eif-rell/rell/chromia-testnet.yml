@@ -85,7 +85,7 @@ blockchains:
               - "L_blockchain_rid_topic"
     moduleArgs:
       chain_version: *chain_version
-      lib.eif_event_receiver_dynamic_icmf_config:
+      lib.eif_event_receiver.dynamic_icmf_config:
         configuration_chain: "token_chain"
 
   transaction_submitter_testnet:
