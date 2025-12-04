@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.testcontainers.containers.DockerComposeContainer
+import org.testcontainers.containers.ComposeContainer
 import org.testcontainers.containers.wait.strategy.Wait
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
@@ -36,7 +36,7 @@ class EifConfigTestIT {
         evmContainer.stop()
     }
 
-    private val evmContainer: DockerComposeContainer<*> = GethContainer().withExposedService(
+    private val evmContainer: ComposeContainer = GethContainer().withExposedService(
             "geth", 8545,
             Wait.forLogMessage(".*Chain head was updated                   number=2.*\\s", 1).withStartupTimeout(Duration.ofSeconds(10))
     )
