@@ -2,7 +2,7 @@ package net.postchain.eif
 
 import assertk.assertThat
 import assertk.assertions.isEqualTo
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.math.BigInteger
 
 class EvmEventProcessorTest {

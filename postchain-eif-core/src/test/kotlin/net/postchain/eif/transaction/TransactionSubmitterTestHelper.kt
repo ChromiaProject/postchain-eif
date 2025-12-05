@@ -18,7 +18,7 @@ import net.postchain.gtv.GtvFactory
 import net.postchain.gtx.data.ExtOpData
 import org.jooq.SQLDialect
 import org.jooq.impl.DSL
-import org.junit.Assert.fail
+import org.junit.jupiter.api.Assertions.fail
 import java.math.BigInteger
 
 data class TxReceiptUpdateOpArg(val blockHash: String, val effectiveGasPrice: Long, val gasUsage: Long)

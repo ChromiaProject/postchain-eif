@@ -11,7 +11,7 @@ import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV2
 import org.apache.logging.log4j.Level
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
-import org.testcontainers.containers.DockerComposeContainer
+import org.testcontainers.containers.ComposeContainer
 import org.testcontainers.containers.wait.strategy.Wait
 import org.web3j.crypto.Credentials
 import org.web3j.protocol.Web3j
@@ -44,7 +44,7 @@ abstract class EifBaseIntegrationTest(private val prependUrls: List<String> = li
 
     val networkId = 1337L
     val gasProvider = DefaultGasProvider()
-    protected val evmContainer: DockerComposeContainer<*> = GethContainer().withExposedService(
+    protected val evmContainer: ComposeContainer = GethContainer().withExposedService(
             "geth", 8545,
             Wait.forLogMessage(".*HTTP server started.*\\s", 1)
     )

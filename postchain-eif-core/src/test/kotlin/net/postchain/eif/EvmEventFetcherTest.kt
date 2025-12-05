@@ -14,7 +14,7 @@ import net.postchain.gtv.GtvNull
 import org.awaitility.Duration
 import org.awaitility.kotlin.await
 import org.awaitility.kotlin.withPollDelay
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.atLeast
 import org.mockito.kotlin.doAnswer

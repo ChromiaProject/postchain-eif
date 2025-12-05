@@ -3,14 +3,14 @@ package net.postchain.eif
 import assertk.assertThat
 import assertk.assertions.isEmpty
 import assertk.assertions.isEqualTo
-import junit.framework.TestCase.assertFalse
-import junit.framework.TestCase.assertTrue
 import net.postchain.base.SpecialTransactionPosition
 import net.postchain.core.BlockEContext
 import net.postchain.eif.config.EifEventReceiverConfig
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.mapper.toObject
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
