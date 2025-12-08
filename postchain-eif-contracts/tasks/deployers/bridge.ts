@@ -12,6 +12,8 @@ import { ChromiaNetwork, verifyProxyContract } from "./utils";
 import { exit } from "process";
 import { inspectManagedValidatorContract } from "./validator";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
+import { ContractFactory } from "ethers";
+import { TokenBridgeV4 } from "../../typechain-types/contracts/upgrade-v4-offset/TokenBridgeV4";
 
 /**
  * Deploys a TokenBridge contract with a proxy pattern.
@@ -45,6 +47,21 @@ task("deploy:bridge")
                 console.log(e);
             }
         }
+    });
+
+/**
+ * Imports a TokenBridge contract.
+ * 
+ * This task imports a TokenBridge contract by creating a new logic contract.
+ * 
+ * @param address - The address of the TokenBridge contract to be imported.
+ */
+task("import:bridge")
+    .addParam("address", "")
+    .setAction(async ({ address }, hre) => {
+        const factory = await hre.ethers.getContractFactory("TokenBridge") as TokenBridge__factory;
+        await hre.upgrades.forceImport(address, factory);
+        console.log("Token bridge has been imported");
     });
 
 /**
@@ -83,21 +100,6 @@ task("upgrade:bridge")
         if (verify) {
             await verifyProxyContract(hre, address);
         }
-    });
-
-/**
- * Imports a TokenBridge contract.
- * 
- * This task imports a TokenBridge contract by creating a new logic contract.
- * 
- * @param address - The address of the TokenBridge contract to be imported.
- */
-task("import:bridge")
-    .addParam("address", "")
-    .setAction(async ({ address }, hre) => {
-        const factory = await hre.ethers.getContractFactory("TokenBridge") as TokenBridge__factory;
-        await hre.upgrades.forceImport(address, factory);
-        console.log("Token bridge has been imported");
     });
 
 /**

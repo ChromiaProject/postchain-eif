@@ -28,9 +28,9 @@ This document describes all available scripts in the `postchain-eif-contracts` p
 - **deploy:native**: Deploys the ChromiaTokenBridge contract, which can be used to bridge tokens between Chromia and EVM networks that are native to Chromia
 - **deploy:snapshots**: Deploys the TokenBridgeWithSnapshotWithdraw contract that uses snapshots for withdrawals in the event of a mass exit.
 - **deploy:chromiatokenbsc**: Deploys the Chromia token on BSC
-- **prepare:bridge**: Prepares an upgrade for the TokenBridge contract
-- **upgrade:bridge**: Upgrades the existing TokenBridge contract
 - **import:bridge**: Imports a TokenBridge contract
+- **prepare:bridge**: Prepares an upgrade for the TokenBridge contract
+- **upgrade:bridge:v4-offset**: Upgrades the existing TokenBridgeV3 contract to TokenBridgeV4 with a new withdraw time offset
 - **setBlockchainRid:bridge**: Sets the blockchain RID for a TokenBridge contract
 - **finalizeBlockchainRid:bridge**: Finalizes the blockchain RID for a TokenBridge contract
 - **allowToken:bridge**: Configures token allowance on a TokenBridge contract
