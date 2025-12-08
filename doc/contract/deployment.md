@@ -136,18 +136,54 @@ $ yarn allowToken:bridge --network sepolia --bridge-address {BRIDGE_CONTRACT_ADD
 
 # Upgrading token bridge contract
 
-Run the following tasks to upgrade token bridge smart contract:
+You may need to upgrade a TokenBridge contract to introduce new features or modify existing logic. For example, assume you have deployed a TokenBridge contract and want to upgrade it to a version with a new withdraw time offset. First, create a new contract that supports initialization with a new withdraw time offset (see example: [TokenBridgeV4.sol](../postchain-eif-contracts/contracts/upgrade-v4-offset/TokenBridgeV4.sol)).
+
+Next, check your deployment manifest. The OpenZeppelin Upgrades plugin tracks deployments in the `.openzeppelin/sepolia.json` file. If it's not up to date, you don't know, (or the proxy was deployed by someone else), remove it and import it again:
 
 ```sh
-$ yarn prepare:bridge --network sepolia --address {PROXY_ADDRESS}
-$ yarn upgrade:bridge --network sepolia --verify --address {PROXY_ADDRESS}
+$ rm -rf .openzeppelin/sepolia.json
+$ yarn import:bridge --network sepolia --address {PROXY_CONTRACT_ADDRESS}
 ```
 
-To force import the token bridge contract:
+### Option 1: Single signature upgrade
+
+If the bridge is owned by a single signature, the upgrade is straightforward:
 
 ```sh
-$ yarn import:bridge --network sepolia --address {PROXY_ADDRESS}
+$ yarn upgrade:bridge:v4-offset --network sepolia --verify --address {PROXY_CONTRACT_ADDRESS} --offset {NEW_WITHDRAW_TIME_OFFSET}
 ```
+
+### Option 2: Multiple signature upgrade
+
+For a bridge whose ownership has been transferred to a multi-signature account, such as Gnosis Safe, we need to deploy the new logic contract, create an upgrade transaction and have it signed by enough signatures to execute it. Start by deploying the new logic contract (`TokenBridgeV4`) and constructing the call data we need to pass to our multi-signature transaction:
+
+```sh
+$ yarn prepare:bridge:v4-offset --network sepolia --address {PROXY_CONTRACT_ADDRESS} --offset {NEW_WITHDRAW_TIME_OFFSET}
+$ npx hardhat prepare-upgrade:chromiabridge-to-v1.1 --network sepolia --address {PROXY_CONTRACT_ADDRESS} --offset {NEW_WITHDRAW_TIME_OFFSET}
+
+The contract 0x5659f283Ce5297A966033968Ffb4A7D20D120b6D has already been verified
+✅ New implementation deployed at: 0x5659f283Ce5297A966033968Ffb4A7D20D120b6D
+📨 Gnosis Safe Transaction
+To: 0x838F9e7B21F27a2facF843CCDA2b7a3f7d6a724b
+Proxy admin address is:  0xFB1E8b7CeEab4020EA163Cda6C5308dE29Aeb50b
+Data: 0x9623609d000000000000000000000000838f9e7b21f27a2facf843ccda2b7a3f7d6a724b0000000000000000000000005659f283ce5297a966033968ffb4a7d20d120b6d00000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000024dc216dca000000000000000000000000000000000000000000000000000000000000006400000000000000000000000000000000000000000000000000000000
+```
+
+Next step is to create, sign and execute the transaction to upgrade the contract. Below is an example of how to do it through [Gnosis Safe](https://app.safe.global/) or [BNB Safe](https://multisig.bnbchain.org/) with a multi-signature wallet already set up:
+
+**⚠️ WARNING**
+> At the time of writing this, the BNB Safe website fails to work for BNC testnet.
+
+1. Click `New transaction` followed by the `Transaction builder` and toggle the `Custom data` in the top right corner.
+2. Provide the proxy admin address (is in the output from previous command)
+3. Set `0` as ETH.
+4. Paste the `Data` output from previous command into the `Data` field.
+5. Click `Add new transaction` and `Create batch`
+6. Click `Simulate` to verify the transaction, and if everything looks good `Add batch`
+7. Click `Continue` and then `Sign`.
+8. Send transaction to other signers to have them sign it.
+9. Once signed by the threshold of required signatures, execute it.
+
 
 # Deploying anchoring contract
 
