@@ -15,3 +15,91 @@
     }
 }
 
+entity dynamic_ras_rule {
+    network_id: integer;
+    token_address: byte_array;
+    key network_id, token_address;
+
+    rule: byte_array; // rule.to_gtv().to_bytes()
+}
+
+function enable_account_creation_on_deposit(
+    network_id: integer,
+    token_address: byte_array,
+    min_amount: big_integer = 1L,
+    timeout_days: integer = 10,
+    transfer_strategy: text = "open",
+) {
+
+    require(
+        empty(dynamic_ras_rule @? { network_id, token_address }),
+        "Account creation on deposit is already enabled for token %s on network %d".format(token_address, network_id)
+    );
+
+    val erc20 = require(
+        erc20.erc20_asset @? { network_id, token_address } ( .virtual_blockchain_rid, asset_id = .asset.id ),
+        "ERC-20 asset not found for the specified network %d and token address %s".format(network_id, token_address)
+    );
+
+    val rule_arg = ft4.transfer_strategy.module_args_list_element(
+        sender_blockchain = erc20.virtual_blockchain_rid.to_gtv(),
+        sender = "*".to_gtv(),
+        recipient = "*".to_gtv(),
+        asset = [["id" : erc20.asset_id.to_gtv(), "min_amount" : min_amount.to_gtv()]].to_gtv_pretty(),
+        timeout_days = timeout_days,
+        strategy = transfer_strategy.to_gtv()
+    );
+
+    val rules = ft4.transfer_strategy.get_config([rule_arg].to_gtv());
+    // TODO: remove
+    log(rules);
+    require(not rules.empty(), "No valid rules were create for network %d and token address %s".format(network_id, token_address));
+
+    create dynamic_ras_rule(network_id, token_address, rule = rules[0].to_gtv().to_bytes());
+}
+
+function disable_account_creation_on_deposit(network_id: integer, token_address: byte_array) {
+    delete dynamic_ras_rule @? { network_id, token_address };
+}
+
+query is_account_creation_on_deposit_enabled(network_id: integer, token_address: byte_array): boolean {
+    return exists(dynamic_ras_rule @? { network_id, token_address });
+}
+
+function find_allowed_ras_rules(
+    from_chain: byte_array,
+    from_id: byte_array,
+    to_id: byte_array,
+    asset: ft4.assets.asset,
+    amount: big_integer
+): map<text, ft4.transfer_strategy.rule> {
+
+    val static_rules = ft4.transfer_strategy.find_allowed_rules(
+        from_chain, from_id, to_id, asset, amount
+    );
+
+    log("static_rules: " + static_rules);
+
+    val dynamic_rules = dynamic_ras_rule @* {} (
+        ft4.transfer_strategy.rule.from_gtv(gtv.from_bytes(.rule))
+    ) @* {
+        ft4.transfer_strategy.is_blockchain_allowed($, from_chain),
+        ft4.transfer_strategy.is_sender_allowed($, from_id),
+        ft4.transfer_strategy.is_recipient_allowed($, to_id, from_id),
+        ft4.transfer_strategy.is_asset_amount_allowed($, asset, amount)
+    };
+
+    log("dynamic_rules: " + dynamic_rules);
+
+
+    val rule_map = static_rules;
+    for (rule in dynamic_rules) {
+        for (strat in rule.strategies) {
+            rule_map[strat] = rule;
+        }
+    }
+
+    log("resul_map: " + rule_map);
+
+    return rule_map;
+}
