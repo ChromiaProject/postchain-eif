@@ -1,0 +1,69 @@
+
+function test_account_creation_on_deposit() {
+    val foo_asset = register_foreign_asset(FOO);
+    val bar_asset = register_foreign_asset(BAR, network_id2);
+
+    // No account creation on deposit enabled
+    assert_false(is_account_creation_on_deposit_enabled(network_id1, FOO.token_address));
+    assert_false(is_account_creation_on_deposit_enabled(network_id2, BAR.token_address));
+
+    // Enable account creation on deposit for FOO and BAR tokens
+    rell.test.tx().op(
+        helpers.enable_account_creation_on_deposit_op(network_id1, FOO.token_address, 1L, 10, "open"),
+        helpers.enable_account_creation_on_deposit_op(network_id2, BAR.token_address, 1L, 10, "open")
+    ).run();
+
+    // Check that account creation on deposit is enabled for FOO and BAR tokens
+    assert_true(is_account_creation_on_deposit_enabled(network_id1, FOO.token_address));
+    assert_true(is_account_creation_on_deposit_enabled(network_id2, BAR.token_address));
+
+    // Disable account creation on deposit for FOO token
+    rell.test.tx().op(
+        helpers.disable_account_creation_on_deposit_op(network_id1, FOO.token_address)
+    ).run();
+
+    // Check that account creation on deposit is disabled for FOO token
+    assert_false(is_account_creation_on_deposit_enabled(network_id1, FOO.token_address));
+    assert_true(is_account_creation_on_deposit_enabled(network_id2, BAR.token_address));
+
+    // Trying to register account on deposit for FOO token again, should fail
+    rell.test.tx().op(
+        helpers.enable_account_creation_on_deposit_op(network_id2, BAR.token_address, 1L, 10, "open")
+    ).run_must_fail("Account creation on deposit is already enabled for token %s on network %d".format(BAR.token_address, network_id2));
+}
+
+function test_dynamic_ras_rules() {
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
+    val foo_asset = register_foreign_asset(FOO);
+    val abc_asset = register_foreign_asset(ABC);
+    val erc20_foo = erc20.get_erc20_for_asset(foo_asset.id)[0];
+    val erc20_abc = erc20.get_erc20_for_asset(abc_asset.id)[0];
+
+    // Check that the rules for FOO token are found
+    val foo_rules = find_allowed_ras_rules(erc20_abc.virtual_blockchain_rid, evm_address, account_id, foo_asset, 10000000L);
+    assert_true(exists(foo_rules));
+
+    // Check that the rules for ABC token are not found (no rules for ABC token are registered)
+    val abc_rules = find_allowed_ras_rules(erc20_abc.virtual_blockchain_rid, evm_address, account_id, abc_asset, 10000000L);
+    assert_false(exists(abc_rules));
+
+    // Enable account creation on deposit for ABC token
+    rell.test.tx().op(
+        helpers.enable_account_creation_on_deposit_op(network_id1, ABC.token_address, 10000000L, 10, "open")
+    ).run();
+    assert_true(is_account_creation_on_deposit_enabled(network_id1, ABC.token_address));
+
+    // Check that the rules for ABC token are found
+    val abc_rules2 = find_allowed_ras_rules(erc20_abc.virtual_blockchain_rid, evm_address, account_id, abc_asset, 10000000L);
+    assert_true(exists(abc_rules2));
+
+    // Disable account creation on deposit for ABC token
+    rell.test.tx().op(
+        helpers.disable_account_creation_on_deposit_op(network_id1, ABC.token_address)
+    ).run();
+    assert_false(is_account_creation_on_deposit_enabled(network_id1, ABC.token_address));
+
+    // Check that the rules for ABC token are not found
+    val abc_rules3 = find_allowed_ras_rules(erc20_abc.virtual_blockchain_rid, evm_address, account_id, abc_asset, 10000000L);
+    assert_false(exists(abc_rules3));
+}

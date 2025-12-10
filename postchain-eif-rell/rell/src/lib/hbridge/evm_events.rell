@@ -139,7 +139,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
         // we want to bounce instead
 
         val sender_blockchain_rid = erc20_asset.virtual_blockchain_rid;
-        val rules = ft4.transfer_strategy.find_allowed_rules(
+        val rules = find_allowed_ras_rules(
             from_chain = sender_blockchain_rid,
             from_id = sender_id,
             to_id = recipient_id,

@@ -34,6 +34,7 @@ blockchains:
   eif:
     module: tests.hbridge_it
     config:
+      nonce: 0
       features:
         merkle_hash_version: 2
       blockstrategy:
@@ -70,6 +71,17 @@ blockchains:
         enable_icmf: false
       lib.hbridge:
         version: 2
+      lib.ft4.core.accounts.strategies.transfer: # Used in HBridgeAccountCreationIT.kt
+        rules:
+          - sender_blockchain: x"16C7CB3DF61C3233038679D19F8F893118C4F3D542361FF7A4D9BDB15E09B57E" # Used for account creation when depositing CHR tokens EVM network: chr repl -c '("EVM", 1337, x"679170CC953B01D270349A344C4ED5634344CA04").hash()'
+            sender: "*"
+            recipient: "*"
+            asset:
+              - name: "Chromia"
+                min_amount: 1L # Smallest possible unit of should be OK
+                issuing_blockchain_rid: x"0000000000000000000000000000000000000000000000000000000000000001"
+            timeout_days: 10
+            strategy: "open"
 
 compile:
   source: src

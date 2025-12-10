@@ -1,6 +1,7 @@
 module;
 
 import lib.ft4.assets;
+import lib.ft4.accounts.strategies.transfer;
 import lib.hbridge.*;
 
 operation register_erc20_asset_op(
@@ -92,3 +93,11 @@ function mock_confirmation_proof_bytes(blockchain_rid: byte_array = x"", height:
 
 @mount("register_recovery_contract")
 operation register_recovery_contract_op(network_id: integer, contract_address: byte_array) {}
+
+operation enable_account_creation_on_deposit_op(network_id: integer, token_address: byte_array, min_amount: big_integer, timeout_days: integer, transfer_strategy: text) {
+    enable_account_creation_on_deposit(network_id, token_address, min_amount, timeout_days, transfer_strategy);
+}
+
+operation disable_account_creation_on_deposit_op(network_id: integer, token_address: byte_array) {
+    disable_account_creation_on_deposit(network_id, token_address);
+}

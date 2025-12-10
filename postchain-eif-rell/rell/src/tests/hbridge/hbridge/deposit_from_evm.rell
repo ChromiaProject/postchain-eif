@@ -70,7 +70,7 @@ function test_deposit_foreign_token_from_evm_eoa_with_already_created_and_linked
     _deposit_token_from_evm_eoa_with_already_created_and_linked_account(ft_asset);
 }
 
-function test_deposit_native_token_from_evm_eoa_with_already_created_and_linked_account_deducs_from_brige_account() {
+function test_deposit_native_token_from_evm_eoa_with_already_created_and_linked_account_deducts_from_bridge_account() {
     val erc20 = register_native_asset();
 
     rell.test.tx().op(
@@ -232,7 +232,19 @@ function test_deposit_foreign_token_from_evm_before_account_creation() {
     _deposit_token_from_evm_before_account_creation(ft_asset);
 }
 
-function test_deposit_native_token_from_evm_before_account_creation_deducs_from_brige_account() {
+function test_deposit_foreign_token_from_evm_using_dynamic_ras_rules_before_account_creation() {
+    val abc_asset = register_foreign_asset(ABC);
+
+    // Enable account creation on deposit for ABC token
+    rell.test.tx().op(
+        helpers.enable_account_creation_on_deposit_op(network_id1, ABC.token_address, 10000000L, 10, "open")
+    ).run();
+    assert_true(is_account_creation_on_deposit_enabled(network_id1, ABC.token_address));
+
+    _deposit_token_from_evm_before_account_creation(abc_asset, ABC);
+}
+
+function test_deposit_native_token_from_evm_before_account_creation_deducts_from_bridge_account() {
     val erc20 = register_native_asset();
 
     rell.test.tx().op(
@@ -246,28 +258,28 @@ function test_deposit_native_token_from_evm_before_account_creation_deducs_from_
     assert_equals(assets.get_asset_balance(bridge_account, erc20.asset), bridge_amount - deposited_amount);
 }
 
-function _deposit_token_from_evm_before_account_creation(ft_asset: ft4.assets.asset): big_integer {
+function _deposit_token_from_evm_before_account_creation(ft_asset: ft4.assets.asset, asset_info: asset_info = CHR): big_integer {
     // Account
     val auth_descriptor = ft4_test.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
     val account_id = rell.test.pubkeys.alice.hash();
     val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
 
     // A user can't deposit less than 10 tCHR before account is created,
-    deposit_from_evm(evm_address, 7000000, block_height = 1);
+    deposit_from_evm(evm_address, 7000000, block_height = 1, asset = asset_info);
     assert_true(empty(erc20_deposit @* {}));
-    assert_withdraw(1, evm_address, 7000000);
+    assert_withdraw(1, evm_address, 7000000, asset = asset_info);
 
     // but can deposit 10+ tCHR before account is created,
-    deposit_from_evm(evm_address, 10000000, block_height = 2);
+    deposit_from_evm(evm_address, 10000000, block_height = 2, asset = asset_info);
     val deposit = erc20_deposit @ {} ($.to_struct());
     assert_equals(deposit.amount, 10000000);
     assert_equals(deposit.state, deposit_state.pending);
     assert_equals(erc20_withdrawal @ {} (@sum 1), 1);
 
     // but only once.
-    deposit_from_evm(evm_address, 11000000, block_height = 3);
+    deposit_from_evm(evm_address, 11000000, block_height = 3, asset = asset_info);
     assert_equals(erc20_deposit @ {} (@sum 1), 1);
-    assert_withdraw(2, evm_address, 11000000, expected_nr_withdrawals = 2);
+    assert_withdraw(2, evm_address, 11000000, expected_nr_withdrawals = 2, asset = asset_info);
 
     // Register account
     rell.test.tx().op(
@@ -279,8 +291,8 @@ function _deposit_token_from_evm_before_account_creation(ft_asset: ft4.assets.as
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), 0L);
 
     // FT4 account is created but EVM account is not linked, so a user can't deposit
-    deposit_from_evm(evm_address, 8000, block_height = 5);
-    deposit_from_evm(evm_address, 12000000, block_height = 6);
+    deposit_from_evm(evm_address, 8000, block_height = 5, asset = asset_info);
+    deposit_from_evm(evm_address, 12000000, block_height = 6, asset = asset_info);
     // We still have 1 pending deposit
     val deposit2 = erc20_deposit @ {} ($.to_struct());
     assert_equals(deposit2.amount, 10000000);
@@ -300,8 +312,8 @@ function _deposit_token_from_evm_before_account_creation(ft_asset: ft4.assets.as
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), 10000000L);
 
     // Once accounts are linked, the user can deposit any amount
-    deposit_from_evm(evm_address, 9000, block_height = 8);
-    deposit_from_evm(evm_address, 13000000, block_height = 9);
+    deposit_from_evm(evm_address, 9000, block_height = 8, asset = asset_info);
+    deposit_from_evm(evm_address, 13000000, block_height = 9, asset = asset_info);
     val deposited_amount = 10000000 + 9000 + 13000000;
     assert_equals(assets.get_asset_balance(ft_account, ft_asset), deposited_amount);
 
