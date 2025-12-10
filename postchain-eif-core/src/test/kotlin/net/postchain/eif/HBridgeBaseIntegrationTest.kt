@@ -18,6 +18,7 @@ import net.postchain.crypto.devtools.KeyPairHelper
 import net.postchain.crypto.sha256Digest
 import net.postchain.devtools.PostchainTestNode
 import net.postchain.devtools.PostchainTestNode.Companion.DEFAULT_CHAIN_IID
+import net.postchain.devtools.currentHeight
 import net.postchain.eif.contracts.Validator
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvArray
@@ -455,6 +456,12 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
         currentBlockHeight += 1
         buildBlock(DEFAULT_CHAIN_IID)
         assertEquals(currentBlockHeight, getLastHeight(node))
+    }
+
+    fun triggerBlockBuilding() {
+        currentBlockHeight += 1
+        val currentHeight = getChainNodes(chainId).first().currentHeight(chainId)
+        buildBlockNoWait(nodes, DEFAULT_CHAIN_IID, currentHeight + 1)
     }
 
     fun enqueueTx(data: ByteArray) {
