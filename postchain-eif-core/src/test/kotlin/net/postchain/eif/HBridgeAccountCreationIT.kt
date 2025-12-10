@@ -214,15 +214,19 @@ class HBridgeAccountCreationIT : HBridgeBaseIntegrationTest() {
         val config = loadEifBlockchainConfig(1L)
         val newConfig = removeRasTransferRule(config)
         addDappBlockchainConfiguration(chainId, GtvEncoder.encodeGtv(newConfig), currentBlockHeight + 2)
-        sealBlock() // build block and reloading config
-        sealBlock() // build block with the new config
 
-        // Assert that the config has been updated
-        val cfg = node.getBlockchainInstance(chainId).blockchainEngine.getConfiguration()
-        assertThat(cfg.rawConfig["nonce"]).isEqualTo(1L.toGtv())
+        await().pollInterval(Duration.ONE_SECOND).atMost(Duration.ONE_MINUTE).untilAsserted {
+            // NOTE: Don't use `awaitHeight()` during reconfiguration -- it holds a reference to the old
+            // block building strategy from the previous config, causing it to wait on a stale object.
+            triggerBlockBuilding()
 
-        // Cache the block queries after reconfiguration
-        blockQuery = node.getBlockchainInstance().blockchainEngine.getBlockQueries()
+            // Assert that the config has been updated
+            val cfg = node.getBlockchainInstance(chainId).blockchainEngine.getConfiguration()
+            assertThat(cfg.rawConfig["nonce"]).isEqualTo(1L.toGtv())
+
+            // Cache the block queries after reconfiguration
+            blockQuery = node.getBlockchainInstance().blockchainEngine.getBlockQueries()
+        }
 
         charlieAccount = depositAndVerifyAccountCreation(
                 charlieCredentials,
