@@ -51,7 +51,7 @@ libs:
   com.chromia.icmf:
     version: 1.102.2
   com.chromia.eif:
-    version: 1.0.0
+    version: 1.0.1
   com.chromia.hbridge:
     version: 1.0.0
 ```
