@@ -67,7 +67,7 @@ class HBridgeNativeModeIT : HBridgeBaseIntegrationTest() {
     private val accountNum = 15
     private val accountBalance = 1L
 
-    private val initialMint = 1000_000_000.chr
+    private val initialMint = 1_000_000_000.chr
     private val withdrawAmount = 1000.chr
     private val multiWithdrawAmount = 1.chr
     private val depositAmount = 100.chr

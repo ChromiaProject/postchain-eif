@@ -81,15 +81,7 @@ abstract class EifBaseIntegrationTest(private val prependUrls: List<String> = li
                 )
         )
 
-        transactionManager = FastRawTransactionManager(
-                web3j,
-                evmCredentials,
-                PollingTransactionReceiptProcessor(
-                        web3j,
-                        1000,
-                        30
-                )
-        )
+        transactionManager = createTransactionManager(evmCredentials)
 
         var urls = "http://$evmHost:$evmPort"
         if (prependUrls.isNotEmpty()) {
@@ -155,4 +147,10 @@ abstract class EifBaseIntegrationTest(private val prependUrls: List<String> = li
 
         return gasProvider.getGasLimit(transaction)
     }
+
+    fun createTransactionManager(credentials: Credentials) = FastRawTransactionManager(
+            web3j,
+            credentials,
+            PollingTransactionReceiptProcessor(web3j, 1000, 30)
+    )
 }

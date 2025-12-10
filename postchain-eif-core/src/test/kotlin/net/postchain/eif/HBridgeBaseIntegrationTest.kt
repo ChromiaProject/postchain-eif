@@ -53,7 +53,7 @@ import java.security.Security
 abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
 
     lateinit var ds: SimpleDigestSystem
-    private val merkleHashCalculator = GtvMerkleHashCalculatorV2(::sha256Digest)
+    protected val merkleHashCalculator = GtvMerkleHashCalculatorV2(::sha256Digest)
 
     val decimals = 18
     inline val Int.chr: BigInteger get() = BigInteger(this.toString() + "0".repeat(decimals), 10)
@@ -98,6 +98,27 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
             evmCredentials = Credentials.create("346B362B66A4F3CE3FEB41043E522C625B6310DEBEBA0E69DF2011748FB38325")
     )
     lateinit var bobAccount: FtAccount
+    lateinit var bobBalance: Uint256
+
+    // Charlie
+    val charlieCredentials = UserCredentials(
+            keyPair = KeyPair(
+                    "03F92FDD71102BFEF8DE6DECC33699462A4A41867A519ACB61428F3CEFDD13FA7E".hexStringToByteArray(),
+                    "98EB4808079CD90F89879FCBF78304C78DC17430C867A7CF9D6416E5C19477B6".hexStringToByteArray()),
+            evmCredentials = Credentials.create("98EB4808079CD90F89879FCBF78304C78DC17430C867A7CF9D6416E5C19477B6")
+    )
+    lateinit var charlieAccount: FtAccount
+    lateinit var charlieBalance: Uint256
+
+    // Dave
+    val daveCredentials = UserCredentials(
+            keyPair = KeyPair(
+                    "03349895AF2EBC50817E7A707F444629BC37969C5FC72F2C50C6CE989262AE71A8".hexStringToByteArray(),
+                    "B97B8918B503B38557F6077DFD200B9EBF22F6797FAF6F0067B1AB458D4AA552".hexStringToByteArray()),
+            evmCredentials = Credentials.create("B97B8918B503B38557F6077DFD200B9EBF22F6797FAF6F0067B1AB458D4AA552")
+    )
+    lateinit var daveAccount: FtAccount
+    lateinit var daveBalance: Uint256
 
     init {
         // We add this provider so that we can get keccak-256 message digest instances
@@ -242,25 +263,70 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
             adminKeyPair: KeyPair
     ): FtAccount {
 
+        val accountId = gtvHash(userPubKey.data)
+
         val auth = gtv(
                 gtv(AuthType.S.ordinal.toLong()),
                 gtv(GtvArray(arrayOf(gtv("A"), gtv("T"))), gtv(userPubKey.data)),
                 GtvNull
         )
-
         val authDescriptorId = auth.merkleHash(hashCalculator)
 
         val b = GtxBuilder(bcRid, listOf(adminKeyPair.pubKey.data), myCS, merkleHashCalculator)
         b.addOperation("ft4.admin.register_account", auth)
-
         enqueueTx(b.finish()
                 .sign(cryptoSystem.buildSigMaker(adminKeyPair))
                 .buildGtx()
                 .encode())
 
-        val accountId = gtv(userPubKey.data).merkleHash(hashCalculator)
-
         return FtAccount(accountId, authDescriptorId)
+    }
+
+    fun registerAccountByDeposit(credentials: UserCredentials, bcRid: BlockchainRid): FtAccount {
+        // Account ID and Auth Descriptor
+        val accountId = gtvHash(credentials.evmAddressBA)
+        val authDescriptor = gtv(
+                gtv(AuthType.S.ordinal.toLong()),
+                gtv(GtvArray(arrayOf(gtv("A"), gtv("T"))), gtv(credentials.evmAddressBA)),
+                GtvNull
+        )
+        val authDescriptorId = authDescriptor.merkleHash(hashCalculator)
+
+        // Operation: evm_signatures
+        val message = blockQuery.query("ft4.get_register_account_message", gtv(mapOf(
+                "strategy_operation" to gtv(mapOf(
+                        "name" to gtv("ft4.ras_transfer_open"),
+                        "args" to gtv(listOf(authDescriptor, GtvNull)),
+                )),
+                "register_account_operation" to gtv(mapOf(
+                        "name" to gtv("ft4.register_account"),
+                        "args" to gtv(listOf()),
+                )),
+        ))).get().asString()
+
+        val evmSig = Sign.signPrefixedMessage(
+                message.toByteArray(StandardCharsets.UTF_8),
+                credentials.evmCredentials.ecKeyPair
+        )
+        val signature = gtv(
+                gtv(evmSig.r),
+                gtv(evmSig.s),
+                gtv(BigInteger(evmSig.v).longValueExact())
+        )
+
+        // Transaction
+        val b = GtxBuilder(bcRid, listOf(adminKeyPair.pubKey.data), myCS, merkleHashCalculator)
+        b.addOperation("ft4.evm_signatures", gtv(listOf(gtv(credentials.evmAddressBA))), gtv(listOf(signature)))
+        b.addOperation("ft4.ras_transfer_open", authDescriptor, GtvNull)
+        b.addOperation("ft4.register_account")
+        val gtx = b.finish()
+                .sign(cryptoSystem.buildSigMaker(adminKeyPair))
+                .buildGtx()
+        val txRid = gtx.calculateTxRid(hashCalculator)
+
+        enqueueTx(gtx.encode())
+
+        return FtAccount(accountId, authDescriptorId, registrationTxRid = txRid)
     }
 
     fun linkAccount(
@@ -478,18 +544,50 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
         return all.map { it.asDict() }.maxByOrNull { it["serial"]!!.asInteger() }!!
     }
 
-    fun loadEifBlockchainConfig(): Gtv = GtvMLParser.parseGtvML(
-            javaClass.getResource("/net/postchain/eif/eif.xml")!!.readText()
-    )
+    fun loadEifBlockchainConfig(nonce: Long? = null): Gtv {
+        val xml = javaClass.getResource("/net/postchain/eif/eif.xml")!!.readText()
+        val gtv = GtvMLParser.parseGtvML(xml)
+        return if (nonce != null) {
+            mapGtvDictValue(gtv, "nonce") { gtv(nonce) }
+        } else {
+            gtv
+        }
+    }
+
+    fun gtvHash(data: ByteArray) = gtv(data).merkleHash(hashCalculator)
+
+    /**
+     * Maps a specific value in a GTV dictionary using the provided remapping function.
+     *
+     * @param gtv The source GTV object containing the dictionary to modify
+     * @param key The key of the value to remap in the dictionary
+     * @param remap Function that takes a Pair of key and value and returns new GTV value or null to remove the entry
+     * @return Modified GTV dictionary with remapped value, or original GTV if key not found
+     */
+    fun mapGtvDictValue(gtv: Gtv, key: String, remap: (Pair<String, Gtv>) -> Gtv?): Gtv {
+        val dict = gtv.asDict().toMutableMap()
+        val value = dict[key] ?: return gtv
+
+        val newValue = remap(key to value)
+        if (newValue != null) {
+            dict[key] = newValue
+        } else {
+            dict.remove(key)
+        }
+
+        return gtv(dict)
+    }
 
     fun getWithdrawalEventHashByTxRid(txRid: ByteArray): ByteArray = blockQuery.query(
             "eif.hbridge.get_erc20_withdrawal_by_tx",
             gtv("tx_rid" to gtv(txRid), "op_index" to gtv(1))
     ).get().asDict()["event_hash"]!!.asByteArray()
 
-    fun getAssetBalance(userAccount: FtAccount): BigInteger? {
+    fun getAssetBalance(userAccount: FtAccount): BigInteger? = getAssetBalance(userAccount.accountId)
+
+    fun getAssetBalance(accountId: ByteArray): BigInteger? {
         val balanceGtv = blockQuery.query("ft4.get_asset_balance",
-                gtv("account_id" to gtv(userAccount.accountId), "asset_id" to gtv(assetId))
+                gtv("account_id" to gtv(accountId), "asset_id" to gtv(assetId))
         ).get()
 
         return if (balanceGtv.isNull()) null else balanceGtv["amount"]!!.asBigInteger()
@@ -504,6 +602,13 @@ abstract class HBridgeBaseIntegrationTest : EifBaseIntegrationTest() {
 
     fun networkContractDiscriminator(networkId: Long, contractAddress: ByteArray) =
             gtv(BigInteger.valueOf(networkId).shiftLeft(160) + BigInteger(contractAddress))
+
+    @Suppress("EnumEntryName")
+    enum class DepositStatus {
+        pending,
+        completed,
+        recalled,
+    }
 
     @Suppress("EnumEntryName")
     enum class WithdrawalStatus {

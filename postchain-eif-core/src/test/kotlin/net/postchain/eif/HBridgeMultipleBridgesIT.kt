@@ -48,7 +48,7 @@ import java.math.BigInteger
 class HBridgeMultipleBridgesIT : HBridgeBaseIntegrationTest() {
     private val logger = KotlinLogging.logger("test_logger")
 
-    private val initialMint = 1000_000_000.chr
+    private val initialMint = 1_000_000_000.chr
     private val depositAmount1 = 1000.chr
     private val depositAmount2 = 2000.chr
     private val withdrawAmount1 = 100.chr
