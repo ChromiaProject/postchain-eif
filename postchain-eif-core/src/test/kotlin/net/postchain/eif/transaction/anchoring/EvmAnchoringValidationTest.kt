@@ -1,12 +1,15 @@
 package net.postchain.eif.transaction.anchoring
 
+import assertk.assertFailure
 import assertk.assertThat
-import assertk.assertions.isFalse
+import assertk.assertions.isInstanceOf
 import assertk.assertions.isTrue
+import assertk.assertions.messageContains
 import net.postchain.base.BaseBlockWitness
 import net.postchain.base.SpecialTransactionPosition
 import net.postchain.base.gtv.BlockHeaderData
 import net.postchain.common.BlockchainRid
+import net.postchain.common.exception.UserMistake
 import net.postchain.common.toHex
 import net.postchain.core.BlockEContext
 import net.postchain.core.BlockRid
@@ -110,10 +113,11 @@ class EvmAnchoringValidationTest {
                 mockContext, GET_CURRENT_EVM_SIGNER_LIST_QUERY, gtv("blockchain_rid" to gtv(systemAnchoringBrid))
         )).doReturn(gtv(listOf(gtv(cryptoSystem.generateKeyPair().pubKey.data))))
 
-        assertThat(sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
-                ANCHOR_SYSTEM_ANCHORING_BLOCK_OP,
-                arrayOf(gtv(blockHeaderData), gtv(signatures), gtv(signers))
-        )))).isFalse()
+        assertFailure {
+            sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
+                    ANCHOR_SYSTEM_ANCHORING_BLOCK_OP,
+                    arrayOf(gtv(blockHeaderData), gtv(signatures), gtv(signers)))))
+        }.isInstanceOf<UserMistake>().messageContains("Signature mismatch")
     }
 
     @Test
@@ -123,19 +127,23 @@ class EvmAnchoringValidationTest {
         val newBlockRid = blockWithAnotherPrevBlockRid.toGtv().merkleHash(hashCalculator)
 
         val wrongBlockHeaderData = encodeBlockHeaderDataForEVM(newBlockRid, BlockHeaderData.fromBinary(rawDummyBlock))
-        assertThat(sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
-                ANCHOR_SYSTEM_ANCHORING_BLOCK_OP,
-                arrayOf(gtv(wrongBlockHeaderData), gtv(signatures), gtv(signers))
-        )))).isFalse()
+        assertFailure {
+            sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
+                    ANCHOR_SYSTEM_ANCHORING_BLOCK_OP,
+                    arrayOf(gtv(wrongBlockHeaderData), gtv(signatures), gtv(signers))
+            )))
+        }.isInstanceOf<UserMistake>().messageContains("Invalid block rid")
     }
 
     @Test
     fun `Signer and signature mismatch`() {
         val signers = listOf(gtv(getEthereumAddress(cryptoSystem.generateKeyPair().pubKey.data)))
-        assertThat(sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
-                ANCHOR_SYSTEM_ANCHORING_BLOCK_OP,
-                arrayOf(gtv(blockHeaderData), gtv(signatures), gtv(signers))
-        )))).isFalse()
+        assertFailure {
+            sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
+                    ANCHOR_SYSTEM_ANCHORING_BLOCK_OP,
+                    arrayOf(gtv(blockHeaderData), gtv(signatures), gtv(signers))
+            )))
+        }.isInstanceOf<UserMistake>().messageContains("Signature mismatch")
     }
 
     @Test
@@ -150,23 +158,29 @@ class EvmAnchoringValidationTest {
             gtv(encodeSignatureWithV(incorrectDigest, it))
         }
 
-        assertThat(sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
-                ANCHOR_SYSTEM_ANCHORING_BLOCK_OP,
-                arrayOf(gtv(blockHeaderData), gtv(incorrectSignatures), gtv(signers))
-        )))).isFalse()
+        assertFailure {
+            sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
+                    ANCHOR_SYSTEM_ANCHORING_BLOCK_OP,
+                    arrayOf(gtv(blockHeaderData), gtv(incorrectSignatures), gtv(signers))
+            )))
+        }.isInstanceOf<UserMistake>().messageContains("Signature mismatch")
     }
 
     @Test
     fun `Wrong signer order or duplicates`() {
-        assertThat(sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
-                ANCHOR_SYSTEM_ANCHORING_BLOCK_OP,
-                arrayOf(gtv(blockHeaderData), gtv(signatures.reversed()), gtv(signers.reversed()))
-        )))).isFalse()
+        assertFailure {
+            sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
+                    ANCHOR_SYSTEM_ANCHORING_BLOCK_OP,
+                    arrayOf(gtv(blockHeaderData), gtv(signatures.reversed()), gtv(signers.reversed()))
+            )))
+        }.isInstanceOf<UserMistake>().messageContains("Signers are duplicated or out of order")
 
-        assertThat(sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
-                ANCHOR_SYSTEM_ANCHORING_BLOCK_OP,
-                arrayOf(gtv(blockHeaderData), gtv(signatures + signatures.last()), gtv(signers + signers.last()))
-        )))).isFalse()
+        assertFailure {
+            sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
+                    ANCHOR_SYSTEM_ANCHORING_BLOCK_OP,
+                    arrayOf(gtv(blockHeaderData), gtv(signatures + signatures.last()), gtv(signers + signers.last()))
+            )))
+        }.isInstanceOf<UserMistake>().messageContains("Signers are duplicated or out of order")
     }
 
     private fun makeBlockHeader(blockchainRID: BlockchainRid, previousBlockRid: BlockRid, height: Long) = BlockHeaderData(

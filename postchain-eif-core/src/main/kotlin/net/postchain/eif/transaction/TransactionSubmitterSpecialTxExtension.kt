@@ -4,6 +4,7 @@ import mu.KLogging
 import mu.withLoggingContext
 import net.postchain.base.SpecialTransactionPosition
 import net.postchain.common.BlockchainRid
+import net.postchain.common.exception.UserMistake
 import net.postchain.concurrent.util.get
 import net.postchain.core.BlockEContext
 import net.postchain.core.EContext
@@ -92,8 +93,7 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
         removeTxsWithUpdatedProcessedByValue(bctx)
 
         if (!isNoOpValid(ops, bctx.height)) {
-            logger.warn { "Validation failed. Invalid no op. Operations: $ops" }
-            return false
+            throw UserMistake("Invalid no op. Operations: $ops")
         }
 
         for (op in ops) {
@@ -107,38 +107,29 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
                 val signedData = op.args[4].asByteArray()
 
                 if (!cryptoSystem.verifyDigest(statusSignatureDataHash(requestId, newTxStatus), Signature(signer, signedData))) {
-                    logger.warn { "Validation failed. Invalid signature" }
-                    return false
+                    throw UserMistake("Invalid signature")
                 }
 
                 val currentTxStatus = getBcTransactionStatus(module, bctx, requestId)
-
-                if (currentTxStatus == null) {
-                    logger.warn { "Validation failed. Transaction $requestId not found" }
-                    return false
-                }
+                        ?: throw UserMistake("Transaction $requestId not found")
 
                 if (validateSpecialOps()) {
                     if (newTxStatus == RellTransactionStatus.TAKEN && currentTxStatus != RellTransactionStatus.QUEUED) {
-                        logger.warn { "Validation failed. Transaction $requestId can not be set to status ${RellTransactionStatus.TAKEN} from current status $currentTxStatus" }
-                        return false
+                        throw UserMistake("Transaction $requestId can not be set to status ${RellTransactionStatus.TAKEN} from current status $currentTxStatus")
                     }
                     if (newTxStatus == RellTransactionStatus.QUEUED && currentTxStatus != RellTransactionStatus.TAKEN) {
-                        logger.warn { "Validation failed. Only rell or the node submitting a transaction can set status to ${RellTransactionStatus.QUEUED}" }
-                        return false
+                        throw UserMistake("Only rell or the node submitting a transaction can set status to ${RellTransactionStatus.QUEUED}")
                     }
                 }
 
                 if (newTxStatus == RellTransactionStatus.PENDING) {
 
                     if (validateSpecialOps() && currentTxStatus != RellTransactionStatus.QUEUED && currentTxStatus != RellTransactionStatus.TAKEN) {
-                        logger.warn { "Validation failed. Transaction $requestId can not be set to status ${RellTransactionStatus.PENDING} from current status $currentTxStatus" }
-                        return false
+                        throw UserMistake("Transaction $requestId can not be set to status ${RellTransactionStatus.PENDING} from current status $currentTxStatus")
                     }
 
                     if (txHash == null) {
-                        logger.warn { "Validation failed. Transaction $requestId did not set any transaction hash when changing status to ${RellTransactionStatus.PENDING}" }
-                        return false
+                        throw UserMistake("Transaction $requestId did not set any transaction hash when changing status to ${RellTransactionStatus.PENDING}")
                     }
 
                     val txPending = getBcTransaction(bctx, requestId)
@@ -170,14 +161,12 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
                             acceptable
                         }
                         if (txStatusMatchesThisNode != true) {
-                            logger.warn { "Validation failed. Transaction $requestId can not be set to status $newTxStatus because the status can't be approved by this node" }
-                            return false
+                            throw UserMistake("Transaction $requestId can not be set to status $newTxStatus because the status can't be approved by this node")
                         }
 
                         // A SUCCESS must contain a receipt in the same transaction
                         if (newTxStatus == RellTransactionStatus.SUCCESS && getOpsForTx(ops, UPDATE_EVM_TRANSACTION_RECEIPT, requestId).isEmpty()) {
-                            logger.warn { "Validation failed. Transaction $requestId is set to ${RellTransactionStatus.SUCCESS.name} but without a receipt" }
-                            return false
+                            throw UserMistake("Transaction $requestId is set to ${RellTransactionStatus.SUCCESS.name} but without a receipt")
                         }
 
                         logger.info { "Transaction $requestId is verified as $newTxStatus" }
@@ -201,21 +190,20 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
                             txPending.gasUsed != null && txPending.gasUsed!! == gasUsage
 
                     if (!match) {
-                        logger.warn { "Validation failed. Receipt for transaction $requestId does not match this nodes receipt. Op receipt: block hash: $blockHash, effective gas price: $effectiveGasPrice, gas usage: $gasUsage. This nodes receipt: block hash: ${txPending.blockHash}, effective gas price: ${txPending.effectiveGasPrice}, gas usage: ${txPending.gasUsed}" }
+                        logger.warn { "Receipt for transaction $requestId does not match this nodes receipt. Op receipt: block hash: $blockHash, effective gas price: $effectiveGasPrice, gas usage: $gasUsage. This nodes receipt: block hash: ${txPending.blockHash}, effective gas price: ${txPending.effectiveGasPrice}, gas usage: ${txPending.gasUsed}" }
                     }
 
                     match
                 }
 
                 if (valid == false) {
-                    return false
+                    throw UserMistake("Receipt for transaction $requestId does not match this nodes receipt.")
                 }
 
                 // A receipt requires a SUCCESS update status
                 if (!getOpsForTx(ops, UPDATE_EVM_TRANSACTION_STATUS, requestId)
                                 .any { RellTransactionStatus.entries[it.args[1].asInteger().toInt()] == RellTransactionStatus.SUCCESS }) {
-                    logger.warn { "Validation failed. Receipt for transaction $requestId set without any ${RellTransactionStatus.SUCCESS.name} status update op" }
-                    return false
+                    throw UserMistake("Receipt for transaction $requestId set without any ${RellTransactionStatus.SUCCESS.name} status update op")
                 }
             } else if (op.opName == SET_NODE_FAILURE_REASON) {
 
@@ -225,14 +213,12 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
                 val signedData = op.args[3].asByteArray()
 
                 if (!cryptoSystem.verifyDigest(txIdHeightSignatureDataHash(requestId, bctx.height), Signature(signer, signedData))) {
-                    logger.warn { "Validation failed. Invalid signature for transaction $requestId and op $SET_NODE_FAILURE_REASON" }
-                    return false
+                    throw UserMistake("Invalid signature for transaction $requestId and op $SET_NODE_FAILURE_REASON")
                 }
 
                 // A FAILURE can contain any reason set by node, but not too long
                 if (failureReason.length > TRANSACTION_FAILURE_REASON_LENGTH_LIMIT) {
-                    logger.warn { "Validation failed. Transaction $requestId is set to ${RellTransactionStatus.FAILURE.name} but with a too long failure reason: ${failureReason.take(TRANSACTION_FAILURE_REASON_LENGTH_LIMIT)}..." }
-                    return false
+                    throw UserMistake("Transaction $requestId is set to ${RellTransactionStatus.FAILURE.name} but with a too long failure reason: ${failureReason.take(TRANSACTION_FAILURE_REASON_LENGTH_LIMIT)}...")
                 }
             }
         }

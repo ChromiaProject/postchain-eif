@@ -6,6 +6,7 @@ import net.postchain.base.SpecialTransactionPosition
 import net.postchain.base.gtv.BlockHeaderData
 import net.postchain.common.BlockchainRid
 import net.postchain.common.exception.ProgrammerMistake
+import net.postchain.common.exception.UserMistake
 import net.postchain.common.toHex
 import net.postchain.concurrent.util.get
 import net.postchain.core.BlockEContext
@@ -97,19 +98,16 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
         if (ops.isEmpty()) return true
 
         if (ops.size > 1) {
-            logger.warn("Validation failed. Received more than one anchoring operation")
-            return false
+            throw UserMistake("Received more than one anchoring operation")
         }
 
         if (systemAnchoringBrid == null) {
-            logger.warn("Validation failed. Received anchoring op when anchoring is disabled.")
-            return false
+            throw UserMistake("Received anchoring op when anchoring is disabled.")
         }
 
         val shouldAnchor = module.query(bctx, SHOULD_ANCHOR_SYSTEM_ANCHORING_BLOCK_QUERY, gtv(mapOf())).asBoolean()
         if (!shouldAnchor) {
-            logger.warn("Validation failed. We should not anchor yet")
-            return false
+            throw UserMistake("We should not anchor yet")
         }
 
         val anchoringOp = ops.first()
@@ -118,20 +116,17 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
         val decodedHeader = decodeBlockHeaderDataFromEVM(header)
         val lastAnchoredHeight = module.query(bctx, GET_PREVIOUSLY_ANCHORED_SYSTEM_ANCHORING_BLOCK_HEIGHT_QUERY, gtv(mapOf())).asInteger()
         if (decodedHeader.height <= lastAnchoredHeight) {
-            logger.warn("Validation failed. Trying to anchor block at height ${decodedHeader.height} when last anchored height was $lastAnchoredHeight")
-            return false
+            throw UserMistake("Trying to anchor block at height ${decodedHeader.height} when last anchored height was $lastAnchoredHeight")
         }
 
         if (!decodedHeader.verifyBlockRid()) {
-            logger.warn("Validation failed. Invalid block rid.")
-            return false
+            throw UserMistake("Invalid block rid.")
         }
 
         val evmSignatures = anchoringOp.args[1].asArray().map { it.asByteArray() }
         val evmSigners = anchoringOp.args[2].asArray().toList()
         if (evmSigners.distinct().sortedBy { Address(it.asByteArray().toHex()).toUint().value } != evmSigners) {
-            logger.warn("Validation failed. Signers are duplicated or out of order")
-            return false
+            throw UserMistake("Signers are duplicated or out of order")
         }
 
         if (!evmBlockHeaderValidator.verifyEVMSignaturesAndCompareAgainstCurrentEVMSignerList(
@@ -140,8 +135,7 @@ class EvmAnchoringSpecialTxExtension : GTXSpecialTxExtension {
                         evmSigners.map { it.asByteArray() },
                         getCurrentEVMSignerList(bctx)
                 )) {
-            logger.warn("Validation failed. Signature mismatch.")
-            return false
+            throw UserMistake("Signature mismatch.")
         }
 
         return true

@@ -1,14 +1,17 @@
 package net.postchain.eif
 
+import assertk.assertFailure
 import assertk.assertThat
 import assertk.assertions.isEmpty
 import assertk.assertions.isEqualTo
+import assertk.assertions.isInstanceOf
+import assertk.assertions.messageContains
 import net.postchain.base.SpecialTransactionPosition
+import net.postchain.common.exception.UserMistake
 import net.postchain.core.BlockEContext
 import net.postchain.eif.config.EifEventReceiverConfig
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.mapper.toObject
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
@@ -186,7 +189,10 @@ class EifSpecialTxExtensionTest {
                 expectedOpData(1L, "10", 0, 1, 2),
                 expectedOpData(2L, "20", 3, 4, 5)
         )
-        assertFalse(sut.validateSpecialOperations(SpecialTransactionPosition.Begin, blockCtx, tooManyOps))
+        assertFailure {
+            sut.validateSpecialOperations(SpecialTransactionPosition.Begin, blockCtx, tooManyOps)
+        }.isInstanceOf<UserMistake>().messageContains("Block contains too many events")
+
 
         // Should pass when all events are from the same block
         val sameBlockOps = listOf(

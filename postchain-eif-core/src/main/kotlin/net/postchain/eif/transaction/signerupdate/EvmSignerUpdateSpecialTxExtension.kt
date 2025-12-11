@@ -5,6 +5,7 @@ import net.postchain.base.SpecialTransactionPosition
 import net.postchain.base.snapshot.SimpleDigestSystem
 import net.postchain.common.BlockchainRid
 import net.postchain.common.data.KECCAK256
+import net.postchain.common.exception.UserMistake
 import net.postchain.common.toHex
 import net.postchain.concurrent.util.get
 import net.postchain.core.BlockEContext
@@ -175,19 +176,17 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
             val correspondingUpdate = queuedEvmSignerUpdates.find { it.rowId == rowId }
 
             if (correspondingUpdate == null) {
-                logger.warn("Validation failed. Trying to inject a transaction for a signer update that is not queued")
-                return false
+                throw UserMistake("Trying to inject a transaction for a signer update that is not queued")
             }
 
             if (correspondingUpdate.historical) enqueuedHistoricalUpdates.add(correspondingUpdate)
 
             if (!readyForUpdate(bctx, correspondingUpdate.blockchainRid, correspondingUpdate.confirmedInDirectoryAtHeight)) {
                 if (correspondingUpdate.blockchainRid.contentEquals(directoryChainBrid.data)) {
-                    logger.warn("Validation failed. Signer update for directory chain is not allowed since dependent updates are still queued")
+                    throw UserMistake("Signer update for directory chain is not allowed since dependent updates are still queued")
                 } else {
-                    logger.warn("Validation failed. Signer update for blockchain is not allowed since dependent directory chain updates are still queued")
+                    throw UserMistake("Signer update for blockchain is not allowed since dependent directory chain updates are still queued")
                 }
-                return false
             }
 
             val updateEvent = op.args[1].asByteArray()
@@ -198,56 +197,47 @@ class EvmSignerUpdateSpecialTxExtension : GTXSpecialTxExtension {
             )
 
             if (!updateEvent.contentEquals(expectedUpdateEvent)) {
-                logger.warn("Validation failed. Signer update does not match expected update.")
-                return false
+                throw UserMistake("Signer update does not match expected update.")
             }
 
             val header = op.args[2].asByteArray()
             val decodedHeader = decodeBlockHeaderDataFromEVM(header)
             if (decodedHeader.height != correspondingUpdate.confirmedInDirectoryAtHeight) {
-                logger.warn("Validation failed. Header height ${decodedHeader.height} is not the confirmed at height ${correspondingUpdate.confirmedInDirectoryAtHeight}")
-                return false
+                throw UserMistake("Header height ${decodedHeader.height} is not the confirmed at height ${correspondingUpdate.confirmedInDirectoryAtHeight}")
             }
 
             if (!decodedHeader.verifyBlockRid()) {
-                logger.warn("Validation failed. Invalid block rid.")
-                return false
+                throw UserMistake("Invalid block rid.")
             }
 
             val evmSignatures = op.args[3].asArray().map { it.asByteArray() }
             val evmSigners = op.args[4].asArray().toList()
             if (evmSigners.distinct().sortedBy { Address(it.asByteArray().toHex()).toUint().value } != evmSigners) {
-                logger.warn("Validation failed. Signers are duplicated or out of order")
-                return false
+                throw UserMistake("Signers are duplicated or out of order")
             }
 
             if (!evmBlockHeaderValidator.verifyEVMSignatures(decodedHeader, evmSignatures, evmSigners.map { it.asByteArray() })) {
-                logger.warn("Validation failed. Signature mismatch")
-                return false
+                throw UserMistake("Signature mismatch")
             }
 
             val extraMerkleProof = EvmTypeEncoder.decodeExtraMerkleProof(op.args[5].asByteArray())
             if (!decodedHeader.extraHash.contentEquals(extraMerkleProof.extraRoot)) {
-                logger.warn("Validation failed. Extra root does not match header extra root")
-                return false
+                throw UserMistake("Extra root does not match header extra root")
             }
 
             val extraMerkleProofCalculatedRoot = MerkleProofUtil.getPrefixedMerkleProof(extraMerkleProof.extraMerkleProofs, extraMerkleProof.position.toInt(), extraMerkleProof.hashedLeaf, cryptoSystem)
             if (!extraMerkleProofCalculatedRoot.contentEquals(extraMerkleProof.extraRoot)) {
-                logger.warn("Validation failed. Calculated extra root mismatch")
-                return false
+                throw UserMistake("Calculated extra root mismatch")
             }
 
             val proof = EvmTypeEncoder.decodeProof(op.args[6].asByteArray())
             val signerUpdateEventHash = keccakDigest.digest(updateEvent)
             if (!signerUpdateEventHash.contentEquals(proof.leaf)) {
-                logger.warn("Validation failed. Proof hash does not match expected hash of signer update event.")
-                return false
+                throw UserMistake("Proof hash does not match expected hash of signer update event.")
             }
             val proofCalculatedRoot = MerkleProofUtil.getMerkleProof(proof.merkleProofs, proof.position.toInt(), proof.leaf, keccakDigest::hash)
             if (!extraMerkleProof.leaf.contentEquals(proofCalculatedRoot)) {
-                logger.warn("Validation failed. Calculated proof root mismatch")
-                return false
+                throw UserMistake("Calculated proof root mismatch")
             }
 
             if (!correspondingUpdate.blockchainRid.contentEquals(directoryChainBrid.data)) enqueuedDirectoryChainUpdate = true
