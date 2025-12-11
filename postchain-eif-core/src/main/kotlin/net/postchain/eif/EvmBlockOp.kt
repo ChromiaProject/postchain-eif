@@ -19,20 +19,18 @@ data class EvmBlockOp(
         // operation __evm_block(network_id: integer, evm_block_height: big_integer, evm_block_hash: byte_array, events: list<messaging.event_data>)
         const val OP_NAME = "__evm_block"
 
-        fun fromOpData(opData: OpData): EvmBlockOp? = fromOpNameAndArgs(opData.opName, opData.args)
+        fun fromOpData(opData: OpData): EvmBlockOp = fromOpNameAndArgs(opData.opName, opData.args)
 
-        fun fromOpNameAndArgs(opName: String, args: Array<out Gtv>): EvmBlockOp? {
-            if (opName != OP_NAME) return null
+        fun fromOpNameAndArgs(opName: String, args: Array<out Gtv>): EvmBlockOp {
+            if (opName != OP_NAME) throw UserMistake("Unknown operation: $opName")
             if (args.size != 4) {
-                logger.warn("Got $OP_NAME operation with wrong number of arguments: ${args.size}")
-                return null
+                throw UserMistake("Got $OP_NAME operation with wrong number of arguments: ${args.size}")
             }
 
             return try {
                 EvmBlockOp(args[0].asInteger(), args[1].asBigInteger(), args[2].asByteArray().wrap(), args[3].asArray().toList())
             } catch (e: UserMistake) {
-                logger.warn("Got $OP_NAME operation with invalid argument types: ${e.message}")
-                null
+                throw UserMistake("Got $OP_NAME operation with invalid argument types: ${e.message}")
             }
         }
     }

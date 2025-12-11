@@ -1,8 +1,10 @@
 package net.postchain.eif.transaction.signerupdate
 
+import assertk.assertFailure
 import assertk.assertThat
-import assertk.assertions.isFalse
+import assertk.assertions.isInstanceOf
 import assertk.assertions.isTrue
+import assertk.assertions.messageContains
 import net.postchain.base.BaseBlockWitness
 import net.postchain.base.SpecialTransactionPosition
 import net.postchain.base.gtv.BlockHeaderData
@@ -10,6 +12,7 @@ import net.postchain.base.snapshot.SimpleDigestSystem
 import net.postchain.common.BlockchainRid
 import net.postchain.common.data.EMPTY_HASH
 import net.postchain.common.data.KECCAK256
+import net.postchain.common.exception.UserMistake
 import net.postchain.core.BlockEContext
 import net.postchain.core.BlockRid
 import net.postchain.crypto.Secp256K1CryptoSystem
@@ -168,18 +171,20 @@ class EvmEvmSignerUpdateValidationTest {
             GtvFactory.gtv(encodeSignatureWithV(blockRid, it))
         }
         val encodedHeader = encodeBlockHeaderDataForEVM(blockRid, BlockHeaderData.fromBinary(rawBlock))
-        assertThat(sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
-                ENQUEUE_SIGNER_UPDATE_TRANSACTION_OP,
-                arrayOf(
-                        GtvFactory.gtv(0),
-                        GtvFactory.gtv(signerUpdateEvent),
-                        GtvFactory.gtv(encodedHeader),
-                        GtvFactory.gtv(newSignatures),
-                        GtvFactory.gtv(signers),
-                        GtvFactory.gtv(EvmTypeEncoder.encodeExtraMerkleProof(dummyBlockExtraProof)),
-                        GtvFactory.gtv(dummyBlockProof)
-                )
-        )))).isFalse()
+        assertFailure {
+            sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
+                    ENQUEUE_SIGNER_UPDATE_TRANSACTION_OP,
+                    arrayOf(
+                            GtvFactory.gtv(0),
+                            GtvFactory.gtv(signerUpdateEvent),
+                            GtvFactory.gtv(encodedHeader),
+                            GtvFactory.gtv(newSignatures),
+                            GtvFactory.gtv(signers),
+                            GtvFactory.gtv(EvmTypeEncoder.encodeExtraMerkleProof(dummyBlockExtraProof)),
+                            GtvFactory.gtv(dummyBlockProof)
+                    )
+            )))
+        }.isInstanceOf<UserMistake>().messageContains("Extra root does not match header extra root")
     }
 
     @Test
@@ -206,18 +211,20 @@ class EvmEvmSignerUpdateValidationTest {
                 proofs
         )
 
-        assertThat(sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
-                ENQUEUE_SIGNER_UPDATE_TRANSACTION_OP,
-                arrayOf(
-                        GtvFactory.gtv(0),
-                        GtvFactory.gtv(signerUpdateEvent),
-                        GtvFactory.gtv(blockHeaderData),
-                        GtvFactory.gtv(signatures),
-                        GtvFactory.gtv(signers),
-                        GtvFactory.gtv(EvmTypeEncoder.encodeExtraMerkleProof(proofOfOtherSigner)),
-                        GtvFactory.gtv(dummyBlockProof)
-                )
-        )))).isFalse()
+        assertFailure {
+            sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
+                    ENQUEUE_SIGNER_UPDATE_TRANSACTION_OP,
+                    arrayOf(
+                            GtvFactory.gtv(0),
+                            GtvFactory.gtv(signerUpdateEvent),
+                            GtvFactory.gtv(blockHeaderData),
+                            GtvFactory.gtv(signatures),
+                            GtvFactory.gtv(signers),
+                            GtvFactory.gtv(EvmTypeEncoder.encodeExtraMerkleProof(proofOfOtherSigner)),
+                            GtvFactory.gtv(dummyBlockProof)
+                    )
+            )))
+        }.isInstanceOf<UserMistake>().messageContains("Calculated extra root mismatch")
     }
 
     @Test
@@ -232,18 +239,20 @@ class EvmEvmSignerUpdateValidationTest {
                         false
                 )))
         )
-        assertThat(sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
-                ENQUEUE_SIGNER_UPDATE_TRANSACTION_OP,
-                arrayOf(
-                        GtvFactory.gtv(0),
-                        GtvFactory.gtv(signerUpdateEvent),
-                        GtvFactory.gtv(blockHeaderData),
-                        GtvFactory.gtv(signatures),
-                        GtvFactory.gtv(signers),
-                        GtvFactory.gtv(EvmTypeEncoder.encodeExtraMerkleProof(dummyBlockExtraProof)),
-                        GtvFactory.gtv(dummyBlockProof)
-                )
-        )))).isFalse()
+        assertFailure {
+            sut.validateSpecialOperations(SpecialTransactionPosition.Begin, mockContext, listOf(OpData(
+                    ENQUEUE_SIGNER_UPDATE_TRANSACTION_OP,
+                    arrayOf(
+                            GtvFactory.gtv(0),
+                            GtvFactory.gtv(signerUpdateEvent),
+                            GtvFactory.gtv(blockHeaderData),
+                            GtvFactory.gtv(signatures),
+                            GtvFactory.gtv(signers),
+                            GtvFactory.gtv(EvmTypeEncoder.encodeExtraMerkleProof(dummyBlockExtraProof)),
+                            GtvFactory.gtv(dummyBlockProof)
+                    )
+            )))
+        }.isInstanceOf<UserMistake>().messageContains("Signer update does not match expected update")
     }
 
     private fun makeBlockHeader(blockchainRID: BlockchainRid, previousBlockRid: BlockRid, height: Long, extraHeader: GtvDictionary) = BlockHeaderData(

@@ -32,6 +32,7 @@ interface EventProcessor {
 class EventValidationResult(
         val valid: Boolean,
         val conflictingHeight: BigInteger? = null,
+        val errorMessage: String? = null,
 )
 
 /**
@@ -97,12 +98,11 @@ class EvmEventProcessor(
             // If there are too many rejections, readOffset should be increased
             if (ops.size > eventBlocks.size) {
                 // We don't have all these blocks
-                logger.warn("Received unexpected blocks")
                 val conflictingHeight = if (lastReadLogBlockHeight >= ops.last().evmBlockHeight) {
                     val firstReceivedEventHeight = ops.last().evmBlockHeight
                     eventBlocks.peek()?.evmBlockHeight?.min(firstReceivedEventHeight) ?: firstReceivedEventHeight
                 } else null
-                return EventValidationResult(false, conflictingHeight)
+                return EventValidationResult(false, conflictingHeight, errorMessage = "Received unexpected blocks")
             }
             for ((index, eventBlock) in eventBlocks.withIndex()) {
                 if (index >= ops.size) break
@@ -110,16 +110,14 @@ class EvmEventProcessor(
                 val op = ops[index]
 
                 if (op.networkId != eventBlock.networkId || op.evmBlockHeight != eventBlock.evmBlockHeight || op.evmBlockHash != eventBlock.evmBlockHash) {
-                    logger.warn(
+                    return EventValidationResult(false, op.evmBlockHeight.min(eventBlock.evmBlockHeight), errorMessage =
                             "Received unexpected block ${op.evmBlockHeight} with hash ${op.evmBlockHash} in network ${op.networkId}." +
-                                    " Expected block ${eventBlock.evmBlockHeight} with hash ${eventBlock.evmBlockHash} in network ${eventBlock.networkId}"
-                    )
-                    return EventValidationResult(false, op.evmBlockHeight.min(eventBlock.evmBlockHeight))
+                                    " Expected block ${eventBlock.evmBlockHeight} with hash ${eventBlock.evmBlockHash} in network ${eventBlock.networkId}")
                 }
 
                 if (op.events != eventBlock.events) {
-                    logger.warn("Events in received block ${op.evmBlockHeight} do not match expected events")
-                    return EventValidationResult(false, op.evmBlockHeight)
+                    return EventValidationResult(false, op.evmBlockHeight, errorMessage =
+                            "Events in received block ${op.evmBlockHeight} do not match expected events")
                 }
             }
             return EventValidationResult(true)

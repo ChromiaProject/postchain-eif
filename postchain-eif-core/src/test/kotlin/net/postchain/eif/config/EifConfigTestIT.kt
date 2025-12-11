@@ -11,11 +11,13 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.testcontainers.containers.ComposeContainer
 import org.testcontainers.containers.wait.strategy.Wait
+import org.testcontainers.junit.jupiter.Testcontainers
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.time.Clock
 import java.time.Duration
 
+@Testcontainers(disabledWithoutDocker = true)
 class EifConfigTestIT {
 
     private val outContent = ByteArrayOutputStream()

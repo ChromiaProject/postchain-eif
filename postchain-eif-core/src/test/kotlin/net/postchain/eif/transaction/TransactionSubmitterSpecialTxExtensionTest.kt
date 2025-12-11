@@ -1,18 +1,20 @@
 package net.postchain.eif.transaction
 
+import assertk.assertFailure
 import assertk.assertThat
 import assertk.assertions.isFalse
+import assertk.assertions.isInstanceOf
 import assertk.assertions.isTrue
+import assertk.assertions.messageContains
 import net.postchain.base.SpecialTransactionPosition
 import net.postchain.common.BlockchainRid
+import net.postchain.common.exception.UserMistake
 import net.postchain.common.hexStringToByteArray
 import net.postchain.core.BlockEContext
 import net.postchain.core.block.BlockQueries
 import net.postchain.crypto.KeyPair
 import net.postchain.crypto.Secp256K1CryptoSystem
-import net.postchain.eif.TestLogAppender
 import net.postchain.gtv.GtvFactory.gtv
-import org.apache.logging.log4j.Level
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
@@ -27,7 +29,6 @@ import java.util.concurrent.CompletableFuture
 
 class TransactionSubmitterSpecialTxExtensionTest {
 
-    lateinit var testLogAppender: TestLogAppender
     lateinit var transactionSubmitter: TransactionSubmitter
     lateinit var txExtension: TransactionSubmitterSpecialTxExtension
     lateinit var module: TransactionSubmitterTestGTXModule
@@ -35,9 +36,6 @@ class TransactionSubmitterSpecialTxExtensionTest {
 
     @BeforeEach
     fun setup() {
-        testLogAppender = TestLogAppender.addAppender(listOf(Level.INFO, Level.WARN, Level.ERROR))
-        testLogAppender.clear()
-
         val txDb = mkEvmPendingDbTx()
         txDb.status = PendingTxStatus.SUCCESS
         txDb.blockHash = "00"
@@ -83,8 +81,9 @@ class TransactionSubmitterSpecialTxExtensionTest {
                 txExtension.buildTxUpdateOp(0, RellTransactionStatus.SUCCESS),
         )
 
-        assertThat(txExtension.validateSpecialOperations(SpecialTransactionPosition.Begin, mock<BlockEContext>(), ops)).isFalse()
-        testLogAppender.assertWarn("Validation failed. Transaction 0 is set to SUCCESS but without a receipt")
+        assertFailure {
+            txExtension.validateSpecialOperations(SpecialTransactionPosition.Begin, mock<BlockEContext>(), ops)
+        }.isInstanceOf<UserMistake>().messageContains("Transaction 0 is set to SUCCESS but without a receipt")
     }
 
     @Test
@@ -105,8 +104,9 @@ class TransactionSubmitterSpecialTxExtensionTest {
                 txExtension.buildTxReceiptOp(txDb),
         )
 
-        assertThat(txExtension.validateSpecialOperations(SpecialTransactionPosition.Begin, mock<BlockEContext>(), ops)).isFalse()
-        testLogAppender.assertWarn("Validation failed. Receipt for transaction ${txDb.rowId} set without any ${RellTransactionStatus.SUCCESS.name} status update op")
+        assertFailure {
+            txExtension.validateSpecialOperations(SpecialTransactionPosition.Begin, mock<BlockEContext>(), ops)
+        }.isInstanceOf<UserMistake>().messageContains("Receipt for transaction ${txDb.rowId} set without any ${RellTransactionStatus.SUCCESS.name} status update op")
     }
 
     @Test

@@ -3,6 +3,7 @@ package net.postchain.eif
 import mu.KLogging
 import net.postchain.base.SpecialTransactionPosition
 import net.postchain.common.BlockchainRid
+import net.postchain.common.exception.UserMistake
 import net.postchain.core.BlockEContext
 import net.postchain.core.block.BlockData
 import net.postchain.crypto.CryptoSystem
@@ -68,25 +69,14 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
         if (position == SpecialTransactionPosition.Begin && processors.isNotEmpty()) {
             val index = bctx.height.mod(processors.size)
             val (proc, fetcher) = processors.values.toList()[index]
-            val allDecodedOps = ops.map {
-                if (it.opName != EvmBlockOp.OP_NAME) {
-                    logger.error("Unknown operation: ${it.opName}")
-                    null
-                } else {
-                    EvmBlockOp.fromOpData(it)
-                }
-            }
-
-            // Ensure only __evm_block operations are present
-            if (allDecodedOps.contains(null)) return false
-            val decodedOps = allDecodedOps.filterNotNull()
+            val decodedOps = ops.map { EvmBlockOp.fromOpData(it) }
 
             // Validate that a block does not contain too many events
             // `maxEventsPerBlock` can be exceeded if all events are from the same EVM block
             if (config.maxEventsPerBlock > 0 && isSigner()) {
                 val totalEvents = decodedOps.sumOf { it.events.size }
                 if (totalEvents > config.maxEventsPerBlock && decodedOps.map { it.evmBlockHeight }.toSet().count() > 1)
-                    return false
+                    throw UserMistake("Block contains too many events")
             }
 
             // Validate event data
@@ -97,11 +87,15 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
 
             bctx.addAfterCommitHook { proc.markAsProcessed(decodedOps) }
 
+            if (!validationResult.valid && validationResult.errorMessage != null) {
+                throw UserMistake(validationResult.errorMessage)
+            }
             return validationResult.valid
         }
         return ops.isEmpty()
     }
 
+    @Volatile
     private var firstEventBlockTime = 0L
 
     override fun blockCommitted(blockData: BlockData) {
