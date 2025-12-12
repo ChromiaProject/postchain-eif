@@ -26,10 +26,19 @@ function test_account_creation_on_deposit() {
     assert_false(is_account_creation_on_deposit_enabled(network_id1, FOO.token_address));
     assert_true(is_account_creation_on_deposit_enabled(network_id2, BAR.token_address));
 
-    // Trying to register account on deposit for FOO token again, should fail
+    // Trying to enable account creation on deposit for BAR token again, should fail
     rell.test.tx().op(
         helpers.enable_account_creation_on_deposit_op(network_id2, BAR.token_address, 1L, 10, "open")
     ).run_must_fail("Account creation on deposit is already enabled for token %s on network %d".format(BAR.token_address, network_id2));
+
+    // Enable account creation on deposit for FOO token after disabling it
+    rell.test.tx().op(
+        helpers.enable_account_creation_on_deposit_op(network_id1, FOO.token_address, 1L, 10, "open")
+    ).run();
+    
+    // Check that account creation on deposit is enabled for FOO and BAR tokens
+    assert_true(is_account_creation_on_deposit_enabled(network_id1, FOO.token_address));
+    assert_true(is_account_creation_on_deposit_enabled(network_id2, BAR.token_address));
 }
 
 function test_dynamic_ras_rules() {
