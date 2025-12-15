@@ -483,8 +483,8 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
                     BaseBlockHeader(blockDetail.header, merkleHashCalculator).blockHeaderRec,
             )
 
-            // TODO: we use state proof only for extraProofData, we don't use the proof itself.
-            // otherwise it's rather hard to construct extra proof data...
+            // NB: we use state proof only for extraProofData, we don't use the proof itself.
+            // otherwise it's rather hard to construct extra proof data.
             val stateProof = blockQuery.query(
                     "get_account_state_merkle_proof",
                     gtv(
