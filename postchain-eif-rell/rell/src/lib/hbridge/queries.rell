@@ -1,5 +1,12 @@
 
 /**
+ * Retrieves the current version of the HBridge module.
+ *
+ * @return An integer representing the version number of the HBridge module as specified in chain context arguments.
+ */
+query get_hbridge_version() = chain_context.args.version;
+
+/**
  * @deprecated Use get_erc20_withdrawals()
  */
 query get_erc20_withdrawal(network_id: integer, token_address: byte_array, beneficiary: byte_array): list<struct<erc20_withdrawal>> =
@@ -178,9 +185,35 @@ query get_erc20_withdrawal_history(withdrawal_id: rowid): list<erc20_withdrawal_
     return history;
 }
 
+
+// Account creation on deposit queries
+
 /**
- * Retrieves the current version of the HBridge module.
- *
- * @return An integer representing the version number of the HBridge module as specified in chain context arguments.
+ * Checks if account creation on deposit is enabled for a given token on a given network.
+ * 
+ * API version: 18
+ * 
+ * @param network_id The network ID of the network to check.
+ * @param token_address The address of the token to check.
+ * @return True if account creation on deposit is enabled for the given token on the given network, false otherwise.
  */
-query get_hbridge_version() = chain_context.args.version;
+query is_account_creation_on_deposit_enabled(network_id: integer, @size(20) token_address: byte_array): boolean {
+    return exists(dynamic_ras_rule @? { network_id, token_address });
+}
+
+/**
+ * Returns a list of rules for account creation on deposit for all networks and ERC-20 assets.
+ * 
+ * API version: 18
+ * 
+ * @return A list of rules for account creation on deposit for all networks and ERC-20 assets.
+ */
+query get_account_creation_rules(): list<ft4.transfer_strategy.rule> {
+    val rules = ft4.transfer_strategy.get_transfer_rules();
+
+    rules.add_all(
+        dynamic_ras_rule @* {} ( ft4.transfer_strategy.rule.from_bytes(.rule) )
+    );
+
+    return rules;
+}

@@ -60,10 +60,6 @@ function disable_account_creation_on_deposit(network_id: integer, @size(20) toke
     delete dynamic_ras_rule @? { network_id, token_address };
 }
 
-query is_account_creation_on_deposit_enabled(network_id: integer, @size(20) token_address: byte_array): boolean {
-    return exists(dynamic_ras_rule @? { network_id, token_address });
-}
-
 function find_allowed_ras_rules(
     @size(32) from_chain: byte_array,
     from_id: byte_array,

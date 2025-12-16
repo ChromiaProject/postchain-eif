@@ -41,7 +41,7 @@ function test_account_creation_on_deposit() {
     assert_true(is_account_creation_on_deposit_enabled(network_id2, BAR.token_address));
 }
 
-function test_dynamic_ras_rules() {
+function test_allowed_account_creation_dynamic_rules() {
     val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
     val foo_asset = register_foreign_asset(FOO);
     val abc_asset = register_foreign_asset(ABC);
@@ -75,4 +75,49 @@ function test_dynamic_ras_rules() {
     // Check that the rules for ABC token are not found
     val abc_rules3 = find_allowed_ras_rules(erc20_abc.virtual_blockchain_rid, evm_address, account_id, abc_asset, 10000000L);
     assert_false(exists(abc_rules3));
+}
+
+function test_account_creation_dynamic_rules_query() {
+    val (auth_descriptor, ft_account, evm_address) = _register_ft_account_and_link_evm_address();
+    val foo_asset = register_foreign_asset(FOO);
+    val abc_asset = register_foreign_asset(ABC);
+    val erc20_foo = erc20.get_erc20_for_asset(foo_asset.id)[0];
+    val erc20_abc = erc20.get_erc20_for_asset(abc_asset.id)[0];
+
+    // Check that FT4 rules and HBridge rules are the same and there is one *static* rule for the FOO asset
+    val ft4_rules = ft4.transfer_strategy.get_transfer_rules();
+    val hbridge_rules = get_account_creation_rules();
+    assert_equals(ft4_rules, hbridge_rules);
+    assert_equals(hbridge_rules.size(), 1);
+    assert_equals(hbridge_rules[0].asset_limits.size(), 1);
+    val asset_limit = hbridge_rules[0].asset_limits[0];
+    assert_equals(asset_limit.id, foo_asset.id);
+    assert_equals(asset_limit.name, foo_asset.name);
+    assert_equals(asset_limit.min_amount, 10000000L);
+
+    // Enable account creation on deposit for ABC token
+    rell.test.tx().op(
+        helpers.enable_account_creation_on_deposit_op(network_id1, ABC.token_address, 40000000L, 10, "open")
+    ).run();
+    assert_true(is_account_creation_on_deposit_enabled(network_id1, ABC.token_address));
+
+    // Check that HBridge rules contain FT4 rules and one *dynamic* rule for the ABC asset
+    val hbridge_rules2 = get_account_creation_rules();  
+    assert_equals(hbridge_rules2.size(), 2);
+    assert_equals(hbridge_rules2[1].asset_limits.size(), 1);
+    val asset_limit2 = hbridge_rules2[1].asset_limits[0];
+    assert_equals(asset_limit2.id, abc_asset.id);
+    assert_equals(asset_limit2.name, null); // name is not set for dynamic rules
+    assert_equals(asset_limit2.min_amount, 40000000L);
+    assert_equals(hbridge_rules2[1].blockchains.allowed_values, [erc20_abc.virtual_blockchain_rid]);
+
+    // Disable account creation on deposit for ABC token
+    rell.test.tx().op(
+        helpers.disable_account_creation_on_deposit_op(network_id1, ABC.token_address)
+    ).run();
+    assert_false(is_account_creation_on_deposit_enabled(network_id1, ABC.token_address));
+
+    // Check that FT4 rules and HBridge rules are the same and there is one *static* rule for the FOO asset
+    val hbridge_rules3 = get_account_creation_rules();
+    assert_equals(ft4_rules, hbridge_rules);
 }
