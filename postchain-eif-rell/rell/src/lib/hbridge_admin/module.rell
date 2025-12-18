@@ -108,5 +108,3 @@ function () = ft4.auth.add_auth_handler(
     scope = rell.meta(seize_funds).mount_name,
     flags = ["T"]
 );
-
-
