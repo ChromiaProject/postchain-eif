@@ -108,7 +108,7 @@ $ yarn inspect:chromiabridge --network sepolia --chromia-network {CHROMIA_NETWOR
 $ yarn inspect:nftbridge --network sepolia --chromia-network {CHROMIA_NETWORK}
 ```
 
-# Configuring token bridge
+# Configuring Token Bridge
 
 After deploying bridge chain on Chromia retrieve the blockchain RID of that chain and run the following command (omit `--managed-validator` if you have a manually updated validator contract or already set it when deploying the managed validator contract):
 
@@ -121,7 +121,7 @@ Then allow a token to be bridged on the bridge contract:
 $ yarn allowToken:bridge --network sepolia --bridge-address {BRIDGE_CONTRACT_ADDRESS} --token-address {TOKEN_CONTRACT_ADDRESS}
 ```
 
-# Configuring NFT bridge
+# Configuring NFT Bridge
 
 After deploying the NFT bridge chain on Chromia, retrieve the blockchain RID of that chain and run the following command (omit `--managed-validator` if you have a manually updated validator contract or already set it when deploying the managed validator contract):
 
@@ -134,11 +134,65 @@ Then allow a token to be bridged on the bridge contract:
 $ yarn allowToken:bridge --network sepolia --bridge-address {BRIDGE_CONTRACT_ADDRESS} --token-address {TOKEN_CONTRACT_ADDRESS} --protocol-id {1155/721}
 ```
 
+# Transfer Chromia Bridge Ownership
+
+When a bridge is initially deployed, it is usually owned by a single wallet address (the deployer). For production use, this creates a security risk. Follow these steps to transfer ownership from the deployer's single-signature wallet to a Gnosis multi-signature wallet, ensuring that critical bridge operations require consensus from multiple parties.
+
+## Prepare Proxy Configuration
+
+Before transferring ownership, you need to verify your deployment configuration. Check your deployment manifest in the `.openzeppelin/sepolia.json` file, which tracks all deployments made by the OpenZeppelin Upgrades plugin. If this file is missing, outdated, or the proxy was deployed by someone else, remove it and import it again:
+
+```sh
+rm -rf .openzeppelin/sepolia.json
+yarn import:bridge --network sepolia --address {PROXY_CONTRACT_ADDRESS}
+```
+
+Get or create your multi signature account, e.g. from [Gnosis Safe](https://app.safe.global/).
+
+## Transfer Ownership
+
+As contract owner, run the following command to initiate the transfer of the bridge to the new owner:
+
+```sh
+npx hardhat transfer-ownership:chromiabridge --network sepolia --address {BRIDGE_CONTRACT_ADDRESS} --newOwner {MULTI_SIG_ADDRESS}
+```
+
+This will initiate the transfer of the bridge to the new owner. Verify this by reading the `pendingOwner` which should match the provided `{MULTI_SIG_ADDRESS}`.
+
+Accept the transfer by creating a transaction, sign and execute it. First by creating the transaction data we need:
+
+```sh
+npx hardhat accept-ownership:chromiabridge --network sepolia --address 0x2228b0Ed569d55366Ac5e96dFD53B019D97bb85f
+
+Preparing Gnosis Safe transaction to accept ownership of ChromiaTokenBridge at 0x2228b0Ed569d55366Ac5e96dFD53B019D97bb85f
+Current owner: 0x1c918FC9C7f3D8943e67cAD0BfB4B8e57220490D
+Pending owner: 0x106eEB7F727c4d3C7B331ff39bEC75F93ff7167a
+📨 Gnosis Safe Transaction
+To: 0x2228b0Ed569d55366Ac5e96dFD53B019D97bb85f
+Data: 0x79ba5097
+```
+
+Now add a transaction, sign it by all required signatures and execute it, e.g. from [Gnosis Safe](https://app.safe.global/):
+
+1. Click `New transaction` followed by the `Transaction builder` and toggle the `Custom data` in the top right corner.
+2. Provide the bridge address (`To: ` output)
+3. Set `0` as ETH/BNB.
+4. Paste the `Data` output from previous command into the `Data` field.
+5. Click `Add new transaction` and `Create batch`
+6. Click `Simulate` to verify the transaction, and if everything looks good `Add batch`
+7. Click `Continue` and then `Sign`.
+8. Send transaction to other signers to have them sign it.
+9. Once signed by the threshold of required signatures, execute it.
+
+Verify the change by reading `owner` on the contract.
+
+
+
 # Upgrading token bridge contract
 
 You may need to upgrade a TokenBridge contract to introduce new features or modify existing logic. For example, assume you have deployed a TokenBridge contract and want to upgrade it to a version with a new withdraw time offset. First, create a new contract that supports initialization with a new withdraw time offset (see example: [TokenBridgeV4.sol](../postchain-eif-contracts/contracts/upgrade-v4-offset/TokenBridgeV4.sol)).
 
-Next, check your deployment manifest. The OpenZeppelin Upgrades plugin tracks deployments in the `.openzeppelin/sepolia.json` file. If it's not up to date, you don't know, (or the proxy was deployed by someone else), remove it and import it again:
+Next, check your deployment manifest. The OpenZeppelin Upgrades plugin tracks deployments in the `.openzeppelin/sepolia.json` file. If it's not up to date, or you don't know, (or the proxy was deployed by someone else), remove it and import it again:
 
 ```sh
 $ rm -rf .openzeppelin/sepolia.json

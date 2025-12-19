@@ -34,6 +34,7 @@
     "approveToken:bridge": "npx hardhat approveToken:bridge",
     "inspect:bridge": "npx hardhat inspect:bridge",
     "inspect:chromiabridge": "npx hardhat inspect:chromiabridge",
+    "read:bridge-offset": "npx hardhat read:bridge-offset",
     "pause:bridge": "npx hardhat pause:bridge",
     "unpause:bridge": "npx hardhat unpause:bridge",
     "deploy:recovery": "npx hardhat deploy:recovery",

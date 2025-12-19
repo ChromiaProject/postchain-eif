@@ -4,16 +4,14 @@ import {
     ManagedValidator__factory,
     TokenBridge,
     TokenBridge__factory,
-    IERC20__factory,
     IERC20
 } from "../../typechain-types";
 import fetch from 'node-fetch';
-import { ChromiaNetwork, verifyProxyContract } from "./utils";
+import { ChromiaNetwork, delay, verifyProxyContract } from "./utils";
 import { exit } from "process";
 import { inspectManagedValidatorContract } from "./validator";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { ContractFactory } from "ethers";
-import { TokenBridgeV4 } from "../../typechain-types/contracts/upgrade-v4-offset/TokenBridgeV4";
+import { formatUnits } from "ethers";
 
 /**
  * Deploys a TokenBridge contract with a proxy pattern.
@@ -318,3 +316,36 @@ task("unpause:bridge")
             console.log("Bridge not paused!");
         }
     });
+
+/**
+ * Reads the withdraw time offset of a Token Bridge contract and counts blocks since start.
+ * 
+ * This task reads the withdraw time offset of a Token Bridge contract and counts blocks since start.
+ * It logs the withdraw time offset and the current block number to the console.
+ * 
+ * @dev Used for monitoring withdraws during testing.
+ * 
+ * @param address - The address of the Token Bridge contract to read.
+ */
+task("read:bridge-offset")
+.addParam("address", "Address of the bridge to read")
+.setAction(async ({address}, hre) => {
+
+  const factory = await hre.ethers.getContractFactory("TokenBridge") as TokenBridge__factory;
+  const bridge = factory.attach(address) as TokenBridge;
+  const version = await bridge.version();
+  if (version !== BigInt(3)) {
+    throw new Error(`TokenBridge at ${address} is not version 3 and does not support withdraw-time-offset`);
+  }
+
+  console.log("Bridge address: ", address);
+  console.log("Offset: ", formatUnits(await bridge.withdrawTimeOffset(), 0));
+
+  const firstBlockNumber = await hre.ethers.provider.getBlockNumber();
+  while (true) {
+    const blockNumber = await hre.ethers.provider.getBlockNumber();
+    const elapsedBlocks = blockNumber - firstBlockNumber;
+    console.log("Current block number: ", blockNumber, "( +", elapsedBlocks, ")");
+    await delay(1000);
+  }
+});
