@@ -1,5 +1,5 @@
 
-function emit_withdrawal_event(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer, bridge_address: byte_array = x"") {
+function emit_withdrawal_event(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer, bridge_address: byte_array = x""): erc20_withdrawal {
     val next_serial = common.event_counter.counter + 1;
     common.event_counter.counter = next_serial;
 
@@ -23,6 +23,8 @@ function emit_withdrawal_event(network_id: integer, token_address: byte_array, b
     add_erc20_withdrawal_to_snapshot(withdrawal);
 
     op_context.emit_event("eif_event", event_gtv);
+
+    return withdrawal;
 }
 
 function pack_withdrawal_event_v1(

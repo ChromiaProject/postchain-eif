@@ -17,6 +17,7 @@ struct deposited_erc20_event {
     amount: big_integer;
     beneficiary: byte_array; // account_id
     evm_tx_hash: byte_array;
+    evm_log_index: big_integer;
 }
 
 function create_deposited_erc20_event(event: messaging.event_data) = deposited_erc20_event(
@@ -26,6 +27,7 @@ function create_deposited_erc20_event(event: messaging.event_data) = deposited_e
     amount = big_integer.from_gtv(event.non_indexed_values[0]),
     beneficiary = byte_array.from_gtv(event.non_indexed_values[1]),
     evm_tx_hash = event.tnx_hash,
+    evm_log_index = event.log_index,
 );
 
 function create_withdrawal_event(event: messaging.event_data) = withdrawal_event(
@@ -85,8 +87,8 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
 
     val erc20_asset = erc20.erc20_asset @? { network_id, .token_address == event.token_address };
     if (erc20_asset == null) {
-        log("Deposit event bounced: ERC20 token %s not found".format(event.token_address));
-        bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
+        log("Deposit event bounced: ERC20 token %s not found on network %s".format(event.token_address, network_id));
+        bounce_deposit_event(network_id, event, "Token not registered");
         return;
     }
 
@@ -96,18 +98,19 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
     }
 
     if (not validate_bridge_contract(event.bridge_address, erc20_asset)) {
-        log("Deposit event bounced: ERC20 token %s is not registered to bridge %s".format(event.token_address, event.bridge_address));
+        log("Deposit event bounced: ERC20 token %s is not registered to bridge %s on network %s".format(event.token_address, event.bridge_address, network_id));
         // TODO: Users can still abuse by claiming this withdraw on actual bridge, must be solved in POS-1583
-        bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
+        bounce_deposit_event(network_id, event, "Token not registered to this bridge");
         return;
     }
 
     if (erc20_asset.bridge_mode == bridge_mode.native) {
         val bridge_account = core.ensure_bridge_account(erc20_asset.virtual_blockchain_rid);
         if (ft4.assets.get_asset_balance(bridge_account, erc20_asset.asset) < event.amount) {
-            log("Deposit event bounced: insufficient balance of asset %s: ERC20 token %s, sender %s"
-                .format(erc20_asset.asset.symbol, event.token_address, event.sender));
-            bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
+            log("Deposit event bounced: Insufficient balance of asset %s: ERC20 token %s, network %s, sender %s".format(
+                erc20_asset.asset.symbol, event.token_address, network_id, event.sender
+            ));
+            bounce_deposit_event(network_id, event, "Insufficient bridge balance");
             return;
         }
     }
@@ -117,9 +120,10 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
         ft4_account = ft4.accounts.account @? { .id == beneficiary };
 
         if (not empty(ft4_account)) {
-            // we require explicit link to avoid unwanted deposits
+            // We require explicit link to avoid unwanted deposits
             if (need_consent_on_deposit and empty(core.evm_sc_account_link @? { event.sender, network_id, ft4_account })) {
-                bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
+                log("Deposit event bounced: EVM sender %s is not linked to recipient account %s on network %s".format(event.sender, ft4_account.id, network_id));
+                bounce_deposit_event(network_id, event, "Sender EVM account not linked to recipient FT4 account");
                 return;
             }
         }
@@ -130,15 +134,19 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
         beneficiary = event.sender.hash();
     }
 
-    val sender_id = beneficiary;
+    // Recipient account ID
     val recipient_id = beneficiary;
 
     if (empty(ft4_account)) {
-        // create account_creation_transfer to allow the account to be registered later
-        // note: we don't want to call create_on_transfer because it fails when requirements are not met.
-        // we want to bounce instead
+        // Create account_creation_transfer to allow the account to be registered later
+        // Note: we don't want to call create_on_transfer because it fails when requirements are not met.
+        // We want to bounce instead.
 
+        // Sender and sender blockchain are used by the account creation transfer strategy.
+        // Note: the sender ID becomes the recipient account ID.
+        val sender_id = beneficiary;
         val sender_blockchain_rid = erc20_asset.virtual_blockchain_rid;
+
         val rules = find_allowed_ras_rules(
             from_chain = sender_blockchain_rid,
             from_id = sender_id,
@@ -148,14 +156,14 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
         );
 
         if (empty(rules)) {
-            log("Deposit event bounced: no rules found for transfer");
-            bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
+            log("Deposit event bounced: account creation not allowed: no rules configured for token %s, network %s, sender %s".format(event.token_address, network_id, event.sender));
+            bounce_deposit_event(network_id, event, "Account creation not allowed: no rules configured for this token");
             return;
         }
 
         if (not deposit_from_smart_contract and exists(erc20_deposit @* { .recipient_id == recipient_id, erc20_asset })) {
-            log("Deposit event bounced: tokens has already been transferred from EOA account to this recipient, and has not been claimed yet");
-            bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
+            log("Deposit event bounced: Pending deposit already exists for recipient %s, token %s, network %s".format(recipient_id, event.token_address, network_id));
+            bounce_deposit_event(network_id, event, "Pending deposit from this EOA already exists and has not been claimed yet");
             return;
         }
 
@@ -202,8 +210,8 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
 
             erc20.bridge_increase_balance(ft4_account, erc20_asset, event.amount);
         } else {
-            log("Deposit event bounced: Account id %s not on access list.".format(ft4_account.id));
-            bounce_deposit_event(network_id, event.token_address, event.sender, event.amount);
+            log("Deposit event bounced: Account %s not on access list, token %s, network %s".format(ft4_account.id, event.token_address, network_id));
+            bounce_deposit_event(network_id, event, "Account not on access list");
         }
     }
 }
@@ -229,8 +237,16 @@ function process_withdrawal_to_postchain_event(network_id: integer, event: withd
 }
 
 // return deposit if we cannot credit it to the account
-function bounce_deposit_event(network_id: integer, token_address: byte_array, beneficiary: byte_array, amount: big_integer) {
-    emit_withdrawal_event(network_id, token_address, beneficiary, amount);
+function bounce_deposit_event(network_id: integer, event: deposited_erc20_event, reason: text) {
+    val withdrawal = emit_withdrawal_event(network_id, event.token_address, event.sender, event.amount);
+    create bounced_erc20_deposit(
+        erc20_withdrawal = withdrawal,
+        sender_address = event.sender,
+        recipient_id = event.beneficiary,
+        evm_tx_hash = event.evm_tx_hash,
+        evm_log_index = event.evm_log_index,
+        reason = reason
+    );
 }
 
 function validate_bridge_contract(bridge_address: byte_array, erc20.erc20_asset): boolean {
