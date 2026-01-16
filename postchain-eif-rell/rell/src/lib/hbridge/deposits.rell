@@ -61,6 +61,58 @@ struct erc20_deposit_history_entry {
 }
 
 /**
+ * Tracks deposits that were bounced and returned to sender via withdrawal.
+ * Links the original deposit event data to the corresponding bounced withdrawal object.
+ */
+entity bounced_erc20_deposit {
+    key erc20_withdrawal;
+    index sender_address: byte_array;
+    index recipient_id: byte_array;
+    evm_tx_hash: byte_array;
+    evm_log_index: big_integer;
+    index evm_tx_hash, evm_log_index;
+    reason: text;
+}
+
+struct bounced_erc20_deposit_info {
+    withdrawal: erc20_withdrawal_info;
+    sender_address: byte_array;
+    recipient_id: byte_array;
+    evm_tx_hash: byte_array;
+    evm_log_index: big_integer;
+    reason: text;
+}
+
+/**
+ * Filter for get_bounced_erc20_deposits()
+ */
+struct bounced_deposit_filter {
+    /** EVM network ID. If null, all networks are considered. */
+    network_id: integer? = null;
+    /** EVM token address. If null, all token addresses are considered. */
+    token_address: byte_array? = null;
+    /** EVM sender address. If null, all sender addresses are considered. */
+    sender_address: byte_array? = null;
+    /** EVM transaction hash. If null, all transactions are considered. */
+    evm_tx_hash: byte_array? = null;
+    /** EVM log index. If null, all log indices are considered. */
+    evm_log_index: big_integer? = null;
+    /** Marks the beginning of a time interval. If not null, bounced deposits before `from` are excluded. */
+    from: timestamp? = null;
+    /** Marks the end of a time interval. If not null, bounced deposits at `to` and after are excluded. */
+    to: timestamp? = null;
+}
+
+function map_bounced_deposit(bounced: struct<bounced_erc20_deposit>) = bounced_erc20_deposit_info(
+    withdrawal = map_withdrawal(bounced.erc20_withdrawal),
+    sender_address = bounced.sender_address,
+    recipient_id = bounced.recipient_id,
+    evm_tx_hash = bounced.evm_tx_hash,
+    evm_log_index = bounced.evm_log_index,
+    reason = bounced.reason,
+);
+
+/**
  * Deposit filter for get_erc20_deposits()
  */
 struct deposit_filter {
