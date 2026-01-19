@@ -116,9 +116,9 @@ deploy_library_chain:
     - cd postchain-eif-rell/rell
     - chr install
     - chr build
-    - ${CI_PROJECT_DIR}/ci/library_chain/deploy.sh -n eif --major 1 --minor 0 --library-description "Common EIF library utilities"
+    - ${CI_PROJECT_DIR}/ci/library_chain/deploy.sh -n eif --major 1 --minor 1 --library-description "Common EIF library utilities"
     - ${CI_PROJECT_DIR}/ci/library_chain/deploy.sh -n eif_event_receiver --major 1 --minor 0 --library-description "EIF event receiver"
-    - ${CI_PROJECT_DIR}/ci/library_chain/deploy.sh -n hbridge --major 1 --minor 0 --library-description "Bridge library"
+    - ${CI_PROJECT_DIR}/ci/library_chain/deploy.sh -n hbridge --major 1 --minor 1 --library-description "Bridge library"
     - ${CI_PROJECT_DIR}/ci/library_chain/deploy.sh -n hbridge_crc2 --major 1 --minor 0 --library-description "NFT bridge library"
     - ${CI_PROJECT_DIR}/ci/library_chain/deploy.sh -n hbridge_admin --major 1 --minor 0 --library-description "Bridge admin utilities"
 
