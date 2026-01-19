@@ -252,7 +252,6 @@ function handle_signer_update_message(sender: byte_array, topic: text, body: gtv
         }
 
         // Any queued update is pointless now, we may cancel it. The exception is directory chain updates since those are validated by directory contract itself
-        // TODO: If we implement https://chromaway.atlassian.net/browse/POS-1167 we may even be able to cancel txs that have been taken from queue
         if (not is_directory_chain) {
             val queued_update = signer_list_update @? {
                 .blockchain_rid == update_message.blockchain_rid,
