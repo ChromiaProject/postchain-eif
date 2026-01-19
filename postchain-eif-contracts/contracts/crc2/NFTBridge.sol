@@ -210,12 +210,16 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
         _;
     }
 
-    function depositERC721(address contractAddress, uint256[] calldata tokenIds) public 
+    /**
+     * @dev Deposit ERC721 tokens from an EOA. The recipient account on Chromia is derived from the sender's address.
+     * Smart contracts should use depositERC721ToAccountID() to specify an explicit recipient.
+     */
+    function depositERC721(address contractAddress, uint256[] calldata tokenIds) public
         isAllowedContract(contractAddress)
-        whenNotPaused 
-        whenNotMassExit 
-        onlyEOA 
-        returns (bool) 
+        whenNotPaused
+        whenNotMassExit
+        onlyEOA
+        returns (bool)
     {
         for (uint256 i = 0; i < tokenIds.length; i++) {
             IERC721(contractAddress).safeTransferFrom(msg.sender, address(this), tokenIds[i]);
@@ -224,23 +228,33 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
         return true;
     }
 
-    function depositERC1155(address contractAddress, uint256[] calldata tokenIds, uint256[] calldata amounts) public 
-        isAllowedContract(contractAddress) 
-        whenNotPaused 
-        whenNotMassExit 
-        onlyEOA 
-        returns (bool) 
+    /**
+     * @dev Deposit ERC1155 tokens from an EOA. The recipient account on Chromia is derived from the sender's address.
+     * Smart contracts should use depositERC1155ToAccountID() to specify an explicit recipient.
+     */
+    function depositERC1155(address contractAddress, uint256[] calldata tokenIds, uint256[] calldata amounts) public
+        isAllowedContract(contractAddress)
+        whenNotPaused
+        whenNotMassExit
+        onlyEOA
+        returns (bool)
     {        
         IERC1155(contractAddress).safeBatchTransferFrom(msg.sender, address(this), tokenIds, amounts, "");
         emit DepositedTokens(msg.sender, contractAddress, tokenIds, amounts, bytes32(0), 1155); // accountID will be determined from sender
         return true;
     }
 
+    /**
+     * @dev Deposit ERC721 tokens to a specific account ID. Restricted to smart contracts only.
+     * EOA users must use depositERC721() where the recipient is derived from their address.
+     * This prevents users from accidentally specifying wrong account IDs.
+     * The calling contract is responsible for correctly managing recipient account IDs.
+     */
     function depositERC721ToAccountID(address contractAddress, uint256[] calldata tokenIds, bytes32 accountID) public
         isAllowedContract(contractAddress)
         whenNotPaused
         whenNotMassExit
-        onlyContract() // cannot be called from EOA for security reasons
+        onlyContract
         returns (bool)
     {
         require(accountID != bytes32(0), "NFTBridge: invalid accountID, cannot be zero.");
@@ -252,11 +266,17 @@ contract NFTBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradeabl
         return true;
     }
 
+    /**
+     * @dev Deposit ERC1155 tokens to a specific account ID. Restricted to smart contracts only.
+     * EOA users must use depositERC1155() where the recipient is derived from their address.
+     * This prevents users from accidentally specifying wrong account IDs.
+     * The calling contract is responsible for correctly managing recipient account IDs.
+     */
     function depositERC1155ToAccountID(address contractAddress, uint256[] calldata tokenIds, uint256[] calldata amounts, bytes32 accountID) public
         isAllowedContract(contractAddress)
         whenNotPaused
         whenNotMassExit
-        onlyContract() // cannot be called from EOA for security reasons
+        onlyContract
         returns (bool)
     {
         require(accountID != bytes32(0), "NFTBridge: invalid accountID, cannot be zero.");
