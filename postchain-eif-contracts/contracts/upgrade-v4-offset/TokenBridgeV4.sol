@@ -185,6 +185,10 @@ contract TokenBridgeV4 is Initializable, PausableUpgradeable, Ownable2StepUpgrad
         return true;
     }
 
+    /**
+     * @dev Deposit tokens from an EOA. The recipient account on Chromia is derived from the sender's address.
+     * Smart contracts should use depositToAccountID() to specify an explicit recipient.
+     */
     function deposit(IERC20 token, uint256 amount) public isAllowToken(token) whenNotPaused whenNotMassExit onlyEOA returns (bool) {
         transferDeposit(token, amount);
         emit DepositedERC20(msg.sender, token, amount, 0x0); // accountID will be determined from sender
@@ -207,11 +211,17 @@ contract TokenBridgeV4 is Initializable, PausableUpgradeable, Ownable2StepUpgrad
         _;
     }
 
+    /**
+     * @dev Deposit tokens to a specific account ID. Restricted to smart contracts only.
+     * EOA users must use deposit() where the recipient is derived from their address.
+     * This prevents users from accidentally specifying wrong account IDs.
+     * The calling contract is responsible for correctly managing recipient account IDs.
+     */
     function depositToAccountID(IERC20 token, uint256 amount, bytes32 accountID) public
         isAllowToken(token)
         whenNotPaused
         whenNotMassExit
-        onlyContract() // cannot be called from EOA for security reasons
+        onlyContract
         returns (bool)
     {
         require(accountID != bytes32(0), "TokenBridge: invalid accountID, cannot be zero.");

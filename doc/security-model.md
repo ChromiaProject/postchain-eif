@@ -1,6 +1,16 @@
 # HBridge security model
 
-## Normal operation
+## Deposit functions
+
+The bridge contract provides two deposit functions:
+
+- `deposit(IERC20 token, uint256 amount)`: For EOA (externally owned account) users. The recipient account on Chromia is derived from the sender's EVM address.
+- `depositToAccountID(IERC20 token, uint256 amount, bytes32 accountID)`: For smart contracts only. Allows specifying an explicit recipient account ID.
+
+The `depositToAccountID` function is restricted to smart contracts (`onlyContract` modifier) for security reasons: allowing EOA users to specify arbitrary recipient account IDs would be error-prone and could lead to funds being sent to wrong accounts. By restricting this to smart contracts, we ensure that the calling contract's author is responsible for correctly managing recipient account IDs. End users should use the `deposit` function, where the recipient is automatically derived from their EVM address.
+
+
+## Withdrawal functions
 
 In normal bridge operation, withdrawals must be signed by a supermajority of validators. The supermajority is defined as two-thirds (2/3) of the validators (BFT majority).
 
