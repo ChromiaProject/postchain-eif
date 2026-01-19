@@ -15,7 +15,7 @@ struct deposited_erc20_event {
     sender: byte_array;
     token_address: byte_array;
     amount: big_integer;
-    beneficiary: byte_array; // account_id
+    recipient_id: byte_array;
     evm_tx_hash: byte_array;
     evm_log_index: big_integer;
 }
@@ -25,7 +25,7 @@ function create_deposited_erc20_event(event: messaging.event_data) = deposited_e
     sender = byte_array.from_gtv(event.indexed_values[0]),
     token_address = byte_array.from_gtv(event.indexed_values[1]),
     amount = big_integer.from_gtv(event.non_indexed_values[0]),
-    beneficiary = byte_array.from_gtv(event.non_indexed_values[1]),
+    recipient_id = byte_array.from_gtv(event.non_indexed_values[1]),
     evm_tx_hash = event.tnx_hash,
     evm_log_index = event.log_index,
 );
@@ -79,11 +79,11 @@ function process_link_account_event(network_id: integer, event: link_account_id_
 }
 
 function process_deposit_erc20_event(network_id: integer, event: deposited_erc20_event) {
-    // normally only smart contracts have non-zero beneficiary
-    // given that it's just a flag which enable more complex account registration logic
-    // it's OK if it's not 100% reliable -- it only needs to be true in a specific case
-    var beneficiary = event.beneficiary;
-    val deposit_from_smart_contract = beneficiary != zero_beneficiary;
+    // Normally only smart contracts have non-zero recipient_id (beneficiary).
+    // Given that it's just a flag which enable more complex account registration logic.
+    // It's OK if it's not 100% reliable -- it only needs to be true in a specific case.
+    var recipient_id = event.recipient_id;
+    val deposit_from_smart_contract = recipient_id != zero_recipient_id;
 
     val erc20_asset = erc20.erc20_asset @? { network_id, .token_address == event.token_address };
     if (erc20_asset == null) {
@@ -99,7 +99,6 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
 
     if (not validate_bridge_contract(event.bridge_address, erc20_asset)) {
         log("Deposit event bounced: ERC20 token %s is not registered to bridge %s on network %s".format(event.token_address, event.bridge_address, network_id));
-        // TODO: Users can still abuse by claiming this withdraw on actual bridge, must be solved in POS-1583
         bounce_deposit_event(network_id, event, "Token not registered to this bridge");
         return;
     }
@@ -117,7 +116,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
 
     var ft4_account: ft4.accounts.account? = null;
     if (deposit_from_smart_contract) {
-        ft4_account = ft4.accounts.account @? { .id == beneficiary };
+        ft4_account = ft4.accounts.account @? { .id == recipient_id };
 
         if (not empty(ft4_account)) {
             // We require explicit link to avoid unwanted deposits
@@ -129,13 +128,10 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
         }
 
     } else {
-        // compute beneficiary account automatically
+        // Compute recipient account automatically
         ft4_account = core.find_ft4_account_for_address(event.sender, network_id);
-        beneficiary = event.sender.hash();
+        recipient_id = event.sender.hash();
     }
-
-    // Recipient account ID
-    val recipient_id = beneficiary;
 
     if (empty(ft4_account)) {
         // Create account_creation_transfer to allow the account to be registered later
@@ -144,7 +140,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
 
         // Sender and sender blockchain are used by the account creation transfer strategy.
         // Note: the sender ID becomes the recipient account ID.
-        val sender_id = beneficiary;
+        val sender_id = recipient_id;
         val sender_blockchain_rid = erc20_asset.virtual_blockchain_rid;
 
         val rules = find_allowed_ras_rules(
@@ -242,7 +238,7 @@ function bounce_deposit_event(network_id: integer, event: deposited_erc20_event,
     create bounced_erc20_deposit(
         erc20_withdrawal = withdrawal,
         sender_address = event.sender,
-        recipient_id = event.beneficiary,
+        recipient_id = event.recipient_id,
         evm_tx_hash = event.evm_tx_hash,
         evm_log_index = event.evm_log_index,
         reason = reason

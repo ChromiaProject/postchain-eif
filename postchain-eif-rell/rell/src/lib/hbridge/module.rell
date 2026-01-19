@@ -50,7 +50,7 @@ enum bridge_mode {
 // except that it might be icky and easier to exploit via client (front-end) attacks.
 val need_consent_on_deposit = true;
 
-val zero_beneficiary = x"0000000000000000000000000000000000000000000000000000000000000000";
+val zero_recipient_id = x"0000000000000000000000000000000000000000000000000000000000000000";
 
 @extendable
 function deposit_check_access_list(account_id: byte_array): boolean = true;

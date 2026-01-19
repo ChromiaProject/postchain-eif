@@ -4,7 +4,7 @@ struct deposited_tokens_event {
     contract_address: byte_array;
     protocol_id: big_integer;
     tokens: list<token_amount>;
-    beneficiary: byte_array; // account_id
+    recipient_id: byte_array;
     evm_tx_hash: byte_array;
 }
 
@@ -43,7 +43,7 @@ function create_deposited_tokens_event(event: messaging.event_data): deposited_t
         contract_address = byte_array.from_gtv(event.indexed_values[1]),
         protocol_id = protocol_id,
         tokens = tokens,
-        beneficiary = byte_array.from_gtv(event.non_indexed_values[2]),
+        recipient_id = byte_array.from_gtv(event.non_indexed_values[2]),
         evm_tx_hash = event.tnx_hash,
     ); 
 }
@@ -78,11 +78,11 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
     if (empty(event)) {
         return;
     }
-     // normally only smart contracts have non-zero beneficiary
-    // given that it's just a flag which enable more complex account registration logic
-    // it's OK if it's not 100% reliable -- it only needs to be true in a specific case
-    var beneficiary = event.beneficiary;
-    val deposit_from_smart_contract = beneficiary != zero_beneficiary;
+    // Normally only smart contracts have non-zero recipient_id (beneficiary).
+    // Given that it's just a flag which enable more complex account registration logic.
+    // It's OK if it's not 100% reliable -- it only needs to be true in a specific case.
+    var recipient_id = event.recipient_id;
+    val deposit_from_smart_contract = recipient_id != zero_recipient_id;
     val valid_tokens = event.tokens;
 
     val evm_collection = evm.evm_collection @? { .network_id == network_id, .contract_address == event.contract_address };
@@ -95,7 +95,7 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
 
     var ft4_account: ft4.accounts.account? = null;
     if (deposit_from_smart_contract) {
-        ft4_account = ft4.accounts.account @? { .id == beneficiary };
+        ft4_account = ft4.accounts.account @? { .id == recipient_id };
 
         if (not empty(ft4_account)) {
             // we require explicit link to avoid unwanted deposits
@@ -106,9 +106,9 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
         }
 
     } else {
-        // compute beneficiary account automatically
+        // Compute recipient account automatically
         ft4_account = evm.core.find_ft4_account_for_address(event.sender, network_id);
-        beneficiary = event.sender.hash();
+        recipient_id = event.sender.hash();
     }
 
     if (empty(ft4_account)) {
@@ -117,7 +117,7 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
             network_id,
             contract_address = event.contract_address,
             deposit_from_smart_contract,
-            recipient_id = beneficiary,
+            recipient_id,
             state = deposit_state.recalled,
             last_updated = op_context.last_block_time,
             evm_tx_hash = event.evm_tx_hash,
@@ -160,7 +160,7 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
             network_id,
             contract_address = event.contract_address,
             deposit_from_smart_contract,
-            recipient_id = beneficiary,
+            recipient_id,
             state = deposit_state.recalled,
             last_updated = op_context.last_block_time,
             evm_tx_hash = event.evm_tx_hash,
@@ -174,7 +174,7 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
         network_id,
         contract_address = event.contract_address,
         deposit_from_smart_contract,
-        recipient_id = beneficiary,
+        recipient_id,
         state = deposit_state.completed,
         last_updated = op_context.last_block_time,
         evm_tx_hash = event.evm_tx_hash,

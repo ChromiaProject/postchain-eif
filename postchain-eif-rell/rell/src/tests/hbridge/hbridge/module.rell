@@ -252,7 +252,7 @@ function deposit_from_evm(
     sender_address: byte_array,
     amount: big_integer,
     block_height: integer = 1,
-    account_id: byte_array = hbridge.zero_beneficiary,
+    account_id: byte_array = hbridge.zero_recipient_id,
     asset: asset_info = CHR,
     network_id: integer = network_id1,
     contract_address: byte_array = contract_address

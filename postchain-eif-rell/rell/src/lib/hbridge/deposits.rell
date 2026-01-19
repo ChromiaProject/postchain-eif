@@ -120,7 +120,7 @@ struct deposit_filter {
     network_id: integer? = null;
     /** EVM token address. If null, all token addresses are considered. */
     token_address: byte_array? = null;
-    /** EVM beneficiary address. If null, all recipient_id values are considered. */
+    /** Recipient account ID. If null, all recipient_id values are considered. */
     recipient_id: byte_array? = null;
     /** The state of the deposit. If null, all states are considered. */
     state: deposit_state? = null;
