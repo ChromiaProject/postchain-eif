@@ -25,8 +25,8 @@
     <properties>
         <revision>dev</revision>
         <postchain.version>3.47.7</postchain.version>
-        <rell.version>0.14.15</rell.version>
-        <rell.maven.plugin.version>0.16.1</rell.maven.plugin.version>
+        <rell.version>0.15.0</rell.version>
+        <rell.maven.plugin.version>0.16.4</rell.maven.plugin.version>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <kotlin.compiler.jvmTarget>21</kotlin.compiler.jvmTarget>
