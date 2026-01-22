@@ -1,6 +1,7 @@
 module;
 
 import ^.model.*;
+import ^.pause.*;
 
 query get_last_evm_block(network_id: integer) {
     return evm_block @? { network_id } ( @sort_desc .evm_block_height, .evm_block_hash ) limit 1;
@@ -39,3 +40,5 @@ query get_evm_block_data_with_events(network_id: integer, height: integer): (evm
         evm_events = _get_evm_block_events(block)
     );
 }
+
+query should_process_evm_events() = not eif_event_receiver_state.paused;

@@ -2,6 +2,7 @@
 module;
 
 import eif_event_receiver_with_dynamic_config.*;
+import lib.eif_event_receiver;
 import lib.hbridge;
 
 namespace ft4 {
@@ -56,4 +57,18 @@ operation disable_account_creation_on_deposit(network_id: integer, token_address
     ft4.admin.require_admin();
 
     hbridge.disable_account_creation_on_deposit(network_id, token_address);
+}
+
+operation pause() {
+    ft4.admin.require_admin();
+
+    eif_event_receiver.pause_event_receiver();
+    hbridge.pause_hbridge();
+}
+
+operation unpause() {
+    ft4.admin.require_admin();
+
+    eif_event_receiver.unpause_event_receiver();
+    hbridge.unpause_hbridge();
 }

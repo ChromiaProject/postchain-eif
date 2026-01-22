@@ -5,3 +5,9 @@
  */
 query get_hbridge_version() = chain_context.args.version;
 
+/**
+ * Retrieves the current pause state of the HBridge module.
+ *
+ * @return A boolean representing the current pause state of the HBridge module.
+ */
+query is_paused() = hbridge_state.paused;

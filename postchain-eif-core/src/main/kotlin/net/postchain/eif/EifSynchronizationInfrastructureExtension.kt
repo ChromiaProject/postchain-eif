@@ -27,6 +27,7 @@ const val EIF_CONFIG_CONTRACTS_TO_FETCH_QUERY = "eif.get_contracts_to_fetch"
 const val EIF_CONFIG_EVENTS_QUERY = "eif.get_events"
 const val EIF_LAST_EVM_BLOCK_QUERY = "get_last_evm_block"
 const val EIF_LAST_EVM_EVENT_HEIGHT_QUERY = "get_last_evm_event_height"
+const val EIF_SHOULD_PROCESS_EVM_EVENTS_QUERY = "should_process_evm_events"
 
 @Suppress("unused")
 class EifSynchronizationInfrastructureExtension(

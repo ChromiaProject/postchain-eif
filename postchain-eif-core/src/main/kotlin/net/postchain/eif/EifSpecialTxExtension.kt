@@ -8,6 +8,7 @@ import net.postchain.core.BlockEContext
 import net.postchain.core.block.BlockData
 import net.postchain.crypto.CryptoSystem
 import net.postchain.eif.config.EifEventReceiverConfig
+import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtx.GTXModule
 import net.postchain.gtx.data.OpData
 import net.postchain.gtx.special.GTXBlockBuildingAffectingSpecialTxExtension
@@ -17,6 +18,12 @@ import java.time.Clock
 class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXBlockBuildingAffectingSpecialTxExtension {
 
     companion object : KLogging()
+
+    private var hasShouldProcessEvmEventsQuery = false
+    private lateinit var module: GTXModule
+
+    @Volatile
+    private var lastSeenShouldProcessEvents = true
 
     lateinit var config: EifEventReceiverConfig
     lateinit var isSigner: () -> Boolean
@@ -31,7 +38,9 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
     }
 
     override fun init(module: GTXModule, chainID: Long, blockchainRID: BlockchainRid, cs: CryptoSystem) {
+        this.module = module
         needEifTnx = module.getOperations().contains(EvmBlockOp.OP_NAME)
+        hasShouldProcessEvmEventsQuery = module.getQueries().contains(EIF_SHOULD_PROCESS_EVM_EVENTS_QUERY)
     }
 
     override fun needsSpecialTransaction(position: SpecialTransactionPosition): Boolean {
@@ -42,7 +51,7 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
     }
 
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
-        if (position == SpecialTransactionPosition.Begin && processors.isNotEmpty()) {
+        if (position == SpecialTransactionPosition.Begin && processors.isNotEmpty() && shouldProcessEvmEvents(bctx)) {
             val index = bctx.height.mod(processors.size)
             val proc = processors.values.toList()[index].first
             val evmBlocks = proc.getEventData()
@@ -71,10 +80,14 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
             val (proc, fetcher) = processors.values.toList()[index]
             val decodedOps = ops.map { EvmBlockOp.fromOpData(it) }
 
+            val totalEvents = decodedOps.sumOf { it.events.size }
+            if (!shouldProcessEvmEvents(bctx) && totalEvents > 0) {
+                throw UserMistake("EVM events received when EIF is paused")
+            }
+
             // Validate that a block does not contain too many events
             // `maxEventsPerBlock` can be exceeded if all events are from the same EVM block
             if (config.maxEventsPerBlock > 0 && isSigner()) {
-                val totalEvents = decodedOps.sumOf { it.events.size }
                 if (totalEvents > config.maxEventsPerBlock && decodedOps.map { it.evmBlockHeight }.toSet().count() > 1)
                     throw UserMistake("Block contains too many events")
             }
@@ -103,7 +116,7 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
     }
 
     override fun shouldBuildBlock(): Boolean {
-        if (!::config.isInitialized) return false
+        if (!::config.isInitialized || !lastSeenShouldProcessEvents) return false
 
         val numberOfEvents = fetchNumberOfEvents()
         if (numberOfEvents == 0L) return false
@@ -120,4 +133,10 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
     }
 
     private fun fetchNumberOfEvents(): Long = processors.values.map { it.first }.sumOf { it.numberOfNewEvents() }
+
+    private fun shouldProcessEvmEvents(bctx: BlockEContext): Boolean {
+        lastSeenShouldProcessEvents = !hasShouldProcessEvmEventsQuery ||
+                module.query(bctx, EIF_SHOULD_PROCESS_EVM_EVENTS_QUERY, gtv(mapOf())).asBoolean()
+        return lastSeenShouldProcessEvents
+    }
 }
