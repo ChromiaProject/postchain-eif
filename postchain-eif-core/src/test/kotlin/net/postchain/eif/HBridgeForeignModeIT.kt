@@ -2,12 +2,15 @@ package net.postchain.eif
 
 import assertk.assertThat
 import assertk.assertions.contains
+import assertk.assertions.isLessThan
+import assertk.assertions.isTrue
 import mu.KotlinLogging
 import net.postchain.base.BaseBlockHeader
 import net.postchain.base.BaseBlockWitness
 import net.postchain.common.data.Hash
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
+import net.postchain.common.wrap
 import net.postchain.concurrent.util.get
 import net.postchain.core.BlockRid
 import net.postchain.crypto.Secp256K1CryptoSystem
@@ -29,6 +32,8 @@ import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvNull
 import net.postchain.gtv.mapper.toObject
 import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV2
+import net.postchain.gtx.GTXModuleAware
+import net.postchain.gtx.GtxBuilder
 import org.awaitility.Awaitility.await
 import org.awaitility.Duration
 import org.junit.jupiter.api.Assertions.assertArrayEquals
@@ -442,6 +447,94 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
 
     @Test
     @Order(8)
+    fun `pause hbridge`() {
+        logger.info { "pause hbridge" }
+        val aliceBalance = getAssetBalance(aliceAccount)!!
+
+        val b = GtxBuilder(bcRid, listOf(adminKeyPair.pubKey.data), myCS, merkleHashCalculator)
+        b.addOperation("eif.hbridge.pause")
+        val pauseTx = b.finish()
+                .sign(cryptoSystem.buildSigMaker(adminKeyPair))
+                .buildGtx()
+                .encode()
+
+        enqueueTx(pauseTx)
+        sealBlock()
+
+        logger.info { "\tassert deposits are paused" }
+        val deposit = bridge.deposit(Address(testToken.contractAddress), Uint256(depositAmount)).send()
+
+        val eventProcessor = (node.getBlockchainInstance().blockchainEngine
+                .getConfiguration() as GTXModuleAware).module.getSpecialTxExtensions()
+                .filterIsInstance<EifSpecialTxExtension>().first()
+                .processors[networkId]?.first as EvmEventProcessor
+
+        // Wait until we have read the block with the deposit
+        await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            assertThat(deposit.blockNumber).isLessThan(eventProcessor.lastReadLogBlockHeight)
+        }
+        // Build a new block
+        sealBlock()
+        // Check that deposit was not included in the block and alice balance is still the same
+        assertEquals(aliceBalance, getAssetBalance(aliceAccount))
+
+        // Ensure withdraw fails
+        logger.info { "\tassert withdrawals are paused" }
+        val txRid = withdrawOnPostchainV2(aliceCredentials, aliceAccount, assetId, withdrawAmount, bridgeAddress, bcRid)
+        await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            sealBlock()
+            assertThat(node.getBlockchainInstance()
+                    .blockchainEngine.getTransactionQueue().getRejectionReason(txRid.wrap())?.first?.message
+                    ?.contains("Withdrawals are not allowed when bridge is paused.") ?: false
+            ).isTrue()
+        }
+    }
+
+    @Test
+    @Order(9)
+    fun `unpause hbridge`() {
+        logger.info { "unpause hbridge" }
+        val aliceBalance = getAssetBalance(aliceAccount)!!
+
+        val b = GtxBuilder(bcRid, listOf(adminKeyPair.pubKey.data), myCS, merkleHashCalculator)
+        b.addOperation("eif.hbridge.unpause")
+        val unpauseTx = b.finish()
+                .sign(cryptoSystem.buildSigMaker(adminKeyPair))
+                .buildGtx()
+                .encode()
+
+        enqueueTx(unpauseTx)
+        sealBlock()
+
+        logger.info { "\tassert deposits are unpaused" }
+        // Build a new block
+        sealBlock()
+        // Check that old deposit was now included
+        assertEquals(aliceBalance + depositAmount, getAssetBalance(aliceAccount))
+
+        // Withdraw what we deposited
+        logger.info { "\tassert withdrawals are paused" }
+        val txRid = withdrawOnPostchainV2(aliceCredentials, aliceAccount, assetId, depositAmount, bridgeAddress, bcRid)
+        sealBlock()
+        val eventHash = getWithdrawalEventHashByTxRid(txRid)
+        val eventProof = blockQuery.query("get_event_merkle_proof",
+                gtv("eventHash" to gtv(eventHash.toHex()))
+        ).get().toObject<EventMerkleProof>()
+        bridge.withdrawRequest(
+                eventProof.web3EventData(),
+                eventProof.web3EventProof(),
+                eventProof.web3BlockHeader(),
+                eventProof.web3Signatures(),
+                eventProof.web3Signers(),
+                eventProof.web3ExtraProofData()
+        ).send()
+        buildEvmBlocks(2)
+
+        bridge.withdraw(Bytes32(eventHash), aliceCredentials.evmAddress).send()
+    }
+
+    @Test
+    @Order(10)
     fun `trigger mass exit`() {
         logger.info { "trigger mass exit" }
 
@@ -525,7 +618,7 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
     }
 
     @Test
-    @Order(9)
+    @Order(11)
     fun `request and complete withdrawal initiated before mass exit`() {
         logger.info { "request and complete withdrawal on evm initiated before mass exit" }
 
@@ -577,7 +670,7 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
     }
 
     @Test
-    @Order(10)
+    @Order(12)
     fun `complete withdrawal requested before mass exit`() {
         logger.info { "complete withdrawal on evm requested before mass exit" }
 
@@ -588,7 +681,7 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
     }
 
     @Test
-    @Order(11)
+    @Order(13)
     fun `withdraw token to evm after mass exit using snapshot`() {
         logger.info { "withdraw token to evm after mass exit using snapshot" }
 
@@ -640,7 +733,7 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
     }
 
     @Test
-    @Order(12)
+    @Order(14)
     fun `user can't withdraw token to evm after mass exit block height`() {
         logger.info { "user can't withdraw token to evm after mass exit block height" }
 
@@ -700,7 +793,7 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
     }
 
     @Test
-    @Order(13)
+    @Order(15)
     fun `pause token bridge contract`() {
         Transfer(web3j, transactionManager).sendFunds(
                 node0EvmAddress.value,

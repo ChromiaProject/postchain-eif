@@ -2,6 +2,7 @@ module;
 
 import ^.*;
 import ^.dynamic_config.*;
+import ^.pause.*;
 import lib.icmf.constants.*;
 import lib.icmf.receiver.*;
 
@@ -23,6 +24,7 @@ function eif_event_reciever_dynamic_config_message(sender: byte_array, topic: te
         dynamic_config_common.eif_event_receiver_dynamic_config_topic -> handle_dynamic_config_message(body);
         dynamic_config_common.eif_event_receiver_dynamic_config_topic_v2 -> handle_dynamic_config_message_v2(body);
         dynamic_config_common.eif_event_receiver_dynamic_remove_topic -> handle_dynamic_remove_message(body);
+        dynamic_config_common.eif_event_receiver_pause_topic -> handle_pause_message(body);
         blockchain_rid_topic -> handle_blockchain_rid_message(body);
     }
 }
@@ -82,7 +84,18 @@ function handle_blockchain_rid_message(body: gtv) {
                 icmf_receiver_topic(topic = dynamic_config_common.eif_event_receiver_dynamic_config_topic, bc_rid = message.rid),
                 icmf_receiver_topic(topic = dynamic_config_common.eif_event_receiver_dynamic_config_topic_v2, bc_rid = message.rid),
                 icmf_receiver_topic(topic = dynamic_config_common.eif_event_receiver_dynamic_remove_topic, bc_rid = message.rid),
+                icmf_receiver_topic(topic = dynamic_config_common.eif_event_receiver_pause_topic, bc_rid = message.rid),
             ],
             false);
+    }
+}
+
+function handle_pause_message(body: gtv) {
+    val message = dynamic_config_common.pause_message.from_gtv(body);
+
+    if (message.pause) {
+        pause_event_receiver();
+    } else {
+        unpause_event_receiver();
     }
 }

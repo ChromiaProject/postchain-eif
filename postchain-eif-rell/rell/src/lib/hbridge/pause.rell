@@ -1,0 +1,23 @@
+object hbridge_state {
+    mutable paused: boolean = false;
+}
+
+/**
+ * Pauses the hbridge.
+ *
+ * This means no withdrawals are allowed. To pause deposits, EVM event processing must be paused.
+ * This can be toggled in the event receiver chain (or module in case of single chain setup)
+ */
+function pause_hbridge() {
+    hbridge_state.paused = true;
+}
+
+/**
+ * Unpauses the hbridge.
+ *
+ * This means withdrawals are allowed again. To unpause deposits, EVM event processing must be unpaused.
+ * This can be toggled in the event receiver chain (or module in case of single chain setup)
+ */
+function unpause_hbridge() {
+    hbridge_state.paused = false;
+}

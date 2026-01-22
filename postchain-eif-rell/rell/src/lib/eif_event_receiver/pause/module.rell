@@ -1,0 +1,17 @@
+object eif_event_receiver_state {
+    mutable paused: boolean = false;
+}
+
+/**
+ * Pauses the event receiver. No new EVM events will be processed.
+ */
+function pause_event_receiver() {
+    eif_event_receiver_state.paused = true;
+}
+
+/**
+ * Unpauses the event receiver. EVM event processing will resume.
+ */
+function unpause_event_receiver() {
+    eif_event_receiver_state.paused = false;
+}

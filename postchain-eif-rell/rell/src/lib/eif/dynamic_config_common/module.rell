@@ -3,6 +3,7 @@ module;
 val eif_event_receiver_dynamic_config_topic = "L_eif_event_receiver_dynamic_config";
 val eif_event_receiver_dynamic_config_topic_v2 = "L_eif_event_receiver_dynamic_config_v2";
 val eif_event_receiver_dynamic_remove_topic = "L_eif_event_receiver_dynamic_remove";
+val eif_event_receiver_pause_topic = "L_eif_event_receiver_pause";
 
 struct event_def {
     name: text;
@@ -36,4 +37,8 @@ struct network_contract_address {
 
 struct eif_event_receiver_dynamic_remove_message {
     bridges: list<network_contract_address>;
+}
+
+struct pause_message {
+    pause: boolean;
 }
