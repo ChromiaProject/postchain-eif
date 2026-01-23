@@ -48,6 +48,15 @@ This document describes all available scripts in the `postchain-eif-contracts` p
 - **finalizeBlockchainRid:recovery**: Finalizes the blockchain RID for a RecoveryContract contract
 
 
+## NFT Bridge Scripts
+
+- **deploy:nftbridge**: Deploys the NFTBridge contract for ERC-721/ERC-1155 tokens
+- **inspect:nftbridge**: Inspects the deployed NFTBridge contract
+- **setBlockchainRid:nftbridge**: Sets the blockchain RID for a NFTBridge contract
+- **finalizeBlockchainRid:nftbridge**: Finalizes the blockchain RID for a NFTBridge contract
+- **allowToken:nftbridge**: Configures NFT contract allowance on a NFTBridge contract
+
+
 ## Transaction Submitter Scripts
 
 - **transaction:resubmitSignerUpdate**: Resubmits a signer update transaction by extracting the ManagedValidator contract address and transaction parameters from the input data
