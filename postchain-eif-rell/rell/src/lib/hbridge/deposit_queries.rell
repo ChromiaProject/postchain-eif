@@ -23,6 +23,7 @@ query get_erc20_deposits(filter: deposit_filter, from: timestamp? = null, to: ti
         filter.recipient_id == null or .recipient_id == filter.recipient_id,
         filter.state == null or .state == filter.state,
         filter.evm_tx_hash == null or .evm_tx_hash == filter.evm_tx_hash,
+        filter.evm_log_index == null or .evm_log_index == filter.evm_log_index,
         from == null or .last_updated >= from,
         to == null or .last_updated < to,
         if (sort_desc)
@@ -77,6 +78,20 @@ query get_erc20_deposit_history(deposit_id: rowid): list<erc20_deposit_history_e
  */
 query get_erc20_deposit_by_tx(tx_rid: byte_array, op_index: integer): erc20_deposit_info? =
         erc20_completed_deposit_transaction @? { .transaction.tx_rid == tx_rid, op_index } ( map_deposit($.deposit, $) );
+
+/**
+ * Retrieves an ERC20 deposit by EVM transaction hash.
+ *
+ * @param evm_tx_hash The EVM transaction hash.
+ * @param evm_log_index The EVM log index (defaults to 0).
+ * @return An optional erc20_deposit_info if found, null otherwise.
+ */
+query get_erc20_deposit_by_evm_tx_hash(evm_tx_hash: byte_array, evm_log_index: big_integer = 0L): erc20_deposit_info? {
+    val deposit = erc20_deposit @? { evm_tx_hash, evm_log_index };
+    if (deposit == null) return null;
+    val cdt = erc20_completed_deposit_transaction @? { .deposit == deposit };
+    return map_deposit(deposit, cdt);
+}
 
 
 // Bounced deposit queries
@@ -165,7 +180,7 @@ query get_bounced_erc20_deposits_by_token(network_id: integer, token_address: by
  * @param evm_tx_hash The EVM transaction hash.
  * @return An optional bounced_erc20_deposit_info if found, null otherwise.
  */
-query get_bounced_erc20_deposit_by_tx_hash(evm_tx_hash: byte_array, evm_log_index: big_integer = 0L): bounced_erc20_deposit_info? =
+query get_bounced_erc20_deposit_by_evm_tx_hash(evm_tx_hash: byte_array, evm_log_index: big_integer = 0L): bounced_erc20_deposit_info? =
     bounced_erc20_deposit @? { evm_tx_hash, evm_log_index } ( map_bounced_deposit($.to_struct()) );
 
 // Account creation on deposit queries

@@ -587,3 +587,80 @@ function test_get_bounced_erc20_deposits_from_to_filter() {
     assert_bounced_at(res6, 0, 11L);
     assert_bounced_at(res6, 1, 10L);
 }
+
+function test_duplicate_deposit_with_same_tx_hash_and_log_index_is_ignored() {
+    val ft_asset = register_foreign_asset();
+
+    // Account
+    val auth_descriptor = ft4_test.create_auth_descriptor(rell.test.pubkeys.alice, ["A", "T"]);
+    val account_id = rell.test.pubkeys.alice.hash();
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+
+    // Register account
+    rell.test.tx().op(
+        admin.external.register_account(auth_descriptor)
+    ).sign(admin_privkey).run();
+    val ft_account = accounts.Account(account_id);
+
+    // Link account
+    link_eoa_account(
+        rell.test.keypairs.eve,
+        rell.test.keypairs.alice,
+        account_id,
+        auth_descriptor.hash()
+    );
+
+    // First deposit
+    val amount = 10000000L;
+    deposit_from_evm(evm_address, amount, block_height = 1, log_index = 5L);
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
+    assert_equals(erc20_deposit @ {} (@sum 1), 1);
+
+    // Duplicate deposit with same tx_hash and log_index should be ignored (not bounced)
+    deposit_from_evm(evm_address, amount, block_height = 1, log_index = 5L);
+    // Balance should not change
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount);
+    // Still only 1 deposit
+    assert_equals(erc20_deposit @ {} (@sum 1), 1);
+    assert_equals(bounced_erc20_deposit @ {} (@sum 1), 0);
+
+    // Deposit with same tx_hash but different log_index should succeed
+    deposit_from_evm(evm_address, amount, block_height = 1, log_index = 6L);
+    // Balance should change
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount * 2);
+    // Should be 2 deposits
+    assert_equals(erc20_deposit @ {} (@sum 1), 2);
+    assert_equals(bounced_erc20_deposit @ {} (@sum 1), 0);
+
+    // Deposit with different tx_hash should succeed
+    deposit_from_evm(evm_address, amount, block_height = 2, log_index = 7L);
+    assert_equals(assets.get_asset_balance(ft_account, ft_asset), amount * 3);
+    assert_equals(erc20_deposit @ {} (@sum 1), 3);
+    assert_equals(bounced_erc20_deposit @ {} (@sum 1), 0);
+}
+
+function test_bounced_deposit_blocks_subsequent_deposits_from_same_evm_tx_and_log_index() {
+    // Register asset but don't register account - deposit will be bounced
+    val ft_asset = register_foreign_asset();
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.pubkeys.eve);
+
+    // First deposit - will be bounced because no account exists and amount is below threshold
+    val amount = 1000L; // Below the 10_000_000 threshold for account creation
+    deposit_from_evm(evm_address, amount, block_height = 1, log_index = 0L);
+
+    // Verify it was bounced
+    assert_equals(erc20_deposit @ {} (@sum 1), 0);
+    assert_equals(bounced_erc20_deposit @ {} (@sum 1), 1);
+
+    // Second deposit from same EVM tx and log_index should be ignored (not bounced again)
+    deposit_from_evm(evm_address, amount, block_height = 1, log_index = 0L);
+    // Still no successful deposits
+    assert_equals(erc20_deposit @ {} (@sum 1), 0);
+    // Still only 1 bounced deposit (second one was ignored, not bounced again)
+    assert_equals(bounced_erc20_deposit @ {} (@sum 1), 1);
+
+    // Deposit from different EVM tx and log_index should be bounced (creates new bounced entry)
+    deposit_from_evm(evm_address, amount, block_height = 2, log_index = 0L);
+    assert_equals(erc20_deposit @ {} (@sum 1), 0);
+    assert_equals(bounced_erc20_deposit @ {} (@sum 1), 2);
+}

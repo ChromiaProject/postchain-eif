@@ -255,11 +255,12 @@ function deposit_from_evm(
     account_id: byte_array = hbridge.zero_recipient_id,
     asset: asset_info = CHR,
     network_id: integer = network_id1,
-    contract_address: byte_array = contract_address
+    contract_address: byte_array = contract_address,
+    log_index: big_integer = 0L
 ) {
 
+    val block_hash = ("BLOCK", block_height).hash();
     val tnx_hash = ("TX", block_height).hash();
-    val log_index = 1;
 
     val events = [
         event_data(
@@ -273,7 +274,6 @@ function deposit_from_evm(
         )
     ];
 
-    val block_hash = ("BLOCK", block_height).hash();
     rell.test.tx().nop().op(
         evm_block_op(network_id, block_height, block_hash, events)
     ).run();

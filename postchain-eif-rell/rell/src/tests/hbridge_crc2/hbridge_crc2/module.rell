@@ -187,12 +187,17 @@ function deposit_from_evm(
     block_height: integer = 1,
     account_id: byte_array = hbridge_crc2.zero_recipient_id,
     network_id: integer = network_id1,
-    contract_address: byte_array = contract_address
+    contract_address: byte_array = contract_address,
+    log_index: big_integer = 0L
 ) {
+
+    val block_hash = ("BLOCK", block_height).hash();
+    val tnx_hash = ("TX", block_height).hash();
+
     val events = [
         event_data(
-            tnx_hash = ("TX", block_height).hash(),
-            log_index = 1,
+            tnx_hash = tnx_hash,
+            log_index = log_index,
             signature = ("SIG", block_height).hash(),
             contract_address = contract_address,
             name = evm_events.deposited_tokens_name,
@@ -200,10 +205,12 @@ function deposit_from_evm(
             non_indexed_values = [token_ids.to_gtv(), amounts.to_gtv(), account_id.to_gtv(), protocol_id.to_gtv()]
         )
     ];
-    val block_hash = ("BLOCK", block_height).hash();
+    
     rell.test.tx().nop().op(
         evm_block_op(network_id, block_height, block_hash, events)
     ).run();
+
+    return (tnx_hash, log_index);
 }
 
 function trigger_withdrawal_status_on_evm(
