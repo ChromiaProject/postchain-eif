@@ -79,6 +79,15 @@ function process_link_account_event(network_id: integer, event: link_account_id_
 }
 
 function process_deposit_erc20_event(network_id: integer, event: deposited_erc20_event) {
+    if (exists(erc20_deposit @* { .evm_tx_hash == event.evm_tx_hash, .evm_log_index == event.evm_log_index })) {
+        log("Deposit event ignored: duplicate event with tx_hash %s and log_index %d".format(event.evm_tx_hash, event.evm_log_index));
+        return;
+    }
+    if (exists(bounced_erc20_deposit @* { .evm_tx_hash == event.evm_tx_hash, .evm_log_index == event.evm_log_index })) {
+        log("Deposit event ignored: duplicate event with tx_hash %s and log_index %d (previously bounced)".format(event.evm_tx_hash, event.evm_log_index));
+        return;
+    }
+
     // Normally only smart contracts have non-zero recipient_id (beneficiary).
     // Given that it's just a flag which enable more complex account registration logic.
     // It's OK if it's not 100% reliable -- it only needs to be true in a specific case.
@@ -172,10 +181,11 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
             deposit_from_smart_contract,
             recipient_id,
             erc20_asset,
-            event.amount,
-            deposit_state.pending,
+            amount = event.amount,
+            state = deposit_state.pending,
             last_updated = op_context.last_block_time,
             evm_tx_hash = event.evm_tx_hash,
+            evm_log_index = event.evm_log_index,
         );
 
         val creation = ft4.transfer_strategy.pool_assets_with_rules(
@@ -197,10 +207,11 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
                 deposit_from_smart_contract,
                 recipient_id,
                 erc20_asset,
-                event.amount,
-                deposit_state.completed,
+                amount = event.amount,
+                state = deposit_state.completed,
                 last_updated = op_context.last_block_time,
                 evm_tx_hash = event.evm_tx_hash,
+                evm_log_index = event.evm_log_index,
             );
             create erc20_completed_deposit_transaction(deposit);
 

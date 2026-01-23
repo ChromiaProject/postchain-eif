@@ -1,7 +1,7 @@
 function assert_bounced_queries(
     evm_address: byte_array,
     tnx_hash: byte_array,
-    log_index: integer,
+    log_index: big_integer,
     expected_reason: text,
     network_id: integer = network_id1,
     token_address: byte_array = CHR.token_address
@@ -16,7 +16,7 @@ function assert_bounced_queries(
     val bounced_by_token = bounced_erc20_deposit_info.from_gtv_pretty(token_page.data[0]);
     assert_equals(bounced_by_token.reason, expected_reason);
 
-    val bounced_by_tx = get_bounced_erc20_deposit_by_tx_hash(tnx_hash, log_index);
+    val bounced_by_tx = get_bounced_erc20_deposit_by_evm_tx_hash(tnx_hash, log_index);
     assert_not_null(bounced_by_tx);
     assert_equals(bounced_by_tx.reason, expected_reason);
 

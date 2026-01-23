@@ -7,6 +7,8 @@ entity token_deposit {
     mutable state: deposit_state;
     mutable last_updated: timestamp;
     index evm_tx_hash: byte_array;
+    evm_log_index: big_integer;
+    index evm_tx_hash, evm_log_index;
 }
 
 entity deposited_token {
@@ -32,6 +34,7 @@ struct token_deposit_info {
     state: deposit_state;
     last_updated: timestamp;
     evm_tx_hash: byte_array;
+    evm_log_index: big_integer;
 }
 
 enum deposit_state {
@@ -64,6 +67,8 @@ struct deposit_filter {
     evm_tx_hash: byte_array? = null;
     /** EVM sender address. If null, all sender_address values are considered. */
     sender_address: byte_array? = null;
+    /** EVM event log index. If null, all log indices are considered. */
+    evm_log_index: big_integer? = null;
 }
 
 function map_deposit(deposit: token_deposit) = token_deposit_info(
@@ -77,6 +82,7 @@ function map_deposit(deposit: token_deposit) = token_deposit_info(
     state = deposit.state,
     last_updated = deposit.last_updated,
     evm_tx_hash = deposit.evm_tx_hash,
+    evm_log_index = deposit.evm_log_index,
 );
 
 function update_deposit_state(deposit: token_deposit, state: deposit_state) {

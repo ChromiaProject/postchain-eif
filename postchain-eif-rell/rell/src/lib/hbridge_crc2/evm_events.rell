@@ -6,6 +6,7 @@ struct deposited_tokens_event {
     tokens: list<token_amount>;
     recipient_id: byte_array;
     evm_tx_hash: byte_array;
+    evm_log_index: big_integer;
 }
 
 function create_deposited_tokens_event(event: messaging.event_data): deposited_tokens_event? { 
@@ -45,6 +46,7 @@ function create_deposited_tokens_event(event: messaging.event_data): deposited_t
         tokens = tokens,
         recipient_id = byte_array.from_gtv(event.non_indexed_values[2]),
         evm_tx_hash = event.tnx_hash,
+        evm_log_index = event.log_index,
     ); 
 }
 
@@ -78,6 +80,12 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
     if (empty(event)) {
         return;
     }
+
+    if (exists(token_deposit @* { .evm_tx_hash == event.evm_tx_hash, .evm_log_index == event.evm_log_index })) {
+        log("Deposit event ignored: duplicate event with tx_hash %s and log_index %d".format(event.evm_tx_hash, event.evm_log_index));
+        return;
+    }
+
     // Normally only smart contracts have non-zero recipient_id (beneficiary).
     // Given that it's just a flag which enable more complex account registration logic.
     // It's OK if it's not 100% reliable -- it only needs to be true in a specific case.
@@ -121,6 +129,7 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
             state = deposit_state.recalled,
             last_updated = op_context.last_block_time,
             evm_tx_hash = event.evm_tx_hash,
+            evm_log_index = event.evm_log_index,
         );
         bounce_deposit_event(network_id, event.contract_address, event.protocol_id, event.tokens, event.sender, event.bridge_address);
         log("Deposit event bounced: no FT4 account found for deposit from sender %s".format(event.sender));
@@ -164,6 +173,7 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
             state = deposit_state.recalled,
             last_updated = op_context.last_block_time,
             evm_tx_hash = event.evm_tx_hash,
+            evm_log_index = event.evm_log_index,
         );
         log("Deposit event recalled: no valid tokens");
         return;
@@ -178,6 +188,7 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
         state = deposit_state.completed,
         last_updated = op_context.last_block_time,
         evm_tx_hash = event.evm_tx_hash,
+        evm_log_index = event.evm_log_index,
     );
 
     val deposit_tokens = list<struct<deposited_token>>();
