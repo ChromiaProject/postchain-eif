@@ -98,7 +98,7 @@ blockchains:
           bsc:
             network_id: 56
             evm_read_offset: 100 # Block time 0.75s = 75s
-            read_offset: 50
+            read_offset: 20
             contracts:
               - '0x6045931E511EF7e53A4A817F971e0CA28c758809'
               - '0x16b9a82891338f9ba80e2d6970fdda79d1eb0dae'
@@ -107,7 +107,7 @@ blockchains:
           ethereum:
             network_id: 1
             evm_read_offset: 50 # Block time 12s = 600s
-            read_offset: 5
+            read_offset: 3
             contracts:
               - '0xd366Ed22F5b2262A2Da4C32D8A4607C93690134a'
               - '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
