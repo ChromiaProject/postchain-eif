@@ -45,7 +45,7 @@ blockchains:
 
 libs:
   com.chromia.ft4:
-    version: 1.1.0
+    version: 1.2.0
   com.chromia.iccf:
     version: 1.90.1
   com.chromia.icmf:
