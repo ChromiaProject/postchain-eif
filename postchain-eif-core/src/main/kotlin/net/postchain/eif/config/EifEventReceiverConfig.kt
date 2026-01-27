@@ -4,15 +4,15 @@ import net.postchain.gtv.mapper.DefaultValue
 import net.postchain.gtv.mapper.Name
 
 data class EifEventReceiverConfig(
-        @Name("max_event_delay")
-        @DefaultValue(defaultLong = 1000)
+        @param:Name("max_event_delay")
+        @param:DefaultValue(defaultLong = 1000)
         val maxEventDelay: Long,
-        @Name("number_of_events_to_trigger_block_building")
-        @DefaultValue(defaultLong = 100)
+        @param:Name("number_of_events_to_trigger_block_building")
+        @param:DefaultValue(defaultLong = 100)
         val numberOfEventsToTriggerBlockBuilding: Long,
-        @Name("max_events_per_block")
-        @DefaultValue(defaultLong = 100)
+        @param:Name("max_events_per_block")
+        @param:DefaultValue(defaultLong = 100)
         val maxEventsPerBlock: Long,
-        @Name("chains")
+        @param:Name("chains")
         val chains: Map<String, EifEvmBlockchainConfig>,
 )

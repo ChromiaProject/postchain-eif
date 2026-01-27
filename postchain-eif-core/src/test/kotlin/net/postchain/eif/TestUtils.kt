@@ -55,6 +55,6 @@ internal fun depositErc20EventBlockOp(
                     gtv(contractAddress),
                     gtv(from),
                     gtv(to),
-                    gtv(BigInteger.valueOf(amount.toLong()))
+                    gtv(BigInteger.valueOf(amount))
             )))
 }
