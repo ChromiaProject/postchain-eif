@@ -128,8 +128,8 @@ class EvmSignerUpdateBlockWitnessFetcher(
 }
 
 data class BlockSignature(
-        @Name("subjectID") val subjectID: ByteArray,
-        @Name("data") val signature: ByteArray
+        @param:Name("subjectID") val subjectID: ByteArray,
+        @param:Name("data") val signature: ByteArray
 ) {
     fun toEifSignature(signedData: ByteArray) = EifSignature(
             encodeSignatureWithV(signedData, Signature(subjectID, signature)),

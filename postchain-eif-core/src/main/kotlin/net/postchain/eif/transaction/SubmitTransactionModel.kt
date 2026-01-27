@@ -34,34 +34,34 @@ enum class RellTransactionStatus {
 }
 
 open class EvmSubmitTxRellRequest(
-        @Name("row_id")
+        @param:Name("row_id")
         val rowId: Long,
         @Name("contract_address")
         contractAddress: String,
-        @Name("function_name")
+        @param:Name("function_name")
         val functionName: String,
-        @Name("parameter_types")
+        @param:Name("parameter_types")
         val parameterTypes: List<String>,
-        @Name("parameter_values")
+        @param:Name("parameter_values")
         val parameterValues: List<Gtv>,
-        @Name("network_id")
+        @param:Name("network_id")
         val networkId: Long,
-        @Name("max_priority_fee_per_gas")
+        @param:Name("max_priority_fee_per_gas")
         var maxPriorityFeePerGas: BigInteger,
-        @Name("max_fee_per_gas")
+        @param:Name("max_fee_per_gas")
         var maxFeePerGas: BigInteger,
-        @Name("sender")
+        @param:Name("sender")
         val sender: ByteArray,
-        @Name("created")
+        @param:Name("created")
         val created: Long,
         @Nullable
         @Name("tx_hash")
         txHash: String?,
-        @Nullable
-        @Name("status")
+        @param:Nullable
+        @param:Name("status")
         val status: RellTransactionStatus?,
-        @Nullable
-        @Name("processed_by")
+        @param:Nullable
+        @param:Name("processed_by")
         val processedBy: ByteArray?,
 ) {
     val contractAddress: String = contractAddress.normalizeContractAddress()

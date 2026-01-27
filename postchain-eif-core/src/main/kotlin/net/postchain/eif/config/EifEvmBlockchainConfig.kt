@@ -7,34 +7,34 @@ import net.postchain.gtv.mapper.Name
 import net.postchain.gtv.mapper.RawGtv
 
 data class EifEvmBlockchainConfig(
-        @RawGtv
+        @param:RawGtv
         val rawGtv: Gtv,
-        @Name("network_id")
+        @param:Name("network_id")
         val networkId: Long,
-        @Name("contracts")
+        @param:Name("contracts")
         private val _contracts: List<String>?,
-        @Name("events")
+        @param:Name("events")
         val events: Gtv,
-        @Name("skip_to_height")
-        @DefaultValue(defaultLong = 0)
+        @param:Name("skip_to_height")
+        @param:DefaultValue(defaultLong = 0)
         val skipToHeight: Long,
-        @Name("evm_read_offset")
-        @DefaultValue(defaultLong = 100)
+        @param:Name("evm_read_offset")
+        @param:DefaultValue(defaultLong = 100)
         val evmReadOffset: Long,
-        @Name("read_offset")
-        @DefaultValue(defaultLong = 2)
+        @param:Name("read_offset")
+        @param:DefaultValue(defaultLong = 2)
         val readOffset: Long,
-        @Name("contracts_to_fetch")
+        @param:Name("contracts_to_fetch")
         val contractsToFetch: List<EifEvmContractConfig>?,
 ) {
     val contracts get() = _contracts?.map { parseEvmAddress(it) }
 }
 
 data class EifEvmContractConfig(
-        @Name("address")
+        @param:Name("address")
         private val _address: String,
-        @Name("skip_to_height")
-        @DefaultValue(defaultLong = 0)
+        @param:Name("skip_to_height")
+        @param:DefaultValue(defaultLong = 0)
         val skipToHeight: Long,
 ) {
     val address get() = parseEvmAddress(_address)

@@ -4,17 +4,17 @@ import net.postchain.gtv.mapper.DefaultValue
 import net.postchain.gtv.mapper.Name
 
 data class EvmSignerUpdate(
-        @Name("rowid")
+        @param:Name("rowid")
         val rowId: Long,
-        @Name("serial")
+        @param:Name("serial")
         val serial: Long,
-        @Name("blockchain_rid")
+        @param:Name("blockchain_rid")
         val blockchainRid: ByteArray,
-        @Name("signers")
+        @param:Name("signers")
         val signers: ByteArray,
-        @Name("confirmed_in_directory_at_height")
+        @param:Name("confirmed_in_directory_at_height")
         val confirmedInDirectoryAtHeight: Long,
-        @Name("historical")
-        @DefaultValue(defaultBoolean = false)
+        @param:Name("historical")
+        @param:DefaultValue(defaultBoolean = false)
         val historical: Boolean
 )

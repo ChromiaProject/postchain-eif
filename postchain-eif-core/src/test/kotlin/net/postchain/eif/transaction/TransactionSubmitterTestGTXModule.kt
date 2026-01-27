@@ -128,7 +128,7 @@ open class TransactionSubmitterTestGTXModule(
                     var transaction = conf.transactions.first { it.rowId == args["row_id"]!!.asInteger() }
                     // GtvObjectMapper.toGtvDictionary() do not support mapping inherited attributes, convert class if necessary
                     if (transaction is EvmSubmitTxRequest) {
-                        transaction = (transaction as EvmSubmitTxRequest).toRell()
+                        transaction = transaction.toRell()
                     }
                     GtvObjectMapper.toGtvDictionary(transaction)
                 },

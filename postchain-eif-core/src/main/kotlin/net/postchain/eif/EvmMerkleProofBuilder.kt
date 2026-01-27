@@ -92,31 +92,31 @@ class EvmMerkleProofBuilder(
 
 @Suppress("ArrayInDataClass")
 data class EvmMerkleProof(
-        @Name("data") val data: ByteArray,
-        @Name("blockHeader") val blockHeader: ByteArray,
-        @Name("blockWitness") val blockWitness: List<EifSignature>,
-        @Name("proof") val proof: Proof,
-        @Name("extraMerkleProof") val extraMerkleProof: ExtraMerkleProof
+        @param:Name("data") val data: ByteArray,
+        @param:Name("blockHeader") val blockHeader: ByteArray,
+        @param:Name("blockWitness") val blockWitness: List<EifSignature>,
+        @param:Name("proof") val proof: Proof,
+        @param:Name("extraMerkleProof") val extraMerkleProof: ExtraMerkleProof
 )
 
 @Suppress("ArrayInDataClass")
 data class Proof(
-        @Name("leaf") val leaf: ByteArray,
-        @Name("position") val position: Long,
-        @Name("merkleProofs") val merkleProofs: List<ByteArray>
+        @param:Name("leaf") val leaf: ByteArray,
+        @param:Name("position") val position: Long,
+        @param:Name("merkleProofs") val merkleProofs: List<ByteArray>
 )
 
 @Suppress("ArrayInDataClass")
 data class ExtraMerkleProof(
-        @Name("leaf") val leaf: ByteArray,
-        @Name("hashedLeaf") val hashedLeaf: ByteArray,
-        @Name("position") val position: Long,
-        @Name("extraRoot") val extraRoot: ByteArray,
-        @Name("extraMerkleProofs") val extraMerkleProofs: List<ByteArray>
+        @param:Name("leaf") val leaf: ByteArray,
+        @param:Name("hashedLeaf") val hashedLeaf: ByteArray,
+        @param:Name("position") val position: Long,
+        @param:Name("extraRoot") val extraRoot: ByteArray,
+        @param:Name("extraMerkleProofs") val extraMerkleProofs: List<ByteArray>
 )
 
 @Suppress("ArrayInDataClass")
 data class EifSignature(
-        @Name("sig") val sig: ByteArray,
-        @Name("pubkey") val pubkey: ByteArray
+        @param:Name("sig") val sig: ByteArray,
+        @param:Name("pubkey") val pubkey: ByteArray
 )

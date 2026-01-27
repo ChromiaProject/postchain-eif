@@ -266,11 +266,11 @@ fun isNetworkSupportedOnNode(config: Config, ctx: EContext, args: Gtv): Gtv {
 
 @Suppress("ArrayInDataClass")
 data class AccountStateMerkleProof(
-        @Name("stateData") val stateData: ByteArray,
-        @Name("blockHeader") val blockHeader: ByteArray,
-        @Name("blockWitness") @Nullable val blockWitness: List<EifSignature>?,
-        @Name("stateProof") @Nullable val stateProof: Proof?,
-        @Name("extraMerkleProof") val extraMerkleProof: ExtraMerkleProof?
+        @param:Name("stateData") val stateData: ByteArray,
+        @param:Name("blockHeader") val blockHeader: ByteArray,
+        @param:Name("blockWitness") @param:Nullable val blockWitness: List<EifSignature>?,
+        @param:Name("stateProof") @param:Nullable val stateProof: Proof?,
+        @param:Name("extraMerkleProof") val extraMerkleProof: ExtraMerkleProof?
 ) {
     companion object {
         // For compatibility (keep names of the fields)
@@ -286,11 +286,11 @@ data class AccountStateMerkleProof(
 
 @Suppress("ArrayInDataClass")
 data class EventMerkleProof(
-        @Name("eventData") val eventData: ByteArray,
-        @Name("blockHeader") val blockHeader: ByteArray,
-        @Name("blockWitness") @Nullable val blockWitness: List<EifSignature>?,
-        @Name("eventProof") @Nullable val eventProof: Proof?,
-        @Name("extraMerkleProof") val extraMerkleProof: ExtraMerkleProof?
+        @param:Name("eventData") val eventData: ByteArray,
+        @param:Name("blockHeader") val blockHeader: ByteArray,
+        @param:Name("blockWitness") @param:Nullable val blockWitness: List<EifSignature>?,
+        @param:Name("eventProof") @param:Nullable val eventProof: Proof?,
+        @param:Name("extraMerkleProof") val extraMerkleProof: ExtraMerkleProof?
 ) {
     companion object {
         // For compatibility (keep names of the fields)
