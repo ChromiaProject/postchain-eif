@@ -64,6 +64,8 @@ blockchains:
               bc-rid: x"335C75E08AFAC7D6678263F1A13D5AFED9CD009344B6349107D7CEEA3A40EA08" # Token chain
             - topic: "L_eif_event_receiver_dynamic_remove"
               bc-rid: x"335C75E08AFAC7D6678263F1A13D5AFED9CD009344B6349107D7CEEA3A40EA08" # Token chain
+            - topic: "L_eif_event_receiver_pause"
+              bc-rid: x"335C75E08AFAC7D6678263F1A13D5AFED9CD009344B6349107D7CEEA3A40EA08" # Token chain
     moduleArgs:
       chain_version: *chain_version
       lib.eif_event_receiver.dynamic_icmf_config:

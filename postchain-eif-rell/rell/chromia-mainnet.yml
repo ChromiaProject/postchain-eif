@@ -76,6 +76,10 @@ blockchains:
           directory-chain:
             topics:
               - "L_blockchain_rid_topic"
+          local:
+            # Token chain adds this topic automatically at first deploy but is needed for here since it was deployed before this functionality was added.
+            - topic: "L_eif_event_receiver_pause"
+              bc-rid: x"8035EBF322D0057B00E1D596431A78D535DB45035FAF2045B76942034C0FC507" # Token chain
     moduleArgs:
       chain_version: *chain_version
       lib.eif_event_receiver.dynamic_icmf_config:
