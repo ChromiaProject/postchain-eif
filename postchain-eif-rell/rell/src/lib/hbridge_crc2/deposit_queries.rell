@@ -74,3 +74,94 @@ query get_token_deposit_by_evm_tx_hash(evm_tx_hash: byte_array, evm_log_index: b
     if (deposit == null) return null;
     return map_deposit(deposit);
 }
+
+
+// Bounced deposit queries
+
+/**
+ * Retrieves bounced token deposits based on a given filter, with pagination options.
+ *
+ * @param filter The filter applied to the bounced deposit search. See [bounced_deposit_filter] structure.
+ * @param page_size The number of records to return per page. Limited by the maximum page size defined in the chain configuration.
+ * @param page_cursor A cursor for pagination. If not specified, the first page will be returned.
+ * @param sort_desc Controls the sorting order of results. If true, results are sorted in descending order by `rowid` (newest first). Defaults to false.
+ * @return A `ft4.utils.paged_result` containing the filtered results and pagination data.
+ */
+query get_bounced_token_deposits(filter: bounced_deposit_filter, page_size: integer? = null, page_cursor: text? = null, sort_desc: boolean = false): ft4.utils.paged_result {
+    val before_rowid = ft4.utils.before_rowid(page_cursor);
+
+    val paginated_result = bounced_token_deposit @* {
+        filter.network_id == null or .token_withdrawal.network_id == filter.network_id,
+        filter.contract_address == null or .token_withdrawal.contract_address == filter.contract_address,
+        filter.sender_address == null or .sender_address == filter.sender_address,
+        filter.evm_tx_hash == null or .evm_tx_hash == filter.evm_tx_hash,
+        filter.evm_log_index == null or .evm_log_index == filter.evm_log_index,
+        filter.from == null or .token_withdrawal.transaction.block.timestamp >= filter.from,
+        filter.to == null or .token_withdrawal.transaction.block.timestamp < filter.to,
+        if (sort_desc)
+            .rowid < (before_rowid ?: rowid(integer.MAX_VALUE))
+        else
+            .rowid > (before_rowid ?: rowid(0))
+    } (
+        @omit @sort_desc if (sort_desc) $.rowid else rowid(0),
+        ft4.utils.pagination_result(
+            data = map_bounced_deposit($.to_struct()).to_gtv_pretty(),
+            rowid = $.rowid
+        )
+    ) limit ft4.utils.fetch_data_size(page_size);
+
+    return ft4.utils.make_page(paginated_result, page_size);
+}
+
+/**
+ * Retrieves bounced token deposits by sender address.
+ *
+ * API version: 21
+ *
+ * @param sender_address The EVM sender address.
+ * @param page_size The number of records to return per page.
+ * @param page_cursor A cursor for pagination.
+ * @param sort_desc Controls the sorting order of results.
+ * @return A `ft4.utils.paged_result` containing the bounced deposits for the given sender.
+ */
+query get_bounced_token_deposits_by_sender(sender_address: byte_array, page_size: integer? = null, page_cursor: text? = null, sort_desc: boolean = false): ft4.utils.paged_result {
+    return get_bounced_token_deposits(
+        bounced_deposit_filter(sender_address = sender_address),
+        page_size,
+        page_cursor,
+        sort_desc
+    );
+}
+
+/**
+ * Retrieves bounced token deposits by network ID and contract address.
+ *
+ * API version: 21
+ *
+ * @param network_id The EVM network ID.
+ * @param contract_address The EVM contract address.
+ * @param page_size The number of records to return per page.
+ * @param page_cursor A cursor for pagination.
+ * @param sort_desc Controls the sorting order of results.
+ * @return A `ft4.utils.paged_result` containing the bounced deposits for the given network and contract.
+ */
+query get_bounced_token_deposits_by_token(network_id: integer, contract_address: byte_array, page_size: integer? = null, page_cursor: text? = null, sort_desc: boolean = false): ft4.utils.paged_result {
+    return get_bounced_token_deposits(
+        bounced_deposit_filter(network_id = network_id, contract_address = contract_address),
+        page_size,
+        page_cursor,
+        sort_desc
+    );
+}
+
+/**
+ * Retrieves a bounced token deposit by EVM transaction hash.
+ *
+ * API version: 21
+ *
+ * @param evm_tx_hash The EVM transaction hash.
+ * @param evm_log_index The EVM log index (defaults to 0).
+ * @return An optional bounced_token_deposit_info if found, null otherwise.
+ */
+query get_bounced_token_deposit_by_tx_hash(evm_tx_hash: byte_array, evm_log_index: big_integer = 0L): bounced_token_deposit_info? =
+    bounced_token_deposit @? { evm_tx_hash, evm_log_index } ( map_bounced_deposit($.to_struct()) );

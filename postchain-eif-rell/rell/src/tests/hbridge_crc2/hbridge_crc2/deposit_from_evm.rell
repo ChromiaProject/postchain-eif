@@ -1,20 +1,149 @@
 function test_deposit_bounce_on_no_collection() {
     val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
-    deposit_from_evm(evm_address, FOO.token_address, [123L], [1L], 721L);
-    assert_withdraw(1, evm_address, FOO.token_address, [hbridge_crc2.token_amount(token_id = 123L, amount = 1L)], 721, 1, network_id1, contract_address);
+    val (tnx_hash, log_index) = deposit_from_evm(
+        evm_address,
+        FOO.token_address,
+        [123L],
+        [1L],
+        721L
+    );
+    assert_withdraw(
+        1,
+        evm_address,
+        FOO.token_address,
+        [hbridge_crc2.token_amount(token_id = 123L, amount = 1L)],
+        721,
+        1,
+        network_id1,
+        contract_address
+    );
+
+    // Verify bounced deposit
+    assert_bounced_queries(evm_address, tnx_hash, log_index, "Collection not registered");
 }
 
 function test_deposit_bounce_on_no_account() {
     val evm_collection = register_collection();
     val evm_address = crypto.eth_pubkey_to_address(rell.test.keypairs.alice.pub);
-    deposit_from_evm(evm_address, FOO.token_address, [123L], [1L], 721L);
-    assert_withdraw(1, evm_address, FOO.token_address, [hbridge_crc2.token_amount(token_id = 123L, amount = 1L)], 721, 1, network_id1, contract_address);
+    val (tnx_hash, log_index) = deposit_from_evm(
+        evm_address,
+        FOO.token_address,
+        [123L],
+        [1L],
+        721L
+    );
+    assert_withdraw(
+        1,
+        evm_address,
+        FOO.token_address,
+        [hbridge_crc2.token_amount(token_id = 123L, amount = 1L)],
+        721,
+        1,
+        network_id1,
+        contract_address
+    );
+
+    // Verify bounced deposit
+    assert_bounced_queries(evm_address, tnx_hash, log_index, "No FT4 account found");
+}
+
+function test_deposit_bounce_on_no_consent_link() {
+    val evm_collection = register_collection();
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.keypairs.alice.pub);
+
+    // Create FT4 account but don't link
+    val (ft_account, _) = create_ft4_account(rell.test.keypairs.alice.pub);
+    val account_id = ft_account.id;
+
+    // Deposit from smart contract (non-zero recipient_id) without linking
+    val (tnx_hash, log_index) = deposit_from_evm(
+        evm_address,
+        FOO.token_address,
+        [123L],
+        [1L],
+        721L,
+        account_id = account_id
+    );
+    assert_withdraw(
+        1,
+        evm_address,
+        FOO.token_address,
+        [hbridge_crc2.token_amount(token_id = 123L, amount = 1L)],
+        721,
+        1,
+        network_id1,
+        contract_address
+    );
+
+    // Verify bounced deposit
+    val bounced = hbridge_crc2.get_bounced_token_deposits(hbridge_crc2.bounced_deposit_filter());
+    assert_equals(bounced.data.size(), 1);
+    assert_bounced_at(bounced, 0, [hbridge_crc2.token_amount(token_id = 123L, amount = 1L)], "Sender EVM account not linked to recipient FT4 account");
+}
+
+function test_deposit_bounce_erc1155_invalid_amount() {
+    val evm_collection = register_collection(BAR);
+    val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
+
+    // Deposit with amount = 0 (invalid)
+    val (tnx_hash, log_index) = deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        [123L],
+        [0L],
+        1155L
+    );
+
+    // All tokens bounced, deposit should be recalled
+    assert_equals(hbridge_crc2.token_deposit @ { .state == hbridge_crc2.deposit_state.recalled } (@sum 1), 1);
+
+    // Verify bounced deposit reason
+    val bounced = hbridge_crc2.get_bounced_token_deposits(hbridge_crc2.bounced_deposit_filter());
+    assert_equals(bounced.data.size(), 1);
+    assert_bounced_at(bounced, 0, [hbridge_crc2.token_amount(token_id = 123L, amount = 0L)], "Invalid tokens: amount <= 0 or insufficient bridge balance");
+}
+
+function test_deposit_partial_bounce_erc1155_mixed_amounts() {
+    val evm_collection = register_collection(BAR);
+    val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
+
+    // Deposit with mixed valid/invalid amounts
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        [100L, 200L, 300L],
+        [5L, 0L, 3L],
+        1155L
+    );
+
+    // Valid tokens deposited
+    val token100 = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, 100L);
+    assert_not_null(token100);
+    assert_equals(crc2._get_account_balance(account, token100), 5L);
+
+    val token300 = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, 300L);
+    assert_not_null(token300);
+    assert_equals(crc2._get_account_balance(account, token300), 3L);
+
+    // Invalid token bounced
+    val bounced = hbridge_crc2.get_bounced_token_deposits(hbridge_crc2.bounced_deposit_filter());
+    assert_equals(bounced.data.size(), 1);
+    assert_bounced_at(bounced, 0, [hbridge_crc2.token_amount(token_id = 200L, amount = 0L)], "Invalid tokens: amount <= 0 or insufficient bridge balance");
+
+    // Completed deposit also created
+    assert_equals(hbridge_crc2.token_deposit @ { .state == hbridge_crc2.deposit_state.completed } (@sum 1), 1);
 }
 
 function test_deposit_erc721() {
     val evm_collection = register_collection();
     val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
-    deposit_from_evm(evm_address, evm_collection.contract_address, [123L], [1L], 721L);
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        [123L],
+        [1L],
+        721L
+    );
     val token = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, 123L);
     assert_not_null(token);
     assert_equals(crc2._get_account_balance(account, token), 1L);
@@ -25,7 +154,13 @@ function test_deposit_erc721_many() {
     val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
     val token_ids = [100L, 200L, 300L, 400L, 500L];
     val token_amounts = [1L, 1L, 1L, 1L, 1L];
-    deposit_from_evm(evm_address, evm_collection.contract_address, token_ids, token_amounts, 721L);
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        token_ids,
+        token_amounts,
+        721L
+    );
     for (token_id in token_ids) {
         val token = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, token_id);
         assert_not_null(token);
@@ -36,7 +171,13 @@ function test_deposit_erc721_many() {
 function test_deposit_erc1155() {
     val evm_collection = register_collection(BAR);
     val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
-    deposit_from_evm(evm_address, evm_collection.contract_address, [123L], [5L], 1155L);
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        [123L],
+        [5L],
+        1155L
+    );
     val token = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, 123L);
     assert_not_null(token);
     assert_equals(crc2._get_account_balance(account, token), 5L);
@@ -47,7 +188,13 @@ function test_deposit_erc1155_many() {
     val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
     val token_ids = [100L, 200L, 300L, 400L, 500L];
     val token_amounts = [1L, 2L, 3L, 4L, 5L];
-    deposit_from_evm(evm_address, evm_collection.contract_address, token_ids, token_amounts, 1155L);
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        token_ids,
+        token_amounts,
+        1155L
+    );
     for (token_id in token_ids) {
         val token = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, token_id);
         assert_not_null(token);
@@ -60,7 +207,13 @@ function test_deposit_erc1155_many_with_no_amounts() {
     val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
     val token_ids = [100L, 200L, 300L, 400L, 500L];
     val token_amounts: list<big_integer> = [];
-    deposit_from_evm(evm_address, evm_collection.contract_address, token_ids, token_amounts, 1155L);
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        token_ids,
+        token_amounts,
+        1155L
+    );
     for (token_id in token_ids) {
         val token = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, token_id);
         assert_null(token);
@@ -72,7 +225,13 @@ function test_deposit_erc1155_many_with_missing_amounts() {
     val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
     val token_ids = [100L, 200L, 300L, 400L, 500L];
     val token_amounts = [1L, 2L, 3L];
-    deposit_from_evm(evm_address, evm_collection.contract_address, token_ids, token_amounts, 1155L);
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        token_ids,
+        token_amounts,
+        1155L
+    );
     for (i in range(3)) {
         val token = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, token_ids[i]);
         assert_not_null(token);
@@ -89,7 +248,13 @@ function test_deposit_erc721_many_with_missing_amounts() {
     val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
     val token_ids = [100L, 200L, 300L, 400L, 500L];
     val token_amounts: list<big_integer> = [];
-    deposit_from_evm(evm_address, evm_collection.contract_address, token_ids, token_amounts, 721L);
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        token_ids,
+        token_amounts,
+        721L
+    );
     for (token_id in token_ids) {
         val token = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, token_id);
         assert_not_null(token);
@@ -102,7 +267,13 @@ function test_deposit_with_invalid_protocol_id() {
     val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
     val token_ids = [100L, 200L, 300L, 400L, 500L];
     val token_amounts: list<big_integer> = [1L, 2L, 3L, 4L, 5L];
-    deposit_from_evm(evm_address, evm_collection.contract_address, token_ids, token_amounts, 123L);
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        token_ids,
+        token_amounts,
+        123L
+    );
     for (token_id in token_ids) {
         val token = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, token_id);
         assert_null(token);
@@ -114,7 +285,15 @@ function test_duplicate_deposit_with_same_tx_hash_and_log_index_is_ignored() {
     val (account, evm_address) = register_evm_account(rell.test.keypairs.alice);
 
     // First deposit with log_index = 5
-    deposit_from_evm(evm_address, evm_collection.contract_address, [100L], [1L], 721L, block_height = 1, log_index = 5);
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        [100L],
+        [1L],
+        721L,
+        block_height = 1,
+        log_index = 5
+    );
     val token1 = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, 100L);
     assert_not_null(token1);
     assert_equals(crc2._get_account_balance(account, token1), 1L);
@@ -123,20 +302,45 @@ function test_duplicate_deposit_with_same_tx_hash_and_log_index_is_ignored() {
     assert_equals(hbridge_crc2.token_deposit @ {} .evm_log_index, 5L);
 
     // Duplicate deposit with same tx_hash and log_index should be ignored (not bounced)
-    deposit_from_evm(evm_address, evm_collection.contract_address, [200L], [1L], 721L, block_height = 1, log_index = 5);
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        [200L],
+        [1L],
+        721L,
+        block_height = 1,
+        log_index = 5
+    );
     val token2 = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, 200L);
     assert_null(token2); // Token should not be created
     assert_equals(hbridge_crc2.token_deposit @ {} (@sum 1), 1); // Still only 1 deposit
+    assert_equals(hbridge_crc2.bounced_token_deposit @ {} (@sum 1), 0); // No bounced
 
     // Deposit with same tx_hash but different log_index should succeed
-    deposit_from_evm(evm_address, evm_collection.contract_address, [300L], [1L], 721L, block_height = 1, log_index = 0);
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        [300L],
+        [1L],
+        721L,
+        block_height = 1,
+        log_index = 0
+    );
     val token3 = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, 300L);
     assert_not_null(token3);
     assert_equals(crc2._get_account_balance(account, token3), 1L);
     assert_equals(hbridge_crc2.token_deposit @ {} (@sum 1), 2);
 
     // Deposit with different tx_hash should succeed
-    deposit_from_evm(evm_address, evm_collection.contract_address, [400L], [1L], 721L, block_height = 2, log_index = 0);
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        [400L],
+        [1L],
+        721L,
+        block_height = 2,
+        log_index = 0
+    );
     val token4 = crc2.evm._get_token_by_evm_token(evm_collection.network_id, evm_collection.contract_address, 400L);
     assert_not_null(token4);
     assert_equals(crc2._get_account_balance(account, token4), 1L);
@@ -149,21 +353,186 @@ function test_bounced_deposit_blocks_subsequent_deposits_from_same_evm_tx_and_lo
     val evm_address = crypto.eth_pubkey_to_address(rell.test.keypairs.alice.pub);
 
     // First deposit - will be bounced because no account exists
-    deposit_from_evm(evm_address, evm_collection.contract_address, [100L], [1L], 721L, block_height = 1);
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        [100L],
+        [1L],
+        721L,
+        block_height = 1
+    );
     // Verify it was bounced (state = recalled)
     assert_equals(hbridge_crc2.token_deposit @ {} (@sum 1), 1);
     assert_equals(hbridge_crc2.token_deposit @ { .state == hbridge_crc2.deposit_state.recalled } (@sum 1), 1);
     assert_equals(hbridge_crc2.token_withdrawal @ {} (@sum 1), 1);
+    assert_equals(hbridge_crc2.bounced_token_deposit @ {} (@sum 1), 1);
 
     // Second deposit from same EVM tx and log_index should be ignored
-    deposit_from_evm(evm_address, evm_collection.contract_address, [200L], [1L], 721L, block_height = 1);
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        [200L],
+        [1L],
+        721L,
+        block_height = 1
+    );
     // Still only 1 deposit (second one was ignored)
     assert_equals(hbridge_crc2.token_deposit @ {} (@sum 1), 1);
     assert_equals(hbridge_crc2.token_withdrawal @ {} (@sum 1), 1);
+    assert_equals(hbridge_crc2.bounced_token_deposit @ {} (@sum 1), 1);
 
     // Deposit from different EVM tx should be bounced (creates new entry)
-    deposit_from_evm(evm_address, evm_collection.contract_address, [300L], [1L], 721L, block_height = 2);
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        [300L],
+        [1L],
+        721L,
+        block_height = 2
+    );
     assert_equals(hbridge_crc2.token_deposit @ {} (@sum 1), 2);
     assert_equals(hbridge_crc2.token_deposit @ { .state == hbridge_crc2.deposit_state.recalled } (@sum 1), 2);
     assert_equals(hbridge_crc2.token_withdrawal @ {} (@sum 1), 2);
+    assert_equals(hbridge_crc2.bounced_token_deposit @ {} (@sum 1), 2);
+}
+
+function test_bounced_deposit_no_collection_blocks_duplicate() {
+    // No collection registered, no account - bounce happens before token_deposit is created
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.keypairs.alice.pub);
+
+    // First deposit bounced (collection not registered)
+    deposit_from_evm(
+        evm_address,
+        FOO.token_address,
+        [100L],
+        [1L],
+        721L,
+        block_height = 1,
+        log_index = 0L
+    );
+    assert_equals(hbridge_crc2.token_deposit @ {} (@sum 1), 0); // No token_deposit created
+    assert_equals(hbridge_crc2.bounced_token_deposit @ {} (@sum 1), 1);
+
+    // Second attempt with same tx/log_index ignored via bounced_token_deposit check
+    deposit_from_evm(
+        evm_address,
+        FOO.token_address,
+        [100L],
+        [1L],
+        721L,
+        block_height = 1,
+        log_index = 0L
+    );
+    assert_equals(hbridge_crc2.bounced_token_deposit @ {} (@sum 1), 1); // Still only 1
+}
+
+function test_get_bounced_token_deposits_multiple() {
+    val evm_collection = register_collection(FOO);
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.keypairs.alice.pub);
+
+    // Multiple bounced deposits (no account)
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        [10L],
+        [1L],
+        721L,
+        block_height = 1
+    );
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        [20L],
+        [1L],
+        721L,
+        block_height = 2
+    );
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        [30L],
+        [1L],
+        721L,
+        block_height = 3
+    );
+
+    val result = hbridge_crc2.get_bounced_token_deposits(
+        hbridge_crc2.bounced_deposit_filter(network_id = network_id1, contract_address = evm_collection.contract_address),
+        page_size = 10,
+        sort_desc = true
+    );
+    assert_equals(result.data.size(), 3);
+
+    // Descending order: newest first (30, 20, 10)
+    assert_bounced_at(result, 0, [hbridge_crc2.token_amount(token_id = 30L, amount = 1L)], "No FT4 account found");
+    assert_bounced_at(result, 1, [hbridge_crc2.token_amount(token_id = 20L, amount = 1L)], "No FT4 account found");
+    assert_bounced_at(result, 2, [hbridge_crc2.token_amount(token_id = 10L, amount = 1L)], "No FT4 account found");
+}
+
+function test_get_bounced_token_deposits_from_to_filter() {
+    val evm_collection = register_collection(FOO);
+    val evm_address = crypto.eth_pubkey_to_address(rell.test.keypairs.alice.pub);
+
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        [10L],
+        [1L],
+        721L,
+        block_height = 1
+    );
+    val t0 = rell.test.last_block_time;
+
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        [11L],
+        [1L],
+        721L,
+        block_height = 2
+    );
+    val t1 = rell.test.last_block_time;
+
+    deposit_from_evm(
+        evm_address,
+        evm_collection.contract_address,
+        [12L],
+        [1L],
+        721L,
+        block_height = 3
+    );
+    val t2 = rell.test.last_block_time;
+
+    // Test from/to range: [t0, t1) should return 1 deposit
+    val res1 = hbridge_crc2.get_bounced_token_deposits(hbridge_crc2.bounced_deposit_filter(from = t0, to = t1));
+    assert_equals(res1.data.size(), 1);
+    assert_bounced_at(res1, 0, [hbridge_crc2.token_amount(token_id = 10L, amount = 1L)]);
+
+    // Test from only: [t1, ) should return 2 deposits
+    val res2 = hbridge_crc2.get_bounced_token_deposits(hbridge_crc2.bounced_deposit_filter(from = t1));
+    assert_equals(res2.data.size(), 2);
+    assert_bounced_at(res2, 0, [hbridge_crc2.token_amount(token_id = 11L, amount = 1L)]);
+    assert_bounced_at(res2, 1, [hbridge_crc2.token_amount(token_id = 12L, amount = 1L)]);
+
+    // Test to only: [, t1) should return 1 deposit
+    val res3 = hbridge_crc2.get_bounced_token_deposits(hbridge_crc2.bounced_deposit_filter(to = t1));
+    assert_equals(res3.data.size(), 1);
+    assert_bounced_at(res3, 0, [hbridge_crc2.token_amount(token_id = 10L, amount = 1L)]);
+
+    // Test from/to range: [t0, t2) should return 2 deposits
+    val res4 = hbridge_crc2.get_bounced_token_deposits(hbridge_crc2.bounced_deposit_filter(from = t0, to = t2));
+    assert_equals(res4.data.size(), 2);
+    assert_bounced_at(res4, 0, [hbridge_crc2.token_amount(token_id = 10L, amount = 1L)]);
+    assert_bounced_at(res4, 1, [hbridge_crc2.token_amount(token_id = 11L, amount = 1L)]);
+
+    // Test from/to range: [t1, t2) should return 1 deposit
+    val res5 = hbridge_crc2.get_bounced_token_deposits(hbridge_crc2.bounced_deposit_filter(from = t1, to = t2));
+    assert_equals(res5.data.size(), 1);
+    assert_bounced_at(res5, 0, [hbridge_crc2.token_amount(token_id = 11L, amount = 1L)]);
+
+    // Test from/to range in descending order: [t0, t2) should return 2 deposits
+    val res6 = hbridge_crc2.get_bounced_token_deposits(hbridge_crc2.bounced_deposit_filter(from = t0, to = t2), sort_desc = true);
+    assert_equals(res6.data.size(), 2);
+    assert_bounced_at(res6, 0, [hbridge_crc2.token_amount(token_id = 11L, amount = 1L)]);
+    assert_bounced_at(res6, 1, [hbridge_crc2.token_amount(token_id = 10L, amount = 1L)]);
 }

@@ -1,0 +1,39 @@
+function assert_bounced_queries(
+    evm_address: byte_array,
+    tnx_hash: byte_array,
+    log_index: big_integer,
+    expected_reason: text,
+    network_id: integer = network_id1,
+    contract_address: byte_array = FOO.token_address
+) {
+    val sender_page = hbridge_crc2.get_bounced_token_deposits_by_sender(evm_address);
+    assert_equals(sender_page.data.size(), 1);
+    val bounced_by_sender = hbridge_crc2.bounced_token_deposit_info.from_gtv_pretty(sender_page.data[0]);
+    assert_equals(bounced_by_sender.reason, expected_reason);
+
+    val token_page = hbridge_crc2.get_bounced_token_deposits_by_token(network_id, contract_address);
+    assert_equals(token_page.data.size(), 1);
+    val bounced_by_token = hbridge_crc2.bounced_token_deposit_info.from_gtv_pretty(token_page.data[0]);
+    assert_equals(bounced_by_token.reason, expected_reason);
+
+    val bounced_by_tx = hbridge_crc2.get_bounced_token_deposit_by_tx_hash(tnx_hash, log_index);
+    assert_not_null(bounced_by_tx);
+    assert_equals(bounced_by_tx.reason, expected_reason);
+
+    // All queries return the same result
+    assert_equals(bounced_by_sender, bounced_by_token);
+    assert_equals(bounced_by_sender, bounced_by_tx);
+}
+
+function assert_bounced_at(
+    result: ft4_utils.paged_result,
+    idx: integer,
+    expected_tokens: list<hbridge_crc2.token_amount>,
+    expected_reason: text? = null
+) {
+    val bounced = hbridge_crc2.bounced_token_deposit_info.from_gtv_pretty(result.data[idx]);
+    assert_equals(bounced.withdrawal.tokens, expected_tokens);
+    if (expected_reason != null) {
+        assert_equals(bounced.reason, expected_reason);
+    }
+}
