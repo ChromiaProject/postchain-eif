@@ -24,3 +24,7 @@ target
 *.pid
 *.jar
 .flattened-pom.xml
+
+# Claude Code local files
+*CLAUDE.local*
+.claude/*.local.*

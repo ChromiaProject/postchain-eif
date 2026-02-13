@@ -1,4 +1,4 @@
-function emit_withdrawal_event(network_id: integer, contract_address: byte_array, protocol_id: big_integer, tokens: list<token_amount>, beneficiary: byte_array, bridge_address: byte_array) {
+function emit_withdrawal_event(network_id: integer, contract_address: byte_array, protocol_id: big_integer, tokens: list<token_amount>, beneficiary: byte_array, bridge_address: byte_array): token_withdrawal {
     val next_serial = common.event_counter.counter + 1;
     common.event_counter.counter = next_serial;
 
@@ -27,6 +27,8 @@ function emit_withdrawal_event(network_id: integer, contract_address: byte_array
 
     update_withdrawal_status(event_hash, withdrawal_status.created);
     op_context.emit_event("eif_event", event_gtv);
+
+    return withdrawal;
 }
 
 function pack_withdrawal_event(

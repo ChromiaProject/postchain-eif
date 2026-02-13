@@ -85,6 +85,10 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
         log("Deposit event ignored: duplicate event with tx_hash %s and log_index %d".format(event.evm_tx_hash, event.evm_log_index));
         return;
     }
+    if (exists(bounced_token_deposit @* { .evm_tx_hash == event.evm_tx_hash, .evm_log_index == event.evm_log_index })) {
+        log("Deposit event ignored: duplicate event with tx_hash %s and log_index %d (previously bounced)".format(event.evm_tx_hash, event.evm_log_index));
+        return;
+    }
 
     // Normally only smart contracts have non-zero recipient_id (beneficiary).
     // Given that it's just a flag which enable more complex account registration logic.
@@ -96,8 +100,8 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
     val evm_collection = evm.evm_collection @? { .network_id == network_id, .contract_address == event.contract_address };
 
     if (empty(evm_collection)) {
-        log("Deposit event bounced: EVM collection not found: %s".format(event.contract_address));
-        bounce_deposit_event(network_id, event.contract_address, event.protocol_id, event.tokens, event.sender, event.bridge_address);
+        log("Deposit event bounced: EVM collection not found: %s on network %s".format(event.contract_address, network_id));
+        bounce_deposit_event(network_id, event, event.tokens, "Collection not registered");
         return;
     }
 
@@ -106,9 +110,10 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
         ft4_account = ft4.accounts.account @? { .id == recipient_id };
 
         if (not empty(ft4_account)) {
-            // we require explicit link to avoid unwanted deposits
+            // We require explicit link to avoid unwanted deposits
             if (need_consent_on_deposit and empty(evm.core.evm_sc_account_link @? { event.sender, network_id, ft4_account })) {
-                bounce_deposit_event(network_id, event.contract_address, event.protocol_id, event.tokens, event.sender, event.bridge_address);
+                log("Deposit event bounced: EVM sender %s is not linked to recipient account %s on network %s".format(event.sender, ft4_account.id, network_id));
+                bounce_deposit_event(network_id, event, event.tokens, "Sender EVM account not linked to recipient FT4 account");
                 return;
             }
         }
@@ -131,8 +136,8 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
             evm_tx_hash = event.evm_tx_hash,
             evm_log_index = event.evm_log_index,
         );
-        bounce_deposit_event(network_id, event.contract_address, event.protocol_id, event.tokens, event.sender, event.bridge_address);
-        log("Deposit event bounced: no FT4 account found for deposit from sender %s".format(event.sender));
+        log("Deposit event bounced: No FT4 account found for deposit from sender %s on network %s".format(event.sender, network_id));
+        bounce_deposit_event(network_id, event, event.tokens, "No FT4 account found");
         return;
     }
 
@@ -141,8 +146,8 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
     for (token_amounts in event.tokens) {
         if (token_amounts.amount <= 0) {
             invalid_tokens.add(token_amounts);
-            log("Deposited token bounced: amount must be greater than 0: token id: %s, amount: %s, sender %s"
-                .format(token_amounts.token_id, token_amounts.amount, event.sender));
+            log("Deposited token bounced: Amount must be greater than 0: token id: %s, amount: %s, network %s, sender %s"
+                .format(token_amounts.token_id, token_amounts.amount, network_id, event.sender));
         }
     }
 
@@ -152,15 +157,15 @@ function process_deposit_token_event(network_id: integer, event: deposited_token
             val token = crc2.evm.ensure_evm_token(network_id, event.contract_address, token_amounts.token_id, evm_collection.token_type == evm.evm_token_type.erc721);
             if (crc2._get_account_balance(bridge_account, token) < token_amounts.amount) {
                 invalid_tokens.add(token_amounts);
-                log("Deposited token bounced: insufficient balance of token %s: CRC2 token %s, sender %s"
-                    .format(token.id, event.contract_address, event.sender));
+                log("Deposited token bounced: Insufficient balance of token %s: CRC2 token %s, network %s, sender %s"
+                    .format(token.id, event.contract_address, network_id, event.sender));
             }
         }
     }
     
     if (invalid_tokens.size() > 0) {
         valid_tokens.remove_all(invalid_tokens);
-        bounce_deposit_event(network_id, event.contract_address, event.protocol_id, invalid_tokens, event.sender, event.bridge_address);
+        bounce_deposit_event(network_id, event, invalid_tokens, "Invalid tokens: amount <= 0 or insufficient bridge balance");
     }
 
     if (valid_tokens.size() == 0) {
@@ -221,8 +226,16 @@ function process_withdrawal_to_postchain_event(network_id: integer, event: withd
 }
 
 // return deposit if we cannot credit it to the account
-function bounce_deposit_event(network_id: integer, contract_address: byte_array, protocol_id: big_integer, tokens: list<token_amount>, beneficiary: byte_array, bridge_address: byte_array) {
-    emit_withdrawal_event(network_id, contract_address, protocol_id, tokens, beneficiary, bridge_address);
+function bounce_deposit_event(network_id: integer, event: deposited_tokens_event, tokens: list<token_amount>, reason: text) {
+    val withdrawal = emit_withdrawal_event(network_id, event.contract_address, event.protocol_id, tokens, event.sender, event.bridge_address);
+    create bounced_token_deposit(
+        token_withdrawal = withdrawal,
+        sender_address = event.sender,
+        recipient_id = event.recipient_id,
+        evm_tx_hash = event.evm_tx_hash,
+        evm_log_index = event.evm_log_index,
+        reason = reason
+    );
 }
 
 function validate_bridge_contract(bridge_address: byte_array, evm_collection: evm.evm_collection): boolean {
