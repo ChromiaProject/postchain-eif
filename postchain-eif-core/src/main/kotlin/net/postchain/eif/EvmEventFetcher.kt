@@ -37,7 +37,7 @@ import java.math.BigInteger
 /**
  * Reads events from evm chain.
  *
- * @param evmReadOffset We will read this amount of blocks from the block head on the evm chain, to avoid issues with chain reorg
+ * @param evmReadOffset We will read this number of blocks from the block head on the evm chain, to avoid issues with chain reorg
  */
 class EvmEventFetcher(
         private val networkId: Long,
@@ -87,46 +87,11 @@ class EvmEventFetcher(
      */
     private suspend fun fetchEvents() {
         withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
-            val dynamicContracts = (if (hasLegacyDynamicContracts) {
-                try {
-                    blockchainEngine.getBlockQueries().query(
-                            EIF_CONFIG_CONTRACTS_QUERY, gtv(mapOf("network_id" to gtv(networkId)))).get().asArray()
-                            .map { it.asByteArray().wrap() to 0L }
-                } catch (e: Exception) {
-                    logger.warn(e) { "Unable to fetch legacy dynamic contracts with query $EIF_CONFIG_CONTRACTS_QUERY: $e" }
-                    listOf()
-                }
-            } else {
-                listOf()
-            }).union(if (hasDynamicContacts) {
-                try {
-                    blockchainEngine.getBlockQueries().query(
-                            EIF_CONFIG_CONTRACTS_TO_FETCH_QUERY, gtv(mapOf("network_id" to gtv(networkId)))).get().asArray()
-                            .map {
-                                it["address"]!!.asByteArray().wrap() to (it["skip_to_height"]?.asInteger() ?: 0L)
-                            }
-                } catch (e: Exception) {
-                    logger.warn(e) { "Unable to fetch dynamic contracts with query $EIF_CONFIG_CONTRACTS_TO_FETCH_QUERY: $e" }
-                    listOf()
-                }
-            } else {
-                listOf()
-            })
-            val contractsConfig = dynamicContracts.union(staticContracts)
-            val contracts = contractsConfig.mapNotNull { (address, configuredSkipToHeight) ->
-                val skipToHeight = if (configuredSkipToHeight == 0L) networkSkipToHeight else configuredSkipToHeight
-                if (configuredSkipToHeight < 0) {
-                    logger.warn { "skip-to-height for contract $address is negative, skipping it" }
-                    null
-                } else if (skipToHeight < networkSkipToHeight) {
-                    logger.warn { "skip-to-height for contract $address is lower than skip-to-height for EVM network: $networkId, skipping it" }
-                    null
-                } else {
-                    address to skipToHeight
-                }
-            }
-
+            // Contracts
+            val contractsConfig = fetchDynamicContractConfigs().union(staticContracts)
+            val contracts = resolveContractsSkipToHeight(contractsConfig)
             logger.debug { "Contracts: $contracts" }
+
             if (contracts.isEmpty()) {
                 logger.warn { "No contracts configured, trying again later" }
                 previousContracts = setOf()
@@ -160,18 +125,8 @@ class EvmEventFetcher(
                 return
             }
 
-            val eventMap = if (hasDynamicEvents) {
-                try {
-                    val dynamicEvents = blockchainEngine.getBlockQueries().query(
-                            EIF_CONFIG_EVENTS_QUERY, gtv(mapOf("network_id" to gtv(networkId)))).get().asArray().map(GtvToEventMapper::map)
-                    staticEvents.associateBy(EventEncoder::encode).toMutableMap().apply { putAll(dynamicEvents.associateBy(EventEncoder::encode)) }
-                } catch (e: Exception) {
-                    logger.warn(e) { "Unable to fetch dynamic events: $e" }
-                    staticEvents.associateBy(EventEncoder::encode)
-                }
-            } else {
-                staticEvents.associateBy(EventEncoder::encode)
-            }
+            // Events
+            val eventMap = fetchEventConfigs()
             logger.debug { "Events: ${eventMap.values.map { it.name }}" }
             if (eventMap.isEmpty()) {
                 logger.warn { "No events configured, trying again later" }
@@ -179,6 +134,7 @@ class EvmEventFetcher(
                 return
             }
 
+            // Fetch events
             val filter = EthFilter(
                     DefaultBlockParameter.valueOf(from),
                     DefaultBlockParameter.valueOf(to),
@@ -208,7 +164,7 @@ class EvmEventFetcher(
                     .map { eventBlockToOp(eventMap, it) }
             evmEventProcessor.processLogEventsAndUpdateOffsets(sortedEncodedLogs, to)
 
-            // If we just saw one new block we can probably sleep
+            // If we just saw one new block, we can probably sleep
             if (to == from) {
                 delay(delayWhenNoNewBlocks)
             }
@@ -218,6 +174,73 @@ class EvmEventFetcher(
                 delay(500)
             }
         }
+    }
+
+    private fun fetchDynamicContractConfigs(): Set<Pair<WrappedByteArray, Long>> {
+        val legacyDynamicContracts = if (hasLegacyDynamicContracts) {
+            try {
+                blockchainEngine.getBlockQueries().query(
+                        EIF_CONFIG_CONTRACTS_QUERY, gtv(mapOf("network_id" to gtv(networkId)))).get().asArray()
+                        .map { it.asByteArray().wrap() to 0L }
+            } catch (e: Exception) {
+                logger.warn(e) { "Unable to fetch legacy dynamic contracts with query $EIF_CONFIG_CONTRACTS_QUERY: $e" }
+                listOf()
+            }
+        } else {
+            listOf()
+        }
+
+        val dynamicContracts = if (hasDynamicContacts) {
+            try {
+                blockchainEngine.getBlockQueries().query(
+                        EIF_CONFIG_CONTRACTS_TO_FETCH_QUERY, gtv(mapOf("network_id" to gtv(networkId)))).get().asArray()
+                        .map {
+                            it["address"]!!.asByteArray().wrap() to (it["skip_to_height"]?.asInteger() ?: 0L)
+                        }
+            } catch (e: Exception) {
+                logger.warn(e) { "Unable to fetch dynamic contracts with query $EIF_CONFIG_CONTRACTS_TO_FETCH_QUERY: $e" }
+                listOf()
+            }
+        } else {
+            listOf()
+        }
+
+        return legacyDynamicContracts.union(dynamicContracts)
+    }
+
+    private fun resolveContractsSkipToHeight(contractsConfig: Set<Pair<WrappedByteArray, Long>>): List<Pair<WrappedByteArray, Long>> =
+            contractsConfig.mapNotNull { (address, contractSkipToHeight) ->
+                when {
+                    contractSkipToHeight < 0 -> {
+                        logger.warn { "skip-to-height for contract $address is negative, skipping it" }
+                        null
+                    }
+
+                    contractSkipToHeight == 0L -> address to networkSkipToHeight
+
+                    contractSkipToHeight < networkSkipToHeight -> {
+                        logger.warn { "skip-to-height for contract $address is lower than skip-to-height for EVM network: $networkId, skipping it" }
+                        null
+                    }
+
+                    else -> address to contractSkipToHeight
+                }
+            }
+
+    private fun fetchEventConfigs(): Map<String, Event> = if (hasDynamicEvents) {
+        try {
+            val dynamicEvents = blockchainEngine.getBlockQueries().query(
+                    EIF_CONFIG_EVENTS_QUERY, gtv(mapOf("network_id" to gtv(networkId)))
+            ).get().asArray().map(GtvToEventMapper::map)
+            staticEvents.associateBy(EventEncoder::encode).toMutableMap().apply {
+                putAll(dynamicEvents.associateBy(EventEncoder::encode))
+            }
+        } catch (e: Exception) {
+            logger.warn(e) { "Unable to fetch dynamic events: $e" }
+            staticEvents.associateBy(EventEncoder::encode)
+        }
+    } else {
+        staticEvents.associateBy(EventEncoder::encode)
     }
 
     private fun eventBlockToOp(eventMap: Map<String, Event>, eventBlock: Pair<EvmBlock, List<Log>>): EvmBlockOp {
