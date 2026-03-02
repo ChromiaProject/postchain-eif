@@ -50,17 +50,17 @@ class TransactionSubmitterSpecialTxExtensionTest {
 
         module = TransactionSubmitterTestGTXModule()
 
-        txExtension.init(module, 0, BlockchainRid.ZERO_RID, cryptoSystem)
         val blockQueries = mock<BlockQueries> {
             on { query(any(), any()) } doReturn CompletableFuture.completedStage(gtv(listOf()))
         }
         txExtension.setConfig(
-                updatedSigner.privKey.data,
+                cryptoSystem.buildSigMaker(KeyPair(updatedSigner.pubKey.data, updatedSigner.privKey.data)),
                 updatedSigner.pubKey.data,
                 { true },
                 true,
                 blockQueries,
         )
+        txExtension.init(module, 0, BlockchainRid.ZERO_RID, cryptoSystem)
     }
 
     @Test
