@@ -50,7 +50,6 @@ class TransactionSubmitterSpecialTxExtensionTest {
 
         module = TransactionSubmitterTestGTXModule()
 
-        txExtension.init(module, 0, BlockchainRid.ZERO_RID, cryptoSystem)
         val blockQueries = mock<BlockQueries> {
             on { query(any(), any()) } doReturn CompletableFuture.completedStage(gtv(listOf()))
         }
@@ -61,6 +60,7 @@ class TransactionSubmitterSpecialTxExtensionTest {
                 true,
                 blockQueries,
         )
+        txExtension.init(module, 0, BlockchainRid.ZERO_RID, cryptoSystem)
     }
 
     @Test

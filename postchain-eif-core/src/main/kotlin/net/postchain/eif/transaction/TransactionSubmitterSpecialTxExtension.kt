@@ -453,7 +453,6 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
     ) {
         this.privKey = privKey
         this.pubKey = pubKey
-        this.sigMaker = cryptoSystem.buildSigMaker(KeyPair(pubKey, privKey))
         this.validateSpecialOps = validateSpecialOps
         this.pollEvmReceipts = pollEvmReceipts
         this.blockQueries = blockQueries
@@ -535,6 +534,8 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
     }
 
     private fun startup(bctx: BlockEContext) {
+        if (!::sigMaker.isInitialized) sigMaker = cryptoSystem.buildSigMaker(KeyPair(pubKey, privKey))
+
         if (!startupJobsRun) {
             startupJobsRun = true
             addNewPendingTransactions(bctx)
