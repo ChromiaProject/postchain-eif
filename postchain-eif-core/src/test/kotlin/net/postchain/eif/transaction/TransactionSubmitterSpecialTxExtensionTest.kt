@@ -54,7 +54,7 @@ class TransactionSubmitterSpecialTxExtensionTest {
             on { query(any(), any()) } doReturn CompletableFuture.completedStage(gtv(listOf()))
         }
         txExtension.setConfig(
-                updatedSigner.privKey.data,
+                cryptoSystem.buildSigMaker(KeyPair(updatedSigner.pubKey.data, updatedSigner.privKey.data)),
                 updatedSigner.pubKey.data,
                 { true },
                 true,

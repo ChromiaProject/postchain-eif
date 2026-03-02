@@ -12,6 +12,7 @@ import net.postchain.core.BlockchainProcess
 import net.postchain.core.EContext
 import net.postchain.core.NODE_ID_READ_ONLY
 import net.postchain.core.SynchronizationInfrastructureExtension
+import net.postchain.crypto.KeyPair
 import net.postchain.eif.metrics.NETWORK_ID_TAG
 import net.postchain.eif.metrics.RpcUsageMetrics
 import net.postchain.eif.transaction.TransactionSubmitterSpecialTxExtension.Companion.GET_TRANSACTION
@@ -50,7 +51,12 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
             if (ext is TransactionSubmitterSpecialTxExtension) {
 
                 ext.setConfig(
-                        postchainContext.appConfig.privKeyByteArray,
+                        postchainContext.cryptoSystem.buildSigMaker(
+                                KeyPair(
+                                        postchainContext.appConfig.pubKeyByteArray,
+                                        postchainContext.appConfig.privKeyByteArray
+                                )
+                        ),
                         postchainContext.appConfig.pubKeyByteArray,
                         validateSpecialOps = process::isSigner,
                         pollEvmReceipts = !nodeIsReplica,

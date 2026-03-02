@@ -11,7 +11,6 @@ import net.postchain.core.EContext
 import net.postchain.core.block.BlockData
 import net.postchain.core.block.BlockQueries
 import net.postchain.crypto.CryptoSystem
-import net.postchain.crypto.KeyPair
 import net.postchain.crypto.SigMaker
 import net.postchain.crypto.Signature
 import net.postchain.eif.NETWORK_ID_TAG
@@ -46,7 +45,6 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
     private lateinit var sigMaker: SigMaker
     private val transactionSubmitters = mutableMapOf<Long, TransactionSubmitter>()
     private lateinit var module: GTXModule
-    private lateinit var privKey: ByteArray
     private lateinit var pubKey: ByteArray
     private var validateSpecialOps: () -> Boolean = { false }
     private var pollEvmReceipts = false
@@ -445,13 +443,13 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
     fun getTransactionSubmitter(networkId: Long) = transactionSubmitters[networkId]
 
     fun setConfig(
-            privKey: ByteArray,
+            sigMaker: SigMaker,
             pubKey: ByteArray,
             validateSpecialOps: () -> Boolean,
             pollEvmReceipts: Boolean,
             blockQueries: BlockQueries
     ) {
-        this.privKey = privKey
+        this.sigMaker = sigMaker
         this.pubKey = pubKey
         this.validateSpecialOps = validateSpecialOps
         this.pollEvmReceipts = pollEvmReceipts
@@ -534,8 +532,6 @@ class TransactionSubmitterSpecialTxExtension : GTXBlockBuildingAffectingSpecialT
     }
 
     private fun startup(bctx: BlockEContext) {
-        if (!::sigMaker.isInitialized) sigMaker = cryptoSystem.buildSigMaker(KeyPair(pubKey, privKey))
-
         if (!startupJobsRun) {
             startupJobsRun = true
             addNewPendingTransactions(bctx)
