@@ -43,6 +43,7 @@ open class Web3jRequestHandler(
 
             try {
                 val response = request.send()
+                // metrics?.createUsageCounter(0)?.increment()
 
                 if (response.hasError()) {
                     val errorMessage = "RPC/EVM error code: ${response.error.code} and message: ${response.error.message}"
@@ -56,7 +57,7 @@ open class Web3jRequestHandler(
             }
         }
 
-        // Include RCP errors in chain message - should be safe
+        // Include RPC errors in chain message - should be safe
         val tse = TransactionSubmitterException(
                 "Failed to send web3j request to all ${web3jServices.size} RPC nodes. RPC/EVM errors: ${rpcErrors.joinToString()}")
         logger.error(tse) { tse.message }
@@ -100,7 +101,7 @@ open class Web3jRequestHandler(
                     index = (index + 1) % requests.size
                     if (index == 0) {
                         val rpcErrorSummary = rpcErrors.map { "${it.key}=${it.value}" }.joinToString()
-                        // Include RCP errors in chain message - should be safe
+                        // Include RPC errors in chain message - should be safe
                         val tse = TransactionSubmitterException(
                                 "Request has failed on all ${requests.size} RPCs. No more nodes to try. Giving up. Last error for each RPC: $rpcErrorSummary")
                         logger.error(tse) { tse.message }
