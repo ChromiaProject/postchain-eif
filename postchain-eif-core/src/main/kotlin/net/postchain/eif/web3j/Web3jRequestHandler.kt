@@ -42,6 +42,7 @@ open class Web3jRequestHandler(
         for (request in requests) {
 
             try {
+                logger.error { "@@@ Sending web3j request: ${request.method} to ${request.id}" }
                 val response = request.send()
                 // metrics?.createUsageCounter(0)?.increment()
 
@@ -79,6 +80,7 @@ open class Web3jRequestHandler(
         while (true) {
             val currentIndex = index
             val response = try {
+                logger.error { "@@@ Sending web3j request: ${requests[index].method} to ${urls[index]}" }
                 val response = requests[index].send()
                 metrics?.createUsageCounter(index)?.increment()
                 if (response.hasError()) {
@@ -147,7 +149,7 @@ open class Web3jRequestHandler(
     open fun ethGetBlockByNumber(defaultBlockParameter: DefaultBlockParameter, returnFullTransactionObjects: Boolean): EthBlock {
         return sendWeb3jRequest { it.ethGetBlockByNumber(defaultBlockParameter, returnFullTransactionObjects) }
     }
-    
+
     open fun ethGetTransactionByHash(transactionHash: String): EthTransaction {
         return sendWeb3jRequest { it.ethGetTransactionByHash(transactionHash) }
     }
