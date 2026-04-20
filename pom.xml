@@ -25,9 +25,9 @@
     <properties>
         <revision>dev</revision>
         <postchain.version>3.49.4</postchain.version>
-        <rell.version>0.15.0</rell.version>
+        <rell.version>0.15.3</rell.version>
         <kotlin.version>2.3.0</kotlin.version>
-        <rell.maven.plugin.version>1.0.0</rell.maven.plugin.version>
+        <rell.maven.plugin.version>1.2.1</rell.maven.plugin.version>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <kotlin.compiler.jvmTarget>21</kotlin.compiler.jvmTarget>
@@ -122,6 +122,10 @@
                     <version>${rell.maven.plugin.version}</version>
                     <configuration>
                         <hideLibWarnings>true</hideLibWarnings>
+                        <postchainClientConfig>
+                            <failover.attempts>2</failover.attempts>
+                            <connect.timeout>10000</connect.timeout>
+                        </postchainClientConfig>
                     </configuration>
                 </plugin>
             </plugins>
