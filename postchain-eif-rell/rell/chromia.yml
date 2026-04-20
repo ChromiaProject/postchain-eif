@@ -407,30 +407,12 @@ compile:
   rellVersion: 0.14.5
 
 libs:
-#  com.chromia.ft4:
-#    version: 1.2.0
-  ft4:
-    registry: https://gitlab.com/chromaway/ft4-lib.git
-    path: rell/src/lib/ft4
-    tagOrBranch: v1.2.0r
-    rid: x"E96915FD7C9A5DD4E183D86F4A5B4BB5083A7CC1EDEB1465EDFFC926E67C93F6"
-    insecure: false
-#  com.chromia.iccf:
-#    version: 1.90.1
-  iccf:
-    registry: https://gitlab.com/chromaway/postchain-chromia.git
-    path: chromia-infrastructure/rell/src/lib/iccf
-    tagOrBranch: 3.39.5
-    rid: x"B8D35B4E79BE54FE62D1A8131C0437575DD52DD17D165CC7D95685243AB0D611"
-    insecure: false
-#  com.chromia.icmf:
-#    version: 1.102.2
-  icmf:
-    registry: https://gitlab.com/chromaway/postchain-chromia.git
-    path: chromia-infrastructure/rell/src/lib/icmf
-    tagOrBranch: 3.39.5
-    rid: x"C8A262DDAFAC8E38B49E14BE42E1AF2AD4239A14A49CA2D1367A521C93038EAE"
-    insecure: false
+  com.chromia.ft4:
+    version: 1.2.0
+  com.chromia.iccf:
+    version: 1.90.1
+  com.chromia.icmf:
+    version: 1.102.2
   crc2:
     registry: https://gitlab.com/chromaway/crc2-lib
     path: src/lib/crc2
