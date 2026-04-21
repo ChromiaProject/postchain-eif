@@ -19,7 +19,14 @@ namespace crc2 {
     import lib.crc2.evm;
 }
 
+/**
+ * Module arguments for `lib.hbridge_crc2.evm` (`moduleArgs.lib.hbridge_crc2.evm` in `chromia.yml`).
+ */
 struct module_args {
+    /**
+     * Same semantics as `lib.hbridge.core` `evm_read_offsets`: map of decimal EVM `network_id` (text) to
+     * `evm_read_offset` used on the Event Receiver. Keeps NFT bridge queries aligned with EIF ingestion finality.
+     */
     evm_read_offsets: gtv = map<text, integer>().to_gtv();
 }
 
