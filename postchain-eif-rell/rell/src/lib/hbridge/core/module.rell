@@ -23,5 +23,19 @@ import utils: lib.eif.utils;
 import ^.{ state_slot_type };
 
 struct module_args {
+    /**
+     * Map of decimal EVM `network_id` (as text key) to the EVM read offset integer.
+     *
+     * This value is informational only — it is not used by event receivers or any
+     * internal bridge logic. It is surfaced to query consumers via `bridge_contract_info`
+     * so that UI clients know the finality lag applied during EVM event ingestion, and
+     * can align their own EVM reads accordingly.
+     *
+     * Should mirror the `evm_read_offset` configured on the EIF event receiver
+     * (`EifEvmBlockchainConfig`) for each network. Defaults to 0 for any network
+     * not present in the map.
+     *
+     * Example: `{"1": 100, "56": 100}` for Ethereum mainnet and BSC with a 100-block lag.
+     */
     evm_read_offsets: gtv = map<text, integer>().to_gtv();
 }
