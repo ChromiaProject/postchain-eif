@@ -52,7 +52,7 @@
                                 <int>1337</int>
                             </entry>
                             <entry key="max_gas_price">
-                                <int>600000000000000</int>
+                                <int>2000000000000000</int>
                             </entry>
                             <entry key="min_wallet_balance">
                                 <int>100000000000</int>
