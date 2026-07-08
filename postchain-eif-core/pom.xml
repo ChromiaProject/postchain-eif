@@ -12,7 +12,7 @@
     <artifactId>postchain-eif-core</artifactId>
 
     <properties>
-        <postchain.client.version>3.39.4</postchain.client.version>
+        <postchain.client.version>3.39.6</postchain.client.version>
 
         <executable-classifier>jar-with-dependencies</executable-classifier>
         <dist-classifier>dist</dist-classifier>
