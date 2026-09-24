@@ -9,6 +9,7 @@ import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV2
 import org.apache.logging.log4j.Level
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.testcontainers.containers.ComposeContainer
@@ -23,6 +24,7 @@ import org.web3j.tx.TransactionManager
 import org.web3j.tx.gas.DefaultGasProvider
 import org.web3j.tx.response.PollingTransactionReceiptProcessor
 import java.math.BigInteger
+import java.security.Security
 
 data class AccountRegister(
         var accountId: ByteArray = ByteArray(32),
@@ -37,6 +39,13 @@ enum class AuthType {
 }
 
 abstract class EifBaseIntegrationTest(private val prependUrls: List<String> = listOf()) : ManagedModeTest() {
+
+    init {
+        // We add this provider so that we can get keccak-256 message digest instances
+        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
+            Security.addProvider(BouncyCastleProvider())
+        }
+    }
 
     val myCS = Secp256K1CryptoSystem()
 
