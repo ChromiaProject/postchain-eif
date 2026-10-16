@@ -24,7 +24,7 @@
 
     <properties>
         <revision>dev</revision>
-        <postchain.version>3.49.20</postchain.version>
+        <postchain.version>3.49.22</postchain.version>
         <rell.version>0.15.4</rell.version>
         <kotlin.version>2.3.0</kotlin.version>
         <rell.maven.plugin.version>1.2.3</rell.maven.plugin.version>
@@ -43,6 +43,14 @@
                 <groupId>net.postchain</groupId>
                 <artifactId>postchain</artifactId>
                 <version>${postchain.version}</version>
+                <scope>import</scope>
+                <type>pom</type>
+            </dependency>
+
+            <dependency>
+                <groupId>org.ow2.asm</groupId>
+                <artifactId>asm-bom</artifactId>
+                <version>9.11</version>
                 <scope>import</scope>
                 <type>pom</type>
             </dependency>
