@@ -31,7 +31,7 @@ Each entry in `contracts_to_fetch` has the following configuration properties:
 | `skip_to_height` | The block number to skip up to (inclusive). Event querying begins from `skip_to_height + 1` (usually set to one block before contract deployment block). Cannot be lower than the `skip_to_height` for the network. If unspecified or zero, `skip_to_height` for the network will be used. See note and table below for details.  | int    |                    | 0       |
 
 
-**Note:** EIF adjusts its **read cursor** only when a *new* or *re-added* contract with no processed events introduces a *lower* `skip_to_height`. Updating `skip_to_height` on an existing contract never changes the read cursor. When `skip_to_height` is decreased, EIF resumes processing from the lower height and ignores events from each contract that precede its latest processed event, ensuring data consistency.
+**Note:** While running, EIF adjusts its **read cursor** only when a *new* or *re-added* contract with no processed events introduces a *lower* `skip_to_height`. Updating `skip_to_height` on an existing contract never changes the read cursor. When `skip_to_height` is decreased, EIF resumes processing from the lower height and ignores events from each contract that precede its latest processed event, ensuring data consistency. See [Read cursor across restarts](#read-cursor-across-restarts) for what happens when the reader starts.
 
 
 | Scenario                              | `skip_to_height` change | Effect on read cursor                                                                                                                                                                                      |
@@ -43,6 +43,34 @@ Each entry in `contracts_to_fetch` has the following configuration properties:
 |                                       | Higher                  | No change                                                                                                                                                                                                  |
 | New contract added                    | Lower                   | Decreases — processes blocks and new contract events starting from lower `skip_to_height + 1`, and ignores events from each existing contract that precede its latest processed event for data consistency |
 |                                       | Higher                  | No change                                                                                                                                                                                                  |
+
+#### Read cursor across restarts
+
+Each node keeps a per-network **read cursor** of its own: the highest EVM block height up to which every block has been read and either contained no events for the configured contracts or has been committed on the node. The cursor is node-local state, stored in the table `sys.x.eif.evm_read_cursor` in the chain's database schema. It is not part of consensus and is dropped together with the chain's other tables when the chain is removed from the node.
+
+When the reader starts (node start, chain restart, configuration update), each contract gets a start point and reading begins at the lowest of them:
+
+| Contract                                                                                                                                                       | Start point                                                                                                    |
+|----------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
+| Covered by the persisted read cursor: it entered the filter with the same `skip_to_height`, and the configured `events` are unchanged since the reader last started | The persisted cursor height, or the contract's last committed event height if that is higher                  |
+| Not covered: first start on this node, or the contract was added, its `skip_to_height` was changed or the `events` were changed since the reader last started   | The contract's last committed event height, or its `skip_to_height` if it has no committed events (see above) |
+
+So restarting a node whose reader was caught up costs only the blocks produced while it was down, no matter how long any contract has been quiet. Changing a contract's `skip_to_height` or the `events` still takes effect at the next start of the reader, exactly as before: the contract is then read again from its last committed event height or its `skip_to_height`. A contract that is removed and re-added with the same `skip_to_height` while the reader is not running is indistinguishable from an unchanged contract and keeps the persisted cursor.
+
+The cursor is written every 10 seconds while reading, before anything is read after the read cursor moved backwards (new contract, validation conflict on a non-signer) and on shutdown. When a signer rejects a block proposal because it does not match the events it fetched, it keeps its fetched events but lowers the persisted cursor to just below the conflicting EVM block height, so that a restart of the chain re-reads from there and repairs any divergence. The row for a network can be deleted from `sys.x.eif.evm_read_cursor` to force a full re-read from chain state at the next start.
+
+At start the reader logs the chosen start point; if it is more than `maxReadAhead` blocks behind the EVM chain head the line is logged as a warning and names the contract that set the start point.
+
+The reader exposes these metrics, tagged with chain IID, blockchain RID and network ID:
+
+| Metric                                      | Type    | Description                                                                                   |
+|---------------------------------------------|---------|-----------------------------------------------------------------------------------------------|
+| `eif.last_read_evm_block_height`            | gauge   | Last EVM block height read                                                                    |
+| `eif.evm_head_block_height`                 | gauge   | Last EVM chain head height reported by the RPC node                                           |
+| `eif.evm_read_lag_blocks`                   | gauge   | Readable blocks (head minus `evm_read_offset`) not read yet, 0 when caught up                 |
+| `eif.evm_read_cursor_height`                | gauge   | Height of the last persisted read cursor                                                      |
+| `eif.evm_read_flush_total`                  | counter | Times the read position moved backwards, tagged with `reason` (`new_contract`, `validation_conflict`) |
+| `eif.evm_signer_validation_conflict_total`  | counter | Block proposals this node, as a signer, could not validate against the events it fetched      |
 
 
 In addition, the EVM Event Receiver blockchain configuration uses the `EifGTXModule` and `IcmfSenderGTXModule` GTX modules and the `EifSynchronizationInfrastructureExtension` synchronization extension. It also depends on the ICMF Rell library.
@@ -217,6 +245,7 @@ EVM Event Receiver node configuration has the following properties.
 |-------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|---------|------------------------------------------------|
 | `${chain}.urls`               | CSV list of URLs for connecting to EVM nodes (HTTP URLs or IPC socket paths). Can be set to special value `ignore` to run in disconnected mode for testing purposes.                                                                                                                                                       | list<string> |         | `POSTCHAIN_EIF_${CHAIN}_URLS`                  |
 | `${chain}.maxReadAhead`       | The maximum number of blocks per request whose events will be requested ahead of the current block height                                                                                                                                                                                                                  | int          | 2000    | `POSTCHAIN_EIF_${CHAIN}_MAX_READ_AHEAD`        |
+| `${chain}.minPollInterval`    | The minimum duration of one fetch cycle while the reader is caught up with the EVM chain head (milliseconds). Bounds the RPC request rate on networks that produce blocks faster than the reader polls; catching up is not affected. 0 disables the pacing, in which case the reader only sleeps `evm.delayWhenNoNewBlocks` when it saw at most one new block. | int          | 2000    | `POSTCHAIN_EIF_${CHAIN}_MIN_POLL_INTERVAL`     |
 
 
 #### Configuration when running Master-Sub architecture
