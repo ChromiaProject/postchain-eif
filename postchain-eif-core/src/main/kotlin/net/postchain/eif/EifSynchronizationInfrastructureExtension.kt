@@ -173,6 +173,7 @@ class EifSynchronizationInfrastructureExtension(
                     hasLastEvmEventHeightQuery = hasLastEvmEventHeightQuery,
                     eventProcessor,
                     readCursorStore,
+                    evmConfig.minPollInterval,
             )
             eventProcessor to eventFetcher
         }

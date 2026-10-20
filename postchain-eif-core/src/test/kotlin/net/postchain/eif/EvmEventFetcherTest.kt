@@ -852,6 +852,73 @@ class EvmEventFetcherTest {
         }
     }
 
+    // ---- Poll pacing -----------------------------------------------------------------------------------------------
+
+    @Test
+    fun `should pace polling when caught up with the chain head`() {
+        val rig = createRig(
+                contracts = listOf(contract1Low),
+                persistedCursor = persistedCursorAt(150L),
+                headHeight = 150L,
+                headAdvancesPerPoll = true,
+                minPollInterval = 2000L,
+                clockAdvancePerGetLogs = 50L,
+        )
+        try {
+            await.atMost(Duration.TEN_SECONDS).untilAsserted {
+                assertThat(rig.pacingDelays.size).isGreaterThan(3)
+            }
+            // Each cycle took 50 ms and is padded to the minimum poll interval
+            assertThat(rig.pacingDelays.all { it == 1950L }).isTrue()
+            // Each cycle read exactly the one new block up to the head
+            assertThat(rig.filters.take(3)).isEqualTo(listOf(151L to 151L, 152L to 152L, 153L to 153L))
+        } finally {
+            rig.eventFetcher.shutdown()
+        }
+    }
+
+    @Test
+    fun `shouldn't pace polling while catching up`() {
+        val rig = createRig(
+                contracts = listOf(contract1Low),
+                persistedCursor = persistedCursorAt(150L),
+                headHeight = 1_000_000L,
+                maxReadAhead = 100L,
+                minPollInterval = 2000L,
+                getLogsLatency = 20L,
+        )
+        try {
+            await.atMost(Duration.TEN_SECONDS).untilAsserted {
+                assertThat(rig.filters.size).isGreaterThan(10)
+            }
+            assertThat(rig.pacingDelays.isEmpty()).isTrue()
+            assertThat(rig.filters.take(3)).isEqualTo(listOf(151L to 251L, 252L to 352L, 353L to 453L))
+        } finally {
+            rig.eventFetcher.shutdown()
+        }
+    }
+
+    @Test
+    fun `should use the legacy delay for a single new block when pacing is disabled`() {
+        val rig = createRig(
+                contracts = listOf(contract1Low),
+                persistedCursor = persistedCursorAt(150L),
+                headHeight = 150L,
+                headAdvancesPerPoll = true,
+                maxReadAhead = 1L,
+                minPollInterval = 0L,
+                delayWhenNoNewBlocks = 777L,
+        )
+        try {
+            await.atMost(Duration.TEN_SECONDS).untilAsserted {
+                assertThat(rig.pacingDelays.size).isGreaterThan(3)
+            }
+            assertThat(rig.pacingDelays.all { it == 777L }).isTrue()
+        } finally {
+            rig.eventFetcher.shutdown()
+        }
+    }
+
     // ---- Logging ---------------------------------------------------------------------------------------------------
 
     @Test
@@ -949,6 +1016,8 @@ class EvmEventFetcherTest {
             val headHeight: AtomicLong,
             /** from/to of every eth_getLogs request, in order */
             val filters: CopyOnWriteArrayList<Pair<Long, Long>>,
+            /** every pacing delay requested by the fetcher, in order */
+            val pacingDelays: CopyOnWriteArrayList<Long>,
             val clock: MutableClock,
             /** logs returned by the next eth_getLogs request, consumed once */
             val logs: AtomicReference<List<EthLog.LogResult<*>>>,
@@ -963,7 +1032,9 @@ class EvmEventFetcherTest {
             headHeight: Long,
             headAdvancesPerPoll: Boolean = false,
             maxReadAhead: Long = 100L,
+            minPollInterval: Long = 0L,
             delayWhenNoNewBlocks: Long = 100L,
+            clockAdvancePerGetLogs: Long = 0L,
             getLogsLatency: Long = 0L,
     ): Rig {
         val failContractsQuery = AtomicBoolean(false)
@@ -1004,6 +1075,7 @@ class EvmEventFetcherTest {
             on { ethGetLogs(any()) } doAnswer { invocation ->
                 val filter = invocation.arguments[0] as EthFilter
                 filters.add((filter.fromBlock as DefaultBlockParameterNumber).blockNumber.toLong() to (filter.toBlock as DefaultBlockParameterNumber).blockNumber.toLong())
+                clock.advance(clockAdvancePerGetLogs)
                 if (getLogsLatency > 0) Thread.sleep(getLogsLatency)
                 ethGetLogsRequest
             }
@@ -1023,6 +1095,7 @@ class EvmEventFetcherTest {
         val store = RecordingEvmReadCursorStore()
         persistedCursor?.let { store.save(networkId, it) }
         store.savedCursors.clear()
+        val pacingDelays = CopyOnWriteArrayList<Long>()
 
         // Test subject
         val eventProcessor = EvmEventProcessor(
@@ -1046,11 +1119,13 @@ class EvmEventFetcherTest {
                 hasLastEvmEventHeightQuery = true,
                 evmEventProcessor = eventProcessor,
                 readCursorStore = store,
+                minPollInterval = minPollInterval,
                 cursorPersistInterval = 0L,
                 clock = clock,
+                pacingDelay = { pacingDelays.add(it); delay(10) },
         ).also(fetchers::add)
 
-        return Rig(eventFetcher, eventProcessor, store, head, filters, clock, pendingLogs, failContractsQuery)
+        return Rig(eventFetcher, eventProcessor, store, head, filters, pacingDelays, clock, pendingLogs, failContractsQuery)
     }
 
     @Suppress("UNCHECKED_CAST", "SameParameterValue")
@@ -1115,6 +1190,7 @@ class EvmEventFetcherTest {
                 hasLastEvmEventHeightQuery = true,
                 evmEventProcessor = eventProcessor,
                 readCursorStore = InMemoryEvmReadCursorStore(),
+                minPollInterval = 0L,
         ).also(fetchers::add)
 
         return Mocks(eventFetcher, eventProcessor, blockQueriesHolder, currentBlock)

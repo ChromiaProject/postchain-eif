@@ -103,6 +103,7 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
                 hasLastEvmEventHeightQuery = true,
                 evmEventProcessor,
                 readCursorStore = InMemoryEvmReadCursorStore(),
+                minPollInterval = 0L,
         )
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contract
@@ -248,6 +249,7 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
                 hasLastEvmEventHeightQuery = true,
                 evmEventProcessor,
                 readCursorStore = InMemoryEvmReadCursorStore(),
+                minPollInterval = 0L,
         )
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contracts
@@ -358,6 +360,7 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
                 hasLastEvmEventHeightQuery = true,
                 processor,
                 readCursorStore = readCursorStore,
+                minPollInterval = 0L,
                 cursorPersistInterval = 0L,
         )
 
