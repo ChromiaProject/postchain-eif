@@ -20,17 +20,23 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.spy
 import org.mockito.kotlin.whenever
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.protocol.Web3j
+import org.web3j.protocol.core.DefaultBlockParameterNumber
+import org.web3j.protocol.core.methods.request.EthFilter
+import org.web3j.protocol.http.HttpService
 import org.web3j.tx.Contract.deployRemoteCall
 import java.math.BigInteger
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 
 @Timeout(value = 5, unit = TimeUnit.MINUTES)
@@ -95,7 +101,8 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
                 Web3jRequestHandler(500, 60_000, 2, mutableListOf(url), web3jServices),
                 500,
                 hasLastEvmEventHeightQuery = true,
-                evmEventProcessor
+                evmEventProcessor,
+                readCursorStore = InMemoryEvmReadCursorStore(),
         )
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contract
@@ -240,6 +247,7 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
                 Web3jRequestHandler(500, 60_000, 2, mutableListOf(url), web3jServices), 500,
                 hasLastEvmEventHeightQuery = true,
                 evmEventProcessor,
+                readCursorStore = InMemoryEvmReadCursorStore(),
         )
 
         // Deploy a test token that we mint and then approve transfer of coins to chrL2 contracts
@@ -310,5 +318,107 @@ class EthereumEventProcessorIT : EifBaseIntegrationTest(
                 }
 
         evmEventFetcher.shutdown()
+    }
+
+    @Test
+    fun `Restarted fetcher resumes from the persisted read cursor without re-reading`() {
+        val initialMint = 100L
+        // Deploy token bridge contract
+        val bridge = deployRemoteCall(TokenBridge::class.java, web3jServices[0], transactionManager, gasProvider, tokenBridgeBinary, "").send().apply {
+            initialize(validatorContract, Uint256(2)).send()
+        }
+
+        // The chain has no committed events, so without a persisted read cursor a (re)started fetcher would start from skip-to-height
+        val blockQueriesMock: BlockQueries = mock {
+            on { query(eq("get_last_evm_block"), any()) } doReturn CompletableFuture.completedFuture(GtvNull)
+            on { query(eq("get_last_evm_event_height"), any()) } doReturn CompletableFuture.completedFuture(GtvNull)
+        }
+        val engineMock: BlockchainEngine = mock {
+            on { getBlockQueries() } doReturn blockQueriesMock
+        }
+
+        val contractDeployBlockNumber = web3jServices[0].ethGetTransactionByHash(bridge.transactionReceipt.get().transactionHash)
+                .send().result.blockNumber
+        val readCursorStore = InMemoryEvmReadCursorStore()
+
+        // Each fetcher gets its own web3j instance since the fetcher shuts it down
+        fun startFetcher(processor: EvmEventProcessor, web3jService: Web3j) = EvmEventFetcher(
+                1L,
+                listOf(parseEvmAddress(bridge.contractAddress) to 0),
+                hasLegacyDynamicContracts = false,
+                hasDynamicContacts = false,
+                listOf(TokenBridge.DEPOSITEDERC20_EVENT),
+                hasDynamicEvents = false,
+                BigInteger.ZERO,
+                200L,
+                networkSkipToHeight = contractDeployBlockNumber.toLong(),
+                engineMock,
+                Web3jRequestHandler(500, 60_000, 2, mutableListOf(url), listOf(web3jService)),
+                500,
+                hasLastEvmEventHeightQuery = true,
+                processor,
+                readCursorStore = readCursorStore,
+                cursorPersistInterval = 0L,
+        )
+
+        // Deploy a test token that we mint and then approve transfer of coins to the bridge contract
+        val testToken = deployRemoteCall(TestToken::class.java, web3jServices[0], transactionManager, gasProvider, testTokenBinary, "").send().apply {
+            mint(Address(transactionManager.fromAddress), Uint256(BigInteger.valueOf(initialMint))).send()
+            approve(Address(bridge.contractAddress), Uint256(BigInteger.valueOf(initialMint))).send()
+        }
+        bridge.allowToken(Address(testToken.contractAddress)).send()
+
+        // First run: three deposits are read, consumed and committed
+        val firstProcessor = EvmEventProcessor(1, BigInteger.ONE, 100L)
+        val firstFetcher = startFetcher(firstProcessor, Web3j.build(HttpService(url)))
+        val firstDeposits = (1..3).map { bridge.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN)).send() }
+        Awaitility.await()
+                .atMost(Duration.ONE_MINUTE)
+                .untilAsserted {
+                    assertThat(firstProcessor.getEventData().flatMap { it.events }.size).isEqualTo(3)
+                }
+        val lastDepositBlock = firstDeposits.maxOf { it.blockNumber }
+        firstProcessor.markAsProcessed(firstProcessor.getEventData())
+        firstProcessor.blockCommitted(lastDepositBlock)
+        Awaitility.await()
+                .atMost(Duration.ONE_MINUTE)
+                .untilAsserted {
+                    assertTrue(readCursorStore.load(1L)!!.height >= lastDepositBlock)
+                }
+        firstFetcher.shutdown()
+        val persistedHeight = readCursorStore.load(1L)!!.height
+
+        // Deposits made while the reader is down
+        val secondDeposits = (1..2).map { bridge.deposit(Address(testToken.contractAddress), Uint256(BigInteger.TEN)).send() }
+        assertTrue(secondDeposits.minOf { it.blockNumber } > persistedHeight)
+
+        // Second run with the same store: reading resumes right after the persisted height
+        val filters = CopyOnWriteArrayList<EthFilter>()
+        val spiedWeb3j = spy(Web3j.build(HttpService(url)))
+        doAnswer { invocation ->
+            filters.add(invocation.arguments[0] as EthFilter)
+            invocation.callRealMethod()
+        }.whenever(spiedWeb3j).ethGetLogs(any())
+        val secondProcessor = EvmEventProcessor(1, BigInteger.ONE, 100L)
+        val secondFetcher = startFetcher(secondProcessor, spiedWeb3j)
+        Awaitility.await()
+                .atMost(Duration.ONE_MINUTE)
+                .untilAsserted {
+                    assertThat(secondProcessor.getEventData().flatMap { it.events }.size).isEqualTo(2)
+                }
+
+        val fromHeights = filters.map { (it.fromBlock as DefaultBlockParameterNumber).blockNumber }
+        assertThat(fromHeights.first()).isEqualTo(persistedHeight + BigInteger.ONE)
+        assertTrue(fromHeights.all { it > persistedHeight })
+        assertTrue(secondProcessor.lastReadLogBlockHeight >= persistedHeight)
+
+        // Exactly the deposits made while the reader was down, in order, nothing from the first run
+        val receivedTxHashes = secondProcessor.getEventData().flatMap { it.events }
+                .map { "0x${it[EncodedEvent.TX_HASH.index].asByteArray().toHex().lowercase()}" }
+        assertThat(receivedTxHashes).isEqualTo(secondDeposits.map { it.transactionHash.lowercase() })
+        Thread.sleep(3000)
+        assertThat(secondProcessor.getEventData().flatMap { it.events }.size).isEqualTo(2)
+
+        secondFetcher.shutdown()
     }
 }
