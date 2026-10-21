@@ -375,9 +375,9 @@ class EvmEventFetcher(
         }
         val height = persistedHeightCap?.min(safeHeight) ?: safeHeight
         val cursor = EvmReadCursor(height, previousContracts, eventSignaturesHash ?: return)
-        lastCursorPersistTime = clock.millis()
         try {
             readCursorStore.save(networkId, cursor)
+            lastCursorPersistTime = clock.millis()
             lastPersistedCursorHeight = height
             logger.debug { "Persisted EVM read cursor $cursor" }
         } catch (e: Exception) {
