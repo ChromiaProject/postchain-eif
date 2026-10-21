@@ -739,7 +739,7 @@ class EvmEventFetcherTest {
     }
 
     @Test
-    fun `should cap the persisted read cursor after a validation conflict without flushing`() {
+    fun `should hold the persisted read cursor below a validation conflict without flushing`() {
         val rig = createRig(
                 contracts = listOf(contract1Low),
                 persistedCursor = persistedCursorAt(150L),
@@ -762,7 +762,7 @@ class EvmEventFetcherTest {
             assertThat(rig.eventFetcher.signerValidationConflicts.get()).isEqualTo(1L)
             assertThat(rig.eventFetcher.validationConflictFlushes.get()).isEqualTo(0L)
 
-            // Reading continues in memory, the cap only affects what is persisted
+            // Reading continues in memory, the conflict only affects what is persisted
             val position = rig.eventProcessor.lastReadLogBlockHeight
             await.atMost(Duration.TEN_SECONDS).untilAsserted {
                 assertThat(rig.eventProcessor.lastReadLogBlockHeight).isGreaterThan(position + 2.toBigInteger())
@@ -770,7 +770,7 @@ class EvmEventFetcherTest {
             assertThat(rig.store.load(networkId)!!.height).isEqualTo(119.toBigInteger())
             assertThat(rig.filters.zipWithNext().all { (previous, next) -> next.first > previous.first }).isTrue()
 
-            // Once a block covering the conflicting height has been committed the cap is lifted
+            // Once the conflicting EVM block has been committed the persisted cursor follows the read position again
             rig.eventProcessor.blockCommitted(125.toBigInteger())
             await.atMost(Duration.TEN_SECONDS).untilAsserted {
                 assertThat(rig.store.load(networkId)!!.height).isGreaterThan(position)
