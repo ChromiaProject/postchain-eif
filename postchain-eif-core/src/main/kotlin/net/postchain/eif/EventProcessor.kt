@@ -107,10 +107,12 @@ class EvmEventProcessor(
     var readLagBlocks: BigInteger = BigInteger.ZERO
 
     /**
-     * EVM block heights that this node must see included in a durably committed block before [safeResumeHeight] may
-     * pass them: blocks removed from the queue by [markAsProcessed] whose including block has not been confirmed by
-     * [blockCommitted] yet, and heights at which another signer's proposal disagreed with what this node read, see
-     * [holdResumeHeightBelow].
+     * EVM block heights that [safeResumeHeight] must stay below until a durably committed block covers them, that is
+     * until [blockCommitted] is called with that height or a later one. Two kinds of heights end up here:
+     * - blocks taken out of the queue by [markAsProcessed]: the block they went into is being committed but is not
+     *   durable yet, so a crash could still lose it
+     * - heights at which another signer's proposal disagreed with what this node read, see [holdResumeHeightBelow]:
+     *   this node does not know yet whether its own view of that height is the right one
      */
     private val unconfirmedHeights = TreeSet<BigInteger>()
 
