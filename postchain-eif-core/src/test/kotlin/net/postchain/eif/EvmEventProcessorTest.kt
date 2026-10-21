@@ -171,7 +171,7 @@ class EvmEventProcessorTest {
         assertThat(sut.safeResumeHeight()).isEqualTo(30.toBigInteger())
 
         // Another signer proposed an EVM block at height 20 that this node did not see, reading continues
-        sut.holdResumeBelow(20.toBigInteger())
+        sut.holdResumeHeightBelow(20.toBigInteger())
         sut.processLogEventsAndUpdateOffsets(listOf(), 40.toBigInteger())
         assertThat(sut.safeResumeHeight()).isEqualTo(19.toBigInteger())
 
@@ -184,7 +184,7 @@ class EvmEventProcessorTest {
         assertThat(sut.safeResumeHeight()).isEqualTo(40.toBigInteger())
 
         // A conflict at an already committed height is ignored
-        sut.holdResumeBelow(18.toBigInteger())
+        sut.holdResumeHeightBelow(18.toBigInteger())
         assertThat(sut.safeResumeHeight()).isEqualTo(40.toBigInteger())
     }
 }

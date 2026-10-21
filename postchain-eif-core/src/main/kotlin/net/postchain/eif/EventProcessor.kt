@@ -110,7 +110,7 @@ class EvmEventProcessor(
      * EVM block heights that this node must see included in a durably committed block before [safeResumeHeight] may
      * pass them: blocks removed from the queue by [markAsProcessed] whose including block has not been confirmed by
      * [blockCommitted] yet, and heights at which another signer's proposal disagreed with what this node read, see
-     * [holdResumeBelow].
+     * [holdResumeHeightBelow].
      */
     private val unconfirmedHeights = TreeSet<BigInteger>()
 
@@ -122,7 +122,7 @@ class EvmEventProcessor(
     /**
      * Highest EVM block height such that every block at or below it has been read and either contained no events for
      * the current contract set or is included in a block that has been durably committed on this node, and none of
-     * them is held by [holdResumeBelow]. A restarted reader can safely resume from the block after this height.
+     * them is held by [holdResumeHeightBelow]. A restarted reader can safely resume from the block after this height.
      * Returns null until anything has been read.
      */
     @Synchronized
@@ -141,7 +141,7 @@ class EvmEventProcessor(
      * if such a block has already been committed, since the proposal is then behind this node.
      */
     @Synchronized
-    fun holdResumeBelow(height: BigInteger) {
+    fun holdResumeHeightBelow(height: BigInteger) {
         val confirmed = lastConfirmedEvmBlockHeight
         if (confirmed != null && confirmed >= height) {
             logger.info { "Not holding the read cursor below EVM height $height, EVM blocks up to $confirmed are already committed" }

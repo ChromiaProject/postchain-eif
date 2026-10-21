@@ -484,12 +484,12 @@ class EvmEventFetcher(
      * A signer keeps the EVM blocks it read itself when it rejects a proposal, so its read position keeps advancing
      * past the disagreement. The persisted read cursor would follow it and a restart would never re-read the
      * conflicting height, so the cursor is held below it until this node has committed EVM blocks at or beyond it,
-     * see [EvmEventProcessor.holdResumeBelow]. The cursor is persisted by the fetch loop and not here, since this is
+     * see [EvmEventProcessor.holdResumeHeightBelow]. The cursor is persisted by the fetch loop and not here, since this is
      * called from the block validation thread.
      */
     override fun recordValidationConflict(conflictingHeight: BigInteger) {
         signerValidationConflicts.incrementAndGet()
-        evmEventProcessor.holdResumeBelow(conflictingHeight)
+        evmEventProcessor.holdResumeHeightBelow(conflictingHeight)
         cursorPersistRequested = true
     }
 
