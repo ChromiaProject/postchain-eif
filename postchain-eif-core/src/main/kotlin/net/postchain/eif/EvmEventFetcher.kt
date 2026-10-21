@@ -95,6 +95,12 @@ class EvmEventFetcher(
 
     private var job: Job
 
+    // Read position: what the read cursor covers and how it was initialized
+
+    /** False until the read position has been initialized from the persisted read cursor and the chain state */
+    @Volatile
+    private var readPositionInitialized = false
+
     /** Contracts currently in the filter, with the effective skip-to-height each one had when it entered the filter */
     @Volatile
     private var previousContracts = mapOf<WrappedByteArray, Long>()
@@ -103,25 +109,24 @@ class EvmEventFetcher(
     @Volatile
     private var eventSignaturesHash: WrappedByteArray? = null
 
-    /** False until the read position has been initialized from the persisted read cursor and the chain state */
+    /** Set when the read position was moved backwards, reported once the EVM chain head is known */
     @Volatile
-    private var readPositionInitialized = false
+    private var pendingRewindReason: String? = null
 
-    @Volatile
-    private var lastCursorPersistTime = 0L
+    // Cursor persistence: when the read cursor was written and what it said
 
     /** Set when the read cursor must be persisted before the next fetch, regardless of [cursorPersistInterval] */
     @Volatile
     private var cursorPersistRequested = false
 
+    /** Time of the last successful read cursor persist, in [clock] millis, 0 before the first one */
+    @Volatile
+    private var lastCursorPersistTime = 0L
+
     /** Height of the last persisted read cursor, null if nothing has been persisted by this reader yet */
     @Volatile
     var lastPersistedCursorHeight: BigInteger? = null
         private set
-
-    /** Set when the read position was moved backwards, reported once the EVM chain head is known */
-    @Volatile
-    private var pendingRewindReason: String? = null
 
     val newContractFlushes = AtomicLong()
     val validationConflictFlushes = AtomicLong()
