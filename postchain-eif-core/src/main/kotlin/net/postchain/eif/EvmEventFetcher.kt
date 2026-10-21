@@ -71,7 +71,9 @@ class EvmEventFetcher(
 
         /** Identifies the set of event signatures a read cursor was recorded with */
         fun hashEventSignatures(eventSignatures: Collection<String>): WrappedByteArray =
-                MessageDigest.getInstance("SHA-256").digest(eventSignatures.sorted().joinToString(",").toByteArray()).wrap()
+                MessageDigest.getInstance("SHA-256").digest(
+                        eventSignatures.sorted().joinToString(",").toByteArray()
+                ).wrap()
     }
 
     /** Where reading starts for one contract and why */
@@ -157,13 +159,8 @@ class EvmEventFetcher(
             }
 
             // Contracts
-            val dynamicContractsConfig = fetchDynamicContractConfigs()
-            if (dynamicContractsConfig == null) {
-                // Keep the read position and the known contract set as they are and try again later
-                delay(delayWhenNoNewBlocks)
-                return
-            }
-            val contracts = resolveContractsSkipToHeight(dynamicContractsConfig.union(staticContracts))
+            val contractsConfig = fetchDynamicContractConfigs().union(staticContracts)
+            val contracts = resolveContractsSkipToHeight(contractsConfig)
             logger.debug { "Contracts: $contracts" }
 
             if (contracts.isEmpty()) {
@@ -331,7 +328,9 @@ class EvmEventFetcher(
      * the filter does not change the read position while running, but it must be noticed at the next start.
      */
     private fun rememberContracts(contracts: List<Pair<WrappedByteArray, Long>>): Map<WrappedByteArray, Long> =
-            contracts.associate { (contract, skipToHeight) -> contract to (previousContracts[contract] ?: skipToHeight) }
+            contracts.associate { (contract, skipToHeight) ->
+                contract to (previousContracts[contract] ?: skipToHeight)
+            }
 
     /**
      * Logs how far behind the EVM chain head the reader is after its read position has been (re)set, now that the head
@@ -384,18 +383,15 @@ class EvmEventFetcher(
         }
     }
 
-    /**
-     * @return configured dynamic contracts, or null if they could not be fetched right now
-     */
-    private fun fetchDynamicContractConfigs(): Set<Pair<WrappedByteArray, Long>>? {
+    private fun fetchDynamicContractConfigs(): Set<Pair<WrappedByteArray, Long>> {
         val legacyDynamicContracts = if (hasLegacyDynamicContracts) {
             try {
                 blockchainEngine.getBlockQueries().query(
                         EIF_CONFIG_CONTRACTS_QUERY, gtv(mapOf("network_id" to gtv(networkId)))).get().asArray()
                         .map { it.asByteArray().wrap() to 0L }
             } catch (e: Exception) {
-                logger.warn(e) { "Unable to fetch legacy dynamic contracts with query $EIF_CONFIG_CONTRACTS_QUERY, trying again later: $e" }
-                return null
+                logger.warn(e) { "Unable to fetch legacy dynamic contracts with query $EIF_CONFIG_CONTRACTS_QUERY: $e" }
+                listOf()
             }
         } else {
             listOf()
@@ -409,8 +405,8 @@ class EvmEventFetcher(
                             it["address"]!!.asByteArray().wrap() to (it["skip_to_height"]?.asInteger() ?: 0L)
                         }
             } catch (e: Exception) {
-                logger.warn(e) { "Unable to fetch dynamic contracts with query $EIF_CONFIG_CONTRACTS_TO_FETCH_QUERY, trying again later: $e" }
-                return null
+                logger.warn(e) { "Unable to fetch dynamic contracts with query $EIF_CONFIG_CONTRACTS_TO_FETCH_QUERY: $e" }
+                listOf()
             }
         } else {
             listOf()

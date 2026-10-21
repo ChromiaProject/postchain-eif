@@ -2,9 +2,9 @@ package net.postchain.eif
 
 import mu.KLogging
 import net.postchain.base.data.DatabaseAccess
-import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.base.withReadConnection
 import net.postchain.base.withWriteConnection
+import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.toHex
 import net.postchain.common.types.WrappedByteArray
 import net.postchain.common.wrap
@@ -66,7 +66,7 @@ class DatabaseEvmReadCursorStore(private val storage: Storage, private val chain
 
     companion object : KLogging() {
         // This name should not clash with Rell
-        const val TABLE_NAME: String = "sys.x.eif.evm_read_cursor"
+        const val TABLE_NAME: String = "$PREFIX.evm_read_cursor"
 
         val COLUMN_NETWORK_ID: Field<Long> = field("network_id", SQLDataType.BIGINT.nullable(false))
         val COLUMN_HEIGHT: Field<Long> = field("height", SQLDataType.BIGINT.nullable(false))
@@ -76,9 +76,11 @@ class DatabaseEvmReadCursorStore(private val storage: Storage, private val chain
         fun tableName(ctx: EContext): String = DatabaseAccess.of(ctx).tableName(ctx, TABLE_NAME)
 
         fun encodeContracts(contracts: Map<WrappedByteArray, Long>): ByteArray =
-                GtvEncoder.encodeGtv(gtv(contracts.entries
-                        .sortedBy { it.key.data.toHex() }
-                        .map { (address, skipToHeight) -> gtv(gtv(address.data), gtv(skipToHeight)) }))
+                GtvEncoder.encodeGtv(
+                        gtv(contracts.entries
+                                .sortedBy { it.key.data.toHex() }
+                                .map { (address, skipToHeight) -> gtv(gtv(address.data), gtv(skipToHeight)) })
+                )
 
         fun decodeContracts(bytes: ByteArray): Map<WrappedByteArray, Long> =
                 GtvDecoder.decodeGtv(bytes).asArray().associate { it[0].asByteArray().wrap() to it[1].asInteger() }

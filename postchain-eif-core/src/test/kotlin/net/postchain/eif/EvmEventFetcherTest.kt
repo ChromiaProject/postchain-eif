@@ -48,7 +48,6 @@ import java.time.ZoneOffset
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
@@ -678,43 +677,6 @@ class EvmEventFetcherTest {
     }
 
     @Test
-    fun `shouldn't move the read position when the dynamic contracts query fails`() {
-        val rig = createRig(
-                contracts = listOf(contract1Low),
-                headHeight = 100L,
-                headAdvancesPerPoll = true,
-                maxReadAhead = 1L,
-                delayWhenNoNewBlocks = 50L,
-        )
-        try {
-            await.atMost(Duration.TEN_SECONDS).untilAsserted {
-                assertThat(rig.eventProcessor.lastReadLogBlockHeight.toLong()).isGreaterThan(105L)
-            }
-
-            rig.failContractsQuery.set(true)
-            Thread.sleep(300)
-            val positionDuringFailure = rig.eventProcessor.lastReadLogBlockHeight
-            val requestsDuringFailure = rig.filters.size
-            Thread.sleep(300)
-            // Nothing is read while the query fails, and the read position is kept
-            assertThat(rig.eventProcessor.lastReadLogBlockHeight).isEqualTo(positionDuringFailure)
-            assertThat(rig.filters.size).isEqualTo(requestsDuringFailure)
-
-            rig.failContractsQuery.set(false)
-            await.atMost(Duration.TEN_SECONDS).untilAsserted {
-                assertThat(rig.eventProcessor.lastReadLogBlockHeight).isGreaterThan(positionDuringFailure + 2.toBigInteger())
-            }
-            // Reading continued where it stopped instead of going back to skip-to-height
-            assertThat(rig.filters[requestsDuringFailure].first).isEqualTo(positionDuringFailure.toLong() + 1)
-            assertThat(rig.filters.zipWithNext().all { (previous, next) -> next.first > previous.first }).isTrue()
-        } finally {
-            rig.eventFetcher.shutdown()
-        }
-    }
-
-    // ---- Read cursor persistence -----------------------------------------------------------------------------------
-
-    @Test
     fun `should persist the read cursor as reading progresses`() {
         val rig = createRig(contracts = listOf(contract1Low), headHeight = 160L, delayWhenNoNewBlocks = 50L)
         try {
@@ -952,7 +914,6 @@ class EvmEventFetcherTest {
             val clock: MutableClock,
             /** logs returned by the next eth_getLogs request, consumed once */
             val logs: AtomicReference<List<EthLog.LogResult<*>>>,
-            val failContractsQuery: AtomicBoolean,
     )
 
     @Suppress("UNCHECKED_CAST")
@@ -966,10 +927,8 @@ class EvmEventFetcherTest {
             delayWhenNoNewBlocks: Long = 100L,
             getLogsLatency: Long = 0L,
     ): Rig {
-        val failContractsQuery = AtomicBoolean(false)
         val blockQueries = mock<BlockQueries> {
             on { query(eq(EIF_CONFIG_CONTRACTS_TO_FETCH_QUERY), any()) } doAnswer {
-                if (failContractsQuery.get()) throw RuntimeException("Query failed")
                 CompletableFuture.completedStage(gtv(contracts))
             }
             on { query(eq(EIF_LAST_EVM_EVENT_HEIGHT_QUERY), any()) } doAnswer { invocation ->
@@ -1050,7 +1009,7 @@ class EvmEventFetcherTest {
                 clock = clock,
         ).also(fetchers::add)
 
-        return Rig(eventFetcher, eventProcessor, store, head, filters, clock, pendingLogs, failContractsQuery)
+        return Rig(eventFetcher, eventProcessor, store, head, filters, clock, pendingLogs)
     }
 
     @Suppress("UNCHECKED_CAST", "SameParameterValue")
