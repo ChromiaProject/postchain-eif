@@ -83,7 +83,8 @@ class EvmEventFetcher(
             val usedSkipToHeightFallback: Boolean,
             val usedPersistedCursor: Boolean,
     ) {
-        fun describe(): String = "contract 0x${contract.data.toHex()} (" + when {
+        /** The contract, its start height and where that height came from, for log messages */
+        fun describe(): String = "contract 0x${contract.data.toHex()} at height $height (" + when {
             usedPersistedCursor -> "persisted read cursor"
             usedSkipToHeightFallback -> "no committed events, using skip-to-height"
             else -> "last committed event height"
