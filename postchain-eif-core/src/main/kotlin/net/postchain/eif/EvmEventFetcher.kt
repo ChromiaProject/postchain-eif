@@ -114,20 +114,6 @@ class EvmEventFetcher(
     @Volatile
     private var cursorPersistRequested = false
 
-    /**
-     * Lowest EVM height at which another signer's block proposal disagreed with the EVM blocks this node read.
-     *
-     * A signer keeps the EVM blocks it read itself when it rejects such a proposal (see [recordValidationConflict]),
-     * so its read position and [EvmEventProcessor.safeResumeHeight] keep advancing past the disagreement. Without
-     * this the next persisted read cursor would be beyond the conflicting height and a restart would never re-read
-     * it. While set, the persisted read cursor is held just below it, so that a restart of the chain re-reads from
-     * there and repairs any divergence. It is cleared once this node has committed EVM blocks at or beyond it, since
-     * its events then turned out to agree with the chain after all. It only bounds what is written to the store,
-     * never what is read.
-     */
-    @Volatile
-    private var validationConflictHeight: BigInteger? = null
-
     /** Height of the last persisted read cursor, null if nothing has been persisted by this reader yet */
     @Volatile
     var lastPersistedCursorHeight: BigInteger? = null
@@ -375,16 +361,7 @@ class EvmEventFetcher(
     @Synchronized
     private fun persistReadCursor() {
         if (!readPositionInitialized) return
-        val safeHeight = evmEventProcessor.safeResumeHeight() ?: return
-        validationConflictHeight?.let { conflictHeight ->
-            val confirmed = evmEventProcessor.lastConfirmedEvmBlockHeight
-            if (confirmed != null && confirmed >= conflictHeight) {
-                // This node has committed the conflicting EVM block since, so its events agree with the chain after all
-                logger.info { "EVM blocks up to height $confirmed have been committed since the validation conflict at height $conflictHeight, the read cursor is no longer held below it" }
-                validationConflictHeight = null
-            }
-        }
-        val height = validationConflictHeight?.let { (it - BigInteger.ONE).min(safeHeight) } ?: safeHeight
+        val height = evmEventProcessor.safeResumeHeight() ?: return
         val cursor = EvmReadCursor(height, previousContracts, eventSignaturesHash ?: return)
         try {
             readCursorStore.save(networkId, cursor)
@@ -504,19 +481,15 @@ class EvmEventFetcher(
     }
 
     /**
-     * The EVM blocks in memory are kept, only the persisted read cursor is held below [conflictingHeight] until this
-     * node has committed EVM blocks at or beyond it, see [validationConflictHeight]. The cursor is persisted by the
-     * fetch loop and not here, since this is called from the block validation thread.
+     * A signer keeps the EVM blocks it read itself when it rejects a proposal, so its read position keeps advancing
+     * past the disagreement. The persisted read cursor would follow it and a restart would never re-read the
+     * conflicting height, so the cursor is held below it until this node has committed EVM blocks at or beyond it,
+     * see [EvmEventProcessor.holdResumeBelow]. The cursor is persisted by the fetch loop and not here, since this is
+     * called from the block validation thread.
      */
     override fun recordValidationConflict(conflictingHeight: BigInteger) {
         signerValidationConflicts.incrementAndGet()
-        val confirmed = evmEventProcessor.lastConfirmedEvmBlockHeight
-        if (confirmed != null && confirmed >= conflictingHeight) {
-            // We have already committed EVM blocks at or beyond the conflicting height, the proposal is behind us
-            logger.info { "Ignoring validation conflict at EVM height $conflictingHeight, EVM blocks up to $confirmed are already committed" }
-            return
-        }
-        validationConflictHeight = validationConflictHeight?.min(conflictingHeight) ?: conflictingHeight
+        evmEventProcessor.holdResumeBelow(conflictingHeight)
         cursorPersistRequested = true
     }
 

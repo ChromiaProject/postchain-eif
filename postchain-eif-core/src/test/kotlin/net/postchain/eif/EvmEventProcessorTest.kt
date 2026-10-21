@@ -163,4 +163,28 @@ class EvmEventProcessorTest {
         assertThat(sut.getEventData()).isEqualTo(listOf())
         assertThat(sut.safeResumeHeight()).isEqualTo(5.toBigInteger())
     }
+
+    @Test
+    fun `safe resume height is held below a validation conflict until that height is committed`() {
+        val sut = EvmEventProcessor(1L, BigInteger.ZERO, 2000L)
+        sut.processLogEventsAndUpdateOffsets(listOf(), 30.toBigInteger())
+        assertThat(sut.safeResumeHeight()).isEqualTo(30.toBigInteger())
+
+        // Another signer proposed an EVM block at height 20 that this node did not see, reading continues
+        sut.holdResumeBelow(20.toBigInteger())
+        sut.processLogEventsAndUpdateOffsets(listOf(), 40.toBigInteger())
+        assertThat(sut.safeResumeHeight()).isEqualTo(19.toBigInteger())
+
+        // A committed block below the conflict does not release the hold
+        sut.blockCommitted(15.toBigInteger())
+        assertThat(sut.safeResumeHeight()).isEqualTo(19.toBigInteger())
+
+        // A committed block including the conflicting height does
+        sut.blockCommitted(20.toBigInteger())
+        assertThat(sut.safeResumeHeight()).isEqualTo(40.toBigInteger())
+
+        // A conflict at an already committed height is ignored
+        sut.holdResumeBelow(18.toBigInteger())
+        assertThat(sut.safeResumeHeight()).isEqualTo(40.toBigInteger())
+    }
 }

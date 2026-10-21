@@ -107,10 +107,12 @@ class EvmEventProcessor(
     var readLagBlocks: BigInteger = BigInteger.ZERO
 
     /**
-     * Heights of the blocks removed from the queue by [markAsProcessed] whose including block has not been confirmed
-     * durable by [blockCommitted] yet.
+     * EVM block heights that this node must see included in a durably committed block before [safeResumeHeight] may
+     * pass them: blocks removed from the queue by [markAsProcessed] whose including block has not been confirmed by
+     * [blockCommitted] yet, and heights at which another signer's proposal disagreed with what this node read, see
+     * [holdResumeBelow].
      */
-    private val unconfirmedProcessedHeights = TreeSet<BigInteger>()
+    private val unconfirmedHeights = TreeSet<BigInteger>()
 
     /** Highest EVM block height included in a block that has been durably committed on this node, null if none seen */
     @Volatile
@@ -119,16 +121,33 @@ class EvmEventProcessor(
 
     /**
      * Highest EVM block height such that every block at or below it has been read and either contained no events for
-     * the current contract set or is included in a block that has been durably committed on this node. A restarted
-     * reader can safely resume from the block after this height. Returns null until anything has been read.
+     * the current contract set or is included in a block that has been durably committed on this node, and none of
+     * them is held by [holdResumeBelow]. A restarted reader can safely resume from the block after this height.
+     * Returns null until anything has been read.
      */
     @Synchronized
     fun safeResumeHeight(): BigInteger? {
         if (lastReadLogBlockHeight == BigInteger.ZERO) return null
         var safeHeight = lastReadLogBlockHeight
         eventBlocks.peek()?.let { safeHeight = safeHeight.min(it.evmBlockHeight - BigInteger.ONE) }
-        unconfirmedProcessedHeights.firstOrNull()?.let { safeHeight = safeHeight.min(it - BigInteger.ONE) }
+        unconfirmedHeights.firstOrNull()?.let { safeHeight = safeHeight.min(it - BigInteger.ONE) }
         return safeHeight
+    }
+
+    /**
+     * Holds [safeResumeHeight] below [height] until a block including EVM block [height] or a later one has been durably
+     * committed on this node. Used by a signer that rejected a block proposal whose EVM blocks differ from the ones
+     * this node read: the blocks in memory are kept, but a restart must re-read from before the disagreement. Ignored
+     * if such a block has already been committed, since the proposal is then behind this node.
+     */
+    @Synchronized
+    fun holdResumeBelow(height: BigInteger) {
+        val confirmed = lastConfirmedEvmBlockHeight
+        if (confirmed != null && confirmed >= height) {
+            logger.info { "Not holding the read cursor below EVM height $height, EVM blocks up to $confirmed are already committed" }
+            return
+        }
+        unconfirmedHeights.add(height)
     }
 
     @Synchronized
@@ -168,7 +187,7 @@ class EvmEventProcessor(
     @Synchronized
     override fun markAsProcessed(ops: List<EvmBlockOp>) {
         if (ops.isNotEmpty()) {
-            ops.forEach { unconfirmedProcessedHeights.add(it.evmBlockHeight) }
+            ops.forEach { unconfirmedHeights.add(it.evmBlockHeight) }
             pruneEvents(ops.maxOf { it.evmBlockHeight })
         }
     }
@@ -176,7 +195,7 @@ class EvmEventProcessor(
     @Synchronized
     override fun blockCommitted(upToEvmBlockHeight: BigInteger?) {
         if (upToEvmBlockHeight == null) return
-        unconfirmedProcessedHeights.headSet(upToEvmBlockHeight, true).clear()
+        unconfirmedHeights.headSet(upToEvmBlockHeight, true).clear()
         lastConfirmedEvmBlockHeight = lastConfirmedEvmBlockHeight?.max(upToEvmBlockHeight) ?: upToEvmBlockHeight
     }
 
