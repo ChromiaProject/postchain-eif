@@ -25,16 +25,16 @@ import java.math.BigInteger
  * Node-local record of how far the EVM event reader of one network has progressed.
  *
  * @param height every EVM block at or below this height has been read with the contracts in [contracts] and the events
- * in [eventSignatures] in the filter and either contained no events for them or is included in a durably committed
- * block on this node
+ * behind [eventSignaturesHash] in the filter and either contained no events for them or is included in a durably
+ * committed block on this node
  * @param contracts the contracts that were in the reader's filter when [height] was recorded, with the skip-to-height
  * each one had at the time
- * @param eventSignatures hash of the event signatures that were in the reader's filter, see [EvmEventFetcher.hashEventSignatures]
+ * @param eventSignaturesHash hash of the event signatures that were in the reader's filter, see [EvmEventFetcher.hashEventSignatures]
  */
-data class EvmReadCursor(val height: BigInteger, val contracts: Map<WrappedByteArray, Long>, val eventSignatures: WrappedByteArray) {
+data class EvmReadCursor(val height: BigInteger, val contracts: Map<WrappedByteArray, Long>, val eventSignaturesHash: WrappedByteArray) {
     override fun toString(): String =
             "EvmReadCursor(height=$height, contracts=${contracts.map { (address, skipToHeight) -> "0x${address.data.toHex()}:$skipToHeight" }}, " +
-                    "eventSignatures=${eventSignatures.data.toHex()})"
+                    "eventSignaturesHash=${eventSignaturesHash.data.toHex()})"
 }
 
 /**
@@ -136,12 +136,12 @@ class DatabaseEvmReadCursorStore(private val storage: Storage, private val chain
                     .set(COLUMN_NETWORK_ID, networkId)
                     .set(COLUMN_HEIGHT, cursor.height.longValueExact())
                     .set(COLUMN_CONTRACTS, encodeContracts(cursor.contracts))
-                    .set(COLUMN_EVENT_SIGNATURES, cursor.eventSignatures.data)
+                    .set(COLUMN_EVENT_SIGNATURES, cursor.eventSignaturesHash.data)
                     .onConflict(COLUMN_NETWORK_ID)
                     .doUpdate()
                     .set(COLUMN_HEIGHT, cursor.height.longValueExact())
                     .set(COLUMN_CONTRACTS, encodeContracts(cursor.contracts))
-                    .set(COLUMN_EVENT_SIGNATURES, cursor.eventSignatures.data)
+                    .set(COLUMN_EVENT_SIGNATURES, cursor.eventSignaturesHash.data)
                     .execute()
             true
         }

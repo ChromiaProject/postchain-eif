@@ -103,11 +103,15 @@ class EvmEventFetcher(
 
     /** Contracts currently in the filter, with the effective skip-to-height each one had when it entered the filter */
     @Volatile
-    private var previousContracts = mapOf<WrappedByteArray, Long>()
+    private var filterContracts = mapOf<WrappedByteArray, Long>()
 
-    /** Hash of the event signatures configured when the read position was initialized */
+    /**
+     * Hash of the event signatures in the filter when the read position was initialized. Deliberately not refreshed
+     * when the configured events change at runtime: the persisted cursor then no longer matches the configuration and
+     * a restart falls back to chain state, which re-reads the history of the added events.
+     */
     @Volatile
-    private var eventSignaturesHash: WrappedByteArray? = null
+    private var filterEventSignaturesHash: WrappedByteArray? = null
 
     /** Set when the read position was moved backwards, reported once the EVM chain head is known */
     @Volatile
@@ -169,7 +173,7 @@ class EvmEventFetcher(
 
             if (contracts.isEmpty()) {
                 logger.warn { "No contracts configured, trying again later" }
-                previousContracts = mapOf()
+                filterContracts = mapOf()
                 delay(delayWhenNoNewBlocks)
                 return
             }
@@ -274,7 +278,7 @@ class EvmEventFetcher(
             logger.warn(e) { "Unable to load persisted EVM read cursor, resuming from chain state: $e" }
             null
         }?.takeIf { cursor ->
-            (cursor.eventSignatures == currentEventSignaturesHash).also { unchanged ->
+            (cursor.eventSignaturesHash == currentEventSignaturesHash).also { unchanged ->
                 if (!unchanged) logger.info { "Configured EVM events changed since the read cursor was persisted, resuming from chain state" }
             }
         }
@@ -295,8 +299,8 @@ class EvmEventFetcher(
                     (persistedCursor?.let { "Persisted read cursor: $it" } ?: "No persisted read cursor")
         }
         evmEventProcessor.flushEvents(lowest.height)
-        previousContracts = contracts.toMap()
-        eventSignaturesHash = currentEventSignaturesHash
+        filterContracts = contracts.toMap()
+        filterEventSignaturesHash = currentEventSignaturesHash
         readPositionInitialized = true
         pendingRewindReason = "start point set by ${lowest.describe()}"
         persistReadCursor()
@@ -307,7 +311,7 @@ class EvmEventFetcher(
      * skip-to-height if it has no committed events. If that is below the current read position we have to go back.
      */
     private fun handleNewContracts(contracts: List<Pair<WrappedByteArray, Long>>) {
-        val newContracts = contracts.filter { !previousContracts.containsKey(it.first) }
+        val newContracts = contracts.filter { !filterContracts.containsKey(it.first) }
         if (newContracts.isNotEmpty()) {
             val lowest = newContracts.map { (contract, skipToHeight) ->
                 val lastCommittedEventHeight = getLastCommittedEvmEventHeight(networkId, contract.data)
@@ -318,13 +322,13 @@ class EvmEventFetcher(
                 logger.info { "New contracts detected, reading from height ${lowest.height}" }
                 newContractFlushes.incrementAndGet()
                 evmEventProcessor.flushEvents(lowest.height)
-                previousContracts = rememberContracts(contracts)
+                filterContracts = rememberContracts(contracts)
                 pendingRewindReason = "new ${lowest.describe()}"
                 persistReadCursor()
                 return
             }
         }
-        previousContracts = rememberContracts(contracts)
+        filterContracts = rememberContracts(contracts)
     }
 
     /**
@@ -333,7 +337,7 @@ class EvmEventFetcher(
      */
     private fun rememberContracts(contracts: List<Pair<WrappedByteArray, Long>>): Map<WrappedByteArray, Long> =
             contracts.associate { (contract, skipToHeight) ->
-                contract to (previousContracts[contract] ?: skipToHeight)
+                contract to (filterContracts[contract] ?: skipToHeight)
             }
 
     /**
@@ -367,7 +371,7 @@ class EvmEventFetcher(
     private fun persistReadCursor() {
         if (!readPositionInitialized) return
         val height = evmEventProcessor.safeResumeHeight() ?: return
-        val cursor = EvmReadCursor(height, previousContracts, eventSignaturesHash ?: return)
+        val cursor = EvmReadCursor(height, filterContracts, filterEventSignaturesHash ?: return)
         try {
             readCursorStore.save(networkId, cursor)
             lastCursorPersistTime = clock.millis()
