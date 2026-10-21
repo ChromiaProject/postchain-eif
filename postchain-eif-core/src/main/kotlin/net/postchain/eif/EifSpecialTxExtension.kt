@@ -104,10 +104,10 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
             val validationResult = proc.isValidEventData(decodedOps)
             if (!validationResult.valid && validationResult.conflictingHeight != null) {
                 if (isSigner()) {
-                    // A signer keeps the events it fetched, otherwise a faulty proposer could make every signer re-read
-                    // at will. The conflict is recorded so that a restart re-reads from before it.
+                    // A signer keeps the EVM blocks it read itself, otherwise a faulty proposer could make every signer
+                    // re-read at will. The conflict is recorded so that a restart re-reads from before it.
                     logger.warn {
-                        "Block proposal from another signer does not match the EVM events fetched by this node: ${validationResult.errorMessage}. " +
+                        "EVM blocks proposed by another signer differ from the EVM blocks this node read from the EVM network: ${validationResult.errorMessage}. " +
                                 "A restart of the chain will re-read EVM events from before height ${validationResult.conflictingHeight}"
                     }
                     fetcher.recordValidationConflict(validationResult.conflictingHeight)
