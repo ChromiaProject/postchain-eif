@@ -14,6 +14,7 @@ import kotlinx.coroutines.slf4j.MDCContext
 import kotlinx.coroutines.withTimeoutOrNull
 import mu.KLogging
 import mu.withLoggingContext
+import net.postchain.common.data.KECCAK256
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
@@ -71,7 +72,7 @@ class EvmEventFetcher(
 
         /** Identifies the set of event signatures a read cursor was recorded with */
         fun hashEventSignatures(eventSignatures: Collection<String>): WrappedByteArray =
-                MessageDigest.getInstance("SHA-256").digest(
+                MessageDigest.getInstance(KECCAK256).digest(
                         eventSignatures.sorted().joinToString(",").toByteArray()
                 ).wrap()
     }
