@@ -279,11 +279,11 @@ class EvmEventFetcher(
 
         val startPoints = contracts.map { (contract, skipToHeight) ->
             val lastCommittedEventHeight = getLastCommittedEvmEventHeight(networkId, contract.data)
-            val chainStateStartPoint = lastCommittedEventHeight ?: skipToHeight.toBigInteger()
-            if (persistedCursor != null && persistedCursor.contracts[contract] == skipToHeight && persistedCursor.height > chainStateStartPoint) {
+            val fallbackStartHeight = lastCommittedEventHeight ?: skipToHeight.toBigInteger()
+            if (persistedCursor != null && persistedCursor.contracts[contract] == skipToHeight && persistedCursor.height > fallbackStartHeight) {
                 ContractStartPoint(contract, persistedCursor.height, usedSkipToHeightFallback = false, usedPersistedCursor = true)
             } else {
-                ContractStartPoint(contract, chainStateStartPoint, usedSkipToHeightFallback = lastCommittedEventHeight == null, usedPersistedCursor = false)
+                ContractStartPoint(contract, fallbackStartHeight, usedSkipToHeightFallback = lastCommittedEventHeight == null, usedPersistedCursor = false)
             }
         }
         val lowest = startPoints.minBy { it.height }
