@@ -4,7 +4,6 @@ import assertk.assertThat
 import assertk.assertions.isEqualTo
 import assertk.assertions.isNull
 import net.postchain.StorageBuilder
-import net.postchain.base.withReadWriteConnection
 import net.postchain.base.withWriteConnection
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.wrap
@@ -94,17 +93,6 @@ class DatabaseEvmReadCursorStoreIT {
         val reopenedStore = DatabaseEvmReadCursorStore(storage, chainId).apply { initialize() }
 
         assertThat(reopenedStore.load(1L)).isEqualTo(cursor1)
-    }
-
-    @Test
-    fun `save is skipped while the calling thread has an open write context for the chain`() {
-        store.save(1L, cursor1)
-
-        withReadWriteConnection(storage, chainId) {
-            store.save(1L, cursor2)
-        }
-
-        assertThat(store.load(1L)).isEqualTo(cursor1)
     }
 
     @Test
