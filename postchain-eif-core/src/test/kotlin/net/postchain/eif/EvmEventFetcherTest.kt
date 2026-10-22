@@ -551,7 +551,7 @@ class EvmEventFetcherTest {
             // Both contracts are covered once the range has been read
             await.atMost(Duration.TEN_SECONDS).untilAsserted {
                 assertThat(rig.store.load(networkId)).isEqualTo(
-                        EvmReadCursor(160.toBigInteger(), mapOf(address1.wrap() to skipToHeightLow, address2.wrap() to skipToHeightLow), depositEventSignatures))
+                        EvmReadCursor(160.toBigInteger(), mapOf(address1.wrap() to skipToHeightLow, address2.wrap() to skipToHeightLow)))
             }
         } finally {
             rig.eventFetcher.shutdown()
@@ -581,7 +581,7 @@ class EvmEventFetcherTest {
         val rig = createRig(
                 contracts = listOf(contract1Low),
                 lastEventHeights = mapOf(address1.wrap() to 120L),
-                persistedCursor = EvmReadCursor(150.toBigInteger(), mapOf(address1.wrap() to skipToHeightHigh), depositEventSignatures),
+                persistedCursor = EvmReadCursor(150.toBigInteger(), mapOf(address1.wrap() to skipToHeightHigh)),
                 headHeight = 160L,
         )
         try {
@@ -589,28 +589,6 @@ class EvmEventFetcherTest {
                 assertThat(rig.filters.isNotEmpty()).isTrue()
             }
             assertThat(rig.filters.first()).isEqualTo(121L to 160L)
-        } finally {
-            rig.eventFetcher.shutdown()
-        }
-    }
-
-    @Test
-    fun `shouldn't use the persisted read cursor when the configured events have changed`() {
-        val rig = createRig(
-                contracts = listOf(contract1Low),
-                lastEventHeights = mapOf(address1.wrap() to 120L),
-                persistedCursor = EvmReadCursor(150.toBigInteger(), mapOf(address1.wrap() to skipToHeightLow), otherEventSignatures),
-                headHeight = 160L,
-        )
-        try {
-            await.atMost(Duration.TEN_SECONDS).untilAsserted {
-                assertThat(rig.filters.isNotEmpty()).isTrue()
-            }
-            assertThat(rig.filters.first()).isEqualTo(121L to 160L)
-            // The cursor is re-persisted for the current events
-            await.atMost(Duration.TEN_SECONDS).untilAsserted {
-                assertThat(rig.store.load(networkId)).isEqualTo(persistedCursorAt(160L))
-            }
         } finally {
             rig.eventFetcher.shutdown()
         }
@@ -622,7 +600,7 @@ class EvmEventFetcherTest {
         val rig = createRig(contracts = contractsToFetch, headHeight = 250L, maxReadAhead = 100L, delayWhenNoNewBlocks = 50L)
         try {
             await.atMost(Duration.TEN_SECONDS).untilAsserted {
-                assertThat(rig.store.load(networkId)).isEqualTo(EvmReadCursor(250.toBigInteger(), mapOf(address1.wrap() to skipToHeightHigh), depositEventSignatures))
+                assertThat(rig.store.load(networkId)).isEqualTo(EvmReadCursor(250.toBigInteger(), mapOf(address1.wrap() to skipToHeightHigh)))
             }
             val savesBeforeChange = rig.store.savedCursors.size
 
@@ -635,7 +613,7 @@ class EvmEventFetcherTest {
             // No rewind, and the cursor still records the skip-to-height the contract was read with
             assertThat(rig.eventFetcher.newContractFlushes.get()).isEqualTo(0L)
             assertThat(rig.eventProcessor.lastReadLogBlockHeight).isEqualTo(250.toBigInteger())
-            assertThat(rig.store.load(networkId)).isEqualTo(EvmReadCursor(250.toBigInteger(), mapOf(address1.wrap() to skipToHeightHigh), depositEventSignatures))
+            assertThat(rig.store.load(networkId)).isEqualTo(EvmReadCursor(250.toBigInteger(), mapOf(address1.wrap() to skipToHeightHigh)))
         } finally {
             rig.eventFetcher.shutdown()
         }
@@ -794,7 +772,7 @@ class EvmEventFetcherTest {
         val rig = createRig(contracts = contractsToFetch, headHeight = 250L, maxReadAhead = 100L, delayWhenNoNewBlocks = 50L)
         try {
             await.atMost(Duration.TEN_SECONDS).untilAsserted {
-                assertThat(rig.store.load(networkId)).isEqualTo(EvmReadCursor(250.toBigInteger(), mapOf(address1.wrap() to skipToHeightHigh), depositEventSignatures))
+                assertThat(rig.store.load(networkId)).isEqualTo(EvmReadCursor(250.toBigInteger(), mapOf(address1.wrap() to skipToHeightHigh)))
             }
             assertThat(rig.filters.first()).isEqualTo(201L to 250L)
             val requestsBeforeAdd = rig.filters.size
@@ -803,7 +781,7 @@ class EvmEventFetcherTest {
 
             await.atMost(Duration.TEN_SECONDS).untilAsserted {
                 assertThat(rig.store.load(networkId)).isEqualTo(
-                        EvmReadCursor(250.toBigInteger(), mapOf(address1.wrap() to skipToHeightHigh, address2.wrap() to skipToHeightLow), depositEventSignatures))
+                        EvmReadCursor(250.toBigInteger(), mapOf(address1.wrap() to skipToHeightHigh, address2.wrap() to skipToHeightLow)))
             }
             assertThat(rig.eventFetcher.newContractFlushes.get()).isEqualTo(1L)
             assertThat(rig.filters.drop(requestsBeforeAdd).take(2)).isEqualTo(listOf(101L to 201L, 202L to 250L))
@@ -861,10 +839,8 @@ class EvmEventFetcherTest {
     private val depositEvent = Event("Deposit", listOf())
     private val depositEventConfig = gtv(mapOf("name" to gtv("Deposit"), "inputs" to gtv(listOf())))
 
-    private val depositEventSignatures = EvmEventFetcher.hashEventSignatures(listOf(EventEncoder.encode(depositEvent)))
-    private val otherEventSignatures = EvmEventFetcher.hashEventSignatures(listOf(EventEncoder.encode(Event("Other", listOf()))))
 
-    private fun persistedCursorAt(height: Long) = EvmReadCursor(height.toBigInteger(), mapOf(address1.wrap() to skipToHeightLow), depositEventSignatures)
+    private fun persistedCursorAt(height: Long) = EvmReadCursor(height.toBigInteger(), mapOf(address1.wrap() to skipToHeightLow))
 
     private fun logObject(blockNumber: Long, address: ByteArray): EthLog.LogObject = EthLog.LogObject(
             false,

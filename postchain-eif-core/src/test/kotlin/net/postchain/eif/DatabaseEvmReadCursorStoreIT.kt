@@ -24,10 +24,8 @@ class DatabaseEvmReadCursorStoreIT {
     private val chainId = 1L
     private val address1 = "1234000000000000000000000000000000000000".hexStringToByteArray().wrap()
     private val address2 = "5678000000000000000000000000000000000000".hexStringToByteArray().wrap()
-    private val signatures1 = EvmEventFetcher.hashEventSignatures(listOf("0xaa", "0xbb"))
-    private val signatures2 = EvmEventFetcher.hashEventSignatures(listOf("0xcc"))
-    private val cursor1 = EvmReadCursor(BigInteger.valueOf(123_456_789L), mapOf(address2 to 200L, address1 to 100L), signatures1)
-    private val cursor2 = EvmReadCursor(BigInteger.valueOf(987_654_321L), mapOf(address1 to 100L), signatures2)
+    private val cursor1 = EvmReadCursor(BigInteger.valueOf(123_456_789L), mapOf(address2 to 200L, address1 to 100L))
+    private val cursor2 = EvmReadCursor(BigInteger.valueOf(987_654_321L), mapOf(address1 to 100L))
 
     private lateinit var storage: Storage
     private lateinit var store: DatabaseEvmReadCursorStore
@@ -111,7 +109,7 @@ class DatabaseEvmReadCursorStoreIT {
 
     @Test
     fun `cursor without contracts is ignored`() {
-        store.save(3L, EvmReadCursor(BigInteger.TEN, mapOf(), signatures1))
+        store.save(3L, EvmReadCursor(BigInteger.TEN, mapOf()))
 
         assertThat(store.load(3L)).isNull()
     }

@@ -24,17 +24,14 @@ import java.math.BigInteger
 /**
  * Node-local record of how far the EVM event reader of one network has progressed.
  *
- * @param height every EVM block at or below this height has been read with the contracts in [contracts] and the events
- * behind [eventSignaturesHash] in the filter and either contained no events for them or is included in a durably
- * committed block on this node
+ * @param height every EVM block at or below this height has been read with the contracts in [contracts] in the filter
+ * and either contained no events for them or is included in a durably committed block on this node
  * @param contracts the contracts that were in the reader's filter when [height] was recorded, with the skip-to-height
  * each one had at the time
- * @param eventSignaturesHash hash of the event signatures that were in the reader's filter, see [EvmEventFetcher.hashEventSignatures]
  */
-data class EvmReadCursor(val height: BigInteger, val contracts: Map<WrappedByteArray, Long>, val eventSignaturesHash: WrappedByteArray) {
+data class EvmReadCursor(val height: BigInteger, val contracts: Map<WrappedByteArray, Long>) {
     override fun toString(): String =
-            "EvmReadCursor(height=$height, contracts=${contracts.map { (address, skipToHeight) -> "0x${address.data.toHex()}:$skipToHeight" }}, " +
-                    "eventSignaturesHash=${eventSignaturesHash.data.toHex()})"
+            "EvmReadCursor(height=$height, contracts=${contracts.map { (address, skipToHeight) -> "0x${address.data.toHex()}:$skipToHeight" }})"
 }
 
 /**
@@ -71,7 +68,6 @@ class DatabaseEvmReadCursorStore(private val storage: Storage, private val chain
         val COLUMN_NETWORK_ID: Field<Long> = field("network_id", SQLDataType.BIGINT.nullable(false))
         val COLUMN_HEIGHT: Field<Long> = field("height", SQLDataType.BIGINT.nullable(false))
         val COLUMN_CONTRACTS: Field<ByteArray> = field("contracts", SQLDataType.BLOB.nullable(false))
-        val COLUMN_EVENT_SIGNATURES: Field<ByteArray> = field("event_signatures", SQLDataType.BLOB.nullable(false))
 
         fun tableName(ctx: EContext): String = DatabaseAccess.of(ctx).tableName(ctx, TABLE_NAME)
 
@@ -96,7 +92,6 @@ class DatabaseEvmReadCursorStore(private val storage: Storage, private val chain
                     .column(COLUMN_NETWORK_ID)
                     .column(COLUMN_HEIGHT)
                     .column(COLUMN_CONTRACTS)
-                    .column(COLUMN_EVENT_SIGNATURES)
                     .primaryKey(COLUMN_NETWORK_ID)
                     .execute()
             true
@@ -105,14 +100,13 @@ class DatabaseEvmReadCursorStore(private val storage: Storage, private val chain
 
     override fun load(networkId: Long): EvmReadCursor? = withReadConnection(storage, chainId) { ctx ->
         val record = using(ctx.conn, SQLDialect.POSTGRES)
-                .select(COLUMN_HEIGHT, COLUMN_CONTRACTS, COLUMN_EVENT_SIGNATURES)
+                .select(COLUMN_HEIGHT, COLUMN_CONTRACTS)
                 .from(table(tableName(ctx)))
                 .where(COLUMN_NETWORK_ID.eq(networkId))
                 .fetchOne() ?: return@withReadConnection null
 
         val cursor = try {
-            EvmReadCursor(BigInteger.valueOf(record.get(COLUMN_HEIGHT)), decodeContracts(record.get(COLUMN_CONTRACTS)),
-                    record.get(COLUMN_EVENT_SIGNATURES).wrap())
+            EvmReadCursor(BigInteger.valueOf(record.get(COLUMN_HEIGHT)), decodeContracts(record.get(COLUMN_CONTRACTS)))
         } catch (e: Exception) {
             logger.warn(e) { "Ignoring unreadable EVM read cursor for network $networkId: $e" }
             return@withReadConnection null
@@ -136,12 +130,10 @@ class DatabaseEvmReadCursorStore(private val storage: Storage, private val chain
                     .set(COLUMN_NETWORK_ID, networkId)
                     .set(COLUMN_HEIGHT, cursor.height.longValueExact())
                     .set(COLUMN_CONTRACTS, encodeContracts(cursor.contracts))
-                    .set(COLUMN_EVENT_SIGNATURES, cursor.eventSignaturesHash.data)
                     .onConflict(COLUMN_NETWORK_ID)
                     .doUpdate()
                     .set(COLUMN_HEIGHT, cursor.height.longValueExact())
                     .set(COLUMN_CONTRACTS, encodeContracts(cursor.contracts))
-                    .set(COLUMN_EVENT_SIGNATURES, cursor.eventSignaturesHash.data)
                     .execute()
             true
         }

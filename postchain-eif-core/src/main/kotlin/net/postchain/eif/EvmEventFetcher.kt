@@ -14,7 +14,6 @@ import kotlinx.coroutines.slf4j.MDCContext
 import kotlinx.coroutines.withTimeoutOrNull
 import mu.KLogging
 import mu.withLoggingContext
-import net.postchain.common.data.KECCAK256
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
@@ -36,7 +35,6 @@ import org.web3j.protocol.core.methods.response.EthLog
 import org.web3j.protocol.core.methods.response.Log
 import org.web3j.tx.Contract
 import java.math.BigInteger
-import java.security.MessageDigest
 import java.time.Clock
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration.Companion.milliseconds
@@ -70,12 +68,6 @@ class EvmEventFetcher(
     companion object : KLogging() {
         const val DEFAULT_CURSOR_PERSIST_INTERVAL = 10_000L
         private const val SHUTDOWN_JOIN_TIMEOUT = 2_000L
-
-        /** Identifies the set of event signatures a read cursor was recorded with */
-        fun hashEventSignatures(eventSignatures: Collection<String>): WrappedByteArray =
-                MessageDigest.getInstance(KECCAK256).digest(
-                        eventSignatures.sorted().joinToString(",").toByteArray()
-                ).wrap()
     }
 
     /** Where reading starts for one contract and why */
@@ -104,14 +96,6 @@ class EvmEventFetcher(
     /** Contracts currently in the filter, with the effective skip-to-height each one had when it entered the filter */
     @Volatile
     private var filterContracts = mapOf<WrappedByteArray, Long>()
-
-    /**
-     * Hash of the event signatures in the filter when the read position was initialized. Deliberately not refreshed
-     * when the configured events change at runtime: the persisted cursor then no longer matches the configuration and
-     * a restart falls back to the on-chain heights, which re-reads the history of the added events.
-     */
-    @Volatile
-    private var filterEventSignaturesHash: WrappedByteArray? = null
 
     /** Set when the read position was moved backwards, reported once the EVM chain head is known */
     @Volatile
@@ -259,11 +243,10 @@ class EvmEventFetcher(
     /**
      * Decides where to start reading when the reader starts. Every contract gets the highest start point known to be
      * safe for it:
-     * - the persisted read cursor, if it covers the contract (same address and skip-to-height, and the configured
-     *   events are unchanged): everything up to that height has already been read with the contract in the filter and
-     *   either committed or found empty;
-     * - otherwise (no cursor persisted yet, or the contract was added, its skip-to-height or the events changed since
-     *   the cursor was recorded) the height of the contract's last committed event, falling back to its skip-to-height.
+     * - the persisted read cursor, if it covers the contract (same address and skip-to-height): everything up to that
+     *   height has already been read with the contract in the filter and either committed or found empty;
+     * - otherwise (no cursor persisted yet, or the contract was added or its skip-to-height changed since the cursor
+     *   was recorded) the height of the contract's last committed event, falling back to its skip-to-height.
      *   This is the on-chain height, always safe on its own, but it means re-reading everything the
      *   contract has been quiet for;
      * - never below the on-chain height, so a stale cursor can not move the start point below what the chain
@@ -271,16 +254,11 @@ class EvmEventFetcher(
      * Reading starts at the lowest start point over all contracts.
      */
     private fun initializeReadPosition(contracts: List<Pair<WrappedByteArray, Long>>) {
-        val currentEventSignaturesHash = hashEventSignatures(fetchEventConfigs().keys)
         val persistedCursor = try {
             readCursorStore.load(networkId)
         } catch (e: Exception) {
             logger.warn(e) { "Unable to load persisted EVM read cursor, resuming from the on-chain heights: $e" }
             null
-        }?.takeIf { cursor ->
-            (cursor.eventSignaturesHash == currentEventSignaturesHash).also { unchanged ->
-                if (!unchanged) logger.info { "Configured EVM events changed since the read cursor was persisted, resuming from the on-chain heights" }
-            }
         }
 
         val startPoints = contracts.map { (contract, skipToHeight) ->
@@ -300,7 +278,6 @@ class EvmEventFetcher(
         }
         evmEventProcessor.flushEvents(lowest.height)
         filterContracts = contracts.toMap()
-        filterEventSignaturesHash = currentEventSignaturesHash
         readPositionInitialized = true
         pendingRewindReason = "start point set by ${lowest.describe()}"
         persistReadCursor()
@@ -371,7 +348,7 @@ class EvmEventFetcher(
     private fun persistReadCursor() {
         if (!readPositionInitialized) return
         val height = evmEventProcessor.safeResumeHeight() ?: return
-        val cursor = EvmReadCursor(height, filterContracts, filterEventSignaturesHash ?: return)
+        val cursor = EvmReadCursor(height, filterContracts)
         try {
             readCursorStore.save(networkId, cursor)
             lastCursorPersistTime = clock.millis()
