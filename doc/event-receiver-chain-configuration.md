@@ -57,7 +57,11 @@ When the reader starts (node start, chain restart, configuration update), each c
 
 So restarting a node whose reader was caught up costs only the blocks produced while it was down, no matter how long any contract has been quiet. Changing a contract's `skip_to_height` or the `events` still takes effect at the next start of the reader, exactly as before: the contract is then read again from its last committed event height or its `skip_to_height`. A contract that is removed and re-added with the same `skip_to_height` while the reader is not running is indistinguishable from an unchanged contract and keeps the persisted cursor.
 
-The cursor is written every 10 seconds while reading, before anything is read after the read cursor moved backwards (new contract, validation conflict on a non-signer) and on shutdown. When a signer rejects a block proposal because it does not match the events it fetched, it keeps its fetched events but lowers the persisted cursor to just below the conflicting EVM block height, so that a restart of the chain re-reads from there and repairs any divergence. The row for a network can be deleted from `sys.x.eif.evm_read_cursor` to force a full re-read from chain state at the next start.
+The cursor is written every 10 seconds while reading, at the next fetch after the read position moved backwards (new contract, validation conflict on a replica or a syncing validator) or a signer rejected a block proposal, and on shutdown.
+
+When a signer rejects a block proposal because its EVM blocks differ from the ones this node read from the EVM network, the node keeps the EVM blocks it read, but the persisted cursor is held just below the conflicting EVM block height until a block covering that height has been committed on the node. A restart of the chain in the meantime re-reads from there and repairs any divergence. A cursor written before the conflicting proposal arrived may already lie above that height, since a height with no events is not confirmed by anyone until a proposal claims events there; it is overwritten at the next fetch.
+
+The row for a network can be deleted from `sys.x.eif.evm_read_cursor` to force a full re-read from chain state at the next start.
 
 At start the reader logs the chosen start point; if it is more than `maxReadAhead` blocks behind the EVM chain head the line is logged as a warning and names the contract that set the start point.
 
@@ -70,7 +74,7 @@ The reader exposes these metrics, tagged with chain IID, blockchain RID and netw
 | `eif.evm_read_lag_blocks`                   | gauge   | Readable blocks (head minus `evm_read_offset`) not read yet, 0 when caught up                 |
 | `eif.evm_read_cursor_height`                | gauge   | Height of the last persisted read cursor                                                      |
 | `eif.evm_read_flush_total`                  | counter | Times the read position moved backwards, tagged with `reason` (`new_contract`, `validation_conflict`) |
-| `eif.evm_signer_validation_conflict_total`  | counter | Block proposals this node, as a signer, could not validate against the events it fetched      |
+| `eif.evm_signer_validation_conflict_total`  | counter | Block proposals this node, as a signer, rejected because their EVM blocks differ from the ones it read |
 
 
 In addition, the EVM Event Receiver blockchain configuration uses the `EifGTXModule` and `IcmfSenderGTXModule` GTX modules and the `EifSynchronizationInfrastructureExtension` synchronization extension. It also depends on the ICMF Rell library.
