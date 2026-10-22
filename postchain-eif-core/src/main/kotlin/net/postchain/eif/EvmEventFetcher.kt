@@ -269,6 +269,16 @@ class EvmEventFetcher(
      * - never below the on-chain height, so a stale cursor can not move the start point below what the chain
      *   already has.
      * Reading starts at the lowest start point over all contracts.
+     *
+     * The contracts recorded in the cursor are never compared with the configured ones as a set; the per-contract
+     * lookup above covers every difference between them:
+     * - a configured contract missing from the cursor was added while the reader was down. The lookup finds no
+     *   skip-to-height for it, so it gets its on-chain height, and since the lowest start point wins, the reader
+     *   rewinds to it;
+     * - a cursor contract that is no longer configured was removed while the reader was down. Nothing consults its
+     *   entry and nothing needs to: the cursor guarantees that every block up to its height was read with all of its
+     *   contracts in the filter, and reading with one contract more cannot have missed anything for the ones that
+     *   remain. Requiring equal sets would only force a needless rewind here.
      */
     private fun initializeReadPosition(contracts: List<Pair<WrappedByteArray, Long>>) {
         val persistedCursor = try {
