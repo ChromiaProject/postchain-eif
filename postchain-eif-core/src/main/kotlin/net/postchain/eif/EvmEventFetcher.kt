@@ -44,7 +44,8 @@ import kotlin.time.Duration.Companion.milliseconds
  *
  * @param evmReadOffset We will read this number of blocks from the block head on the evm chain, to avoid issues with chain reorg
  * @param readCursorStore Node-local persistence of the read position, so that a restarted reader resumes where it left off
- * @param minPollInterval Minimum duration of one fetch cycle while the reader is caught up with the EVM chain head (ms), 0 disables pacing
+ * @param minPollInterval Minimum duration of a fetch cycle that did not read below the EVM chain head (ms), whether it read new
+ * blocks or found none; 0 disables pacing
  * @param cursorPersistInterval How often the read position is persisted while reading (ms)
  */
 class EvmEventFetcher(
@@ -156,7 +157,7 @@ class EvmEventFetcher(
                             break
                         } catch (e: Exception) {
                             logger.error("Parsing of EVM logs unexpectedly failed: $e", e)
-                            delay(500.milliseconds) // Delay a bit and hope that we can recover
+                            delay(maxOf(500L, minPollInterval).milliseconds) // Delay a bit and hope that we can recover
                         }
                     }
                 }
@@ -182,7 +183,7 @@ class EvmEventFetcher(
             if (contracts.isEmpty()) {
                 logger.warn { "No contracts configured, trying again later" }
                 filterContracts = mapOf()
-                delay(delayWhenNoNewBlocks.milliseconds)
+                sleepUntilNextPoll(cycleStart)
                 return
             }
 
@@ -205,8 +206,7 @@ class EvmEventFetcher(
                 readLagBlocks = BigInteger.ZERO
                 logger.debug { "No new blocks to read. We are at height: $to" }
                 persistReadCursorIfDue()
-                // Sleep a bit until next attempt
-                delay(delayWhenNoNewBlocks.milliseconds)
+                sleepUntilNextPoll(cycleStart)
                 return
             }
 
@@ -215,7 +215,7 @@ class EvmEventFetcher(
             logger.debug { "Events: ${eventMap.values.map { it.name }}" }
             if (eventMap.isEmpty()) {
                 logger.warn { "No events configured, trying again later" }
-                delay(delayWhenNoNewBlocks.milliseconds)
+                sleepUntilNextPoll(cycleStart)
                 return
             }
 
@@ -274,9 +274,19 @@ class EvmEventFetcher(
      * than we poll. Catching up is not affected since this is only called when the last read ended at the head.
      */
     private suspend fun pauseAtHead(cycleStart: Long) {
-        val remaining = minPollInterval - (clock.millis() - cycleStart)
+        val remaining = remainingPollInterval(cycleStart)
         if (remaining > 0) pacingDelay(remaining)
     }
+
+    /** What is left of [minPollInterval] in the fetch cycle started at [cycleStart]; zero or less once it has passed or when pacing is off */
+    private fun remainingPollInterval(cycleStart: Long) = minPollInterval - (clock.millis() - cycleStart)
+
+    /**
+     * Sleeps before the next fetch cycle when this one read nothing: [delayWhenNoNewBlocks], or what is left of
+     * [minPollInterval] if that is longer, so that a cycle at the chain head never gets shorter than the poll interval.
+     */
+    private suspend fun sleepUntilNextPoll(cycleStart: Long) =
+            pacingDelay(maxOf(delayWhenNoNewBlocks, remainingPollInterval(cycleStart)))
 
     /**
      * Decides where to start reading when the reader starts. Every contract gets the highest start point known to be

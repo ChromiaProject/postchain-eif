@@ -966,6 +966,27 @@ class EvmEventFetcherTest {
         }
     }
 
+    @Test
+    fun `should pace polling when no new blocks are found`() {
+        val rig = createRig(
+                contracts = listOf(contract1Low),
+                persistedCursor = persistedCursorAt(150L),
+                headHeight = 150L,
+                minPollInterval = 2000L,
+                delayWhenNoNewBlocks = 100L,
+        )
+        try {
+            await.atMost(Duration.TEN_SECONDS).untilAsserted {
+                assertThat(rig.pacingDelays.size).isGreaterThan(3)
+            }
+            // Nothing to read at the head: every cycle sleeps the full poll interval, not just delayWhenNoNewBlocks
+            assertThat(rig.pacingDelays.all { it == 2000L }).isTrue()
+            assertThat(rig.filters.isEmpty()).isTrue()
+        } finally {
+            rig.eventFetcher.shutdown()
+        }
+    }
+
     private class MutableClock(startMillis: Long) : Clock() {
         private val now = AtomicLong(startMillis)
 
