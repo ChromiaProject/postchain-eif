@@ -6,6 +6,13 @@ import java.math.BigInteger
 
 interface EventFetcher : Shutdownable {
     fun flushEvents(resetToHeight: BigInteger)
+
+    /**
+     * Called when this node, as a signer, could not validate a block proposal against the events it has fetched.
+     * The fetched events are kept, but a restarted reader must not resume beyond [conflictingHeight] so that a restart
+     * repairs the divergence.
+     */
+    fun recordValidationConflict(conflictingHeight: BigInteger) {}
 }
 
 class NoOpEventFetcher(private val processor: EventProcessor) : EventFetcher {

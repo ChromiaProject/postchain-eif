@@ -83,7 +83,7 @@ class EifSynchronizationInfrastructureExtension(
                         val (eventProcessor, eventFetcher) = initializeEventProcessor(cfg, evmBlockchainName, evmBlockchainConfig, engine, evmConfig, hasLegacyDynamicContracts, hasDynamicContracts, hasDynamicEvents, hasLastEvmEventHeightQuery)
                         ext.addEventProcessor(evmBlockchainConfig.networkId, eventProcessor, eventFetcher)
                         eventFetchers[cfg.blockchainRid]?.set(evmBlockchainConfig.networkId, eventFetcher)
-                        eifMetricsRegistry.registerMetrics(cfg.chainID, cfg.blockchainRid, evmBlockchainConfig.networkId, eventProcessor)
+                        eifMetricsRegistry.registerMetrics(cfg.chainID, cfg.blockchainRid, evmBlockchainConfig.networkId, eventProcessor, eventFetcher)
                     }
                 } catch (e: Exception) {
                     disconnectProcess(process)
@@ -156,6 +156,7 @@ class EifSynchronizationInfrastructureExtension(
             val web3jServices = Web3jServiceFactory.buildServices(evmConfig.urls, evmConfig.connectTimeout,
                     evmConfig.readTimeout, evmConfig.writeTimeout, cfg.blockchainRid)
             val metrics = RpcUsageMetrics(cfg.chainID, cfg.blockchainRid, evmBlockchainConfig.networkId)
+            val readCursorStore = DatabaseEvmReadCursorStore(postchainContext.sharedStorage, cfg.chainID).apply { initialize() }
             val eventFetcher = EvmEventFetcher(
                     evmBlockchainConfig.networkId,
                     staticContracts,
@@ -171,6 +172,7 @@ class EifSynchronizationInfrastructureExtension(
                     evmConfig.delayWhenNoNewBlocks,
                     hasLastEvmEventHeightQuery = hasLastEvmEventHeightQuery,
                     eventProcessor,
+                    readCursorStore,
             )
             eventProcessor to eventFetcher
         }

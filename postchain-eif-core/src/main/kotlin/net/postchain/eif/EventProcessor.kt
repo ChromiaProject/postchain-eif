@@ -10,6 +10,7 @@ import net.postchain.gtv.GtvString
 import java.math.BigInteger
 import java.util.LinkedList
 import java.util.Queue
+import java.util.TreeSet
 
 enum class EncodedEvent(val index: Int) {
     TX_HASH(0),
@@ -27,6 +28,13 @@ interface EventProcessor {
     fun isValidEventData(ops: List<EvmBlockOp>): EventValidationResult
     fun markAsProcessed(ops: List<EvmBlockOp>)
     fun flushEvents(resetToHeight: BigInteger)
+
+    /**
+     * Called after a block has been durably committed. [markAsProcessed] for that block runs before the commit is durable.
+     *
+     * @param upToEvmBlockHeight the highest EVM block height of this network included in the committed block, null if none
+     */
+    fun blockCommitted(upToEvmBlockHeight: BigInteger?) {}
 }
 
 class EventValidationResult(
@@ -90,6 +98,52 @@ class EvmEventProcessor(
     @Volatile
     var lastReadLogBlockHeight: BigInteger = BigInteger.ZERO
 
+    /**
+     * EVM block heights that [safeResumeHeight] must stay below until a durably committed block covers them, that is
+     * until [blockCommitted] is called with that height or a later one. Two kinds of heights end up here:
+     * - blocks taken out of the queue by [markAsProcessed]: the block they went into is being committed but is not
+     *   durable yet, so a crash could still lose it
+     * - heights at which another signer's proposal disagreed with what this node read, see [holdResumeHeightBelow]:
+     *   this node does not know yet whether its own view of that height is the right one
+     */
+    private val unconfirmedHeights = TreeSet<BigInteger>()
+
+    /** Highest EVM block height included in a block that has been durably committed on this node, null if none seen */
+    @Volatile
+    var lastConfirmedEvmBlockHeight: BigInteger? = null
+        private set
+
+    /**
+     * Highest EVM block height such that every block at or below it has been read and either contained no events for
+     * the current contract set or is included in a block that has been durably committed on this node, and none of
+     * them is held by [holdResumeHeightBelow]. A restarted reader can safely resume from the block after this height.
+     * Returns null until anything has been read.
+     */
+    @Synchronized
+    fun safeResumeHeight(): BigInteger? {
+        if (lastReadLogBlockHeight == BigInteger.ZERO) return null
+        var safeHeight = lastReadLogBlockHeight
+        eventBlocks.peek()?.let { safeHeight = safeHeight.min(it.evmBlockHeight - BigInteger.ONE) }
+        unconfirmedHeights.firstOrNull()?.let { safeHeight = safeHeight.min(it - BigInteger.ONE) }
+        return safeHeight
+    }
+
+    /**
+     * Holds [safeResumeHeight] below [height] until a block including EVM block [height] or a later one has been durably
+     * committed on this node. Used by a signer that rejected a block proposal whose EVM blocks differ from the ones
+     * this node read: the blocks in memory are kept, but a restart must re-read from before the disagreement. Ignored
+     * if such a block has already been committed, since the proposal is then behind this node.
+     */
+    @Synchronized
+    fun holdResumeHeightBelow(height: BigInteger) {
+        val confirmed = lastConfirmedEvmBlockHeight
+        if (confirmed != null && confirmed >= height) {
+            logger.info { "Not holding the read cursor below EVM height $height, EVM blocks up to $confirmed are already committed" }
+            return
+        }
+        unconfirmedHeights.add(height)
+    }
+
     @Synchronized
     override fun isValidEventData(ops: List<EvmBlockOp>): EventValidationResult {
         withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
@@ -124,10 +178,19 @@ class EvmEventProcessor(
         }
     }
 
+    @Synchronized
     override fun markAsProcessed(ops: List<EvmBlockOp>) {
         if (ops.isNotEmpty()) {
+            ops.forEach { unconfirmedHeights.add(it.evmBlockHeight) }
             pruneEvents(ops.maxOf { it.evmBlockHeight })
         }
+    }
+
+    @Synchronized
+    override fun blockCommitted(upToEvmBlockHeight: BigInteger?) {
+        if (upToEvmBlockHeight == null) return
+        unconfirmedHeights.headSet(upToEvmBlockHeight, true).clear()
+        lastConfirmedEvmBlockHeight = lastConfirmedEvmBlockHeight?.max(upToEvmBlockHeight) ?: upToEvmBlockHeight
     }
 
     fun isQueueFull() = newBlocks().count() > maxQueueSize
