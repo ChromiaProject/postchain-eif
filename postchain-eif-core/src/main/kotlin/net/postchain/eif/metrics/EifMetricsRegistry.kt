@@ -31,7 +31,7 @@ class EifMetricsRegistry {
                     .tag(NETWORK_ID_TAG, networkId.toString())
                     .register(Metrics.globalRegistry)
 
-            val headGauge = Gauge.builder("eif.evm_head_block_height") { eventProcessor.lastSeenEvmHeadHeight }
+            val headGauge = Gauge.builder("eif.last_seen_evm_head_height") { eventProcessor.lastSeenEvmHeadHeight }
                     .description("Last EVM chain head height reported by the RPC node, before any read offset is applied.")
                     .tag(CHAIN_IID_TAG, chainIID.toString())
                     .tag(BLOCKCHAIN_RID_TAG, blockchainRid.toHex())
