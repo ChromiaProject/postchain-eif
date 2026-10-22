@@ -518,6 +518,50 @@ class EvmEventFetcherTest {
     }
 
     @Test
+    fun `should ignore a persisted read cursor below ignoreReadCursorBelow`() {
+        val rig = createRig(
+                contracts = listOf(contract1Low),
+                lastEventHeights = mapOf(address1.wrap() to 120L),
+                persistedCursor = persistedCursorAt(150L),
+                headHeight = 160L,
+                ignoreReadCursorBelow = 155L,
+        )
+        try {
+            await.atMost(Duration.TEN_SECONDS).untilAsserted {
+                assertThat(rig.filters.isNotEmpty()).isTrue()
+            }
+            // The cursor (150) is below the configured height: reading starts after the last committed event (120) instead
+            assertThat(rig.filters.first()).isEqualTo(121L to 160L)
+            // ... and the cursor is rewritten from there, so it is ignored again until the reader has passed 155
+            assertThat(rig.store.savedCursors.first().height).isEqualTo(120.toBigInteger())
+            await.atMost(Duration.TEN_SECONDS).untilAsserted {
+                assertThat(rig.store.load(networkId)?.height).isEqualTo(160.toBigInteger())
+            }
+        } finally {
+            rig.eventFetcher.shutdown()
+        }
+    }
+
+    @Test
+    fun `should use a persisted read cursor at or above ignoreReadCursorBelow`() {
+        val rig = createRig(
+                contracts = listOf(contract1Low),
+                lastEventHeights = mapOf(address1.wrap() to 120L),
+                persistedCursor = persistedCursorAt(150L),
+                headHeight = 160L,
+                ignoreReadCursorBelow = 150L,
+        )
+        try {
+            await.atMost(Duration.TEN_SECONDS).untilAsserted {
+                assertThat(rig.filters.isNotEmpty()).isTrue()
+            }
+            assertThat(rig.filters.first()).isEqualTo(151L to 160L)
+        } finally {
+            rig.eventFetcher.shutdown()
+        }
+    }
+
+    @Test
     fun `shouldn't resume below the on-chain height when the persisted read cursor is behind it`() {
         val rig = createRig(
                 contracts = listOf(contract1Low),
@@ -902,6 +946,7 @@ class EvmEventFetcherTest {
             maxReadAhead: Long = 100L,
             delayWhenNoNewBlocks: Long = 100L,
             getLogsLatency: Long = 0L,
+            ignoreReadCursorBelow: Long = 0L,
     ): Rig {
         val blockQueries = mock<BlockQueries> {
             on { query(eq(EIF_CONFIG_CONTRACTS_TO_FETCH_QUERY), any()) } doAnswer {
@@ -981,6 +1026,7 @@ class EvmEventFetcherTest {
                 hasLastEvmEventHeightQuery = true,
                 evmEventProcessor = eventProcessor,
                 readCursorStore = store,
+                ignoreReadCursorBelow = ignoreReadCursorBelow.toBigInteger(),
                 cursorPersistInterval = 0L,
                 clock = clock,
         ).also(fetchers::add)

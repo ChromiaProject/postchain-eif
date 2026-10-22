@@ -123,6 +123,7 @@ class EifSynchronizationInfrastructureExtension(
         if (evmBlockchainConfig.readOffset < 0) throw UserMistake("readOffset cannot be negative")
         if (evmBlockchainConfig.evmReadOffset < 0) throw UserMistake("evmReadOffset cannot be negative")
         if (evmConfig.maxQueueSize < 0) throw UserMistake("maxQueueSize cannot be negative")
+        if (evmConfig.ignoreReadCursorBelow < 0) throw UserMistake("ignoreReadCursorBelow for EVM network: $evmBlockchainName is negative")
 
         val eventProcessor = EvmEventProcessor(
                 evmBlockchainConfig.networkId,
@@ -173,6 +174,7 @@ class EifSynchronizationInfrastructureExtension(
                     hasLastEvmEventHeightQuery = hasLastEvmEventHeightQuery,
                     eventProcessor,
                     readCursorStore,
+                    ignoreReadCursorBelow = BigInteger.valueOf(evmConfig.ignoreReadCursorBelow),
             )
             eventProcessor to eventFetcher
         }

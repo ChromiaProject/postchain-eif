@@ -15,6 +15,7 @@ class EifContainerConfigProviderTest {
             addProperty("evm.chains", "ethereum")
             addProperty("ethereum.urls", "testurl")
             addProperty("ethereum.maxReadAhead", 1)
+            addProperty("ethereum.ignoreReadCursorBelow", 5)
         }
         val appConfig = AppConfig(config)
 
@@ -22,5 +23,6 @@ class EifContainerConfigProviderTest {
 
         assertEquals("testurl", envConfigMap["${EIF_CONFIG_ENV_PREFIX}ETHEREUM_URLS"])
         assertEquals("1", envConfigMap["${EIF_CONFIG_ENV_PREFIX}ETHEREUM_MAX_READ_AHEAD"])
+        assertEquals("5", envConfigMap["${EIF_CONFIG_ENV_PREFIX}ETHEREUM_IGNORE_READ_CURSOR_BELOW"])
     }
 }
