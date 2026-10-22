@@ -4,7 +4,6 @@ import mu.KLogging
 import net.postchain.base.data.DatabaseAccess
 import net.postchain.base.withReadConnection
 import net.postchain.base.withWriteConnection
-import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.toHex
 import net.postchain.common.types.WrappedByteArray
 import net.postchain.common.wrap
@@ -83,9 +82,6 @@ class DatabaseEvmReadCursorStore(private val storage: Storage, private val chain
     }
 
     fun initialize() {
-        if (storage.getExistingWriteContext(chainId) != null) {
-            throw ProgrammerMistake("EVM read cursor table must not be created from within a block transaction")
-        }
         withWriteConnection(storage, chainId) { ctx ->
             using(ctx.conn, SQLDialect.POSTGRES)
                     .createTableIfNotExists(table(tableName(ctx)))
@@ -119,11 +115,6 @@ class DatabaseEvmReadCursorStore(private val storage: Storage, private val chain
     }
 
     override fun save(networkId: Long, cursor: EvmReadCursor) {
-        if (storage.getExistingWriteContext(chainId) != null) {
-            // Never write from a thread that is in the middle of a block transaction for this chain
-            logger.warn { "Not persisting EVM read cursor $cursor for network $networkId from within a block transaction" }
-            return
-        }
         withWriteConnection(storage, chainId) { ctx ->
             using(ctx.conn, SQLDialect.POSTGRES)
                     .insertInto(table(tableName(ctx)))
