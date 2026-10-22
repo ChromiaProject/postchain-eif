@@ -134,7 +134,7 @@ class EvmEventFetcher(
                             break
                         } catch (e: Exception) {
                             logger.error("Parsing of EVM logs unexpectedly failed: $e", e)
-                            delay(500) // Delay a bit and hope that we can recover
+                            delay(500.milliseconds) // Delay a bit and hope that we can recover
                         }
                     }
                 }
@@ -158,7 +158,7 @@ class EvmEventFetcher(
             if (contracts.isEmpty()) {
                 logger.warn { "No contracts configured, trying again later" }
                 filterContracts = mapOf()
-                delay(delayWhenNoNewBlocks)
+                delay(delayWhenNoNewBlocks.milliseconds)
                 return
             }
 
@@ -182,7 +182,7 @@ class EvmEventFetcher(
                 logger.debug { "No new blocks to read. We are at height: $to" }
                 persistReadCursorIfDue()
                 // Sleep a bit until next attempt
-                delay(delayWhenNoNewBlocks)
+                delay(delayWhenNoNewBlocks.milliseconds)
                 return
             }
 
@@ -191,7 +191,7 @@ class EvmEventFetcher(
             logger.debug { "Events: ${eventMap.values.map { it.name }}" }
             if (eventMap.isEmpty()) {
                 logger.warn { "No events configured, trying again later" }
-                delay(delayWhenNoNewBlocks)
+                delay(delayWhenNoNewBlocks.milliseconds)
                 return
             }
 
@@ -229,12 +229,12 @@ class EvmEventFetcher(
 
             // If we just saw one new block, we can probably sleep
             if (to == from) {
-                delay(delayWhenNoNewBlocks)
+                delay(delayWhenNoNewBlocks.milliseconds)
             }
 
             while (evmEventProcessor.isQueueFull()) {
                 logger.debug("Wait for events to be consumed until we read more")
-                delay(500)
+                delay(500.milliseconds)
                 persistReadCursorIfDue()
             }
         }
