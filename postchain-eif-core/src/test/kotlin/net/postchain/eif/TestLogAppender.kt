@@ -9,25 +9,27 @@ import org.apache.logging.log4j.core.LifeCycle
 import org.apache.logging.log4j.core.LogEvent
 import org.apache.logging.log4j.core.LoggerContext
 import java.io.Serializable
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 
 // Log appender used to capture and assert log entries
-class TestLogAppender(private val levels: List<Level>) : Appender {
+class TestLogAppender(levels: List<Level>) : Appender {
 
     private val events = ConcurrentLinkedQueue<LogEvent>()
+    private val levels = ConcurrentHashMap.newKeySet<Level>().apply { addAll(levels) }
 
     companion object {
 
         private var SINGLETON: TestLogAppender? = null
 
-        // Use singleton for all tests since appenders in log4j are static
+        // Use singleton for all tests since appenders in log4j are static. Every caller's levels are captured from then on.
         fun addAppender(levels: List<Level>): TestLogAppender {
             if (SINGLETON == null) {
                 SINGLETON = TestLogAppender(levels)
                 val context = LoggerContext.getContext(false)
                 context.rootLogger.addAppender(SINGLETON)
             }
-            return SINGLETON!!
+            return SINGLETON!!.also { it.levels.addAll(levels) }
         }
     }
 
@@ -85,6 +87,9 @@ class TestLogAppender(private val levels: List<Level>) : Appender {
             fail("Expected log ${level.name()} message matching regex: $messageReg - but only found on same level: ${eventsOnLevel.joinToString(", ") { it.message.formattedMessage }}")
         }
     }
+
+    fun hasEvent(level: Level, message: String): Boolean =
+            events.any { it.level == level && it.message.formattedMessage.contains(message) }
 
     fun clear() {
         events.clear()
