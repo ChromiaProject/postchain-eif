@@ -518,7 +518,7 @@ class EvmEventFetcherTest {
     }
 
     @Test
-    fun `shouldn't resume below the chain state when the persisted read cursor is behind it`() {
+    fun `shouldn't resume below the on-chain height when the persisted read cursor is behind it`() {
         val rig = createRig(
                 contracts = listOf(contract1Low),
                 lastEventHeights = mapOf(address1.wrap() to 140L),

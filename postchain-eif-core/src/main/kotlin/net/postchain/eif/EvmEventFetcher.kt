@@ -97,7 +97,7 @@ class EvmEventFetcher(
 
     // Read position: what the read cursor covers and how it was initialized
 
-    /** False until the read position has been initialized from the persisted read cursor and the chain state */
+    /** False until the read position has been initialized from the persisted read cursor and the on-chain heights */
     @Volatile
     private var readPositionInitialized = false
 
@@ -108,7 +108,7 @@ class EvmEventFetcher(
     /**
      * Hash of the event signatures in the filter when the read position was initialized. Deliberately not refreshed
      * when the configured events change at runtime: the persisted cursor then no longer matches the configuration and
-     * a restart falls back to chain state, which re-reads the history of the added events.
+     * a restart falls back to the on-chain heights, which re-reads the history of the added events.
      */
     @Volatile
     private var filterEventSignaturesHash: WrappedByteArray? = null
@@ -264,9 +264,9 @@ class EvmEventFetcher(
      *   either committed or found empty;
      * - otherwise (no cursor persisted yet, or the contract was added, its skip-to-height or the events changed since
      *   the cursor was recorded) the height of the contract's last committed event, falling back to its skip-to-height.
-     *   This is the start point that is always safe from chain state alone, but it means re-reading everything the
+     *   This is the on-chain height, always safe on its own, but it means re-reading everything the
      *   contract has been quiet for;
-     * - never below the chain state start point, so a stale cursor can not move the start point below what the chain
+     * - never below the on-chain height, so a stale cursor can not move the start point below what the chain
      *   already has.
      * Reading starts at the lowest start point over all contracts.
      */
@@ -275,11 +275,11 @@ class EvmEventFetcher(
         val persistedCursor = try {
             readCursorStore.load(networkId)
         } catch (e: Exception) {
-            logger.warn(e) { "Unable to load persisted EVM read cursor, resuming from chain state: $e" }
+            logger.warn(e) { "Unable to load persisted EVM read cursor, resuming from the on-chain heights: $e" }
             null
         }?.takeIf { cursor ->
             (cursor.eventSignaturesHash == currentEventSignaturesHash).also { unchanged ->
-                if (!unchanged) logger.info { "Configured EVM events changed since the read cursor was persisted, resuming from chain state" }
+                if (!unchanged) logger.info { "Configured EVM events changed since the read cursor was persisted, resuming from the on-chain heights" }
             }
         }
 

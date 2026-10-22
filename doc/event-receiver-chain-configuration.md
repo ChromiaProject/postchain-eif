@@ -50,15 +50,15 @@ Each node keeps a per-network **read cursor** of its own: the highest EVM block 
 
 When the reader starts (node start, chain restart, configuration update), it determines for each contract the height up to which that contract is already done, and resumes reading after the lowest of them:
 
-1. The contract's **chain-state height**: its last committed event height, or its `skip_to_height` if it has no committed events. This is the rule from before the read cursor existed and always applies.
+1. The contract's **on-chain height**, the height the chain itself vouches for and that is identical on every node: the contract's last committed event height, or its `skip_to_height` if the chain holds no committed event from it. This is the rule from before the read cursor existed and always applies.
 2. The **persisted cursor height**, if it is higher and the cursor was written with this contract in the filter with the same `skip_to_height` as now, and the configured `events` are unchanged. Otherwise the cursor may have passed blocks holding events that nobody was reading at the time, and it is ignored for that contract.
 
 | Situation at start                                                         | Resume height of the contract                              |
 |----------------------------------------------------------------------------|------------------------------------------------------------|
-| Contract unchanged since the cursor was written                            | The higher of the cursor height and its chain-state height |
-| Contract added, or its `skip_to_height` changed, while the reader was down | Its chain-state height                                     |
-| Configured `events` changed while the reader was down                      | Chain-state height for every contract                      |
-| First start on this node, or the cursor row was deleted                    | Chain-state height for every contract                      |
+| Contract unchanged since the cursor was written                            | The higher of the cursor height and its on-chain height    |
+| Contract added, or its `skip_to_height` changed, while the reader was down | Its on-chain height                                        |
+| Configured `events` changed while the reader was down                      | On-chain height for every contract                         |
+| First start on this node, or the cursor row was deleted                    | On-chain height for every contract                         |
 
 So restarting a node whose reader was caught up costs only the blocks produced while it was down, no matter how long any contract has been quiet. Changing a contract's `skip_to_height` or the `events` still takes effect at the next start of the reader, exactly as before: the contract is then read again from its last committed event height or its `skip_to_height`. A contract that is removed and re-added with the same `skip_to_height` while the reader is not running is indistinguishable from an unchanged contract and keeps the persisted cursor.
 
@@ -66,7 +66,7 @@ The cursor is written every 10 seconds while reading, at the next fetch after th
 
 When a signer rejects a block proposal because its EVM blocks differ from the ones this node read from the EVM network, the node keeps the EVM blocks it read, but the persisted cursor is held just below the conflicting EVM block height until a block covering that height has been committed on the node. A restart of the chain in the meantime re-reads from there and repairs any divergence.
 
-**Note:** The cursor is this node's own claim about what it has read: a height with no events is confirmed by nobody until a proposal claims events there. A cursor written before such a proposal arrived may therefore already lie above the conflicting height. It is overwritten at the next fetch, but if the node goes down before that, it restarts above the conflict and rejects the same proposal again. In that case, or whenever a node must re-read from chain state for any other reason, delete the network's row from `sys.x.eif.evm_read_cursor`; the next start then ignores the cursor and starts from the contracts' last committed event heights.
+**Note:** The cursor is this node's own claim about what it has read: a height with no events is confirmed by nobody until a proposal claims events there. A cursor written before such a proposal arrived may therefore already lie above the conflicting height. It is overwritten at the next fetch, but if the node goes down before that, it restarts above the conflict and rejects the same proposal again. In that case, or whenever a node must start over from the on-chain heights for any other reason, delete the network's row from `sys.x.eif.evm_read_cursor`; the next start then ignores the cursor.
 
 At start the reader logs the chosen start point; if it is more than `maxReadAhead` blocks behind the EVM chain head the line is logged as a warning and names the contract that set the start point.
 
