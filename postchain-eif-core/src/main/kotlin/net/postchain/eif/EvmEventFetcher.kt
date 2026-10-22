@@ -44,6 +44,7 @@ import kotlin.time.Duration.Companion.milliseconds
  *
  * @param evmReadOffset We will read this number of blocks from the block head on the evm chain, to avoid issues with chain reorg
  * @param readCursorStore Node-local persistence of the read position, so that a restarted reader resumes where it left off
+ * @param minPollInterval Minimum duration of one fetch cycle while the reader is caught up with the EVM chain head (ms), 0 disables pacing
  * @param cursorPersistInterval How often the read position is persisted while reading (ms)
  */
 class EvmEventFetcher(
@@ -62,10 +63,12 @@ class EvmEventFetcher(
         private val hasLastEvmEventHeightQuery: Boolean,
         private val evmEventProcessor: EvmEventProcessor,
         private val readCursorStore: EvmReadCursorStore,
+        private val minPollInterval: Long,
         /** A persisted read cursor below this EVM block height is ignored at start, see [initializeReadPosition] */
         private val ignoreReadCursorBelow: BigInteger = BigInteger.ZERO,
         private val cursorPersistInterval: Long = DEFAULT_CURSOR_PERSIST_INTERVAL,
         private val clock: Clock = Clock.systemUTC(),
+        private val pacingDelay: suspend (Long) -> Unit = { delay(it.milliseconds) },
 ) : EventFetcher {
     companion object : KLogging() {
         const val DEFAULT_CURSOR_PERSIST_INTERVAL = 10_000L
@@ -164,6 +167,8 @@ class EvmEventFetcher(
      */
     private suspend fun fetchEvents() {
         withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
+            val cycleStart = clock.millis()
+
             if (cursorPersistRequested) {
                 cursorPersistRequested = false
                 persistReadCursor()
@@ -246,9 +251,13 @@ class EvmEventFetcher(
             readLagBlocks = currentBlockHeight - to
             persistReadCursorIfDue()
 
-            // If we just saw one new block, we can probably sleep
-            if (to == from) {
-                delay(delayWhenNoNewBlocks.milliseconds)
+            if (minPollInterval > 0) {
+                if (to == currentBlockHeight && !evmEventProcessor.isQueueFull()) {
+                    pauseAtHead(cycleStart)
+                }
+            } else if (to == from) {
+                // If we just saw one new block, we can probably sleep
+                pacingDelay(delayWhenNoNewBlocks)
             }
 
             while (evmEventProcessor.isQueueFull()) {
@@ -257,6 +266,16 @@ class EvmEventFetcher(
                 persistReadCursorIfDue()
             }
         }
+    }
+
+    /**
+     * We have just read up to the EVM chain head (minus the EVM read offset). Make sure a fetch cycle at the head takes
+     * at least [minPollInterval], so that the RPC node is polled at a bounded rate on networks that produce blocks faster
+     * than we poll. Catching up is not affected since this is only called when the last read ended at the head.
+     */
+    private suspend fun pauseAtHead(cycleStart: Long) {
+        val remaining = minPollInterval - (clock.millis() - cycleStart)
+        if (remaining > 0) pacingDelay(remaining)
     }
 
     /**

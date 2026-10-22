@@ -14,10 +14,13 @@ data class EvmConfig(
         val urls: List<String>,
         val maxReadAhead: Long,
         val maxQueueSize: Long,
+        // Minimum duration of one fetch cycle while the reader is caught up with the EVM chain head (milliseconds). 0 disables pacing.
+        val minPollInterval: Long = DEFAULT_MIN_POLL_INTERVAL,
         val ignoreReadCursorBelow: Long = 0L,
 ) {
     companion object {
         const val EIF_CONFIG_ENV_PREFIX = "POSTCHAIN_EIF_"
+        const val DEFAULT_MIN_POLL_INTERVAL = 2_000L
         private const val EVM_CONNECT_TIMEOUT = "${EIF_CONFIG_ENV_PREFIX}EVM_CONNECT_TIMEOUT"
         private const val EVM_READ_TIMEOUT = "${EIF_CONFIG_ENV_PREFIX}EVM_READ_TIMEOUT"
         private const val EVM_WRITE_TIMEOUT = "${EIF_CONFIG_ENV_PREFIX}EVM_WRITE_TIMEOUT"
@@ -42,6 +45,7 @@ data class EvmConfig(
                     config.getEnvOrListProperty(chainProperty(chain, "URLS"), "$chain.urls", listOf()),
                     config.getEnvOrLong(chainProperty(chain, "MAX_READ_AHEAD"), "$chain.maxReadAhead", 2_000L),
                     config.getEnvOrLong(EVM_MAX_QUEUE_SIZE, "evm.maxQueueSize", 10_000L),
+                    config.getEnvOrLong(chainProperty(chain, "MIN_POLL_INTERVAL"), "$chain.minPollInterval", DEFAULT_MIN_POLL_INTERVAL),
                     config.getEnvOrLong(chainProperty(chain, "IGNORE_READ_CURSOR_BELOW"), "$chain.ignoreReadCursorBelow", 0L),
             )
         }
@@ -63,6 +67,7 @@ data class EvmConfig(
         put(EVM_MAX_QUEUE_SIZE, maxQueueSize.toString())
         put(chainProperty(chain, "URLS"), urls.joinToString(","))
         put(chainProperty(chain, "MAX_READ_AHEAD"), maxReadAhead.toString())
+        put(chainProperty(chain, "MIN_POLL_INTERVAL"), minPollInterval.toString())
         put(chainProperty(chain, "IGNORE_READ_CURSOR_BELOW"), ignoreReadCursorBelow.toString())
     }
 }
