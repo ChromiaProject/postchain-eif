@@ -62,6 +62,8 @@ class EvmEventFetcher(
         private val hasLastEvmEventHeightQuery: Boolean,
         private val evmEventProcessor: EvmEventProcessor,
         private val readCursorStore: EvmReadCursorStore,
+        /** A persisted read cursor below this EVM block height is ignored at start, see [initializeReadPosition] */
+        private val ignoreReadCursorBelow: BigInteger = BigInteger.ZERO,
         private val cursorPersistInterval: Long = DEFAULT_CURSOR_PERSIST_INTERVAL,
         private val clock: Clock = Clock.systemUTC(),
 ) : EventFetcher {
@@ -270,6 +272,11 @@ class EvmEventFetcher(
      *   already has.
      * Reading starts at the lowest start point over all contracts.
      *
+     * A persisted cursor below [ignoreReadCursorBelow] is treated as if there were none: the operator's way to make
+     * the node read the EVM chain again from the on-chain heights without touching the database. The cursor is then
+     * rewritten from the new start point, so it stays ignored at every start until the reader has read past that
+     * height, and the setting has no effect once it has.
+     *
      * The contracts recorded in the cursor are never compared with the configured ones as a set; the per-contract
      * lookup above covers every difference between them:
      * - a configured contract missing from the cursor was added while the reader was down. The lookup finds no
@@ -281,12 +288,13 @@ class EvmEventFetcher(
      *   remain. Requiring equal sets would only force a needless rewind here.
      */
     private fun initializeReadPosition(contracts: List<Pair<WrappedByteArray, Long>>) {
-        val persistedCursor = try {
+        val loadedCursor = try {
             readCursorStore.load(networkId)
         } catch (e: Exception) {
             logger.warn(e) { "Unable to load persisted EVM read cursor, resuming from the on-chain heights: $e" }
             null
         }
+        val persistedCursor = loadedCursor?.takeIf { it.height >= ignoreReadCursorBelow }
 
         val startPoints = contracts.map { (contract, skipToHeight) ->
             val lastCommittedEventHeight = getLastCommittedEvmEventHeight(networkId, contract.data)
@@ -301,7 +309,11 @@ class EvmEventFetcher(
 
         logger.info {
             "Starting to read EVM events from height ${lowest.height + BigInteger.ONE}, start point set by ${lowest.describe()}. " +
-                    (persistedCursor?.let { "Persisted read cursor: $it" } ?: "No persisted read cursor")
+                    when {
+                        persistedCursor != null -> "Persisted read cursor: $persistedCursor"
+                        loadedCursor != null -> "Persisted read cursor ignored, below ignoreReadCursorBelow=$ignoreReadCursorBelow: $loadedCursor"
+                        else -> "No persisted read cursor"
+                    }
         }
         evmEventProcessor.flushEvents(lowest.height)
         filterContracts = contracts.toMap()

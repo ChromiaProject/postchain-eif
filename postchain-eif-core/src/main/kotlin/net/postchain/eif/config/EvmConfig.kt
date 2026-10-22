@@ -13,7 +13,8 @@ data class EvmConfig(
         val maxTryErrors: Long,
         val urls: List<String>,
         val maxReadAhead: Long,
-        val maxQueueSize: Long
+        val maxQueueSize: Long,
+        val ignoreReadCursorBelow: Long = 0L,
 ) {
     companion object {
         const val EIF_CONFIG_ENV_PREFIX = "POSTCHAIN_EIF_"
@@ -40,7 +41,8 @@ data class EvmConfig(
                     config.getEnvOrLong(EVM_MAX_TRY_ERRORS, "evm.maxTryErrors", 10L),
                     config.getEnvOrListProperty(chainProperty(chain, "URLS"), "$chain.urls", listOf()),
                     config.getEnvOrLong(chainProperty(chain, "MAX_READ_AHEAD"), "$chain.maxReadAhead", 2_000L),
-                    config.getEnvOrLong(EVM_MAX_QUEUE_SIZE, "evm.maxQueueSize", 10_000L)
+                    config.getEnvOrLong(EVM_MAX_QUEUE_SIZE, "evm.maxQueueSize", 10_000L),
+                    config.getEnvOrLong(chainProperty(chain, "IGNORE_READ_CURSOR_BELOW"), "$chain.ignoreReadCursorBelow", 0L),
             )
         }
 
@@ -61,5 +63,6 @@ data class EvmConfig(
         put(EVM_MAX_QUEUE_SIZE, maxQueueSize.toString())
         put(chainProperty(chain, "URLS"), urls.joinToString(","))
         put(chainProperty(chain, "MAX_READ_AHEAD"), maxReadAhead.toString())
+        put(chainProperty(chain, "IGNORE_READ_CURSOR_BELOW"), ignoreReadCursorBelow.toString())
     }
 }
