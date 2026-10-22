@@ -48,12 +48,17 @@ Each entry in `contracts_to_fetch` has the following configuration properties:
 
 Each node keeps a per-network **read cursor** of its own: the highest EVM block height up to which every block has been read and either contained no events for the configured contracts or has been committed on the node. The cursor is node-local state, stored in the table `sys.x.eif.evm_read_cursor` in the chain's database schema. It is not part of consensus and is dropped together with the chain's other tables when the chain is removed from the node.
 
-When the reader starts (node start, chain restart, configuration update), each contract gets a start point and reading begins at the lowest of them:
+When the reader starts (node start, chain restart, configuration update), it determines for each contract the height up to which that contract is already done, and resumes reading after the lowest of them:
 
-| Contract                                                                                                                                                       | Start point                                                                                                    |
-|----------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
-| Covered by the persisted read cursor: it entered the filter with the same `skip_to_height`, and the configured `events` are unchanged since the reader last started | The persisted cursor height, or the contract's last committed event height if that is higher                  |
-| Not covered: first start on this node, or the contract was added, its `skip_to_height` was changed or the `events` were changed since the reader last started   | The contract's last committed event height, or its `skip_to_height` if it has no committed events (see above) |
+1. The contract's **chain-state height**: its last committed event height, or its `skip_to_height` if it has no committed events. This is the rule from before the read cursor existed and always applies.
+2. The **persisted cursor height**, if it is higher and the cursor was written with this contract in the filter with the same `skip_to_height` as now, and the configured `events` are unchanged. Otherwise the cursor may have passed blocks holding events that nobody was reading at the time, and it is ignored for that contract.
+
+| Situation at start                                                         | Resume height of the contract                              |
+|----------------------------------------------------------------------------|------------------------------------------------------------|
+| Contract unchanged since the cursor was written                            | The higher of the cursor height and its chain-state height |
+| Contract added, or its `skip_to_height` changed, while the reader was down | Its chain-state height                                     |
+| Configured `events` changed while the reader was down                      | Chain-state height for every contract                      |
+| First start on this node, or the cursor row was deleted                    | Chain-state height for every contract                      |
 
 So restarting a node whose reader was caught up costs only the blocks produced while it was down, no matter how long any contract has been quiet. Changing a contract's `skip_to_height` or the `events` still takes effect at the next start of the reader, exactly as before: the contract is then read again from its last committed event height or its `skip_to_height`. A contract that is removed and re-added with the same `skip_to_height` while the reader is not running is indistinguishable from an unchanged contract and keeps the persisted cursor.
 
