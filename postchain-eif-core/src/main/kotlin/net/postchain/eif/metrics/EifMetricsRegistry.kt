@@ -38,7 +38,7 @@ class EifMetricsRegistry {
                     .tag(NETWORK_ID_TAG, networkId.toString())
                     .register(Metrics.globalRegistry)
 
-            val lagGauge = Gauge.builder("eif.evm_read_lag_blocks") { eventProcessor.readLagBlocks }
+            val lagGauge = Gauge.builder("eif.unread_evm_blocks") { eventProcessor.readLagBlocks }
                     .description("Number of readable EVM blocks (head minus 'evm_read_offset') not yet read. 0 when the reader is caught up.")
                     .tag(CHAIN_IID_TAG, chainIID.toString())
                     .tag(BLOCKCHAIN_RID_TAG, blockchainRid.toHex())
@@ -48,7 +48,7 @@ class EifMetricsRegistry {
             meters.getOrPut(blockchainRid) { mutableListOf() }.addAll(listOf(gauge, headGauge, lagGauge))
         }
         if (eventFetcher is EvmEventFetcher) {
-            val cursorGauge = Gauge.builder("eif.evm_read_cursor_height") { eventFetcher.lastPersistedCursorHeight ?: BigInteger.ZERO }
+            val cursorGauge = Gauge.builder("eif.last_persisted_evm_block_height") { eventFetcher.lastPersistedCursorHeight ?: BigInteger.ZERO }
                     .description("Height of the last persisted EVM read cursor. A restarted reader resumes after this height. 0 until the reader has persisted anything.")
                     .tag(CHAIN_IID_TAG, chainIID.toString())
                     .tag(BLOCKCHAIN_RID_TAG, blockchainRid.toHex())
@@ -59,7 +59,7 @@ class EifMetricsRegistry {
                     "new_contract" to eventFetcher.newContractFlushes,
                     "validation_conflict" to eventFetcher.validationConflictFlushes,
             ).map { (reason, counter) ->
-                FunctionCounter.builder("eif.evm_read_flush_total", counter) { it.get().toDouble() }
+                FunctionCounter.builder("eif.evm_read_rewind_total", counter) { it.get().toDouble() }
                         .description("Number of times the EVM read position was moved backwards, by reason.")
                         .tag(CHAIN_IID_TAG, chainIID.toString())
                         .tag(BLOCKCHAIN_RID_TAG, blockchainRid.toHex())

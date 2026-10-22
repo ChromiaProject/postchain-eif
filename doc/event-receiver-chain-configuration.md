@@ -70,10 +70,10 @@ The reader exposes these metrics, tagged with chain IID, blockchain RID and netw
 | Metric                                      | Type    | Description                                                                                   |
 |---------------------------------------------|---------|-----------------------------------------------------------------------------------------------|
 | `eif.last_read_evm_block_height`            | gauge   | Last EVM block height read                                                                    |
-| `eif.last_seen_evm_head_height`              | gauge   | Last EVM chain head height reported by the RPC node                                           |
-| `eif.evm_read_lag_blocks`                   | gauge   | Readable blocks (head minus `evm_read_offset`) not read yet, 0 when caught up                 |
-| `eif.evm_read_cursor_height`                | gauge   | Height of the last persisted read cursor                                                      |
-| `eif.evm_read_flush_total`                  | counter | Times the read position moved backwards, tagged with `reason` (`new_contract`, `validation_conflict`) |
+| `eif.last_seen_evm_head_height`             | gauge   | Last EVM chain head height reported by the RPC node                                           |
+| `eif.unread_evm_blocks`                     | gauge   | Readable blocks (head minus `evm_read_offset`) not read yet, 0 when caught up                 |
+| `eif.last_persisted_evm_block_height`       | gauge   | Height of the last persisted read cursor, a restarted reader resumes after it                 |
+| `eif.evm_read_rewind_total`                 | counter | Times the read position moved backwards, tagged with `reason` (`new_contract`, `validation_conflict`) |
 | `eif.evm_signer_validation_conflict_total`  | counter | Block proposals this node, as a signer, rejected because their EVM blocks differ from the ones it read |
 
 
