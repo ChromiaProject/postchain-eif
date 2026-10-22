@@ -59,9 +59,9 @@ So restarting a node whose reader was caught up costs only the blocks produced w
 
 The cursor is written every 10 seconds while reading, at the next fetch after the read position moved backwards (new contract, validation conflict on a replica or a syncing validator) or a signer rejected a block proposal, and on shutdown.
 
-When a signer rejects a block proposal because its EVM blocks differ from the ones this node read from the EVM network, the node keeps the EVM blocks it read, but the persisted cursor is held just below the conflicting EVM block height until a block covering that height has been committed on the node. A restart of the chain in the meantime re-reads from there and repairs any divergence. A cursor written before the conflicting proposal arrived may already lie above that height, since a height with no events is not confirmed by anyone until a proposal claims events there; it is overwritten at the next fetch.
+When a signer rejects a block proposal because its EVM blocks differ from the ones this node read from the EVM network, the node keeps the EVM blocks it read, but the persisted cursor is held just below the conflicting EVM block height until a block covering that height has been committed on the node. A restart of the chain in the meantime re-reads from there and repairs any divergence.
 
-The row for a network can be deleted from `sys.x.eif.evm_read_cursor` to force a full re-read from chain state at the next start.
+**Note:** The cursor is this node's own claim about what it has read: a height with no events is confirmed by nobody until a proposal claims events there. A cursor written before such a proposal arrived may therefore already lie above the conflicting height. It is overwritten at the next fetch, but if the node goes down before that, it restarts above the conflict and rejects the same proposal again. In that case, or whenever a node must re-read from chain state for any other reason, delete the network's row from `sys.x.eif.evm_read_cursor`; the next start then ignores the cursor and starts from the contracts' last committed event heights.
 
 At start the reader logs the chosen start point; if it is more than `maxReadAhead` blocks behind the EVM chain head the line is logged as a warning and names the contract that set the start point.
 
