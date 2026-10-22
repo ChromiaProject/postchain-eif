@@ -32,24 +32,24 @@ class EifMetricsRegistry {
                     .tag(NETWORK_ID_TAG, networkId.toString())
                     .register(Metrics.globalRegistry)
 
-            val headGauge = Gauge.builder("eif.last_seen_evm_head_height") { eventProcessor.lastSeenEvmHeadHeight }
+            meters.getOrPut(blockchainRid) { mutableListOf() }.add(gauge)
+        }
+
+        if (eventFetcher is EvmEventFetcher) {
+            val headGauge = Gauge.builder("eif.last_seen_evm_head_height") { eventFetcher.lastSeenEvmHeadHeight }
                     .description("Last EVM chain head height reported by the RPC node, before any read offset is applied.")
                     .tag(CHAIN_IID_TAG, chainIID.toString())
                     .tag(BLOCKCHAIN_RID_TAG, blockchainRid.toHex())
                     .tag(NETWORK_ID_TAG, networkId.toString())
                     .register(Metrics.globalRegistry)
 
-            val lagGauge = Gauge.builder("eif.unread_evm_blocks") { eventProcessor.readLagBlocks }
+            val lagGauge = Gauge.builder("eif.unread_evm_blocks") { eventFetcher.readLagBlocks }
                     .description("Number of readable EVM blocks (head minus 'evm_read_offset') not yet read. 0 when the reader is caught up.")
                     .tag(CHAIN_IID_TAG, chainIID.toString())
                     .tag(BLOCKCHAIN_RID_TAG, blockchainRid.toHex())
                     .tag(NETWORK_ID_TAG, networkId.toString())
                     .register(Metrics.globalRegistry)
 
-            meters.getOrPut(blockchainRid) { mutableListOf() }.addAll(listOf(gauge, headGauge, lagGauge))
-        }
-
-        if (eventFetcher is EvmEventFetcher) {
             val cursorGauge = Gauge.builder("eif.last_persisted_evm_block_height") {
                 eventFetcher.lastPersistedCursorHeight ?: BigInteger.ZERO
             }
@@ -73,13 +73,13 @@ class EifMetricsRegistry {
             }
 
             val signerConflictCounter = FunctionCounter.builder("eif.evm_signer_validation_conflict_total", eventFetcher.signerValidationConflicts) { it.get().toDouble() }
-                    .description("Number of block proposals this node, as a signer, could not validate against the EVM events it fetched.")
+                    .description("Number of block proposals this node, as a signer, rejected because their EVM blocks differ from the ones it read.")
                     .tag(CHAIN_IID_TAG, chainIID.toString())
                     .tag(BLOCKCHAIN_RID_TAG, blockchainRid.toHex())
                     .tag(NETWORK_ID_TAG, networkId.toString())
                     .register(Metrics.globalRegistry)
 
-            meters.getOrPut(blockchainRid) { mutableListOf() }.addAll(flushCounters + cursorGauge + signerConflictCounter)
+            meters.getOrPut(blockchainRid) { mutableListOf() }.addAll(listOf(headGauge, lagGauge, cursorGauge) + flushCounters + signerConflictCounter)
         }
     }
 

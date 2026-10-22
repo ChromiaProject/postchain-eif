@@ -111,13 +111,30 @@ class EvmEventFetcher(
     @Volatile
     private var lastCursorPersistTime = 0L
 
+    // Exposed for EifMetricsRegistry, not used by the reader itself
+
+    /** Last EVM chain head height reported by the RPC node, before any read offset is applied */
+    @Volatile
+    var lastSeenEvmHeadHeight: BigInteger = BigInteger.ZERO
+        private set
+
+    /** Number of readable EVM blocks (head minus the EVM read offset) not read yet, 0 when caught up */
+    @Volatile
+    var readLagBlocks: BigInteger = BigInteger.ZERO
+        private set
+
     /** Height of the last persisted read cursor, null if nothing has been persisted by this reader yet */
     @Volatile
     var lastPersistedCursorHeight: BigInteger? = null
         private set
 
+    /** Times the read position was moved backwards because a contract entered the filter */
     val newContractFlushes = AtomicLong()
+
+    /** Times the read position was moved backwards because a block proposal did not match, on a replica or a syncing validator */
     val validationConflictFlushes = AtomicLong()
+
+    /** Block proposals this node, as a signer, rejected because their EVM blocks differ from the ones it read */
     val signerValidationConflicts = AtomicLong()
 
     init {
@@ -171,14 +188,14 @@ class EvmEventFetcher(
             val from = evmEventProcessor.lastReadLogBlockHeight + BigInteger.ONE
 
             val evmHeadHeight = web3jRequestHandler.sendWeb3jRequestWithRetry { it.ethBlockNumber() }.blockNumber
-            evmEventProcessor.lastSeenEvmHeadHeight = evmHeadHeight
+            lastSeenEvmHeadHeight = evmHeadHeight
             val currentBlockHeight = evmHeadHeight - evmReadOffset
             reportPendingRewind(from, currentBlockHeight)
             // Pacing the reading of logs
             val to = minOf(currentBlockHeight, from + BigInteger.valueOf(maxReadAhead))
 
             if (to < from) {
-                evmEventProcessor.readLagBlocks = BigInteger.ZERO
+                readLagBlocks = BigInteger.ZERO
                 logger.debug { "No new blocks to read. We are at height: $to" }
                 persistReadCursorIfDue()
                 // Sleep a bit until next attempt
@@ -224,7 +241,7 @@ class EvmEventFetcher(
                     .sortedBy { it.first.number }
                     .map { eventBlockToOp(eventMap, it) }
             evmEventProcessor.processLogEventsAndUpdateOffsets(sortedEncodedLogs, to)
-            evmEventProcessor.readLagBlocks = currentBlockHeight - to
+            readLagBlocks = currentBlockHeight - to
             persistReadCursorIfDue()
 
             // If we just saw one new block, we can probably sleep

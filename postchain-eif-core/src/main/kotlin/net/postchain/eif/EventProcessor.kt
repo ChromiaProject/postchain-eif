@@ -98,14 +98,6 @@ class EvmEventProcessor(
     @Volatile
     var lastReadLogBlockHeight: BigInteger = BigInteger.ZERO
 
-    /** Last EVM chain head height reported by the RPC node, before [readOffset] and the EVM read offset are applied */
-    @Volatile
-    var lastSeenEvmHeadHeight: BigInteger = BigInteger.ZERO
-
-    /** Number of readable EVM blocks (head minus EVM read offset) that the reader has not read yet. 0 when caught up. */
-    @Volatile
-    var readLagBlocks: BigInteger = BigInteger.ZERO
-
     /**
      * EVM block heights that [safeResumeHeight] must stay below until a durably committed block covers them, that is
      * until [blockCommitted] is called with that height or a later one. Two kinds of heights end up here:
