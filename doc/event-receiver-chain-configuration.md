@@ -73,7 +73,7 @@ The reader exposes these metrics, tagged with chain IID, blockchain RID and netw
 
 | Metric                                      | Type    | Description                                                                                   |
 |---------------------------------------------|---------|-----------------------------------------------------------------------------------------------|
-| `eif.last_read_evm_block_height`            | gauge   | Last EVM block height read                                                                    |
+| `eif.last_read_evm_block_height`            | gauge   | Last EVM block height read, the reader's position; its events are proposed after `read_offset` more blocks |
 | `eif.last_seen_evm_head_height`             | gauge   | Last EVM chain head height reported by the RPC node                                           |
 | `eif.unread_evm_blocks`                     | gauge   | Readable blocks (head minus `evm_read_offset`) not read yet, 0 when caught up                 |
 | `eif.last_persisted_evm_block_height`       | gauge   | Height of the last persisted read cursor, a restarted reader resumes after it                 |

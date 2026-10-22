@@ -20,11 +20,12 @@ class EifMetricsRegistry {
     private val meters = mutableMapOf<BlockchainRid, MutableList<Meter>>()
 
     fun registerMetrics(chainIID: Long, blockchainRid: BlockchainRid, networkId: Long, eventProcessor: EventProcessor, eventFetcher: EventFetcher) {
+
         if (eventProcessor is EvmEventProcessor) {
             val gauge = Gauge.builder("eif.last_read_evm_block_height") { eventProcessor.lastReadLogBlockHeight }
                     .description(
-                            "Last read evm block height. " +
-                                    "Note that we will not attempt to process events from this block until we have seen the configured 'read_offset' more blocks."
+                            "Last EVM block height read, the reader's position. Blocks are read 'evm_read_offset' behind the EVM chain head, " +
+                                    "and the events of a read block are proposed only once 'read_offset' more blocks have been read."
                     )
                     .tag(CHAIN_IID_TAG, chainIID.toString())
                     .tag(BLOCKCHAIN_RID_TAG, blockchainRid.toHex())
@@ -47,8 +48,11 @@ class EifMetricsRegistry {
 
             meters.getOrPut(blockchainRid) { mutableListOf() }.addAll(listOf(gauge, headGauge, lagGauge))
         }
+
         if (eventFetcher is EvmEventFetcher) {
-            val cursorGauge = Gauge.builder("eif.last_persisted_evm_block_height") { eventFetcher.lastPersistedCursorHeight ?: BigInteger.ZERO }
+            val cursorGauge = Gauge.builder("eif.last_persisted_evm_block_height") {
+                eventFetcher.lastPersistedCursorHeight ?: BigInteger.ZERO
+            }
                     .description("Height of the last persisted EVM read cursor. A restarted reader resumes after this height. 0 until the reader has persisted anything.")
                     .tag(CHAIN_IID_TAG, chainIID.toString())
                     .tag(BLOCKCHAIN_RID_TAG, blockchainRid.toHex())
