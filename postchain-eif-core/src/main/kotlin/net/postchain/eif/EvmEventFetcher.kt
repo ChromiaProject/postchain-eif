@@ -23,6 +23,7 @@ import net.postchain.concurrent.util.get
 import net.postchain.core.BlockchainEngine
 import net.postchain.eif.EvmEventProcessor.EvmBlock
 import net.postchain.eif.web3j.Web3jRequestHandler
+import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvBigInteger
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvInteger
@@ -556,52 +557,28 @@ class EvmEventFetcher(
         }
     }
 
-    fun getLastCommittedEvmEventHeight(networkId: Long, contractAddress: ByteArray): BigInteger? = if (hasLastEvmEventHeightQuery)
-        getLastCommittedEvmEventHeightQuery(networkId, contractAddress)
-    else
-        getLastCommittedEvmBlockHeightQuery(networkId)
-
-    fun getLastCommittedEvmEventHeightQuery(networkId: Long, contractAddress: ByteArray): BigInteger? {
-        val eventHeight = blockchainEngine.getBlockQueries().query(EIF_LAST_EVM_EVENT_HEIGHT_QUERY,
-                gtv("network_id" to gtv(networkId), "contract_address" to gtv(contractAddress))).get()
-        if (eventHeight == GtvNull) {
-            return null
+    /**
+     * Height of the last committed EVM block holding an event of [contractAddress] on [networkId], null if none.
+     * Asks the receiver's `get_last_evm_event_height` query when its module has one, otherwise the per-network
+     * `get_last_evm_block` query, whose answer does not depend on the contract.
+     */
+    fun getLastCommittedEvmEventHeight(networkId: Long, contractAddress: ByteArray): BigInteger? {
+        val height = if (hasLastEvmEventHeightQuery) {
+            query(EIF_LAST_EVM_EVENT_HEIGHT_QUERY, gtv("network_id" to gtv(networkId), "contract_address" to gtv(contractAddress)))
+        } else {
+            query(EIF_LAST_EVM_BLOCK_QUERY, gtv("network_id" to gtv(networkId)))
+                    ?.let { it.asDict()["evm_block_height"] ?: throw ProgrammerMistake("Last evm block has no height stored") }
         }
-
         // Trying to be flexible here, don't care what the query gives us as long as it's a number
-        return when (eventHeight) {
-            is GtvBigInteger -> {
-                eventHeight.asBigInteger()
-            }
-
-            is GtvInteger -> {
-                BigInteger.valueOf(eventHeight.asInteger())
-            }
-
-            else -> throw ProgrammerMistake("Unexpected block height type: ${eventHeight.type}")
+        return when (height) {
+            null -> null
+            is GtvBigInteger -> height.asBigInteger()
+            is GtvInteger -> BigInteger.valueOf(height.asInteger())
+            else -> throw ProgrammerMistake("Unexpected block height type: ${height.type}")
         }
     }
 
-    fun getLastCommittedEvmBlockHeightQuery(networkId: Long): BigInteger? {
-        val block = blockchainEngine.getBlockQueries().query(EIF_LAST_EVM_BLOCK_QUERY, gtv("network_id" to gtv(networkId))).get()
-        if (block == GtvNull) {
-            return null
-        }
-
-        val blockHeight = block.asDict()["evm_block_height"]
-                ?: throw ProgrammerMistake("Last evm block has no height stored")
-
-        // Trying to be flexible here, don't care what the query gives us as long as it's a number
-        return when (blockHeight) {
-            is GtvBigInteger -> {
-                blockHeight.asBigInteger()
-            }
-
-            is GtvInteger -> {
-                BigInteger.valueOf(blockHeight.asInteger())
-            }
-
-            else -> throw ProgrammerMistake("Unexpected block height type: ${blockHeight.type}")
-        }
-    }
+    /** Runs a query of the receiver chain, null when it answered with GtvNull */
+    private fun query(name: String, args: Gtv): Gtv? =
+            blockchainEngine.getBlockQueries().query(name, args).get().takeUnless { it == GtvNull }
 }
