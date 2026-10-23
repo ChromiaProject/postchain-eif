@@ -142,6 +142,8 @@ Transaction submitter node configuration has the following properties.
 | `${chain}.submitterUrls` | CSV list of URLs for connecting to EVM nodes (HTTP URLs or IPC socket paths). Will fallback to EIF urls property if not specified. | list<string> | `${chain}.urls`     | `POSTCHAIN_TRANSACTION_SUBMITTER_${CHAIN}_URLS`        |
 | `${chain}.privateKey`    | Private key to use for submitting transactions. Will use node keypair by default.                                                  | string       | `messaging.privkey` | `POSTCHAIN_TRANSACTION_SUBMITTER_${CHAIN}_PRIVATE_KEY` |
 
+The submitter's RPC requests are counted in the `rpc.counter.<n>` metric, one counter per URL at position `n` (from 0) of `${chain}.submitterUrls`, tagged with chain IID, blockchain RID and network ID. It counts the JSON-RPC requests answered by that URL, including answers that carry an error; connection failures are not counted.
+
 #### Configuration when running Master-Sub architecture
 
 Not needed, transaction submitter chain is a system chain, thus we only support running on master node
