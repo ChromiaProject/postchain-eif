@@ -4,7 +4,7 @@ import net.postchain.common.BlockchainRid
 import net.postchain.core.block.BlockQueries
 import net.postchain.core.block.BlockQueriesProvider
 import net.postchain.crypto.Secp256K1CryptoSystem
-import net.postchain.eif.EifSignature
+import net.postchain.eif.merkle.EifSignature
 import net.postchain.eif.getEthereumAddress
 import org.awaitility.Awaitility.await
 import org.bouncycastle.jce.provider.BouncyCastleProvider

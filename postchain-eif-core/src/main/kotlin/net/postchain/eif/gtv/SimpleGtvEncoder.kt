@@ -1,4 +1,4 @@
-package net.postchain.eif
+package net.postchain.eif.gtv
 
 import net.postchain.common.hexStringToByteArray
 import net.postchain.gtv.GtvArray

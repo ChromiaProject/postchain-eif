@@ -15,6 +15,7 @@ import net.postchain.eif.config.EifEvmContractConfig
 import net.postchain.eif.config.EvmConfig
 import net.postchain.eif.metrics.EifMetricsRegistry
 import net.postchain.eif.metrics.RpcUsageMetrics
+import net.postchain.eif.gtv.GtvToEventMapper
 import net.postchain.eif.web3j.Web3jRequestHandler
 import net.postchain.eif.web3j.Web3jServiceFactory
 import net.postchain.gtv.mapper.toObject

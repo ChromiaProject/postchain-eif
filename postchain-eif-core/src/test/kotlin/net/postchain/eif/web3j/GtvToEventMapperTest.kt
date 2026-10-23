@@ -1,7 +1,7 @@
 package net.postchain.eif.web3j
 
 import net.postchain.common.exception.UserMistake
-import net.postchain.eif.GtvToEventMapper
+import net.postchain.eif.gtv.GtvToEventMapper
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.gtvml.GtvMLParser

@@ -16,7 +16,7 @@ import net.postchain.core.block.BlockQueries
 import net.postchain.core.block.BlockQueriesProvider
 import net.postchain.core.block.MultiSigBlockWitnessBuilder
 import net.postchain.crypto.Signature
-import net.postchain.eif.EifSignature
+import net.postchain.eif.merkle.EifSignature
 import net.postchain.eif.encodeSignatureWithV
 import net.postchain.eif.getEthereumAddress
 import net.postchain.getBFTRequiredSignatureCount

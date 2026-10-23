@@ -16,7 +16,7 @@ import net.postchain.core.BlockEContext
 import net.postchain.core.EContext
 import net.postchain.core.Shutdownable
 import net.postchain.core.Storage
-import net.postchain.eif.GtvToTypeMapper
+import net.postchain.eif.gtv.GtvToTypeMapper
 import net.postchain.eif.NETWORK_ID_TAG
 import net.postchain.eif.transaction.gas.EIP1559FeeEstimatorFactory
 import net.postchain.eif.web3j.Web3jRawTransactionHandler

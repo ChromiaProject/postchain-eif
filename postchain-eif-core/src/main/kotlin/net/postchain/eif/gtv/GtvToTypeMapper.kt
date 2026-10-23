@@ -1,4 +1,4 @@
-package net.postchain.eif
+package net.postchain.eif.gtv
 
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.common.exception.UserMistake

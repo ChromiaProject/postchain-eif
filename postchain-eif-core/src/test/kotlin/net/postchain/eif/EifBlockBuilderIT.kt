@@ -17,7 +17,8 @@ import net.postchain.crypto.devtools.KeyPairHelper
 import net.postchain.devtools.IntegrationTestSetup
 import net.postchain.devtools.PostchainTestNode
 import net.postchain.devtools.testinfra.BaseTestInfrastructureFactory
-import net.postchain.eif.MerkleProofUtil.getMerkleProof
+import net.postchain.eif.merkle.MerkleProofUtil.getMerkleProof
+import net.postchain.eif.gtv.SimpleGtvEncoder
 import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvInteger

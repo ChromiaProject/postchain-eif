@@ -1,4 +1,4 @@
-package net.postchain.eif
+package net.postchain.eif.gtv
 
 import net.postchain.common.exception.UserMistake
 import net.postchain.gtv.Gtv
@@ -8,7 +8,7 @@ import org.web3j.abi.datatypes.Event
 /**
  * Maps gtv representations of JSON ABI specifications to web3j [Event] objects.
  * Does not support structs due to limitations in web3j [TypeReference.makeTypeReference].
- * Does not support multi-dimensional arrays due to a bug in [EncodedEvent.encode]
+ * Does not support multi-dimensional arrays due to a bug in [net.postchain.eif.EncodedEvent.encode]
  *
  * Web3j also introduces some limits to statically sized values:
  * Static array sizes: 0 - 32

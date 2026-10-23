@@ -9,6 +9,7 @@ import net.postchain.common.types.WrappedByteArray
 import net.postchain.common.wrap
 import net.postchain.core.BlockRid
 import net.postchain.crypto.sha256Digest
+import net.postchain.eif.gtv.SimpleGtvEncoder
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.merkle.GtvMerkleBasics.HASH_PREFIX_NODE_GTV_ARRAY
 import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV2

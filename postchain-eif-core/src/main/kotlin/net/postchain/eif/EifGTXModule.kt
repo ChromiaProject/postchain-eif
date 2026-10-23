@@ -20,6 +20,11 @@ import net.postchain.crypto.Signature
 import net.postchain.eif.config.EifEventConsumerConfig
 import net.postchain.eif.config.EifEventReceiverConfig
 import net.postchain.eif.config.EvmConfig
+import net.postchain.eif.merkle.EifSignature
+import net.postchain.eif.merkle.EvmMerkleProof
+import net.postchain.eif.merkle.EvmMerkleProofBuilder
+import net.postchain.eif.merkle.ExtraMerkleProof
+import net.postchain.eif.merkle.Proof
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvNull

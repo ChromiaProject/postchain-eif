@@ -19,6 +19,8 @@ import net.postchain.eif.contracts.TestToken
 import net.postchain.eif.contracts.TokenBridgeWithSnapshotWithdraw
 import net.postchain.eif.contracts.Validator
 import net.postchain.eif.transaction.TransactionSubmitter
+import net.postchain.eif.gtv.SimpleGtvEncoder
+import net.postchain.eif.merkle.EifSignature
 import net.postchain.eif.web3j.web3BlockHeader
 import net.postchain.eif.web3j.web3EventData
 import net.postchain.eif.web3j.web3EventProof

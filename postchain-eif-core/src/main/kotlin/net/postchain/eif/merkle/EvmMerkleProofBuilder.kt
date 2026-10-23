@@ -1,4 +1,4 @@
-package net.postchain.eif
+package net.postchain.eif.merkle
 
 import net.postchain.base.BaseBlockWitness
 import net.postchain.base.data.DatabaseAccess
@@ -10,7 +10,9 @@ import net.postchain.common.toHex
 import net.postchain.core.EContext
 import net.postchain.crypto.CryptoSystem
 import net.postchain.crypto.Signature
-import net.postchain.eif.merkle.ProofTreeParser
+import net.postchain.eif.encodeBlockHeaderDataForEVM
+import net.postchain.eif.encodeSignatureWithV
+import net.postchain.eif.getEthereumAddress
 import net.postchain.gtv.GtvByteArray
 import net.postchain.gtv.GtvEncoder
 import net.postchain.gtv.generateProof
