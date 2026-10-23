@@ -467,7 +467,7 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
         val eventProcessor = (node.getBlockchainInstance().blockchainEngine
                 .getConfiguration() as GTXModuleAware).module.getSpecialTxExtensions()
                 .filterIsInstance<EifSpecialTxExtension>().first()
-                .processors[networkId]?.first as EvmEventProcessor
+                .pipelines[networkId]?.processor as EvmEventProcessor
 
         // Wait until we have read the block with the deposit
         await().atMost(Duration.ONE_MINUTE).untilAsserted {
