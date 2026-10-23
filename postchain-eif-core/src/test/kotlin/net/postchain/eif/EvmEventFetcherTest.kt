@@ -946,13 +946,11 @@ class EvmEventFetcherTest {
     }
 
     @Test
-    fun `should use the legacy delay for a single new block when pacing is disabled`() {
+    fun `should sleep delayWhenNoNewBlocks at the chain head when pacing is disabled`() {
         val rig = createRig(
                 contracts = listOf(contract1Low),
                 persistedCursor = persistedCursorAt(150L),
-                headHeight = 150L,
-                headAdvancesPerPoll = true,
-                maxReadAhead = 1L,
+                headHeight = 160L,
                 minPollInterval = 0L,
                 delayWhenNoNewBlocks = 777L,
         )
@@ -960,6 +958,8 @@ class EvmEventFetcherTest {
             await.atMost(Duration.TEN_SECONDS).untilAsserted {
                 assertThat(rig.pacingDelays.size).isGreaterThan(3)
             }
+            // The first cycle reads all ten new blocks up to the head and sleeps; the next ones find nothing and sleep too
+            assertThat(rig.filters.first()).isEqualTo(151L to 160L)
             assertThat(rig.pacingDelays.all { it == 777L }).isTrue()
         } finally {
             rig.eventFetcher.shutdown()
