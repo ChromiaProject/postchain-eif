@@ -19,7 +19,7 @@ class EifMetricsRegistry {
 
     private val meters = mutableMapOf<BlockchainRid, MutableList<Meter>>()
 
-    fun registerMetrics(chainIID: Long, blockchainRid: BlockchainRid, networkId: Long, eventProcessor: EventProcessor, eventFetcher: EventFetcher) {
+    fun registerMetrics(chainIID: Long, blockchainRid: BlockchainRid, networkId: Long, eventFetcher: EventFetcher, eventProcessor: EventProcessor) {
 
         if (eventProcessor is EvmEventProcessor) {
             val gauge = Gauge.builder("eif.last_read_evm_block_height") { eventProcessor.lastReadLogBlockHeight }

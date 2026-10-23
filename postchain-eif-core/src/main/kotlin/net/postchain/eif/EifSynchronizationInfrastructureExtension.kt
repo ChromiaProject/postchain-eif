@@ -71,10 +71,10 @@ class EifSynchronizationInfrastructureExtension(
                         }
                         if (eventReceiverConfig.maxEventsPerBlock > evmConfig.maxQueueSize) throw UserMistake("maxEventsPerBlock cannot be larger than maxQueueSize")
 
-                        val (eventProcessor, eventFetcher) = initializeEventProcessor(cfg, evmBlockchainName, evmBlockchainConfig, engine, evmConfig, hasLegacyDynamicContracts, hasDynamicContracts, hasDynamicEvents, hasLastEvmEventHeightQuery)
-                        ext.addEventProcessor(evmBlockchainConfig.networkId, eventProcessor, eventFetcher)
+                        val (eventFetcher, eventProcessor) = initializeEventProcessor(cfg, evmBlockchainName, evmBlockchainConfig, engine, evmConfig, hasLegacyDynamicContracts, hasDynamicContracts, hasDynamicEvents, hasLastEvmEventHeightQuery)
+                        ext.addEventProcessor(evmBlockchainConfig.networkId, eventFetcher, eventProcessor)
                         eventFetchers[cfg.blockchainRid]?.set(evmBlockchainConfig.networkId, eventFetcher)
-                        eifMetricsRegistry.registerMetrics(cfg.chainID, cfg.blockchainRid, evmBlockchainConfig.networkId, eventProcessor, eventFetcher)
+                        eifMetricsRegistry.registerMetrics(cfg.chainID, cfg.blockchainRid, evmBlockchainConfig.networkId, eventFetcher, eventProcessor)
                     }
                 } catch (e: Exception) {
                     disconnectProcess(process)
@@ -110,7 +110,7 @@ class EifSynchronizationInfrastructureExtension(
     private fun initializeEventProcessor(cfg: BlockchainConfiguration, evmBlockchainName: String,
                                          evmBlockchainConfig: EifEvmBlockchainConfig, engine: BlockchainEngine,
                                          evmConfig: EvmConfig, hasLegacyDynamicContracts: Boolean, hasDynamicContacts: Boolean,
-                                         hasDynamicEvents: Boolean, hasLastEvmEventHeightQuery: Boolean): Pair<EventProcessor, EventFetcher> {
+                                         hasDynamicEvents: Boolean, hasLastEvmEventHeightQuery: Boolean): Pair<EventFetcher, EventProcessor> {
         if (evmBlockchainConfig.readOffset < 0) throw UserMistake("readOffset cannot be negative")
         if (evmBlockchainConfig.evmReadOffset < 0) throw UserMistake("evmReadOffset cannot be negative")
         if (evmConfig.maxQueueSize < 0) throw UserMistake("maxQueueSize cannot be negative")
@@ -124,7 +124,7 @@ class EifSynchronizationInfrastructureExtension(
         )
         return if ("ignore".equals(evmConfig.urls.first(), ignoreCase = true)) {
             logger.warn("EIF is running in disconnected mode. No events will be fetched from or validated against ethereum.")
-            NoOpEventProcessor().let { it to NoOpEventFetcher(it) }
+            NoOpEventProcessor().let { NoOpEventFetcher(it) to it }
         } else {
             if (evmBlockchainConfig.skipToHeight == 0L) {
                 withLoggingContext(NETWORK_ID_TAG to evmBlockchainConfig.networkId.toString()) {
@@ -169,7 +169,7 @@ class EifSynchronizationInfrastructureExtension(
                     evmConfig.minPollInterval,
                     ignoreReadCursorBelow = BigInteger.valueOf(evmConfig.ignoreReadCursorBelow),
             )
-            eventProcessor to eventFetcher
+            eventFetcher to eventProcessor
         }
     }
 }

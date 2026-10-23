@@ -32,15 +32,15 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
     lateinit var isSigner: () -> Boolean
 
     private var needEifTnx: Boolean = false
-    internal val processors = mutableMapOf<Long, Pair<EventProcessor, EventFetcher>>()
+    internal val processors = mutableMapOf<Long, Pair<EventFetcher, EventProcessor>>()
 
     /** Chain block height -> (network id, highest EVM block height) of the EVM blocks in the block being built or validated at that height */
     private val pendingEvmBlockHeights = ConcurrentHashMap<Long, Pair<Long, BigInteger>>()
 
     override fun getRelevantOps() = setOf(EvmBlockOp.OP_NAME)
 
-    fun addEventProcessor(networkID: Long, processor: EventProcessor, eventFetcher: EventFetcher) {
-        processors[networkID] = processor to eventFetcher
+    fun addEventProcessor(networkID: Long, fetcher: EventFetcher, processor: EventProcessor) {
+        processors[networkID] = fetcher to processor
     }
 
     override fun init(module: GTXModule, chainID: Long, blockchainRID: BlockchainRid, cs: CryptoSystem) {
@@ -59,9 +59,9 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
         if (position == SpecialTransactionPosition.Begin && processors.isNotEmpty() && shouldProcessEvmEvents(bctx)) {
             val index = bctx.height.mod(processors.size)
-            val (networkId, procAndFetcher) = processors.entries.toList()[index]
-            val proc = procAndFetcher.first
-            val evmBlocks = proc.getEventData()
+            val (networkId, fetcherAndProcessor) = processors.entries.toList()[index]
+            val (_, processor) = fetcherAndProcessor
+            val evmBlocks = processor.getEventData()
 
             if (evmBlocks.isEmpty()) return listOf()
 
@@ -76,7 +76,7 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
 
             return relevantBlocks.map { it.toOpData() }.also {
                 recordPendingEvmBlockHeight(bctx.height, networkId, relevantBlocks)
-                bctx.addAfterCommitHook { proc.markAsProcessed(relevantBlocks) }
+                bctx.addAfterCommitHook { processor.markAsProcessed(relevantBlocks) }
             }
         }
 
@@ -86,8 +86,8 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
     override fun validateSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext, ops: List<OpData>): Boolean {
         if (position == SpecialTransactionPosition.Begin && processors.isNotEmpty()) {
             val index = bctx.height.mod(processors.size)
-            val (networkId, procAndFetcher) = processors.entries.toList()[index]
-            val (proc, fetcher) = procAndFetcher
+            val (networkId, fetcherAndProcessor) = processors.entries.toList()[index]
+            val (fetcher, processor) = fetcherAndProcessor
             withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
                 val decodedOps = ops.map { EvmBlockOp.fromOpData(it) }
 
@@ -105,7 +105,7 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
                 }
 
                 // Validate event data
-                val validationResult = proc.isValidEventData(decodedOps)
+                val validationResult = processor.isValidEventData(decodedOps)
                 if (!validationResult.valid && validationResult.conflictingHeight != null) {
                     if (isSigner()) {
                         // A signer keeps the EVM blocks it read itself, otherwise a faulty proposer could make every signer
@@ -122,7 +122,7 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
                 }
 
                 recordPendingEvmBlockHeight(bctx.height, networkId, decodedOps)
-                bctx.addAfterCommitHook { proc.markAsProcessed(decodedOps) }
+                bctx.addAfterCommitHook { processor.markAsProcessed(decodedOps) }
 
                 if (!validationResult.valid && validationResult.errorMessage != null) {
                     throw UserMistake(validationResult.errorMessage)
@@ -154,8 +154,8 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
         val height = (blockData.header as? BaseBlockHeader)?.blockHeaderRec?.getHeight()
         val committed = height?.let { pendingEvmBlockHeights.remove(it) }
         height?.let { h -> pendingEvmBlockHeights.keys.removeIf { it < h } }
-        processors.forEach { (networkId, procAndFetcher) ->
-            procAndFetcher.first.blockCommitted(committed?.takeIf { it.first == networkId }?.second)
+        processors.forEach { (networkId, fetcherAndProcessor) ->
+            fetcherAndProcessor.second.blockCommitted(committed?.takeIf { it.first == networkId }?.second)
         }
     }
 
