@@ -14,13 +14,13 @@ data class EvmConfig(
         val urls: List<String>,
         val maxReadAhead: Long,
         val maxQueueSize: Long,
-        // Minimum duration of one fetch cycle while the reader is caught up with the EVM chain head (milliseconds). 0 disables pacing.
+        // Minimum duration of one fetch cycle at the EVM chain head (milliseconds), see the event receiver docs. 0 disables it.
         val minPollInterval: Long = DEFAULT_MIN_POLL_INTERVAL,
         val ignoreReadCursorBelow: Long = 0L,
 ) {
     companion object {
         const val EIF_CONFIG_ENV_PREFIX = "POSTCHAIN_EIF_"
-        const val DEFAULT_MIN_POLL_INTERVAL = 2_000L
+        const val DEFAULT_MIN_POLL_INTERVAL = 1_000L
         private const val EVM_CONNECT_TIMEOUT = "${EIF_CONFIG_ENV_PREFIX}EVM_CONNECT_TIMEOUT"
         private const val EVM_READ_TIMEOUT = "${EIF_CONFIG_ENV_PREFIX}EVM_READ_TIMEOUT"
         private const val EVM_WRITE_TIMEOUT = "${EIF_CONFIG_ENV_PREFIX}EVM_WRITE_TIMEOUT"

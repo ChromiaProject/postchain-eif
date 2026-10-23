@@ -946,7 +946,7 @@ class EvmEventFetcherTest {
     }
 
     @Test
-    fun `should sleep delayWhenNoNewBlocks at the chain head when pacing is disabled`() {
+    fun `should wait delayWhenNoNewBlocks when no new blocks are found and pacing is disabled`() {
         val rig = createRig(
                 contracts = listOf(contract1Low),
                 persistedCursor = persistedCursorAt(150L),
@@ -958,7 +958,7 @@ class EvmEventFetcherTest {
             await.atMost(Duration.TEN_SECONDS).untilAsserted {
                 assertThat(rig.pacingDelays.size).isGreaterThan(3)
             }
-            // The first cycle reads all ten new blocks up to the head and sleeps; the next ones find nothing and sleep too
+            // The first cycle reads all ten new blocks up to the head without sleeping; every later one finds nothing and waits
             assertThat(rig.filters.first()).isEqualTo(151L to 160L)
             assertThat(rig.pacingDelays.all { it == 777L }).isTrue()
         } finally {
@@ -982,6 +982,29 @@ class EvmEventFetcherTest {
             // Nothing to read at the head: every cycle sleeps the full poll interval, not just delayWhenNoNewBlocks
             assertThat(rig.pacingDelays.all { it == 2000L }).isTrue()
             assertThat(rig.filters.isEmpty()).isTrue()
+        } finally {
+            rig.eventFetcher.shutdown()
+        }
+    }
+
+    @Test
+    fun `should pad a cycle that read new blocks to minPollInterval and wait delayWhenNoNewBlocks otherwise`() {
+        val rig = createRig(
+                contracts = listOf(contract1Low),
+                persistedCursor = persistedCursorAt(150L),
+                headHeight = 160L,
+                minPollInterval = 1000L,
+                delayWhenNoNewBlocks = 2000L,
+                clockAdvancePerGetLogs = 50L,
+        )
+        try {
+            await.atMost(Duration.TEN_SECONDS).untilAsserted {
+                assertThat(rig.pacingDelays.size).isGreaterThan(3)
+            }
+            // The first cycle read ten new blocks in 50 ms and is padded to the poll interval only
+            assertThat(rig.pacingDelays.first()).isEqualTo(950L)
+            // Every later cycle finds no new blocks and waits delayWhenNoNewBlocks, which is longer than the interval
+            assertThat(rig.pacingDelays.drop(1).all { it == 2000L }).isTrue()
         } finally {
             rig.eventFetcher.shutdown()
         }
@@ -1192,7 +1215,8 @@ class EvmEventFetcherTest {
                 hasLastEvmEventHeightQuery = true,
                 evmEventProcessor = eventProcessor,
                 readCursorStore = InMemoryEvmReadCursorStore(),
-                minPollInterval = 0L,
+                // The mock network grows one block per poll, so pace the loop as the sleep after each block used to
+                minPollInterval = 1000L,
         ).also(fetchers::add)
 
         return Mocks(eventFetcher, eventProcessor, blockQueriesHolder, currentBlock)

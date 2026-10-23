@@ -44,8 +44,8 @@ import kotlin.time.Duration.Companion.milliseconds
  *
  * @param evmReadOffset We will read this number of blocks from the block head on the evm chain, to avoid issues with chain reorg
  * @param readCursorStore Node-local persistence of the read position, so that a restarted reader resumes where it left off
- * @param minPollInterval Minimum duration of a fetch cycle at the EVM chain head (ms), whether it read new blocks or found none;
- * the reader sleeps at least [delayWhenNoNewBlocks] there in any case, 0 adds nothing to that
+ * @param minPollInterval Minimum duration of a fetch cycle at the EVM chain head (ms): a cycle that read new blocks is padded to
+ * it, a cycle that found nothing to read waits [delayWhenNoNewBlocks] but never less than this; 0 disables the minimum
  * @param cursorPersistInterval How often the read position is persisted while reading (ms)
  */
 class EvmEventFetcher(
@@ -183,7 +183,7 @@ class EvmEventFetcher(
             if (contracts.isEmpty()) {
                 logger.warn { "No contracts configured, trying again later" }
                 filterContracts = mapOf()
-                pauseBeforeNextPoll(cycleStart)
+                waitForNewBlocks(cycleStart)
                 return
             }
 
@@ -206,7 +206,7 @@ class EvmEventFetcher(
                 readLagBlocks = BigInteger.ZERO
                 logger.debug { "No new blocks to read. We are at height: $to" }
                 persistReadCursorIfDue()
-                pauseBeforeNextPoll(cycleStart)
+                waitForNewBlocks(cycleStart)
                 return
             }
 
@@ -215,7 +215,7 @@ class EvmEventFetcher(
             logger.debug { "Events: ${eventMap.values.map { it.name }}" }
             if (eventMap.isEmpty()) {
                 logger.warn { "No events configured, trying again later" }
-                pauseBeforeNextPoll(cycleStart)
+                waitForNewBlocks(cycleStart)
                 return
             }
 
@@ -251,7 +251,7 @@ class EvmEventFetcher(
             readLagBlocks = currentBlockHeight - to
             persistReadCursorIfDue()
 
-            // At the chain head there is no point in polling again right away.
+            // Read up to the chain head, more blocks are expected next time: pace the next poll.
             // Not when the queue is full: the loop below waits for the chain to consume events instead.
             if (to == currentBlockHeight && !evmEventProcessor.isQueueFull()) {
                 pauseBeforeNextPoll(cycleStart)
@@ -266,12 +266,23 @@ class EvmEventFetcher(
     }
 
     /**
-     * Called when this fetch cycle reached the EVM chain head or had nothing to read, never while catching up: sleeps
-     * [delayWhenNoNewBlocks], or what is left of [minPollInterval] in the cycle if that is longer, so that the RPC node
-     * is polled at a bounded rate on networks that produce blocks faster than we poll.
+     * Ends a fetch cycle that read up to the EVM chain head and expects more blocks next time: pads the cycle to
+     * [minPollInterval], so that the RPC node is polled at a bounded rate on networks that produce blocks faster than
+     * we poll. Never called while catching up.
      */
-    private suspend fun pauseBeforeNextPoll(cycleStart: Long) =
-            pacingDelay(maxOf(delayWhenNoNewBlocks, minPollInterval - (clock.millis() - cycleStart)))
+    private suspend fun pauseBeforeNextPoll(cycleStart: Long) {
+        val remaining = remainingPollInterval(cycleStart)
+        if (remaining > 0) pacingDelay(remaining)
+    }
+
+    /**
+     * Ends a fetch cycle that found nothing to read, no new blocks or nothing configured: sleeps [delayWhenNoNewBlocks],
+     * but never less than what is left of [minPollInterval], so that a cycle at the chain head never gets shorter than that.
+     */
+    private suspend fun waitForNewBlocks(cycleStart: Long) =
+            pacingDelay(maxOf(delayWhenNoNewBlocks, remainingPollInterval(cycleStart)))
+
+    private fun remainingPollInterval(cycleStart: Long) = minPollInterval - (clock.millis() - cycleStart)
 
     /**
      * Decides where to start reading when the reader starts. Every contract gets the highest start point known to be
