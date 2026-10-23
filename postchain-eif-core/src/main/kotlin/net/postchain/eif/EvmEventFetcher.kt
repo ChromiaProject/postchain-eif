@@ -145,6 +145,8 @@ class EvmEventFetcher(
     /** Block proposals this node, as a signer, rejected because their EVM blocks differ from the ones it read */
     val signerValidationConflicts = AtomicLong()
 
+    private val staticEventsBySignature = staticEvents.associateBy(EventEncoder::encode)
+
     init {
         job = launchEventFetching()
     }
@@ -478,20 +480,15 @@ class EvmEventFetcher(
                 }
             }
 
-    private fun fetchEventConfigs(): Map<String, Event> = if (hasDynamicEvents) {
-        try {
-            val dynamicEvents = blockchainEngine.getBlockQueries().query(
-                    EIF_CONFIG_EVENTS_QUERY, gtv(mapOf("network_id" to gtv(networkId)))
-            ).get().asArray().map(GtvToEventMapper::map)
-            staticEvents.associateBy(EventEncoder::encode).toMutableMap().apply {
-                putAll(dynamicEvents.associateBy(EventEncoder::encode))
-            }
-        } catch (e: Exception) {
-            logger.warn(e) { "Unable to fetch dynamic events: $e" }
-            staticEvents.associateBy(EventEncoder::encode)
-        }
-    } else {
-        staticEvents.associateBy(EventEncoder::encode)
+    /** The events to read by signature hash: the static ones of the blockchain configuration plus the dapp's dynamic ones, which win on the same signature */
+    private fun fetchEventConfigs(): Map<String, Event> = staticEventsBySignature + fetchDynamicEvents().associateBy(EventEncoder::encode)
+
+    private fun fetchDynamicEvents(): List<Event> = if (!hasDynamicEvents) emptyList() else try {
+        blockchainEngine.getBlockQueries().query(EIF_CONFIG_EVENTS_QUERY, gtv(mapOf("network_id" to gtv(networkId))))
+                .get().asArray().map(GtvToEventMapper::map)
+    } catch (e: Exception) {
+        logger.warn(e) { "Unable to fetch dynamic events: $e" }
+        emptyList()
     }
 
     private fun eventBlockToOp(eventMap: Map<String, Event>, eventBlock: Pair<EvmBlock, List<Log>>): EvmBlockOp {
