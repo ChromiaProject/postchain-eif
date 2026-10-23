@@ -21,6 +21,20 @@ data class EvmConfig(
     companion object {
         const val EIF_CONFIG_ENV_PREFIX = "POSTCHAIN_EIF_"
         const val DEFAULT_MIN_POLL_INTERVAL = 1_000L
+
+        /**
+         * Default `<chain>.minPollInterval` by chain key, the name a network goes by in the node and blockchain
+         * configuration on mainnet and testnet alike. Chosen from the block time: about two polls per block on slow
+         * networks, every third second on networks whose blocks come faster than that.
+         */
+        val DEFAULT_MIN_POLL_INTERVALS: Map<String, Long> = mapOf(
+                "ethereum" to 6_000L, // 12 s blocks
+                "bsc" to 3_000L, // 0.75 s blocks
+                "base" to 3_000L, // 2 s blocks
+                "arbitrum" to 3_000L, // 0.25 s blocks
+        )
+
+        fun defaultMinPollInterval(chain: String): Long = DEFAULT_MIN_POLL_INTERVALS[chain.lowercase()] ?: DEFAULT_MIN_POLL_INTERVAL
         private const val EVM_CONNECT_TIMEOUT = "${EIF_CONFIG_ENV_PREFIX}EVM_CONNECT_TIMEOUT"
         private const val EVM_READ_TIMEOUT = "${EIF_CONFIG_ENV_PREFIX}EVM_READ_TIMEOUT"
         private const val EVM_WRITE_TIMEOUT = "${EIF_CONFIG_ENV_PREFIX}EVM_WRITE_TIMEOUT"
@@ -45,7 +59,7 @@ data class EvmConfig(
                     config.getEnvOrListProperty(chainProperty(chain, "URLS"), "$chain.urls", listOf()),
                     config.getEnvOrLong(chainProperty(chain, "MAX_READ_AHEAD"), "$chain.maxReadAhead", 2_000L),
                     config.getEnvOrLong(EVM_MAX_QUEUE_SIZE, "evm.maxQueueSize", 10_000L),
-                    config.getEnvOrLong(chainProperty(chain, "MIN_POLL_INTERVAL"), "$chain.minPollInterval", DEFAULT_MIN_POLL_INTERVAL),
+                    config.getEnvOrLong(chainProperty(chain, "MIN_POLL_INTERVAL"), "$chain.minPollInterval", defaultMinPollInterval(chain)),
                     config.getEnvOrLong(chainProperty(chain, "IGNORE_READ_CURSOR_BELOW"), "$chain.ignoreReadCursorBelow", 0L),
             )
         }

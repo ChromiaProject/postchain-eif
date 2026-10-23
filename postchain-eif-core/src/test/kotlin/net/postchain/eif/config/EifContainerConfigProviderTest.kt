@@ -32,13 +32,18 @@ class EifContainerConfigProviderTest {
     fun testMinPollIntervalDefaultIsForwarded() {
         val config = BaseConfiguration()
         with(config) {
-            addProperty("evm.chains", "bsc")
+            addProperty("evm.chains", "bsc,ethereum,somechain")
             addProperty("bsc.urls", "testurl")
+            addProperty("ethereum.urls", "testurl")
+            addProperty("somechain.urls", "testurl")
         }
         val appConfig = AppConfig(config)
 
         val envConfigMap = EifContainerConfigProvider().getConfig(appConfig)
 
-        assertEquals(EvmConfig.DEFAULT_MIN_POLL_INTERVAL.toString(), envConfigMap["${EIF_CONFIG_ENV_PREFIX}BSC_MIN_POLL_INTERVAL"])
+        // Known chain keys get their own default, any other key the general one
+        assertEquals("3000", envConfigMap["${EIF_CONFIG_ENV_PREFIX}BSC_MIN_POLL_INTERVAL"])
+        assertEquals("6000", envConfigMap["${EIF_CONFIG_ENV_PREFIX}ETHEREUM_MIN_POLL_INTERVAL"])
+        assertEquals(EvmConfig.DEFAULT_MIN_POLL_INTERVAL.toString(), envConfigMap["${EIF_CONFIG_ENV_PREFIX}SOMECHAIN_MIN_POLL_INTERVAL"])
     }
 }
