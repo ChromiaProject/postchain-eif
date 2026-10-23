@@ -21,20 +21,6 @@ class EifMetricsRegistry {
 
     fun registerMetrics(chainIID: Long, blockchainRid: BlockchainRid, networkId: Long, eventFetcher: EventFetcher, eventProcessor: EventProcessor) {
 
-        if (eventProcessor is EvmEventProcessor) {
-            val gauge = Gauge.builder("eif.last_read_evm_block_height") { eventProcessor.lastReadLogBlockHeight }
-                    .description(
-                            "Last EVM block height read, the reader's position. Blocks are read 'evm_read_offset' behind the EVM chain head, " +
-                                    "and the events of a read block are proposed only once 'read_offset' more blocks have been read."
-                    )
-                    .tag(CHAIN_IID_TAG, chainIID.toString())
-                    .tag(BLOCKCHAIN_RID_TAG, blockchainRid.toHex())
-                    .tag(NETWORK_ID_TAG, networkId.toString())
-                    .register(Metrics.globalRegistry)
-
-            meters.getOrPut(blockchainRid) { mutableListOf() }.add(gauge)
-        }
-
         if (eventFetcher is EvmEventFetcher) {
             val headGauge = Gauge.builder("eif.last_seen_evm_head_height") { eventFetcher.lastSeenEvmHeadHeight }
                     .description("Last EVM chain head height reported by the RPC node, before any read offset is applied.")
@@ -80,6 +66,20 @@ class EifMetricsRegistry {
                     .register(Metrics.globalRegistry)
 
             meters.getOrPut(blockchainRid) { mutableListOf() }.addAll(listOf(headGauge, lagGauge, cursorGauge) + flushCounters + signerConflictCounter)
+        }
+
+        if (eventProcessor is EvmEventProcessor) {
+            val gauge = Gauge.builder("eif.last_read_evm_block_height") { eventProcessor.lastReadLogBlockHeight }
+                    .description(
+                            "Last EVM block height read, the reader's position. Blocks are read 'evm_read_offset' behind the EVM chain head, " +
+                                    "and the events of a read block are proposed only once 'read_offset' more blocks have been read."
+                    )
+                    .tag(CHAIN_IID_TAG, chainIID.toString())
+                    .tag(BLOCKCHAIN_RID_TAG, blockchainRid.toHex())
+                    .tag(NETWORK_ID_TAG, networkId.toString())
+                    .register(Metrics.globalRegistry)
+
+            meters.getOrPut(blockchainRid) { mutableListOf() }.add(gauge)
         }
     }
 
