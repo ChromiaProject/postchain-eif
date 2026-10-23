@@ -1,4 +1,4 @@
-package net.postchain.eif
+package net.postchain.eif.config
 
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -6,7 +6,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import net.postchain.config.app.AppConfig
 import net.postchain.config.app.ConfigTest
-import net.postchain.eif.config.EvmConfig
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.core.DefaultBlockParameterName
