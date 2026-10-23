@@ -1,7 +1,6 @@
 package net.postchain.eif
 
 import mu.KLogging
-import mu.withLoggingContext
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvBigInteger
@@ -146,36 +145,34 @@ class EvmEventProcessor(
 
     @Synchronized
     override fun isValidEventData(ops: List<EvmBlockOp>): EventValidationResult {
-        withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
-            // We are strict here, if we have not seen something we will not try to go and fetch it.
-            // We simply verify that the same blocks and events are coming in the same order that we have seen them
-            // If there are too many rejections, readOffset should be increased
-            if (ops.size > eventBlocks.size) {
-                // We don't have all these blocks
-                val conflictingHeight = if (lastReadLogBlockHeight >= ops.last().evmBlockHeight) {
-                    val firstReceivedEventHeight = ops.last().evmBlockHeight
-                    eventBlocks.peek()?.evmBlockHeight?.min(firstReceivedEventHeight) ?: firstReceivedEventHeight
-                } else null
-                return EventValidationResult(false, conflictingHeight, errorMessage = "Received unexpected blocks")
-            }
-            for ((index, eventBlock) in eventBlocks.withIndex()) {
-                if (index >= ops.size) break
-
-                val op = ops[index]
-
-                if (op.networkId != eventBlock.networkId || op.evmBlockHeight != eventBlock.evmBlockHeight || op.evmBlockHash != eventBlock.evmBlockHash) {
-                    return EventValidationResult(false, op.evmBlockHeight.min(eventBlock.evmBlockHeight), errorMessage =
-                            "Received unexpected block ${op.evmBlockHeight} with hash ${op.evmBlockHash} in network ${op.networkId}." +
-                                    " Expected block ${eventBlock.evmBlockHeight} with hash ${eventBlock.evmBlockHash} in network ${eventBlock.networkId}")
-                }
-
-                if (op.events != eventBlock.events) {
-                    return EventValidationResult(false, op.evmBlockHeight, errorMessage =
-                            "Events in received block ${op.evmBlockHeight} do not match expected events")
-                }
-            }
-            return EventValidationResult(true)
+        // We are strict here, if we have not seen something we will not try to go and fetch it.
+        // We simply verify that the same blocks and events are coming in the same order that we have seen them
+        // If there are too many rejections, readOffset should be increased
+        if (ops.size > eventBlocks.size) {
+            // We don't have all these blocks
+            val conflictingHeight = if (lastReadLogBlockHeight >= ops.last().evmBlockHeight) {
+                val firstReceivedEventHeight = ops.last().evmBlockHeight
+                eventBlocks.peek()?.evmBlockHeight?.min(firstReceivedEventHeight) ?: firstReceivedEventHeight
+            } else null
+            return EventValidationResult(false, conflictingHeight, errorMessage = "Received unexpected blocks")
         }
+        for ((index, eventBlock) in eventBlocks.withIndex()) {
+            if (index >= ops.size) break
+
+            val op = ops[index]
+
+            if (op.networkId != eventBlock.networkId || op.evmBlockHeight != eventBlock.evmBlockHeight || op.evmBlockHash != eventBlock.evmBlockHash) {
+                return EventValidationResult(false, op.evmBlockHeight.min(eventBlock.evmBlockHeight), errorMessage =
+                        "Received unexpected block ${op.evmBlockHeight} with hash ${op.evmBlockHash} in network ${op.networkId}." +
+                                " Expected block ${eventBlock.evmBlockHeight} with hash ${eventBlock.evmBlockHash} in network ${eventBlock.networkId}")
+            }
+
+            if (op.events != eventBlock.events) {
+                return EventValidationResult(false, op.evmBlockHeight, errorMessage =
+                        "Events in received block ${op.evmBlockHeight} do not match expected events")
+            }
+        }
+        return EventValidationResult(true)
     }
 
     @Synchronized

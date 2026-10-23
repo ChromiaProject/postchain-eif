@@ -1,6 +1,7 @@
 package net.postchain.eif
 
 import mu.KLogging
+import mu.withLoggingContext
 import net.postchain.base.BaseBlockHeader
 import net.postchain.base.SpecialTransactionPosition
 import net.postchain.common.BlockchainRid
@@ -87,45 +88,47 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
             val index = bctx.height.mod(processors.size)
             val (networkId, procAndFetcher) = processors.entries.toList()[index]
             val (proc, fetcher) = procAndFetcher
-            val decodedOps = ops.map { EvmBlockOp.fromOpData(it) }
+            withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
+                val decodedOps = ops.map { EvmBlockOp.fromOpData(it) }
 
-            val totalEvents = decodedOps.sumOf { it.events.size }
-            if (!shouldProcessEvmEvents(bctx) && totalEvents > 0) {
-                throw UserMistake("EVM events received when EIF is paused")
-            }
-
-            // A block may hold more than `maxEventsPerBlock` events only when they all come from a single EVM block,
-            // since an EVM block cannot be split and the proposer includes it whole in that case
-            if (config.maxEventsPerBlock > 0 && isSigner()) {
-                val evmBlockCount = decodedOps.map { it.evmBlockHeight }.toSet().size
-                if (totalEvents > config.maxEventsPerBlock && evmBlockCount > 1)
-                    throw UserMistake("Block contains $totalEvents EVM events from $evmBlockCount EVM blocks, more than the maxEventsPerBlock limit of ${config.maxEventsPerBlock}")
-            }
-
-            // Validate event data
-            val validationResult = proc.isValidEventData(decodedOps)
-            if (!validationResult.valid && validationResult.conflictingHeight != null) {
-                if (isSigner()) {
-                    // A signer keeps the EVM blocks it read itself, otherwise a faulty proposer could make every signer
-                    // re-read at will. The conflict is recorded so that a restart re-reads from before it.
-                    logger.warn {
-                        "EVM blocks proposed by another signer differ from the EVM blocks this node read from the EVM network: ${validationResult.errorMessage}. " +
-                                "A restart of the chain will re-read EVM events from before height ${validationResult.conflictingHeight}"
-                    }
-                    fetcher.recordValidationConflict(validationResult.conflictingHeight)
-                } else {
-                    // Replicas and validators that are still syncing simply re-read from the conflicting height
-                    fetcher.flushEvents(validationResult.conflictingHeight - BigInteger.ONE)
+                val totalEvents = decodedOps.sumOf { it.events.size }
+                if (!shouldProcessEvmEvents(bctx) && totalEvents > 0) {
+                    throw UserMistake("EVM events received when EIF is paused")
                 }
-            }
 
-            recordPendingEvmBlockHeight(bctx.height, networkId, decodedOps)
-            bctx.addAfterCommitHook { proc.markAsProcessed(decodedOps) }
+                // A block may hold more than `maxEventsPerBlock` events only when they all come from a single EVM block,
+                // since an EVM block cannot be split and the proposer includes it whole in that case
+                if (config.maxEventsPerBlock > 0 && isSigner()) {
+                    val evmBlockCount = decodedOps.map { it.evmBlockHeight }.toSet().size
+                    if (totalEvents > config.maxEventsPerBlock && evmBlockCount > 1)
+                        throw UserMistake("Block contains $totalEvents EVM events from $evmBlockCount EVM blocks, more than the maxEventsPerBlock limit of ${config.maxEventsPerBlock}")
+                }
 
-            if (!validationResult.valid && validationResult.errorMessage != null) {
-                throw UserMistake(validationResult.errorMessage)
+                // Validate event data
+                val validationResult = proc.isValidEventData(decodedOps)
+                if (!validationResult.valid && validationResult.conflictingHeight != null) {
+                    if (isSigner()) {
+                        // A signer keeps the EVM blocks it read itself, otherwise a faulty proposer could make every signer
+                        // re-read at will. The conflict is recorded so that a restart re-reads from before it.
+                        logger.warn {
+                            "EVM blocks proposed by another signer differ from the EVM blocks this node read from the EVM network: ${validationResult.errorMessage}. " +
+                                    "A restart of the chain will re-read EVM events from before height ${validationResult.conflictingHeight}"
+                        }
+                        fetcher.recordValidationConflict(validationResult.conflictingHeight)
+                    } else {
+                        // Replicas and validators that are still syncing simply re-read from the conflicting height
+                        fetcher.flushEvents(validationResult.conflictingHeight - BigInteger.ONE)
+                    }
+                }
+
+                recordPendingEvmBlockHeight(bctx.height, networkId, decodedOps)
+                bctx.addAfterCommitHook { proc.markAsProcessed(decodedOps) }
+
+                if (!validationResult.valid && validationResult.errorMessage != null) {
+                    throw UserMistake(validationResult.errorMessage)
+                }
+                return validationResult.valid
             }
-            return validationResult.valid
         }
         return ops.isEmpty()
     }
