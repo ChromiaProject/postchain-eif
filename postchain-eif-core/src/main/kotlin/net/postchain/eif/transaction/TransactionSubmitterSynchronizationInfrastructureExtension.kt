@@ -65,10 +65,10 @@ class TransactionSubmitterSynchronizationInfrastructureExtension(private val pos
 
                 // Do not start the transaction submitter if we are a replica node
                 if (!nodeIsReplica) {
-                    for ((evmBlockchainName, networkBlockchainConfig) in transactionSubmitterBlockchainConfig.chains) {
+                    for ((evmChainName, networkBlockchainConfig) in transactionSubmitterBlockchainConfig.chains) {
                         val networkId = networkBlockchainConfig.networkId
                         val appConfig =
-                                EvmTransactionSubmitterConfig.fromAppConfig(evmBlockchainName, postchainContext.appConfig)
+                                EvmTransactionSubmitterConfig.fromAppConfig(evmChainName, postchainContext.appConfig)
                         val web3jServicesMap = Web3jServiceFactory.buildServicesMap(
                                 appConfig.urls,
                                 appConfig.connectTimeout,
