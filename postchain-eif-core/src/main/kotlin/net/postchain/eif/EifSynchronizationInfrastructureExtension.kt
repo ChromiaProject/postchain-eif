@@ -10,7 +10,7 @@ import net.postchain.core.BlockchainEngine
 import net.postchain.core.BlockchainProcess
 import net.postchain.core.SynchronizationInfrastructureExtension
 import net.postchain.eif.config.EifEventReceiverConfig
-import net.postchain.eif.config.EifEvmBlockchainConfig
+import net.postchain.eif.config.EifEvmChainConfig
 import net.postchain.eif.config.EifEvmContractConfig
 import net.postchain.eif.config.EvmConfig
 import net.postchain.eif.metrics.EifMetricsRegistry
@@ -112,7 +112,7 @@ class EifSynchronizationInfrastructureExtension(
     private fun createEventPipeline(
             cfg: BlockchainConfiguration,
             evmChainName: String,
-            evmChainConfig: EifEvmBlockchainConfig,
+            evmChainConfig: EifEvmChainConfig,
             engine: BlockchainEngine,
             evmConfig: EvmConfig,
             hasLegacyDynamicContracts: Boolean,

@@ -14,5 +14,5 @@ data class EifEventReceiverConfig(
         @param:DefaultValue(defaultLong = 100)
         val maxEventsPerBlock: Long,
         @param:Name("chains")
-        val chains: Map<String, EifEvmBlockchainConfig>,
+        val chains: Map<String, EifEvmChainConfig>,
 )
