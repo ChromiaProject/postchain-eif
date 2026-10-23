@@ -32,6 +32,7 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
     lateinit var isSigner: () -> Boolean
 
     private var needEifTnx: Boolean = false
+
     /** The pipeline of every EVM network this chain reads, by network id */
     internal val pipelines = mutableMapOf<Long, EventPipeline>()
 
@@ -40,8 +41,8 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
 
     override fun getRelevantOps() = setOf(EvmBlockOp.OP_NAME)
 
-    fun addPipeline(networkId: Long, fetcher: EventFetcher, processor: EventProcessor) {
-        pipelines[networkId] = EventPipeline(fetcher, processor)
+    fun addPipeline(networkId: Long, pipeline: EventPipeline) {
+        pipelines[networkId] = pipeline
     }
 
     override fun init(module: GTXModule, chainID: Long, blockchainRID: BlockchainRid, cs: CryptoSystem) {

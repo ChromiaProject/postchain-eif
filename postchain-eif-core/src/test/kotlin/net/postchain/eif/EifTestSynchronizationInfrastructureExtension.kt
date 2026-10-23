@@ -24,7 +24,7 @@ class EifTestSynchronizationInfrastructureExtension(
             if (te is EifSpecialTxExtension) {
                 engine.getConfiguration().rawConfig["eif"]?.toObject<EifEventReceiverConfig>()?.let { te.config = it }
                 te.isSigner = process::isSigner
-                te.addPipeline(1L, NoOpEventFetcher(processor), processor)
+                te.addPipeline(1L, EventPipeline(NoOpEventFetcher(processor), processor))
             }
         }
     }

@@ -204,18 +204,13 @@ class EvmEventProcessor(
     override fun getEventData(): List<EvmBlockOp> = newBlocks()
 
     @Synchronized
-    fun processLogEventsAndUpdateOffsets(
-            logs: List<EvmBlockOp>,
-            newLastReadLogBlockHeight: BigInteger
-    ) {
+    fun processLogEventsAndUpdateOffsets(logs: List<EvmBlockOp>, newLastReadLogBlockHeight: BigInteger) {
         eventBlocks.addAll(logs)
         lastReadLogBlockHeight = newLastReadLogBlockHeight
     }
 
     @Synchronized
-    override fun flushEvents(
-            resetToHeight: BigInteger,
-    ) {
+    override fun flushEvents(resetToHeight: BigInteger) {
         val currentQueue = eventBlocks.toList()
         eventBlocks.clear()
         for (event in currentQueue) {

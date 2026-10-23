@@ -33,6 +33,7 @@ const val EIF_SHOULD_PROCESS_EVM_EVENTS_QUERY = "should_process_evm_events"
 class EifSynchronizationInfrastructureExtension(
         private val postchainContext: PostchainContext
 ) : SynchronizationInfrastructureExtension {
+
     private val eventFetchers = mutableMapOf<BlockchainRid, MutableMap<Long, EventFetcher>>()
     private val eifMetricsRegistry = EifMetricsRegistry()
 
@@ -72,9 +73,9 @@ class EifSynchronizationInfrastructureExtension(
                         if (eventReceiverConfig.maxEventsPerBlock > evmConfig.maxQueueSize) throw UserMistake("maxEventsPerBlock cannot be larger than maxQueueSize")
 
                         val pipeline = createEventPipeline(cfg, evmBlockchainName, evmBlockchainConfig, engine, evmConfig, hasLegacyDynamicContracts, hasDynamicContracts, hasDynamicEvents, hasLastEvmEventHeightQuery)
-                        ext.addPipeline(evmBlockchainConfig.networkId, pipeline.fetcher, pipeline.processor)
+                        ext.addPipeline(evmBlockchainConfig.networkId, pipeline)
                         eventFetchers[cfg.blockchainRid]?.set(evmBlockchainConfig.networkId, pipeline.fetcher)
-                        eifMetricsRegistry.registerMetrics(cfg.chainID, cfg.blockchainRid, evmBlockchainConfig.networkId, pipeline.fetcher, pipeline.processor)
+                        eifMetricsRegistry.registerMetrics(cfg.chainID, cfg.blockchainRid, evmBlockchainConfig.networkId, pipeline)
                     }
                 } catch (e: Exception) {
                     disconnectProcess(process)
@@ -107,10 +108,18 @@ class EifSynchronizationInfrastructureExtension(
         eventFetchers.clear()
     }
 
-    private fun createEventPipeline(cfg: BlockchainConfiguration, evmBlockchainName: String,
-                                         evmBlockchainConfig: EifEvmBlockchainConfig, engine: BlockchainEngine,
-                                         evmConfig: EvmConfig, hasLegacyDynamicContracts: Boolean, hasDynamicContacts: Boolean,
-                                         hasDynamicEvents: Boolean, hasLastEvmEventHeightQuery: Boolean): EventPipeline {
+    private fun createEventPipeline(
+            cfg: BlockchainConfiguration,
+            evmBlockchainName: String,
+            evmBlockchainConfig: EifEvmBlockchainConfig,
+            engine: BlockchainEngine,
+            evmConfig: EvmConfig,
+            hasLegacyDynamicContracts: Boolean,
+            hasDynamicContacts: Boolean,
+            hasDynamicEvents: Boolean,
+            hasLastEvmEventHeightQuery: Boolean,
+    ): EventPipeline {
+
         if (evmBlockchainConfig.readOffset < 0) throw UserMistake("readOffset cannot be negative")
         if (evmBlockchainConfig.evmReadOffset < 0) throw UserMistake("evmReadOffset cannot be negative")
         if (evmConfig.maxQueueSize < 0) throw UserMistake("maxQueueSize cannot be negative")
@@ -123,8 +132,9 @@ class EifSynchronizationInfrastructureExtension(
                 evmConfig.maxQueueSize,
         )
         return if ("ignore".equals(evmConfig.urls.first(), ignoreCase = true)) {
-            logger.warn("EIF is running in disconnected mode. No events will be fetched from or validated against ethereum.")
-            NoOpEventProcessor().let { EventPipeline(NoOpEventFetcher(it), it) }
+            logger.warn("EIF is running in disconnected mode. No events will be fetched from or validated against Ethereum.")
+            val processor = NoOpEventProcessor()
+            EventPipeline(NoOpEventFetcher(processor), processor)
         } else {
             if (evmBlockchainConfig.skipToHeight == 0L) {
                 withLoggingContext(NETWORK_ID_TAG to evmBlockchainConfig.networkId.toString()) {

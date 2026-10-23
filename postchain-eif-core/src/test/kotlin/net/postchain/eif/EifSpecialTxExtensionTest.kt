@@ -33,7 +33,7 @@ class EifSpecialTxExtensionTest {
 
         // Initialize EifSpecialTxExtension
         val sut = EifSpecialTxExtension().apply {
-            addPipeline(1L, NoOpEventFetcher(eventProcessor), eventProcessor)
+            addPipeline(1L, EventPipeline(NoOpEventFetcher(eventProcessor), eventProcessor))
         }
 
         // No operations should be created
@@ -57,7 +57,7 @@ class EifSpecialTxExtensionTest {
         // Initialize EifSpecialTxExtension
         val sut = EifSpecialTxExtension().apply {
             config = config(maxEventsPerBlock = 0L)
-            addPipeline(1L, NoOpEventFetcher(eventProcessor), eventProcessor)
+            addPipeline(1L, EventPipeline(NoOpEventFetcher(eventProcessor), eventProcessor))
         }
 
         // All events should be added
@@ -92,7 +92,7 @@ class EifSpecialTxExtensionTest {
         // Initialize EifSpecialTxExtension
         val sut = EifSpecialTxExtension().apply {
             config = config(maxEventsPerBlock = 5L)
-            addPipeline(1L, NoOpEventFetcher(eventProcessor), eventProcessor)
+            addPipeline(1L, EventPipeline(NoOpEventFetcher(eventProcessor), eventProcessor))
         }
 
         // Only events from the first block are included
@@ -131,7 +131,7 @@ class EifSpecialTxExtensionTest {
         // Initialize EifSpecialTxExtension with max 3 events per block
         val sut = EifSpecialTxExtension().apply {
             config = config(maxEventsPerBlock = 3L)
-            addPipeline(1L, NoOpEventFetcher(eventProcessor), eventProcessor)
+            addPipeline(1L, EventPipeline(NoOpEventFetcher(eventProcessor), eventProcessor))
         }
 
         // All 7 events from the first block should be added despite maxEventsPerBlock of 3
@@ -155,7 +155,7 @@ class EifSpecialTxExtensionTest {
         val sut = EifSpecialTxExtension().apply {
             config = config(maxEventsPerBlock = 0L)
             isSigner = { true }
-            addPipeline(1L, NoOpEventFetcher(eventProcessor), eventProcessor)
+            addPipeline(1L, EventPipeline(NoOpEventFetcher(eventProcessor), eventProcessor))
         }
 
         // All operations should be allowed
@@ -181,7 +181,7 @@ class EifSpecialTxExtensionTest {
         val sut = EifSpecialTxExtension().apply {
             config = config(maxEventsPerBlock = 5L)
             isSigner = { true }
-            addPipeline(1L, NoOpEventFetcher(eventProcessor), eventProcessor)
+            addPipeline(1L, EventPipeline(NoOpEventFetcher(eventProcessor), eventProcessor))
         }
 
         // Should fail when events from multiple blocks exceed the limit
@@ -215,7 +215,7 @@ class EifSpecialTxExtensionTest {
         val sut = EifSpecialTxExtension().apply {
             config = config(maxEventsPerBlock = 5L)
             isSigner = { false }
-            addPipeline(1L, NoOpEventFetcher(eventProcessor), eventProcessor)
+            addPipeline(1L, EventPipeline(NoOpEventFetcher(eventProcessor), eventProcessor))
         }
 
         // Should pass even when events from multiple blocks exceed the limit
