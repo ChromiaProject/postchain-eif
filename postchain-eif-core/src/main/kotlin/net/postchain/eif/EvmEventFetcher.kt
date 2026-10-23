@@ -417,7 +417,7 @@ class EvmEventFetcher(
     @Synchronized
     private fun persistReadCursor() {
         if (!readPositionInitialized) return
-        val height = evmEventProcessor.safeResumeHeight() ?: return
+        val height = evmEventProcessor.getSafeResumeHeight() ?: return
         val cursor = EvmReadCursor(height, filterContracts)
         try {
             readCursorStore.save(networkId, cursor)

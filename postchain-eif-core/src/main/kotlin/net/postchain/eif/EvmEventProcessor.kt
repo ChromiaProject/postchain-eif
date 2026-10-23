@@ -26,7 +26,7 @@ class EvmEventProcessor(
     var lastReadLogBlockHeight: BigInteger = BigInteger.ZERO
 
     /**
-     * EVM block heights that [safeResumeHeight] must stay below until a durably committed block covers them, that is
+     * EVM block heights that [getSafeResumeHeight] must stay below until a durably committed block covers them, that is
      * until [blockCommitted] is called with that height or a later one. Two kinds of heights end up here:
      * - blocks taken out of the queue by [markAsProcessed]: the block they went into is being committed but is not
      *   durable yet, so a crash could still lose it
@@ -47,7 +47,7 @@ class EvmEventProcessor(
      * Returns null until anything has been read.
      */
     @Synchronized
-    fun safeResumeHeight(): BigInteger? {
+    fun getSafeResumeHeight(): BigInteger? {
         if (lastReadLogBlockHeight == BigInteger.ZERO) return null
         var safeHeight = lastReadLogBlockHeight
         eventBlocks.peek()?.let { safeHeight = safeHeight.min(it.evmBlockHeight - BigInteger.ONE) }
@@ -56,7 +56,7 @@ class EvmEventProcessor(
     }
 
     /**
-     * Holds [safeResumeHeight] below [height] until a block including EVM block [height] or a later one has been durably
+     * Holds [getSafeResumeHeight] below [height] until a block including EVM block [height] or a later one has been durably
      * committed on this node. Used by a signer that rejected a block proposal whose EVM blocks differ from the ones
      * this node read: the blocks in memory are kept, but a restart must re-read from before the disagreement. Ignored
      * if such a block has already been committed, since the proposal is then behind this node.
@@ -126,7 +126,7 @@ class EvmEventProcessor(
     private fun newBlocks(): List<EvmBlockOp> = eventBlocks.takeWhile { it.evmBlockHeight <= lastReadLogBlockHeight - readOffset }
 
     @Synchronized
-    override fun numberOfNewEvents(): Long = newBlocks().sumOf { it.events.size }.toLong()
+    override fun getNumberOfNewEvents(): Long = newBlocks().sumOf { it.events.size }.toLong()
 
     @Synchronized
     override fun getEventData(): List<EvmBlockOp> = newBlocks()

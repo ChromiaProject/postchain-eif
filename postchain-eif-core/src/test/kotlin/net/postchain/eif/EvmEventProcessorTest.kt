@@ -51,7 +51,7 @@ class EvmEventProcessorTest {
     fun `safe resume height is unknown before anything has been read`() {
         val sut = EvmEventProcessor(1L, BigInteger.ZERO, 2000L)
 
-        assertThat(sut.safeResumeHeight()).isNull()
+        assertThat(sut.getSafeResumeHeight()).isNull()
     }
 
     @Test
@@ -59,10 +59,10 @@ class EvmEventProcessorTest {
         val sut = EvmEventProcessor(1L, BigInteger.TWO, 2000L)
 
         sut.processLogEventsAndUpdateOffsets(listOf(), 10.toBigInteger())
-        assertThat(sut.safeResumeHeight()).isEqualTo(10.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(10.toBigInteger())
 
         sut.processLogEventsAndUpdateOffsets(listOf(), 25.toBigInteger())
-        assertThat(sut.safeResumeHeight()).isEqualTo(25.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(25.toBigInteger())
     }
 
     @Test
@@ -74,22 +74,22 @@ class EvmEventProcessorTest {
                 evmBlockOp(18L, "30", events(3)),
         )
         sut.processLogEventsAndUpdateOffsets(blocks, 20.toBigInteger())
-        assertThat(sut.safeResumeHeight()).isEqualTo(11.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(11.toBigInteger())
 
         // Consumed into a block that is not yet committed: still not safe to skip
         sut.markAsProcessed(blocks.take(1))
-        assertThat(sut.safeResumeHeight()).isEqualTo(11.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(11.toBigInteger())
 
         sut.blockCommitted(12.toBigInteger())
-        assertThat(sut.safeResumeHeight()).isEqualTo(14.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(14.toBigInteger())
 
         sut.markAsProcessed(blocks.drop(1).take(1))
         sut.blockCommitted(15.toBigInteger())
-        assertThat(sut.safeResumeHeight()).isEqualTo(17.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(17.toBigInteger())
 
         sut.markAsProcessed(blocks.drop(2))
         sut.blockCommitted(18.toBigInteger())
-        assertThat(sut.safeResumeHeight()).isEqualTo(20.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(20.toBigInteger())
     }
 
     @Test
@@ -105,21 +105,21 @@ class EvmEventProcessorTest {
         // All consumed into a block that is being built: the lowest consumed block still bounds the safe height
         sut.markAsProcessed(blocks)
         assertThat(sut.getEventData()).isEqualTo(listOf())
-        assertThat(sut.safeResumeHeight()).isEqualTo(9.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(9.toBigInteger())
         assertThat(sut.lastConfirmedEvmBlockHeight).isNull()
 
         // A committed block without EVM blocks confirms nothing
         sut.blockCommitted(null)
-        assertThat(sut.safeResumeHeight()).isEqualTo(9.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(9.toBigInteger())
         assertThat(sut.lastConfirmedEvmBlockHeight).isNull()
 
         // Only the blocks up to the committed height are confirmed
         sut.blockCommitted(20.toBigInteger())
-        assertThat(sut.safeResumeHeight()).isEqualTo(29.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(29.toBigInteger())
         assertThat(sut.lastConfirmedEvmBlockHeight).isEqualTo(20.toBigInteger())
 
         sut.blockCommitted(30.toBigInteger())
-        assertThat(sut.safeResumeHeight()).isEqualTo(35.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(35.toBigInteger())
         assertThat(sut.lastConfirmedEvmBlockHeight).isEqualTo(30.toBigInteger())
 
         sut.blockCommitted(null)
@@ -133,13 +133,13 @@ class EvmEventProcessorTest {
 
         // A block with events at the read height itself
         sut.processLogEventsAndUpdateOffsets(blocks, 20.toBigInteger())
-        assertThat(sut.safeResumeHeight()).isEqualTo(19.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(19.toBigInteger())
 
         sut.markAsProcessed(blocks)
-        assertThat(sut.safeResumeHeight()).isEqualTo(19.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(19.toBigInteger())
 
         sut.blockCommitted(20.toBigInteger())
-        assertThat(sut.safeResumeHeight()).isEqualTo(20.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(20.toBigInteger())
     }
 
     @Test
@@ -156,35 +156,35 @@ class EvmEventProcessorTest {
         sut.flushEvents(14.toBigInteger())
         assertThat(sut.lastReadLogBlockHeight).isEqualTo(14.toBigInteger())
         assertThat(sut.getEventData()).isEqualTo(blocks.take(1))
-        assertThat(sut.safeResumeHeight()).isEqualTo(11.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(11.toBigInteger())
 
         // Flush below the queue: queue is empty and the flush height is the safe height
         sut.flushEvents(5.toBigInteger())
         assertThat(sut.getEventData()).isEqualTo(listOf())
-        assertThat(sut.safeResumeHeight()).isEqualTo(5.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(5.toBigInteger())
     }
 
     @Test
     fun `safe resume height is held below a validation conflict until that height is committed`() {
         val sut = EvmEventProcessor(1L, BigInteger.ZERO, 2000L)
         sut.processLogEventsAndUpdateOffsets(listOf(), 30.toBigInteger())
-        assertThat(sut.safeResumeHeight()).isEqualTo(30.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(30.toBigInteger())
 
         // Another signer proposed an EVM block at height 20 that this node did not see, reading continues
         sut.holdResumeHeightBelow(20.toBigInteger())
         sut.processLogEventsAndUpdateOffsets(listOf(), 40.toBigInteger())
-        assertThat(sut.safeResumeHeight()).isEqualTo(19.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(19.toBigInteger())
 
         // A committed block below the conflict does not release the hold
         sut.blockCommitted(15.toBigInteger())
-        assertThat(sut.safeResumeHeight()).isEqualTo(19.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(19.toBigInteger())
 
         // A committed block including the conflicting height does
         sut.blockCommitted(20.toBigInteger())
-        assertThat(sut.safeResumeHeight()).isEqualTo(40.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(40.toBigInteger())
 
         // A conflict at an already committed height is ignored
         sut.holdResumeHeightBelow(18.toBigInteger())
-        assertThat(sut.safeResumeHeight()).isEqualTo(40.toBigInteger())
+        assertThat(sut.getSafeResumeHeight()).isEqualTo(40.toBigInteger())
     }
 }

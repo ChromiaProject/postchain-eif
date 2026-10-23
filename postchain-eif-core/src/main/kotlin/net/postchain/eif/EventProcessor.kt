@@ -20,7 +20,7 @@ enum class EncodedEvent(val index: Int) {
 
 interface EventProcessor {
     fun getEventData(): List<EvmBlockOp>
-    fun numberOfNewEvents(): Long
+    fun getNumberOfNewEvents(): Long
     fun isValidEventData(ops: List<EvmBlockOp>): EventValidationResult
     fun markAsProcessed(ops: List<EvmBlockOp>)
     fun flushEvents(resetToHeight: BigInteger)
@@ -48,7 +48,7 @@ class NoOpEventProcessor : EventProcessor {
 
     override fun getEventData(): List<EvmBlockOp> = emptyList()
 
-    override fun numberOfNewEvents(): Long = 0L
+    override fun getNumberOfNewEvents(): Long = 0L
 
     /**
      * We can at least validate structure

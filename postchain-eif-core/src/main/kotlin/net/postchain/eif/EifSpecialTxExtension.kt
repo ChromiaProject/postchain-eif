@@ -178,7 +178,7 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
         return false
     }
 
-    private fun fetchNumberOfEvents(): Long = pipelines.values.sumOf { it.processor.numberOfNewEvents() }
+    private fun fetchNumberOfEvents(): Long = pipelines.values.sumOf { it.processor.getNumberOfNewEvents() }
 
     private fun shouldProcessEvmEvents(bctx: BlockEContext): Boolean {
         lastSeenShouldProcessEvents = !hasShouldProcessEvmEventsQuery ||
