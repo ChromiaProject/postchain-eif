@@ -2,7 +2,11 @@ package net.postchain.eif
 
 import assertk.assertThat
 import assertk.assertions.isEqualTo
+import assertk.assertions.isFalse
+import assertk.assertions.isNotNull
 import assertk.assertions.isNull
+import assertk.assertions.isTrue
+import assertk.assertions.startsWith
 import org.junit.jupiter.api.Test
 import java.math.BigInteger
 
@@ -186,5 +190,136 @@ class EvmEventProcessorTest {
         // A conflict at an already committed height is ignored
         sut.holdResumeHeightBelow(18.toBigInteger())
         assertThat(sut.getSafeResumeHeight()).isEqualTo(40.toBigInteger())
+    }
+
+    // ---- isValidEventData ------------------------------------------------------------------------------------------
+
+    @Test
+    fun `should accept a proposal of the first queued blocks`() {
+        val sut = EvmEventProcessor(1L, BigInteger.ZERO, 2000L)
+        val blocks = listOf(
+                evmBlockOp(5L, "50", events(1)),
+                evmBlockOp(6L, "60", events(2)),
+                evmBlockOp(7L, "70", events(3)),
+        )
+        sut.processLogEventsAndUpdateOffsets(blocks, 10.toBigInteger())
+
+        assertThat(sut.isValidEventData(blocks).valid).isTrue()
+        // The proposer may have been limited by maxEventsPerBlock
+        assertThat(sut.isValidEventData(blocks.take(2)).valid).isTrue()
+        assertThat(sut.isValidEventData(listOf()).valid).isTrue()
+    }
+
+    @Test
+    fun `should rewind to the first proposed block when none of the proposed blocks was read with events`() {
+        val sut = EvmEventProcessor(1L, BigInteger.ZERO, 2000L)
+        sut.processLogEventsAndUpdateOffsets(listOf(), 10.toBigInteger())
+
+        val proposal = listOf(
+                evmBlockOp(5L, "50", events(1)),
+                evmBlockOp(6L, "60", events(2)),
+                evmBlockOp(7L, "70", events(3)),
+        )
+        assertInvalid(sut.isValidEventData(proposal), conflictingHeight = 5L, errorMessagePrefix = "Received unexpected blocks")
+    }
+
+    @Test
+    fun `should rewind to the first proposed block when only later blocks were read with events`() {
+        val sut = EvmEventProcessor(1L, BigInteger.ZERO, 2000L)
+        sut.processLogEventsAndUpdateOffsets(listOf(
+                evmBlockOp(10L, "a0", events(4)),
+                evmBlockOp(11L, "b0", events(5)),
+        ), 11.toBigInteger())
+
+        val proposal = listOf(
+                evmBlockOp(5L, "50", events(1)),
+                evmBlockOp(6L, "60", events(2)),
+                evmBlockOp(7L, "70", events(3)),
+        )
+        assertInvalid(sut.isValidEventData(proposal), conflictingHeight = 5L, errorMessagePrefix = "Received unexpected block 5")
+    }
+
+    @Test
+    fun `should rewind to the first proposed block that is not queued`() {
+        val sut = EvmEventProcessor(1L, BigInteger.ZERO, 2000L)
+        sut.processLogEventsAndUpdateOffsets(listOf(
+                evmBlockOp(5L, "50", events(1)),
+                evmBlockOp(7L, "70", events(3)),
+        ), 10.toBigInteger())
+
+        val proposal = listOf(
+                evmBlockOp(5L, "50", events(1)),
+                evmBlockOp(6L, "60", events(2)),
+                evmBlockOp(7L, "70", events(3)),
+        )
+        assertInvalid(sut.isValidEventData(proposal), conflictingHeight = 6L, errorMessagePrefix = "Received unexpected block 6")
+    }
+
+    @Test
+    fun `should rewind to a proposed block above the queue that was read without events`() {
+        val sut = EvmEventProcessor(1L, BigInteger.ZERO, 2000L)
+        sut.processLogEventsAndUpdateOffsets(listOf(
+                evmBlockOp(5L, "50", events(1)),
+                evmBlockOp(7L, "70", events(3)),
+        ), 10.toBigInteger())
+
+        val proposal = listOf(
+                evmBlockOp(5L, "50", events(1)),
+                evmBlockOp(7L, "70", events(3)),
+                evmBlockOp(9L, "90", events(4)),
+        )
+        assertInvalid(sut.isValidEventData(proposal), conflictingHeight = 9L, errorMessagePrefix = "Received unexpected blocks")
+    }
+
+    @Test
+    fun `shouldn't rewind when the proposal reaches beyond the read position`() {
+        val sut = EvmEventProcessor(1L, BigInteger.ZERO, 2000L)
+        sut.processLogEventsAndUpdateOffsets(listOf(evmBlockOp(5L, "50", events(1))), 5.toBigInteger())
+
+        val proposal = listOf(
+                evmBlockOp(5L, "50", events(1)),
+                evmBlockOp(6L, "60", events(2)),
+        )
+        assertInvalid(sut.isValidEventData(proposal), conflictingHeight = null, errorMessagePrefix = "Received unexpected blocks")
+    }
+
+    @Test
+    fun `should rewind to a queued block whose hash differs from the proposed one`() {
+        val sut = EvmEventProcessor(1L, BigInteger.ZERO, 2000L)
+        sut.processLogEventsAndUpdateOffsets(listOf(
+                evmBlockOp(5L, "50", events(1)),
+                evmBlockOp(6L, "60", events(2)),
+                evmBlockOp(7L, "70", events(3)),
+        ), 10.toBigInteger())
+
+        val proposal = listOf(
+                evmBlockOp(5L, "50", events(1)),
+                evmBlockOp(6L, "61", events(2)),
+                evmBlockOp(7L, "70", events(3)),
+        )
+        assertInvalid(sut.isValidEventData(proposal), conflictingHeight = 6L, errorMessagePrefix = "Received unexpected block 6")
+    }
+
+    @Test
+    fun `should rewind to a queued block whose events differ from the proposed ones`() {
+        val sut = EvmEventProcessor(1L, BigInteger.ZERO, 2000L)
+        sut.processLogEventsAndUpdateOffsets(listOf(
+                evmBlockOp(5L, "50", events(1)),
+                evmBlockOp(6L, "60", events(2)),
+                evmBlockOp(7L, "70", events(3)),
+        ), 10.toBigInteger())
+
+        val proposal = listOf(
+                evmBlockOp(5L, "50", events(1)),
+                evmBlockOp(6L, "60", events(2, 22)),
+                evmBlockOp(7L, "70", events(3)),
+        )
+        assertInvalid(sut.isValidEventData(proposal), conflictingHeight = 6L, errorMessagePrefix = "Events in received block 6")
+    }
+
+    private fun assertInvalid(result: EventValidationResult, conflictingHeight: Long?, errorMessagePrefix: String) {
+        assertThat(result.valid).isFalse()
+        assertThat(result.conflictingHeight).isEqualTo(conflictingHeight?.toBigInteger())
+        assertThat(result.errorMessage).isNotNull().startsWith(errorMessagePrefix)
     }
 }
