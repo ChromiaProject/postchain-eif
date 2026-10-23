@@ -1,7 +1,7 @@
 package net.postchain.eif.web3j
 
 import net.postchain.common.toHex
-import net.postchain.eif.GtvToTypeMapper
+import net.postchain.eif.gtv.GtvToTypeMapper
 import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvBigInteger
 import net.postchain.gtv.GtvByteArray

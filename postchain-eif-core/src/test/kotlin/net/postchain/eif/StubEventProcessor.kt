@@ -24,7 +24,7 @@ class StubEventProcessor : EventProcessor {
         }
     }
 
-    override fun numberOfNewEvents(): Long = 10L
+    override fun getNumberOfNewEvents(): Long = 10L
 
     override fun isValidEventData(ops: List<EvmBlockOp>) = EventValidationResult(true)
 

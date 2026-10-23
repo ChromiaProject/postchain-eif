@@ -229,7 +229,7 @@ class EifEventProcessingIT : IntegrationTestSetup() {
     private fun getEventProcessor(node: PostchainTestNode, networkId: Long) = (node.getBlockchainInstance().blockchainEngine
             .getConfiguration() as GTXModuleAware).module.getSpecialTxExtensions()
             .filterIsInstance<EifSpecialTxExtension>().first()
-            .processors[networkId]?.first as EvmEventProcessor
+            .pipelines[networkId]?.processor as EvmEventProcessor
 
     private fun enqueueTx(node: PostchainTestNode, data: ByteArray): Transaction? {
         try {

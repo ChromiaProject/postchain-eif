@@ -11,9 +11,9 @@ import net.postchain.concurrent.util.get
 import net.postchain.core.BlockEContext
 import net.postchain.core.block.BlockQueriesProvider
 import net.postchain.crypto.CryptoSystem
-import net.postchain.eif.EifSignature
-import net.postchain.eif.EvmMerkleProof
-import net.postchain.eif.MerkleProofUtil
+import net.postchain.eif.merkle.EifSignature
+import net.postchain.eif.merkle.EvmMerkleProof
+import net.postchain.eif.merkle.MerkleProofUtil
 import net.postchain.eif.decodeBlockHeaderDataFromEVM
 import net.postchain.eif.getEthereumAddress
 import net.postchain.eif.transaction.EvmBlockHeaderValidator

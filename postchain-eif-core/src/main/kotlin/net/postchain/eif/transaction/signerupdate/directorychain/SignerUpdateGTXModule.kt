@@ -7,7 +7,7 @@ import net.postchain.common.data.KECCAK256
 import net.postchain.common.exception.UserMistake
 import net.postchain.core.EContext
 import net.postchain.crypto.Secp256K1CryptoSystem
-import net.postchain.eif.EvmMerkleProofBuilder
+import net.postchain.eif.merkle.EvmMerkleProofBuilder
 import net.postchain.eif.transaction.signerupdate.directorychain.EvmSignerUpdateBlockBuilderExtension.Companion.SIGNER_LIST_UPDATE_EXTRA_HEADER
 import net.postchain.eif.transaction.signerupdate.directorychain.EvmSignerUpdateBlockBuilderExtension.Companion.SIGNER_LIST_UPDATE_TABLE_PREFIX
 import net.postchain.gtv.Gtv

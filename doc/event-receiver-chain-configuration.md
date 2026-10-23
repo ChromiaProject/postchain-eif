@@ -72,14 +72,15 @@ At start the reader logs the chosen start point; if it is more than `maxReadAhea
 
 The reader exposes these metrics, tagged with chain IID, blockchain RID and network ID:
 
-| Metric                                      | Type    | Description                                                                                   |
-|---------------------------------------------|---------|-----------------------------------------------------------------------------------------------|
-| `eif.last_read_evm_block_height`            | gauge   | Last EVM block height read, the reader's position; its events are proposed after `read_offset` more blocks |
-| `eif.last_seen_evm_head_height`             | gauge   | Last EVM chain head height reported by the RPC node                                           |
-| `eif.unread_evm_blocks`                     | gauge   | Readable blocks (head minus `evm_read_offset`) not read yet, 0 when caught up                 |
-| `eif.last_persisted_evm_block_height`       | gauge   | Height of the last persisted read cursor, a restarted reader resumes after it                 |
-| `eif.evm_read_rewind_total`                 | counter | Times the read position moved backwards, tagged with `reason` (`new_contract`, `validation_conflict`) |
-| `eif.evm_signer_validation_conflict_total`  | counter | Block proposals this node, as a signer, rejected because their EVM blocks differ from the ones it read |
+| Metric                                     | Type    | Description                                                                                                                                                   |
+|--------------------------------------------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `eif.last_read_evm_block_height`           | gauge   | Last EVM block height read, the reader's position; its events are proposed after `read_offset` more blocks                                                    |
+| `eif.last_seen_evm_head_height`            | gauge   | Last EVM chain head height reported by the RPC node                                                                                                           |
+| `eif.unread_evm_blocks`                    | gauge   | Readable blocks (head minus `evm_read_offset`) not read yet, 0 when caught up                                                                                 |
+| `eif.last_persisted_evm_block_height`      | gauge   | Height of the last persisted read cursor, a restarted reader resumes after it                                                                                 |
+| `eif.evm_read_rewind_total`                | counter | Times the read position moved backwards, tagged with `reason` (`new_contract`, `validation_conflict`)                                                         |
+| `eif.evm_signer_validation_conflict_total` | counter | Block proposals this node, as a signer, rejected because their EVM blocks differ from the ones it read                                                        |
+| `rpc.counter.<n>`                          | counter | JSON-RPC requests answered by the URL at position `n` (from 0) of `${chain}.urls`, including answers that carry an error; connection failures are not counted |
 
 
 In addition, the EVM Event Receiver blockchain configuration uses the `EifGTXModule` and `IcmfSenderGTXModule` GTX modules and the `EifSynchronizationInfrastructureExtension` synchronization extension. It also depends on the ICMF Rell library.

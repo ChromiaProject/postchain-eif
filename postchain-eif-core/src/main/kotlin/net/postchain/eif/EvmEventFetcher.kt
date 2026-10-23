@@ -22,7 +22,10 @@ import net.postchain.common.wrap
 import net.postchain.concurrent.util.get
 import net.postchain.core.BlockchainEngine
 import net.postchain.eif.EvmEventProcessor.EvmBlock
+import net.postchain.eif.gtv.GtvToEventMapper
+import net.postchain.eif.gtv.TypeToGtvMapper
 import net.postchain.eif.web3j.Web3jRequestHandler
+import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvBigInteger
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.GtvInteger
@@ -145,125 +148,129 @@ class EvmEventFetcher(
     /** Block proposals this node, as a signer, rejected because their EVM blocks differ from the ones it read */
     val signerValidationConflicts = AtomicLong()
 
+    private val staticEventsBySignature = staticEvents.associateBy(EventEncoder::encode)
+
     init {
         job = launchEventFetching()
     }
 
-    private fun launchEventFetching() =
-            CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-event-processor") + MDCContext()) {
-                withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
-                    while (isActive) {
-                        try {
-                            fetchEvents()
-                        } catch (_: CancellationException) {
-                            break
-                        } catch (e: Exception) {
-                            logger.error("Parsing of EVM logs unexpectedly failed: $e", e)
-                            delay(maxOf(FAILURE_RETRY_DELAY, minPollInterval).milliseconds) // Delay a bit and hope that we can recover
-                        }
-                    }
+    /**
+     * The fetch loop is a coroutine, so its logging context cannot be set from inside it: [MDCContext] restores the
+     * MDC captured at launch on every resumption, and anything put into it after a suspension point is lost. Setting
+     * the network id before the launch puts it into that snapshot instead, for every log line of the loop.
+     */
+    private fun launchEventFetching() = withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
+        CoroutineScope(Dispatchers.IO).launch(CoroutineName("$networkId-event-processor") + MDCContext()) {
+            while (isActive) {
+                try {
+                    fetchEvents()
+                } catch (_: CancellationException) {
+                    break
+                } catch (e: Exception) {
+                    logger.error("Parsing of EVM logs unexpectedly failed: $e", e)
+                    delay(maxOf(FAILURE_RETRY_DELAY, minPollInterval).milliseconds) // Delay a bit and hope that we can recover
                 }
             }
+        }
+    }
 
     /**
      * Producer thread will read events from ethereum ond add to queue in this action. Main thread will consume them.
      */
     private suspend fun fetchEvents() {
-        withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
-            val cycleStart = clock.millis()
+        val cycleStart = clock.millis()
 
-            if (cursorPersistRequested) {
-                cursorPersistRequested = false
-                persistReadCursor()
-            }
+        if (cursorPersistRequested) {
+            cursorPersistRequested = false
+            persistReadCursor()
+        }
 
-            // Contracts
-            val contractsConfig = fetchDynamicContractConfigs().union(staticContracts)
-            val contracts = resolveContractsSkipToHeight(contractsConfig)
-            logger.debug { "Contracts: $contracts" }
+        // Contracts
+        val contractsConfig = fetchDynamicContractConfigs().union(staticContracts)
+        val contracts = resolveContractsSkipToHeight(contractsConfig)
+        logger.debug { "Contracts: $contracts" }
 
-            if (contracts.isEmpty()) {
-                logger.warn { "No contracts configured, trying again later" }
-                filterContracts = mapOf()
-                waitForNewBlocks(cycleStart)
-                return
-            }
+        if (contracts.isEmpty()) {
+            logger.warn { "No contracts configured, trying again later" }
+            filterContracts = mapOf()
+            waitForNewBlocks(cycleStart)
+            return
+        }
 
-            if (readPositionInitialized) {
-                handleNewContracts(contracts)
-            } else {
-                initializeReadPosition(contracts)
-            }
+        if (readPositionInitialized) {
+            handleNewContracts(contracts)
+        } else {
+            initializeReadPosition(contracts)
+        }
 
-            val from = evmEventProcessor.lastReadLogBlockHeight + BigInteger.ONE
+        val from = evmEventProcessor.lastReadLogBlockHeight + BigInteger.ONE
 
-            val evmHeadHeight = web3jRequestHandler.sendWeb3jRequestWithRetry { it.ethBlockNumber() }.blockNumber
-            lastSeenEvmHeadHeight = evmHeadHeight
-            val currentBlockHeight = evmHeadHeight - evmReadOffset
-            reportPendingRewind(from, currentBlockHeight)
-            // Pacing the reading of logs
-            val to = minOf(currentBlockHeight, from + BigInteger.valueOf(maxReadAhead))
+        val evmHeadHeight = web3jRequestHandler.sendWeb3jRequestWithRetry { it.ethBlockNumber() }.blockNumber
+        lastSeenEvmHeadHeight = evmHeadHeight
+        val currentBlockHeight = evmHeadHeight - evmReadOffset
+        reportPendingRewind(from, currentBlockHeight)
+        // Pacing the reading of logs
+        val to = minOf(currentBlockHeight, from + BigInteger.valueOf(maxReadAhead))
 
-            if (to < from) {
-                readLagBlocks = BigInteger.ZERO
-                logger.debug { "No new blocks to read. We are at height: $to" }
-                persistReadCursorIfDue()
-                waitForNewBlocks(cycleStart)
-                return
-            }
-
-            // Events
-            val eventMap = fetchEventConfigs()
-            logger.debug { "Events: ${eventMap.values.map { it.name }}" }
-            if (eventMap.isEmpty()) {
-                logger.warn { "No events configured, trying again later" }
-                waitForNewBlocks(cycleStart)
-                return
-            }
-
-            // Fetch events
-            val filter = EthFilter(
-                    DefaultBlockParameter.valueOf(from),
-                    DefaultBlockParameter.valueOf(to),
-                    contracts.map { "0x${it.first.toHex()}" }.toList()
-            )
-            filter.addOptionalTopics(*eventMap.keys.toTypedArray())
-
-            val logResponse = web3jRequestHandler.sendWeb3jRequestWithRetry { it.ethGetLogs(filter) }
-
-            // Ensure events are sorted on txIndex + logIndex, blocks sorted on block number
-            val sortedEncodedLogs = logResponse.logs
-                    .map { (it as EthLog.LogObject).get() }
-                    .groupBy { EvmBlock(it.blockNumber, it.blockHash) }
-                    .mapValues { it.value.sortedWith(compareBy({ event -> event.transactionIndex }, { event -> event.logIndex })) }
-                    .mapValues {
-                        it.value.filter { event ->
-                            val contractAddress = parseEvmAddress(event.address)
-                            val skipToHeight = getLastCommittedEvmEventHeight(networkId, contractAddress.data)
-                                    ?: BigInteger.valueOf(contracts.find { contract -> contract.first == contractAddress }?.second
-                                            ?: networkSkipToHeight)
-                            event.blockNumber > skipToHeight
-                        }
-                    }
-                    .toList()
-                    .filter { it.second.isNotEmpty() }
-                    .sortedBy { it.first.number }
-                    .map { eventBlockToOp(eventMap, it) }
-            evmEventProcessor.processLogEventsAndUpdateOffsets(sortedEncodedLogs, to)
-            readLagBlocks = currentBlockHeight - to
+        if (to < from) {
+            readLagBlocks = BigInteger.ZERO
+            logger.debug { "No new blocks to read. We are at height: $to" }
             persistReadCursorIfDue()
+            waitForNewBlocks(cycleStart)
+            return
+        }
 
-            // Read up to the chain head, more blocks are expected next time: pace the next poll.
-            // Not when the queue is full: the loop below waits for the chain to consume events instead.
-            if (to == currentBlockHeight && !evmEventProcessor.isQueueFull()) {
-                pauseBeforeNextPoll(cycleStart)
-            }
+        // Events
+        val eventMap = fetchEventConfigs()
+        logger.debug { "Events: ${eventMap.values.map { it.name }}" }
+        if (eventMap.isEmpty()) {
+            logger.warn { "No events configured, trying again later" }
+            waitForNewBlocks(cycleStart)
+            return
+        }
 
-            while (evmEventProcessor.isQueueFull()) {
-                logger.debug("Wait for events to be consumed until we read more")
-                delay(QUEUE_FULL_CHECK_INTERVAL.milliseconds)
-                persistReadCursorIfDue()
-            }
+        // Fetch events
+        val filter = EthFilter(
+                DefaultBlockParameter.valueOf(from),
+                DefaultBlockParameter.valueOf(to),
+                contracts.map { "0x${it.first.toHex()}" }.toList()
+        )
+        filter.addOptionalTopics(*eventMap.keys.toTypedArray())
+
+        val logResponse = web3jRequestHandler.sendWeb3jRequestWithRetry { it.ethGetLogs(filter) }
+
+        // Ensure events are sorted on txIndex + logIndex, blocks sorted on block number
+        val sortedEncodedLogs = logResponse.logs
+                .map { (it as EthLog.LogObject).get() }
+                .groupBy { EvmBlock(it.blockNumber, it.blockHash) }
+                .mapValues { it.value.sortedWith(compareBy({ event -> event.transactionIndex }, { event -> event.logIndex })) }
+                .mapValues {
+                    it.value.filter { event ->
+                        val contractAddress = parseEvmAddress(event.address)
+                        val skipToHeight = getLastCommittedEvmEventHeight(networkId, contractAddress.data)
+                                ?: BigInteger.valueOf(contracts.find { contract -> contract.first == contractAddress }?.second
+                                        ?: networkSkipToHeight)
+                        event.blockNumber > skipToHeight
+                    }
+                }
+                .toList()
+                .filter { it.second.isNotEmpty() }
+                .sortedBy { it.first.number }
+                .map { eventBlockToOp(eventMap, it) }
+        evmEventProcessor.processLogEventsAndUpdateOffsets(sortedEncodedLogs, to)
+        readLagBlocks = currentBlockHeight - to
+        persistReadCursorIfDue()
+
+        // Read up to the chain head, more blocks are expected next time: pace the next poll.
+        // Not when the queue is full: the loop below waits for the chain to consume events instead.
+        if (to == currentBlockHeight && !evmEventProcessor.isQueueFull()) {
+            pauseBeforeNextPoll(cycleStart)
+        }
+
+        while (evmEventProcessor.isQueueFull()) {
+            logger.debug("Wait for events to be consumed until we read more")
+            delay(QUEUE_FULL_CHECK_INTERVAL.milliseconds)
+            persistReadCursorIfDue()
         }
     }
 
@@ -413,7 +420,7 @@ class EvmEventFetcher(
     @Synchronized
     private fun persistReadCursor() {
         if (!readPositionInitialized) return
-        val height = evmEventProcessor.safeResumeHeight() ?: return
+        val height = evmEventProcessor.getSafeResumeHeight() ?: return
         val cursor = EvmReadCursor(height, filterContracts)
         try {
             readCursorStore.save(networkId, cursor)
@@ -476,20 +483,15 @@ class EvmEventFetcher(
                 }
             }
 
-    private fun fetchEventConfigs(): Map<String, Event> = if (hasDynamicEvents) {
-        try {
-            val dynamicEvents = blockchainEngine.getBlockQueries().query(
-                    EIF_CONFIG_EVENTS_QUERY, gtv(mapOf("network_id" to gtv(networkId)))
-            ).get().asArray().map(GtvToEventMapper::map)
-            staticEvents.associateBy(EventEncoder::encode).toMutableMap().apply {
-                putAll(dynamicEvents.associateBy(EventEncoder::encode))
-            }
-        } catch (e: Exception) {
-            logger.warn(e) { "Unable to fetch dynamic events: $e" }
-            staticEvents.associateBy(EventEncoder::encode)
-        }
-    } else {
-        staticEvents.associateBy(EventEncoder::encode)
+    /** The events to read by signature hash: the static ones of the blockchain configuration plus the dapp's dynamic ones, which win on the same signature */
+    private fun fetchEventConfigs(): Map<String, Event> = staticEventsBySignature + fetchDynamicEvents().associateBy(EventEncoder::encode)
+
+    private fun fetchDynamicEvents(): List<Event> = if (!hasDynamicEvents) emptyList() else try {
+        blockchainEngine.getBlockQueries().query(EIF_CONFIG_EVENTS_QUERY, gtv(mapOf("network_id" to gtv(networkId))))
+                .get().asArray().map(GtvToEventMapper::map)
+    } catch (e: Exception) {
+        logger.warn(e) { "Unable to fetch dynamic events: $e" }
+        emptyList()
     }
 
     private fun eventBlockToOp(eventMap: Map<String, Event>, eventBlock: Pair<EvmBlock, List<Log>>): EvmBlockOp {
@@ -515,21 +517,19 @@ class EvmEventFetcher(
     }
 
     override fun flushEvents(resetToHeight: BigInteger) {
-        withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
-            // We first need to stop the ongoing fetching to avoid conflicts
-            runBlocking {
-                job.cancelAndJoin()
-            }
-            logger.info("Flushing EVM events from network $networkId and re-fetching from height: $resetToHeight")
-            validationConflictFlushes.incrementAndGet()
-            evmEventProcessor.flushEvents(resetToHeight)
-            pendingRewindReason = "after flushing events"
-            // The read position went backwards, so the persisted cursor must be lowered before anything else is read.
-            // This is called from the block validation thread, which must not write to the database itself, so the
-            // relaunched fetch loop persists first.
-            cursorPersistRequested = true
-            job = launchEventFetching()
+        // We first need to stop the ongoing fetching to avoid conflicts
+        runBlocking {
+            job.cancelAndJoin()
         }
+        logger.info("Flushing EVM events from network $networkId and re-fetching from height: $resetToHeight")
+        validationConflictFlushes.incrementAndGet()
+        evmEventProcessor.flushEvents(resetToHeight)
+        pendingRewindReason = "after flushing events"
+        // The read position went backwards, so the persisted cursor must be lowered before anything else is read.
+        // This is called from the block validation thread, which must not write to the database itself, so the
+        // relaunched fetch loop persists first.
+        cursorPersistRequested = true
+        job = launchEventFetching()
     }
 
     /**
@@ -546,63 +546,41 @@ class EvmEventFetcher(
     }
 
     override fun shutdown() {
-        runBlocking {
-            withTimeoutOrNull(SHUTDOWN_JOIN_TIMEOUT.milliseconds) { job.cancelAndJoin() }
+        withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
+            runBlocking {
+                withTimeoutOrNull(SHUTDOWN_JOIN_TIMEOUT.milliseconds) { job.cancelAndJoin() }
+            }
+            try {
+                persistReadCursor()
+            } catch (e: Exception) {
+                logger.warn(e) { "Unable to persist EVM read cursor on shutdown: $e" }
+            }
+            web3jRequestHandler.close()
         }
-        try {
-            persistReadCursor()
-        } catch (e: Exception) {
-            logger.warn(e) { "Unable to persist EVM read cursor on shutdown: $e" }
-        }
-        web3jRequestHandler.close()
     }
 
-    fun getLastCommittedEvmEventHeight(networkId: Long, contractAddress: ByteArray): BigInteger? = if (hasLastEvmEventHeightQuery)
-        getLastCommittedEvmEventHeightQuery(networkId, contractAddress)
-    else
-        getLastCommittedEvmBlockHeightQuery(networkId)
-
-    fun getLastCommittedEvmEventHeightQuery(networkId: Long, contractAddress: ByteArray): BigInteger? {
-        val eventHeight = blockchainEngine.getBlockQueries().query(EIF_LAST_EVM_EVENT_HEIGHT_QUERY,
-                gtv("network_id" to gtv(networkId), "contract_address" to gtv(contractAddress))).get()
-        if (eventHeight == GtvNull) {
-            return null
+    /**
+     * Height of the last committed EVM block holding an event of [contractAddress] on [networkId], null if none.
+     * Asks the receiver's `get_last_evm_event_height` query when its module has one, otherwise the per-network
+     * `get_last_evm_block` query, whose answer does not depend on the contract.
+     */
+    fun getLastCommittedEvmEventHeight(networkId: Long, contractAddress: ByteArray): BigInteger? {
+        val height = if (hasLastEvmEventHeightQuery) {
+            query(EIF_LAST_EVM_EVENT_HEIGHT_QUERY, gtv("network_id" to gtv(networkId), "contract_address" to gtv(contractAddress)))
+        } else {
+            query(EIF_LAST_EVM_BLOCK_QUERY, gtv("network_id" to gtv(networkId)))
+                    ?.let { it.asDict()["evm_block_height"] ?: throw ProgrammerMistake("Last evm block has no height stored") }
         }
-
         // Trying to be flexible here, don't care what the query gives us as long as it's a number
-        return when (eventHeight) {
-            is GtvBigInteger -> {
-                eventHeight.asBigInteger()
-            }
-
-            is GtvInteger -> {
-                BigInteger.valueOf(eventHeight.asInteger())
-            }
-
-            else -> throw ProgrammerMistake("Unexpected block height type: ${eventHeight.type}")
+        return when (height) {
+            null -> null
+            is GtvBigInteger -> height.asBigInteger()
+            is GtvInteger -> BigInteger.valueOf(height.asInteger())
+            else -> throw ProgrammerMistake("Unexpected block height type: ${height.type}")
         }
     }
 
-    fun getLastCommittedEvmBlockHeightQuery(networkId: Long): BigInteger? {
-        val block = blockchainEngine.getBlockQueries().query(EIF_LAST_EVM_BLOCK_QUERY, gtv("network_id" to gtv(networkId))).get()
-        if (block == GtvNull) {
-            return null
-        }
-
-        val blockHeight = block.asDict()["evm_block_height"]
-                ?: throw ProgrammerMistake("Last evm block has no height stored")
-
-        // Trying to be flexible here, don't care what the query gives us as long as it's a number
-        return when (blockHeight) {
-            is GtvBigInteger -> {
-                blockHeight.asBigInteger()
-            }
-
-            is GtvInteger -> {
-                BigInteger.valueOf(blockHeight.asInteger())
-            }
-
-            else -> throw ProgrammerMistake("Unexpected block height type: ${blockHeight.type}")
-        }
-    }
+    /** Runs a query of the receiver chain, null when it answered with GtvNull */
+    private fun query(name: String, args: Gtv): Gtv? =
+            blockchainEngine.getBlockQueries().query(name, args).get().takeUnless { it == GtvNull }
 }

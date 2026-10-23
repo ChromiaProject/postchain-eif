@@ -1,7 +1,6 @@
 package net.postchain.eif.transaction
 
 import net.postchain.base.data.DatabaseAccess
-import net.postchain.core.BlockEContext
 import net.postchain.core.EContext
 import net.postchain.gtv.GtvEncoder
 import net.postchain.gtv.GtvFactory

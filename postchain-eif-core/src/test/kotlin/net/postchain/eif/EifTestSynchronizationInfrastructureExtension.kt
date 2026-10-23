@@ -17,14 +17,14 @@ class EifTestSynchronizationInfrastructureExtension(
 
     override fun connectProcess(process: BlockchainProcess) {
         val engine = process.blockchainEngine
-        val proc = makeEventProcessor(process.blockchainEngine)
+        val processor = makeEventProcessor(process.blockchainEngine)
         val gtxModule = (engine.getConfiguration() as GTXBlockchainConfiguration).module
         val txExtensions = gtxModule.getSpecialTxExtensions()
         for (te in txExtensions) {
             if (te is EifSpecialTxExtension) {
                 engine.getConfiguration().rawConfig["eif"]?.toObject<EifEventReceiverConfig>()?.let { te.config = it }
                 te.isSigner = process::isSigner
-                te.addEventProcessor(1L, proc, NoOpEventFetcher(proc))
+                te.addPipeline(1L, EventPipeline(NoOpEventFetcher(processor), processor))
             }
         }
     }

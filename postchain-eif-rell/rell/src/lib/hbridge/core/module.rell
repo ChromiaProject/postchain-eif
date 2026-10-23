@@ -32,7 +32,7 @@ struct module_args {
      * can align their own EVM reads accordingly.
      *
      * Should mirror the `evm_read_offset` configured on the EIF event receiver
-     * (`EifEvmBlockchainConfig`) for each network. Defaults to 0 for any network
+     * (`EifEvmChainConfig`) for each network. Defaults to 0 for any network
      * not present in the map.
      *
      * Example: `{"1": 100, "56": 100}` for Ethereum mainnet and BSC with a 100-block lag.

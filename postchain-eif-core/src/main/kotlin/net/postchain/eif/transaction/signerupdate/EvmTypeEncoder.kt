@@ -2,8 +2,8 @@ package net.postchain.eif.transaction.signerupdate
 
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.toHex
-import net.postchain.eif.ExtraMerkleProof
-import net.postchain.eif.Proof
+import net.postchain.eif.merkle.ExtraMerkleProof
+import net.postchain.eif.merkle.Proof
 import org.web3j.abi.TypeDecoder
 import org.web3j.abi.TypeEncoder
 import org.web3j.abi.TypeReference

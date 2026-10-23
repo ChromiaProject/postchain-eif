@@ -6,7 +6,7 @@ import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.mapper.GtvObjectMapper
 import org.junit.jupiter.api.Test
 
-class EifEvmBlockchainConfigTest {
+class EifEvmChainConfigTest {
 
     @Test
     fun `verify contracts get 0x prefix`() {
@@ -14,7 +14,7 @@ class EifEvmBlockchainConfigTest {
         val eifConfig = GtvObjectMapper.fromGtv(gtv(
                 "network_id" to gtv(1L),
                 "contracts" to gtv(gtv("ee"), gtv("0xff")),
-        ), EifEvmBlockchainConfig::class.java)
+        ), EifEvmChainConfig::class.java)
         assertThat(eifConfig.contracts?.map { it.toHex() }).isEqualTo(listOf("EE", "FF"))
 
         val contractConfig = GtvObjectMapper.fromGtv(
