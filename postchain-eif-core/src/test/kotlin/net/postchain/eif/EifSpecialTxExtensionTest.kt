@@ -191,7 +191,7 @@ class EifSpecialTxExtensionTest {
         )
         assertFailure {
             sut.validateSpecialOperations(SpecialTransactionPosition.Begin, blockCtx, tooManyOps)
-        }.isInstanceOf<UserMistake>().messageContains("Block contains too many events")
+        }.isInstanceOf<UserMistake>().messageContains("more than the maxEventsPerBlock limit of")
 
 
         // Should pass when all events are from the same block

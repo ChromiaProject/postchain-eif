@@ -70,6 +70,7 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
                             .zip(evmBlocks)
                             .takeWhile { (sum, _) -> sum <= config.maxEventsPerBlock }
                             .map { it.second }
+                            // An EVM block cannot be split: if the first one alone exceeds the limit it is proposed on its own
                             .ifEmpty { listOf(evmBlocks.first()) }
 
             return relevantBlocks.map { it.toOpData() }.also {
@@ -93,11 +94,12 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
                 throw UserMistake("EVM events received when EIF is paused")
             }
 
-            // Validate that a block does not contain too many events
-            // `maxEventsPerBlock` can be exceeded if all events are from the same EVM block
+            // A block may hold more than `maxEventsPerBlock` events only when they all come from a single EVM block,
+            // since an EVM block cannot be split and the proposer includes it whole in that case
             if (config.maxEventsPerBlock > 0 && isSigner()) {
-                if (totalEvents > config.maxEventsPerBlock && decodedOps.map { it.evmBlockHeight }.toSet().count() > 1)
-                    throw UserMistake("Block contains too many events")
+                val evmBlockCount = decodedOps.map { it.evmBlockHeight }.toSet().size
+                if (totalEvents > config.maxEventsPerBlock && evmBlockCount > 1)
+                    throw UserMistake("Block contains $totalEvents EVM events from $evmBlockCount EVM blocks, more than the maxEventsPerBlock limit of ${config.maxEventsPerBlock}")
             }
 
             // Validate event data
