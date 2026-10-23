@@ -53,14 +53,8 @@ class NoOpEventProcessor : EventProcessor {
     /**
      * We can at least validate structure
      */
-    override fun isValidEventData(ops: List<EvmBlockOp>): EventValidationResult {
-        ops.forEach { op ->
-            if (!op.events.all { isValidEvmEventFormat(it.asArray()) }) {
-                return EventValidationResult(false)
-            }
-        }
-        return EventValidationResult(true)
-    }
+    override fun isValidEventData(ops: List<EvmBlockOp>): EventValidationResult =
+            EventValidationResult(ops.all { op -> op.events.all { isValidEvmEventFormat(it.asArray()) } })
 
     override fun markAsProcessed(ops: List<EvmBlockOp>) {}
     override fun flushEvents(resetToHeight: BigInteger) {}
