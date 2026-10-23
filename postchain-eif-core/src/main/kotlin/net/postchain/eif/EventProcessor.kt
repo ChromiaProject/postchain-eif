@@ -190,19 +190,18 @@ class EvmEventProcessor(
         lastConfirmedEvmBlockHeight = lastConfirmedEvmBlockHeight?.max(upToEvmBlockHeight) ?: upToEvmBlockHeight
     }
 
-    fun isQueueFull() = newBlocks().count() > maxQueueSize
+    @Synchronized
+    fun isQueueFull() = newBlocks().size > maxQueueSize
+
+    /** The queued blocks that are at least [readOffset] blocks behind the last read one, so they may be proposed now */
+    @Synchronized
+    private fun newBlocks(): List<EvmBlockOp> = eventBlocks.takeWhile { it.evmBlockHeight <= lastReadLogBlockHeight - readOffset }
 
     @Synchronized
-    private fun newBlocks() = eventBlocks.stream()
-            .takeWhile { it.evmBlockHeight <= lastReadLogBlockHeight - readOffset }
+    override fun numberOfNewEvents(): Long = newBlocks().sumOf { it.events.size }.toLong()
 
     @Synchronized
-    override fun numberOfNewEvents(): Long = newBlocks().flatMap { it.events.stream() }.count()
-
-    @Synchronized
-    override fun getEventData(): List<EvmBlockOp> = eventBlocks.stream()
-            .takeWhile { it.evmBlockHeight <= lastReadLogBlockHeight - readOffset }
-            .toList()
+    override fun getEventData(): List<EvmBlockOp> = newBlocks()
 
     @Synchronized
     fun processLogEventsAndUpdateOffsets(
