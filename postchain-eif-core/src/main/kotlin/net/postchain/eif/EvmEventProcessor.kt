@@ -71,24 +71,21 @@ class EvmEventProcessor(
         unconfirmedHeights.add(height)
     }
 
+    /**
+     * Checks a block proposal against the EVM blocks this node read itself. The proposed blocks must be the first blocks
+     * of the queue, in order, with the same hashes and events. A proposal of fewer blocks than queued is fine, the
+     * proposer may have been limited by `maxEventsPerBlock`.
+     *
+     * When the proposal does not match, [EventValidationResult.conflictingHeight] is the lowest EVM height at which the
+     * two views differ, so re-reading from that height can repair this node's view. It is null when this node has simply
+     * not read as far as the proposer yet: the proposal may well validate once it has caught up.
+     */
     @Synchronized
     override fun isValidEventData(ops: List<EvmBlockOp>): EventValidationResult {
         // We are strict here, if we have not seen something we will not try to go and fetch it.
         // We simply verify that the same blocks and events are coming in the same order that we have seen them
         // If there are too many rejections, readOffset should be increased
-        if (ops.size > eventBlocks.size) {
-            // We don't have all these blocks
-            val conflictingHeight = if (lastReadLogBlockHeight >= ops.last().evmBlockHeight) {
-                val firstReceivedEventHeight = ops.last().evmBlockHeight
-                eventBlocks.peek()?.evmBlockHeight?.min(firstReceivedEventHeight) ?: firstReceivedEventHeight
-            } else null
-            return EventValidationResult(false, conflictingHeight, errorMessage = "Received unexpected blocks")
-        }
-        for ((index, eventBlock) in eventBlocks.withIndex()) {
-            if (index >= ops.size) break
-
-            val op = ops[index]
-
+        for ((op, eventBlock) in ops.zip(eventBlocks)) {
             if (op.networkId != eventBlock.networkId || op.evmBlockHeight != eventBlock.evmBlockHeight || op.evmBlockHash != eventBlock.evmBlockHash) {
                 return EventValidationResult(false, op.evmBlockHeight.min(eventBlock.evmBlockHeight), errorMessage =
                         "Received unexpected block ${op.evmBlockHeight} with hash ${op.evmBlockHash} in network ${op.networkId}." +
@@ -100,6 +97,16 @@ class EvmEventProcessor(
                         "Events in received block ${op.evmBlockHeight} do not match expected events")
             }
         }
+
+        if (ops.size > eventBlocks.size) {
+            // The queued blocks match but the proposer has more. The first extra block is a conflict only if this node
+            // has read past its height without getting any events for it, otherwise this node is just behind
+            val firstMissingBlock = ops[eventBlocks.size]
+            val conflictingHeight = firstMissingBlock.evmBlockHeight.takeIf { it <= lastReadLogBlockHeight }
+            return EventValidationResult(false, conflictingHeight, errorMessage =
+                    "Received unexpected blocks: no events were read from block ${firstMissingBlock.evmBlockHeight} in network ${firstMissingBlock.networkId}")
+        }
+
         return EventValidationResult(true)
     }
 

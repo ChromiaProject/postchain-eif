@@ -226,6 +226,41 @@ class EifEventProcessingIT : IntegrationTestSetup() {
         }
     }
 
+    @Test
+    fun testResettingWhenMissingSeveralBlocks() {
+        val nodes = createNodes(4, "/net/postchain/eif/test_blockchain_config_4.xml")
+
+        val nodeProcessors = nodes.map { getEventProcessor(it, 1) }
+
+        val blocks = listOf(
+                EvmBlockOp(1, BigInteger.ONE, "01".hexStringToByteArray().wrap(), listOf()),
+                EvmBlockOp(1, BigInteger.TWO, "02".hexStringToByteArray().wrap(), listOf()),
+                EvmBlockOp(1, BigInteger.valueOf(3), "03".hexStringToByteArray().wrap(), listOf())
+        )
+        nodeProcessors.subList(0, 3).forEach {
+            it.processLogEventsAndUpdateOffsets(blocks, BigInteger.valueOf(4))
+        }
+
+        // Node4 read past the same heights but got none of the blocks
+        nodeProcessors[3].processLogEventsAndUpdateOffsets(listOf(), BigInteger.valueOf(4))
+
+        buildBlock(nodes.toList().subList(0, 3), 1, 1)
+        assertThat(nodeProcessors[3].lastReadLogBlockHeight).isEqualTo(BigInteger.valueOf(4))
+        buildBlock(nodes.toList().subList(0, 3), 1, 2)
+        assertThat(nodeProcessors[3].lastReadLogBlockHeight).isEqualTo(BigInteger.valueOf(4))
+        buildBlock(nodes.toList().subList(0, 3), 1, 3)
+        // Now we should fall into fast sync and reset to before the first of the three proposed blocks
+        await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            assertThat(nodeProcessors[3].lastReadLogBlockHeight).isEqualTo(BigInteger.ZERO)
+        }
+
+        // Assert that we can sync up again by providing correct history
+        nodeProcessors[3].processLogEventsAndUpdateOffsets(blocks, BigInteger.valueOf(4))
+        await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            assertThat(nodes[3].blockQueries().getLastBlockHeight().get()).isEqualTo(3L)
+        }
+    }
+
     private fun getEventProcessor(node: PostchainTestNode, networkId: Long) = (node.getBlockchainInstance().blockchainEngine
             .getConfiguration() as GTXModuleAware).module.getSpecialTxExtensions()
             .filterIsInstance<EifSpecialTxExtension>().first()
