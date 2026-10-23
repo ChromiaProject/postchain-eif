@@ -55,6 +55,13 @@ class EifSynchronizationInfrastructureExtension(
                 ext.config = eventReceiverConfig
                 ext.isSigner = process::isSigner
 
+                // The queries the dapp exposes decide which of them the fetcher may use, same for every EVM network
+                val queries = (cfg.module as? CompositeGTXModule)?.getQueries() ?: emptySet()
+                val hasLastEvmEventHeightQuery = EIF_LAST_EVM_EVENT_HEIGHT_QUERY in queries
+                val hasLegacyDynamicContracts = EIF_CONFIG_CONTRACTS_QUERY in queries
+                val hasDynamicContracts = EIF_CONFIG_CONTRACTS_TO_FETCH_QUERY in queries
+                val hasDynamicEvents = EIF_CONFIG_EVENTS_QUERY in queries
+
                 eventFetchers[cfg.blockchainRid] = mutableMapOf()
                 try {
                     for ((evmBlockchainName, evmBlockchainConfig) in eventReceiverConfig.chains) {
@@ -63,22 +70,6 @@ class EifSynchronizationInfrastructureExtension(
                             throw UserMistake("Node does not have any URLs configured for EVM network: $evmBlockchainName")
                         }
                         if (eventReceiverConfig.maxEventsPerBlock > evmConfig.maxQueueSize) throw UserMistake("maxEventsPerBlock cannot be larger than maxQueueSize")
-
-                        val hasLastEvmEventHeightQuery = (cfg.module as? CompositeGTXModule)?.let { compositeModule ->
-                            ("get_last_evm_event_height" in compositeModule.getQueries())
-                        } == true
-
-                        val hasLegacyDynamicContracts = (cfg.module as? CompositeGTXModule)?.let { compositeModule ->
-                            (EIF_CONFIG_CONTRACTS_QUERY in compositeModule.getQueries())
-                        } == true
-
-                        val hasDynamicContracts = (cfg.module as? CompositeGTXModule)?.let { compositeModule ->
-                            (EIF_CONFIG_CONTRACTS_TO_FETCH_QUERY in compositeModule.getQueries())
-                        } == true
-
-                        val hasDynamicEvents = (cfg.module as? CompositeGTXModule)?.let { compositeModule ->
-                            (EIF_CONFIG_EVENTS_QUERY in compositeModule.getQueries())
-                        } == true
 
                         val (eventProcessor, eventFetcher) = initializeEventProcessor(cfg, evmBlockchainName, evmBlockchainConfig, engine, evmConfig, hasLegacyDynamicContracts, hasDynamicContracts, hasDynamicEvents, hasLastEvmEventHeightQuery)
                         ext.addEventProcessor(evmBlockchainConfig.networkId, eventProcessor, eventFetcher)
