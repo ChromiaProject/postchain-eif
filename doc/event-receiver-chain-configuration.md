@@ -257,7 +257,34 @@ EVM Event Receiver node configuration has the following properties.
 | `${chain}.ignoreReadCursorBelow` | Ignore the node's persisted read cursor at reader start if it is below this EVM block height and resume from the on-chain heights instead, see [Read cursor across restarts](#read-cursor-across-restarts). Set it to the network's current head, not higher. 0 disables it.                                                                                  | int          | 0            | `POSTCHAIN_EIF_${CHAIN}_IGNORE_READ_CURSOR_BELOW` |
 | `${chain}.minPollInterval`       | Minimum duration of a fetch cycle at the EVM chain head (milliseconds). A cycle that read new blocks is padded to it; a cycle that found nothing to read waits `evm.delayWhenNoNewBlocks`, but never less than this. Bounds the RPC request rate on networks with fast blocks; catching up is not affected. 0 disables the minimum.                           | int          | by chain key | `POSTCHAIN_EIF_${CHAIN}_MIN_POLL_INTERVAL`        |
 
-The default `${chain}.minPollInterval` depends on the chain key, the same name on mainnet and testnet: `ethereum` 6000 (12 s blocks), `bsc`, `base` and `arbitrum` 3000, any other key 1000. The property or the environment variable overrides it.
+#### Polling at the EVM chain head
+
+One fetch cycle of the reader costs two RPC requests: `eth_blockNumber` for the head and `eth_getLogs` for the events of the blocks read, up to `${chain}.maxReadAhead` blocks per request. While the reader is behind, cycles follow each other without a pause. Once a cycle has read up to the readable head, the EVM head minus `evm_read_offset`, the next poll is paced:
+
+- A cycle that read new blocks is padded to `${chain}.minPollInterval`, since more blocks are expected.
+- A cycle that found nothing to read, no new blocks or no contracts or events configured, waits `evm.delayWhenNoNewBlocks`, but never less than what is left of `${chain}.minPollInterval`.
+- A cycle that failed unexpectedly is retried after at least `${chain}.minPollInterval`.
+
+The poll period does not change how much of the chain is read: every cycle reads all blocks since the previous one in a single request. It changes the request count, two per cycle, and the latency with which an event is noticed, on average half a period after its block became readable. On a network with 250 ms blocks:
+
+| Poll period | Requests per day, per network and node | Blocks per `eth_getLogs` | Average added latency |
+|-------------|----------------------------------------|--------------------------|-----------------------|
+| 1 s         | 172 800                                | 4                        | 0.5 s                 |
+| 2 s         | 86 400                                 | 8                        | 1 s                   |
+| 3 s         | 57 600                                 | 12                       | 1.5 s                 |
+| 6 s         | 28 800                                 | 24                       | 3 s                   |
+
+The default `${chain}.minPollInterval` therefore depends on the chain key. The key is the same name on mainnet and on testnet, so one node configuration key serves both, and a network and its testnet share the block time. The rule behind the defaults: poll about twice per block on slow networks, so that a block is picked up within half a block time of becoming readable; and never faster than every 3 s on fast networks, where every poll finds new blocks anyway and a faster poll only adds requests.
+
+| Chain key     | Block time | Default `minPollInterval` | Blocks per poll |
+|---------------|------------|---------------------------|-----------------|
+| `ethereum`    | 12 s       | 6000                      | 0.5             |
+| `bsc`         | 0.75 s     | 3000                      | 4               |
+| `base`        | 2 s        | 3000                      | 1.5             |
+| `arbitrum`    | 0.25 s     | 3000                      | 12              |
+| any other key |            | 1000                      |                 |
+
+The property or the environment variable overrides the default. Raise it to spend fewer requests at the cost of latency, lower it for the opposite; the latency is small next to the confirmation delay of `evm_read_offset` blocks and the receiver chain's own block time. `evm.delayWhenNoNewBlocks` is a node-wide setting shared by every network, so leave it at its default and tune `${chain}.minPollInterval` per network. 0 disables the minimum; on a network whose blocks come faster than a fetch cycle the reader then polls back to back.
 
 
 #### Configuration when running Master-Sub architecture
