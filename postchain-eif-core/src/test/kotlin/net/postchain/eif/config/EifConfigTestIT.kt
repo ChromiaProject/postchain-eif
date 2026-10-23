@@ -1,7 +1,6 @@
 package net.postchain.eif.config
 
 import net.postchain.config.app.AppConfig
-import net.postchain.eif.EifConfigTest
 import net.postchain.eif.web3j.GethContainer
 import org.apache.commons.configuration2.BaseConfiguration
 import org.junit.jupiter.api.AfterEach

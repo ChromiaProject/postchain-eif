@@ -1,4 +1,4 @@
-package net.postchain.eif
+package net.postchain.eif.merkle
 
 import net.postchain.common.data.Hash
 import net.postchain.crypto.CryptoSystem

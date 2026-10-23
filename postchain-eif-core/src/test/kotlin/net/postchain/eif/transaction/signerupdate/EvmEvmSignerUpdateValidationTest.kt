@@ -16,9 +16,9 @@ import net.postchain.common.exception.UserMistake
 import net.postchain.core.BlockEContext
 import net.postchain.core.BlockRid
 import net.postchain.crypto.Secp256K1CryptoSystem
-import net.postchain.eif.ExtraMerkleProof
-import net.postchain.eif.Proof
-import net.postchain.eif.SimpleGtvEncoder
+import net.postchain.eif.merkle.ExtraMerkleProof
+import net.postchain.eif.merkle.Proof
+import net.postchain.eif.gtv.SimpleGtvEncoder
 import net.postchain.eif.encodeBlockHeaderDataForEVM
 import net.postchain.eif.encodeSignatureWithV
 import net.postchain.eif.getEthereumAddress

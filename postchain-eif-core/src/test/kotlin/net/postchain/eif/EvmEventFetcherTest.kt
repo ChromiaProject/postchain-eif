@@ -40,7 +40,6 @@ import org.web3j.protocol.core.Response
 import org.web3j.protocol.core.methods.request.EthFilter
 import org.web3j.protocol.core.methods.response.EthBlockNumber
 import org.web3j.protocol.core.methods.response.EthLog
-import java.math.BigInteger
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId

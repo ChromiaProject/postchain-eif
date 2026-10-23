@@ -199,7 +199,7 @@ src/main/kotlin/net/postchain/eif/
 ### Configuration Classes
 - `EifEventReceiverConfig`: Event receiver configuration
 - `EvmTransactionSubmitterConfig`: TX submission configuration
-- `EifEvmBlockchainConfig`: EVM connection configuration
+- `EifEvmChainConfig`: EVM connection configuration
 - `EifContainerConfigProvider`: Container-based configuration
 
 ---

@@ -1,6 +1,7 @@
 package net.postchain.eif
 
 import mu.KLogging
+import mu.withLoggingContext
 import net.postchain.base.BaseBlockHeader
 import net.postchain.base.SpecialTransactionPosition
 import net.postchain.common.BlockchainRid
@@ -31,15 +32,17 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
     lateinit var isSigner: () -> Boolean
 
     private var needEifTnx: Boolean = false
-    internal val processors = mutableMapOf<Long, Pair<EventProcessor, EventFetcher>>()
+
+    /** The pipeline of every EVM network this chain reads, by network id */
+    internal val pipelines = mutableMapOf<Long, EventPipeline>()
 
     /** Chain block height -> (network id, highest EVM block height) of the EVM blocks in the block being built or validated at that height */
     private val pendingEvmBlockHeights = ConcurrentHashMap<Long, Pair<Long, BigInteger>>()
 
     override fun getRelevantOps() = setOf(EvmBlockOp.OP_NAME)
 
-    fun addEventProcessor(networkID: Long, processor: EventProcessor, eventFetcher: EventFetcher) {
-        processors[networkID] = processor to eventFetcher
+    fun addPipeline(networkId: Long, pipeline: EventPipeline) {
+        pipelines[networkId] = pipeline
     }
 
     override fun init(module: GTXModule, chainID: Long, blockchainRID: BlockchainRid, cs: CryptoSystem) {
@@ -56,11 +59,11 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
     }
 
     override fun createSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext): List<OpData> {
-        if (position == SpecialTransactionPosition.Begin && processors.isNotEmpty() && shouldProcessEvmEvents(bctx)) {
-            val index = bctx.height.mod(processors.size)
-            val (networkId, procAndFetcher) = processors.entries.toList()[index]
-            val proc = procAndFetcher.first
-            val evmBlocks = proc.getEventData()
+        if (position == SpecialTransactionPosition.Begin && pipelines.isNotEmpty() && shouldProcessEvmEvents(bctx)) {
+            val index = bctx.height.mod(pipelines.size)
+            val (networkId, pipeline) = pipelines.entries.toList()[index]
+            val processor = pipeline.processor
+            val evmBlocks = processor.getEventData()
 
             if (evmBlocks.isEmpty()) return listOf()
 
@@ -70,11 +73,12 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
                             .zip(evmBlocks)
                             .takeWhile { (sum, _) -> sum <= config.maxEventsPerBlock }
                             .map { it.second }
+                            // An EVM block cannot be split: if the first one alone exceeds the limit it is proposed on its own
                             .ifEmpty { listOf(evmBlocks.first()) }
 
             return relevantBlocks.map { it.toOpData() }.also {
                 recordPendingEvmBlockHeight(bctx.height, networkId, relevantBlocks)
-                bctx.addAfterCommitHook { proc.markAsProcessed(relevantBlocks) }
+                bctx.addAfterCommitHook { processor.markAsProcessed(relevantBlocks) }
             }
         }
 
@@ -82,48 +86,51 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
     }
 
     override fun validateSpecialOperations(position: SpecialTransactionPosition, bctx: BlockEContext, ops: List<OpData>): Boolean {
-        if (position == SpecialTransactionPosition.Begin && processors.isNotEmpty()) {
-            val index = bctx.height.mod(processors.size)
-            val (networkId, procAndFetcher) = processors.entries.toList()[index]
-            val (proc, fetcher) = procAndFetcher
-            val decodedOps = ops.map { EvmBlockOp.fromOpData(it) }
+        if (position == SpecialTransactionPosition.Begin && pipelines.isNotEmpty()) {
+            val index = bctx.height.mod(pipelines.size)
+            val (networkId, pipeline) = pipelines.entries.toList()[index]
+            val (fetcher, processor) = pipeline
+            withLoggingContext(NETWORK_ID_TAG to networkId.toString()) {
+                val decodedOps = ops.map { EvmBlockOp.fromOpData(it) }
 
-            val totalEvents = decodedOps.sumOf { it.events.size }
-            if (!shouldProcessEvmEvents(bctx) && totalEvents > 0) {
-                throw UserMistake("EVM events received when EIF is paused")
-            }
-
-            // Validate that a block does not contain too many events
-            // `maxEventsPerBlock` can be exceeded if all events are from the same EVM block
-            if (config.maxEventsPerBlock > 0 && isSigner()) {
-                if (totalEvents > config.maxEventsPerBlock && decodedOps.map { it.evmBlockHeight }.toSet().count() > 1)
-                    throw UserMistake("Block contains too many events")
-            }
-
-            // Validate event data
-            val validationResult = proc.isValidEventData(decodedOps)
-            if (!validationResult.valid && validationResult.conflictingHeight != null) {
-                if (isSigner()) {
-                    // A signer keeps the EVM blocks it read itself, otherwise a faulty proposer could make every signer
-                    // re-read at will. The conflict is recorded so that a restart re-reads from before it.
-                    logger.warn {
-                        "EVM blocks proposed by another signer differ from the EVM blocks this node read from the EVM network: ${validationResult.errorMessage}. " +
-                                "A restart of the chain will re-read EVM events from before height ${validationResult.conflictingHeight}"
-                    }
-                    fetcher.recordValidationConflict(validationResult.conflictingHeight)
-                } else {
-                    // Replicas and validators that are still syncing simply re-read from the conflicting height
-                    fetcher.flushEvents(validationResult.conflictingHeight - BigInteger.ONE)
+                val totalEvents = decodedOps.sumOf { it.events.size }
+                if (!shouldProcessEvmEvents(bctx) && totalEvents > 0) {
+                    throw UserMistake("EVM events received when EIF is paused")
                 }
-            }
 
-            recordPendingEvmBlockHeight(bctx.height, networkId, decodedOps)
-            bctx.addAfterCommitHook { proc.markAsProcessed(decodedOps) }
+                // A block may hold more than `maxEventsPerBlock` events only when they all come from a single EVM block,
+                // since an EVM block cannot be split and the proposer includes it whole in that case
+                if (config.maxEventsPerBlock > 0 && isSigner()) {
+                    val evmBlockCount = decodedOps.map { it.evmBlockHeight }.toSet().size
+                    if (totalEvents > config.maxEventsPerBlock && evmBlockCount > 1)
+                        throw UserMistake("Block contains $totalEvents EVM events from $evmBlockCount EVM blocks, more than the maxEventsPerBlock limit of ${config.maxEventsPerBlock}")
+                }
 
-            if (!validationResult.valid && validationResult.errorMessage != null) {
-                throw UserMistake(validationResult.errorMessage)
+                // Validate event data
+                val validationResult = processor.isValidEventData(decodedOps)
+                if (!validationResult.valid && validationResult.conflictingHeight != null) {
+                    if (isSigner()) {
+                        // A signer keeps the EVM blocks it read itself, otherwise a faulty proposer could make every signer
+                        // re-read at will. The conflict is recorded so that a restart re-reads from before it.
+                        logger.warn {
+                            "EVM blocks proposed by another signer differ from the EVM blocks this node read from the EVM network: ${validationResult.errorMessage}. " +
+                                    "A restart of the chain will re-read EVM events from before height ${validationResult.conflictingHeight}"
+                        }
+                        fetcher.recordValidationConflict(validationResult.conflictingHeight)
+                    } else {
+                        // Replicas and validators that are still syncing simply re-read from the conflicting height
+                        fetcher.flushEvents(validationResult.conflictingHeight - BigInteger.ONE)
+                    }
+                }
+
+                recordPendingEvmBlockHeight(bctx.height, networkId, decodedOps)
+                bctx.addAfterCommitHook { processor.markAsProcessed(decodedOps) }
+
+                if (!validationResult.valid && validationResult.errorMessage != null) {
+                    throw UserMistake(validationResult.errorMessage)
+                }
+                return validationResult.valid
             }
-            return validationResult.valid
         }
         return ops.isEmpty()
     }
@@ -149,8 +156,8 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
         val height = (blockData.header as? BaseBlockHeader)?.blockHeaderRec?.getHeight()
         val committed = height?.let { pendingEvmBlockHeights.remove(it) }
         height?.let { h -> pendingEvmBlockHeights.keys.removeIf { it < h } }
-        processors.forEach { (networkId, procAndFetcher) ->
-            procAndFetcher.first.blockCommitted(committed?.takeIf { it.first == networkId }?.second)
+        pipelines.forEach { (networkId, pipeline) ->
+            pipeline.processor.blockCommitted(committed?.takeIf { it.first == networkId }?.second)
         }
     }
 
@@ -171,7 +178,7 @@ class EifSpecialTxExtension(private val clock: Clock = Clock.systemUTC()) : GTXB
         return false
     }
 
-    private fun fetchNumberOfEvents(): Long = processors.values.map { it.first }.sumOf { it.numberOfNewEvents() }
+    private fun fetchNumberOfEvents(): Long = pipelines.values.sumOf { it.processor.getNumberOfNewEvents() }
 
     private fun shouldProcessEvmEvents(bctx: BlockEContext): Boolean {
         lastSeenShouldProcessEvents = !hasShouldProcessEvmEventsQuery ||

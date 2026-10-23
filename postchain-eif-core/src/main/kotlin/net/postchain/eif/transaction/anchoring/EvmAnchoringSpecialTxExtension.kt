@@ -12,11 +12,11 @@ import net.postchain.concurrent.util.get
 import net.postchain.core.BlockEContext
 import net.postchain.core.block.BlockQueriesProvider
 import net.postchain.crypto.CryptoSystem
-import net.postchain.eif.EifSignature
 import net.postchain.eif.decodeBlockHeaderDataFromEVM
 import net.postchain.eif.encodeBlockHeaderDataForEVM
 import net.postchain.eif.encodeSignatureWithV
 import net.postchain.eif.getEthereumAddress
+import net.postchain.eif.merkle.EifSignature
 import net.postchain.eif.transaction.EvmBlockHeaderValidator
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtx.GTXModule

@@ -13,6 +13,7 @@ import net.postchain.common.data.Hash
 import net.postchain.common.exception.ProgrammerMistake
 import net.postchain.core.BlockEContext
 import net.postchain.core.TxEContext
+import net.postchain.eif.gtv.SimpleGtvEncoder
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvArray
 import net.postchain.gtv.GtvByteArray

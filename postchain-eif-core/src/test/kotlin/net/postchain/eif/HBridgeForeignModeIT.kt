@@ -19,6 +19,8 @@ import net.postchain.eif.contracts.TestToken
 import net.postchain.eif.contracts.TokenBridgeWithSnapshotWithdraw
 import net.postchain.eif.contracts.Validator
 import net.postchain.eif.transaction.TransactionSubmitter
+import net.postchain.eif.gtv.SimpleGtvEncoder
+import net.postchain.eif.merkle.EifSignature
 import net.postchain.eif.web3j.web3BlockHeader
 import net.postchain.eif.web3j.web3EventData
 import net.postchain.eif.web3j.web3EventProof
@@ -467,7 +469,7 @@ class HBridgeForeignModeIT : HBridgeBaseIntegrationTest() {
         val eventProcessor = (node.getBlockchainInstance().blockchainEngine
                 .getConfiguration() as GTXModuleAware).module.getSpecialTxExtensions()
                 .filterIsInstance<EifSpecialTxExtension>().first()
-                .processors[networkId]?.first as EvmEventProcessor
+                .pipelines[networkId]?.processor as EvmEventProcessor
 
         // Wait until we have read the block with the deposit
         await().atMost(Duration.ONE_MINUTE).untilAsserted {

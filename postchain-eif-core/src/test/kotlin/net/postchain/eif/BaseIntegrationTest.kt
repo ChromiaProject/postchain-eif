@@ -116,7 +116,7 @@ abstract class EifBaseIntegrationTest(private val prependUrls: List<String> = li
 
     /**
      * convert evm address to 32 bytes to compliance with EIF simple gtv encoder
-     * @see SimpleGtvEncoder.encodeGtv
+     * @see net.postchain.eif.gtv.SimpleGtvEncoder.encodeGtv
      */
     fun to32Bytes(address: String) = "000000000000000000000000$address".hexStringToByteArray()
 

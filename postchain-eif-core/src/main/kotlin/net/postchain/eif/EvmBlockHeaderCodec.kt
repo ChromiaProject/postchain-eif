@@ -4,11 +4,9 @@ import com.google.common.primitives.Longs
 import net.postchain.base.extension.getMerkleHashVersion
 import net.postchain.base.gtv.BlockHeaderData
 import net.postchain.common.BlockchainRid
-import net.postchain.common.hexStringToByteArray
-import net.postchain.common.types.WrappedByteArray
-import net.postchain.common.wrap
 import net.postchain.core.BlockRid
 import net.postchain.crypto.sha256Digest
+import net.postchain.eif.gtv.SimpleGtvEncoder
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtv.merkle.GtvMerkleBasics.HASH_PREFIX_NODE_GTV_ARRAY
 import net.postchain.gtv.merkle.GtvMerkleHashCalculatorV2
@@ -90,24 +88,4 @@ data class DecodedBlockHeaderDataForEVM(
 
         return expectedRid.contentEquals(blockRid.data)
     }
-}
-
-fun String.upperCaseHex(): String {
-    if (this.startsWith("0x")) {
-        return "0x" + this.substring(2).uppercase()
-    }
-    return this.uppercase()
-}
-
-fun String.normalizeContractAddress(): String {
-    if (this.startsWith("0x", ignoreCase = true)) {
-        return this.substring(2).uppercase()
-    }
-    return this.uppercase()
-}
-
-fun parseEvmAddress(address: String): WrappedByteArray = if (address.startsWith("0x", ignoreCase = true)) {
-    address.substring(2).hexStringToByteArray().wrap()
-} else {
-    address.hexStringToByteArray().wrap()
 }

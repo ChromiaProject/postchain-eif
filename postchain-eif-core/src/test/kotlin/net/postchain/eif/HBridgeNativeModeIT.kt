@@ -13,6 +13,7 @@ import net.postchain.eif.contracts.ChromiaTokenBridge
 import net.postchain.eif.contracts.TokenMinterTest
 import net.postchain.eif.contracts.Validator
 import net.postchain.eif.transaction.TransactionSubmitter
+import net.postchain.eif.gtv.SimpleGtvEncoder
 import net.postchain.eif.web3j.chromiaWeb3EventProof
 import net.postchain.eif.web3j.chromiaWeb3ExtraProofData
 import net.postchain.eif.web3j.web3BlockHeader
