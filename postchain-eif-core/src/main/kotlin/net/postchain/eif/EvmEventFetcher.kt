@@ -74,6 +74,8 @@ class EvmEventFetcher(
     companion object : KLogging() {
         const val DEFAULT_CURSOR_PERSIST_INTERVAL = 10_000L
         private const val SHUTDOWN_JOIN_TIMEOUT = 2_000L
+        private const val FAILURE_RETRY_DELAY = 500L
+        private const val QUEUE_FULL_CHECK_INTERVAL = 500L
     }
 
     /** Where reading starts for one contract and why */
@@ -157,7 +159,7 @@ class EvmEventFetcher(
                             break
                         } catch (e: Exception) {
                             logger.error("Parsing of EVM logs unexpectedly failed: $e", e)
-                            delay(maxOf(500L, minPollInterval).milliseconds) // Delay a bit and hope that we can recover
+                            delay(maxOf(FAILURE_RETRY_DELAY, minPollInterval).milliseconds) // Delay a bit and hope that we can recover
                         }
                     }
                 }
@@ -259,7 +261,7 @@ class EvmEventFetcher(
 
             while (evmEventProcessor.isQueueFull()) {
                 logger.debug("Wait for events to be consumed until we read more")
-                delay(500.milliseconds)
+                delay(QUEUE_FULL_CHECK_INTERVAL.milliseconds)
                 persistReadCursorIfDue()
             }
         }
