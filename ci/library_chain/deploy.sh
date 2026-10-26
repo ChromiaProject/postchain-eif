@@ -22,7 +22,7 @@ trap 'rm -f "$RESPONSE_FILE"' EXIT
 
 # Queries the library chain and prints the response body. A throttled node answers 503 with an error body,
 # which must not be read as "library not found": retry on any non-200 answer and fail if it does not recover.
-function query_library_chain {
+query_library_chain() {
   url="$1"
   attempts=6
   attempt=1
