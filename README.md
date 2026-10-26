@@ -52,3 +52,18 @@ cd ..
 mvn clean package
 ```
 
+### API compatibility
+
+The public API of `postchain-eif-core` is tracked with `kotlin-bcv-maven-plugin`. The module records its API in `postchain-eif-core/api/postchain-eif-core.api`, and the build (`verify` phase) fails if the compiled API differs from that file.
+
+To accept an intended API change, compile the module, regenerate the file and commit it:
+
+```shell
+mvn -pl postchain-eif-core -am -DskipTests clean compile com.chromaway:kotlin-bcv-maven-plugin:0.2.0:dump
+```
+
+To run only the check (needs compiled classes):
+
+```shell
+mvn -pl postchain-eif-core com.chromaway:kotlin-bcv-maven-plugin:0.2.0:check
+```
