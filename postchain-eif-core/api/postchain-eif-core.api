@@ -1,0 +1,1224 @@
+public final class net/postchain/eif/AccountStateMerkleProof {
+	public static final field Companion Lnet/postchain/eif/AccountStateMerkleProof$Companion;
+	public fun <init> ([B[BLjava/util/List;Lnet/postchain/eif/merkle/Proof;Lnet/postchain/eif/merkle/ExtraMerkleProof;)V
+	public final fun component1 ()[B
+	public final fun component2 ()[B
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Lnet/postchain/eif/merkle/Proof;
+	public final fun component5 ()Lnet/postchain/eif/merkle/ExtraMerkleProof;
+	public final fun copy ([B[BLjava/util/List;Lnet/postchain/eif/merkle/Proof;Lnet/postchain/eif/merkle/ExtraMerkleProof;)Lnet/postchain/eif/AccountStateMerkleProof;
+	public static synthetic fun copy$default (Lnet/postchain/eif/AccountStateMerkleProof;[B[BLjava/util/List;Lnet/postchain/eif/merkle/Proof;Lnet/postchain/eif/merkle/ExtraMerkleProof;ILjava/lang/Object;)Lnet/postchain/eif/AccountStateMerkleProof;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBlockHeader ()[B
+	public final fun getBlockWitness ()Ljava/util/List;
+	public final fun getExtraMerkleProof ()Lnet/postchain/eif/merkle/ExtraMerkleProof;
+	public final fun getStateData ()[B
+	public final fun getStateProof ()Lnet/postchain/eif/merkle/Proof;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class net/postchain/eif/AccountStateMerkleProof$Companion {
+	public final fun fromEvmMerkleProof (Lnet/postchain/eif/merkle/EvmMerkleProof;)Lnet/postchain/eif/AccountStateMerkleProof;
+}
+
+public final class net/postchain/eif/Config {
+	public fun <init> ()V
+	public fun <init> (IIILjava/util/Map;Lnet/postchain/PostchainContext;)V
+	public synthetic fun <init> (IIILjava/util/Map;Lnet/postchain/PostchainContext;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getConfiguredNetworks ()Ljava/util/Map;
+	public final fun getLevelsPerPage ()I
+	public final fun getPostchainContext ()Lnet/postchain/PostchainContext;
+	public final fun getSnapshotsToKeep ()I
+	public final fun getVersion ()I
+	public final fun setConfiguredNetworks (Ljava/util/Map;)V
+	public final fun setLevelsPerPage (I)V
+	public final fun setPostchainContext (Lnet/postchain/PostchainContext;)V
+	public final fun setSnapshotsToKeep (I)V
+	public final fun setVersion (I)V
+}
+
+public final class net/postchain/eif/ConstKt {
+	public static final field NETWORK_ID_TAG Ljava/lang/String;
+}
+
+public final class net/postchain/eif/CryptoKt {
+	public static final fun compressKey ([B)[B
+	public static final fun decodeEVMEncodedSignature ([B[B[B)Lnet/postchain/crypto/Signature;
+	public static final fun decompressKey ([B)[B
+	public static final fun digest ([B)[B
+	public static final fun ecrecover (I[BLjava/math/BigInteger;Ljava/math/BigInteger;Z)[B
+	public static synthetic fun ecrecover$default (I[BLjava/math/BigInteger;Ljava/math/BigInteger;ZILjava/lang/Object;)[B
+	public static final fun encodeSignature (Ljava/math/BigInteger;Ljava/math/BigInteger;I)[B
+	public static final fun encodeSignatureWithV ([BLnet/postchain/crypto/Signature;)[B
+	public static final fun getEthereumAddress ([B)[B
+}
+
+public final class net/postchain/eif/DatabaseEvmReadCursorStore : net/postchain/eif/EvmReadCursorStore {
+	public static final field Companion Lnet/postchain/eif/DatabaseEvmReadCursorStore$Companion;
+	public static final field TABLE_NAME Ljava/lang/String;
+	public fun <init> (Lnet/postchain/core/Storage;J)V
+	public final fun initialize ()V
+	public fun load (J)Lnet/postchain/eif/EvmReadCursor;
+	public fun save (JLnet/postchain/eif/EvmReadCursor;)V
+}
+
+public final class net/postchain/eif/DatabaseEvmReadCursorStore$Companion : mu/KLogging {
+	public final fun decodeContracts ([B)Ljava/util/Map;
+	public final fun encodeContracts (Ljava/util/Map;)[B
+	public final fun getCOLUMN_CONTRACTS ()Lorg/jooq/Field;
+	public final fun getCOLUMN_HEIGHT ()Lorg/jooq/Field;
+	public final fun getCOLUMN_NETWORK_ID ()Lorg/jooq/Field;
+	public final fun tableName (Lnet/postchain/core/ExecutionContext;)Ljava/lang/String;
+}
+
+public final class net/postchain/eif/DecodedBlockHeaderDataForEVM {
+	public static final field Companion Lnet/postchain/eif/DecodedBlockHeaderDataForEVM$Companion;
+	public fun <init> (Lnet/postchain/common/BlockchainRid;Lnet/postchain/core/BlockRid;Lnet/postchain/core/BlockRid;[BJJ[B[B)V
+	public final fun component1 ()Lnet/postchain/common/BlockchainRid;
+	public final fun component2 ()Lnet/postchain/core/BlockRid;
+	public final fun component3 ()Lnet/postchain/core/BlockRid;
+	public final fun component4 ()[B
+	public final fun component5 ()J
+	public final fun component6 ()J
+	public final fun component7 ()[B
+	public final fun component8 ()[B
+	public final fun copy (Lnet/postchain/common/BlockchainRid;Lnet/postchain/core/BlockRid;Lnet/postchain/core/BlockRid;[BJJ[B[B)Lnet/postchain/eif/DecodedBlockHeaderDataForEVM;
+	public static synthetic fun copy$default (Lnet/postchain/eif/DecodedBlockHeaderDataForEVM;Lnet/postchain/common/BlockchainRid;Lnet/postchain/core/BlockRid;Lnet/postchain/core/BlockRid;[BJJ[B[BILjava/lang/Object;)Lnet/postchain/eif/DecodedBlockHeaderDataForEVM;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBlockRid ()Lnet/postchain/core/BlockRid;
+	public final fun getBlockchainRid ()Lnet/postchain/common/BlockchainRid;
+	public final fun getDependenciesHash ()[B
+	public final fun getExtraHash ()[B
+	public final fun getHeight ()J
+	public final fun getMerkleRootHash ()[B
+	public final fun getPreviousBlockRid ()Lnet/postchain/core/BlockRid;
+	public final fun getTimestamp ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public final fun verifyBlockRid ()Z
+}
+
+public final class net/postchain/eif/DecodedBlockHeaderDataForEVM$Companion {
+	public final fun getHashCalculator ()Lnet/postchain/gtv/merkle/GtvMerkleHashCalculatorV2;
+}
+
+public final class net/postchain/eif/EifBlockBuilderExtension : net/postchain/base/BaseBlockBuilderExtension, net/postchain/base/TxEventSink {
+	public fun <init> (Lnet/postchain/base/snapshot/DigestSystem;Lnet/postchain/eif/Config;)V
+	public fun finalize ()Ljava/util/Map;
+	public fun init (Lnet/postchain/core/BlockEContext;Lnet/postchain/base/data/BaseBlockBuilder;)V
+	public fun processEmittedEvent (Lnet/postchain/core/TxEContext;Ljava/lang/String;Lnet/postchain/gtv/Gtv;)V
+}
+
+public final class net/postchain/eif/EifBlockBuilderExtensionKt {
+	public static final field EIF_EVENT Ljava/lang/String;
+	public static final field EIF_STATE Ljava/lang/String;
+}
+
+public final class net/postchain/eif/EifGTXModule : net/postchain/gtx/SimpleGTXModule, net/postchain/gtx/MetadataProvider, net/postchain/gtx/PostchainContextAware {
+	public fun <init> ()V
+	public fun getMetadata ()Lnet/postchain/gtx/GTXModuleMetadata;
+	public fun getSpecialTxExtensions ()Ljava/util/List;
+	public fun initializeContext (Lnet/postchain/core/BlockchainConfiguration;Lnet/postchain/PostchainContext;Lnet/postchain/core/ExecutionContext;)V
+	public fun initializeDB (Lnet/postchain/core/ExecutionContext;)V
+	public fun makeBlockBuilderExtensions ()Ljava/util/List;
+}
+
+public final class net/postchain/eif/EifGTXModuleKt {
+	public static final field EIF Ljava/lang/String;
+	public static final field PREFIX Ljava/lang/String;
+	public static final fun accountStateMerkleProofQuery (Lnet/postchain/eif/Config;Lnet/postchain/core/ExecutionContext;Lnet/postchain/gtv/Gtv;)Lnet/postchain/gtv/Gtv;
+	public static final fun eventBlockHeightQuery (Lnet/postchain/eif/Config;Lnet/postchain/core/ExecutionContext;Lnet/postchain/gtv/Gtv;)Lnet/postchain/gtv/Gtv;
+	public static final fun eventMerkleProofQuery (Lnet/postchain/eif/Config;Lnet/postchain/core/ExecutionContext;Lnet/postchain/gtv/Gtv;)Lnet/postchain/gtv/Gtv;
+	public static final fun getConfiguredNetworks (Lnet/postchain/eif/Config;Lnet/postchain/core/ExecutionContext;Lnet/postchain/gtv/Gtv;)Lnet/postchain/gtv/Gtv;
+	public static final fun isNetworkSupportedOnNode (Lnet/postchain/eif/Config;Lnet/postchain/core/ExecutionContext;Lnet/postchain/gtv/Gtv;)Lnet/postchain/gtv/Gtv;
+}
+
+public final class net/postchain/eif/EifSpecialTxExtension : net/postchain/gtx/special/GTXBlockBuildingAffectingSpecialTxExtension {
+	public static final field Companion Lnet/postchain/eif/EifSpecialTxExtension$Companion;
+	public field config Lnet/postchain/eif/config/EifEventReceiverConfig;
+	public field isSigner Lkotlin/jvm/functions/Function0;
+	public fun <init> ()V
+	public fun <init> (Ljava/time/Clock;)V
+	public synthetic fun <init> (Ljava/time/Clock;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun addPipeline (JLnet/postchain/eif/EventPipeline;)V
+	public fun blockCommitted (Lnet/postchain/core/block/BlockData;)V
+	public fun createSpecialOperations (Lnet/postchain/base/SpecialTransactionPosition;Lnet/postchain/core/BlockEContext;)Ljava/util/List;
+	public final fun getConfig ()Lnet/postchain/eif/config/EifEventReceiverConfig;
+	public fun getRelevantOps ()Ljava/util/Set;
+	public fun init (Lnet/postchain/gtx/GTXModule;JLnet/postchain/common/BlockchainRid;Lnet/postchain/crypto/CryptoSystem;)V
+	public final fun isSigner ()Lkotlin/jvm/functions/Function0;
+	public fun needsSpecialTransaction (Lnet/postchain/base/SpecialTransactionPosition;)Z
+	public final fun setConfig (Lnet/postchain/eif/config/EifEventReceiverConfig;)V
+	public final fun setSigner (Lkotlin/jvm/functions/Function0;)V
+	public fun shouldBuildBlock ()Z
+	public fun validateSpecialOperations (Lnet/postchain/base/SpecialTransactionPosition;Lnet/postchain/core/BlockEContext;Ljava/util/List;)Z
+}
+
+public final class net/postchain/eif/EifSpecialTxExtension$Companion : mu/KLogging {
+}
+
+public final class net/postchain/eif/EifSynchronizationInfrastructureExtension : net/postchain/core/SynchronizationInfrastructureExtension {
+	public static final field Companion Lnet/postchain/eif/EifSynchronizationInfrastructureExtension$Companion;
+	public fun <init> (Lnet/postchain/PostchainContext;)V
+	public fun connectProcess (Lnet/postchain/core/BlockchainProcess;)V
+	public fun disconnectProcess (Lnet/postchain/core/BlockchainProcess;)V
+	public fun shutdown ()V
+}
+
+public final class net/postchain/eif/EifSynchronizationInfrastructureExtension$Companion : mu/KLogging {
+}
+
+public final class net/postchain/eif/EifSynchronizationInfrastructureExtensionKt {
+	public static final field EIF_CONFIG_CONTRACTS_QUERY Ljava/lang/String;
+	public static final field EIF_CONFIG_CONTRACTS_TO_FETCH_QUERY Ljava/lang/String;
+	public static final field EIF_CONFIG_EVENTS_QUERY Ljava/lang/String;
+	public static final field EIF_LAST_EVM_BLOCK_QUERY Ljava/lang/String;
+	public static final field EIF_LAST_EVM_EVENT_HEIGHT_QUERY Ljava/lang/String;
+	public static final field EIF_SHOULD_PROCESS_EVM_EVENTS_QUERY Ljava/lang/String;
+}
+
+public final class net/postchain/eif/EncodedEvent : java/lang/Enum {
+	public static final field CONTRACT Lnet/postchain/eif/EncodedEvent;
+	public static final field INDEXED_VALUES Lnet/postchain/eif/EncodedEvent;
+	public static final field LOG_INDEX Lnet/postchain/eif/EncodedEvent;
+	public static final field NAME Lnet/postchain/eif/EncodedEvent;
+	public static final field NON_INDEXED_VALUES Lnet/postchain/eif/EncodedEvent;
+	public static final field SIGNATURE Lnet/postchain/eif/EncodedEvent;
+	public static final field TX_HASH Lnet/postchain/eif/EncodedEvent;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getIndex ()I
+	public static fun valueOf (Ljava/lang/String;)Lnet/postchain/eif/EncodedEvent;
+	public static fun values ()[Lnet/postchain/eif/EncodedEvent;
+}
+
+public abstract interface class net/postchain/eif/EventFetcher : net/postchain/core/Shutdownable {
+	public abstract fun flushEvents (Ljava/math/BigInteger;)V
+	public fun recordValidationConflict (Ljava/math/BigInteger;)V
+}
+
+public final class net/postchain/eif/EventFetcher$DefaultImpls {
+	public static fun recordValidationConflict (Lnet/postchain/eif/EventFetcher;Ljava/math/BigInteger;)V
+}
+
+public final class net/postchain/eif/EventMerkleProof {
+	public static final field Companion Lnet/postchain/eif/EventMerkleProof$Companion;
+	public fun <init> ([B[BLjava/util/List;Lnet/postchain/eif/merkle/Proof;Lnet/postchain/eif/merkle/ExtraMerkleProof;)V
+	public final fun component1 ()[B
+	public final fun component2 ()[B
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Lnet/postchain/eif/merkle/Proof;
+	public final fun component5 ()Lnet/postchain/eif/merkle/ExtraMerkleProof;
+	public final fun copy ([B[BLjava/util/List;Lnet/postchain/eif/merkle/Proof;Lnet/postchain/eif/merkle/ExtraMerkleProof;)Lnet/postchain/eif/EventMerkleProof;
+	public static synthetic fun copy$default (Lnet/postchain/eif/EventMerkleProof;[B[BLjava/util/List;Lnet/postchain/eif/merkle/Proof;Lnet/postchain/eif/merkle/ExtraMerkleProof;ILjava/lang/Object;)Lnet/postchain/eif/EventMerkleProof;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBlockHeader ()[B
+	public final fun getBlockWitness ()Ljava/util/List;
+	public final fun getEventData ()[B
+	public final fun getEventProof ()Lnet/postchain/eif/merkle/Proof;
+	public final fun getExtraMerkleProof ()Lnet/postchain/eif/merkle/ExtraMerkleProof;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class net/postchain/eif/EventMerkleProof$Companion {
+	public final fun fromEvmMerkleProof (Lnet/postchain/eif/merkle/EvmMerkleProof;)Lnet/postchain/eif/EventMerkleProof;
+}
+
+public final class net/postchain/eif/EventPipeline {
+	public fun <init> (Lnet/postchain/eif/EventFetcher;Lnet/postchain/eif/EventProcessor;)V
+	public final fun component1 ()Lnet/postchain/eif/EventFetcher;
+	public final fun component2 ()Lnet/postchain/eif/EventProcessor;
+	public final fun copy (Lnet/postchain/eif/EventFetcher;Lnet/postchain/eif/EventProcessor;)Lnet/postchain/eif/EventPipeline;
+	public static synthetic fun copy$default (Lnet/postchain/eif/EventPipeline;Lnet/postchain/eif/EventFetcher;Lnet/postchain/eif/EventProcessor;ILjava/lang/Object;)Lnet/postchain/eif/EventPipeline;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFetcher ()Lnet/postchain/eif/EventFetcher;
+	public final fun getProcessor ()Lnet/postchain/eif/EventProcessor;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class net/postchain/eif/EventProcessor {
+	public fun blockCommitted (Ljava/math/BigInteger;)V
+	public abstract fun flushEvents (Ljava/math/BigInteger;)V
+	public abstract fun getEventData ()Ljava/util/List;
+	public abstract fun getNumberOfNewEvents ()J
+	public abstract fun isValidEventData (Ljava/util/List;)Lnet/postchain/eif/EventValidationResult;
+	public abstract fun markAsProcessed (Ljava/util/List;)V
+}
+
+public final class net/postchain/eif/EventProcessor$DefaultImpls {
+	public static fun blockCommitted (Lnet/postchain/eif/EventProcessor;Ljava/math/BigInteger;)V
+}
+
+public final class net/postchain/eif/EventValidationResult {
+	public fun <init> (ZLjava/math/BigInteger;Ljava/lang/String;)V
+	public synthetic fun <init> (ZLjava/math/BigInteger;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getConflictingHeight ()Ljava/math/BigInteger;
+	public final fun getErrorMessage ()Ljava/lang/String;
+	public final fun getValid ()Z
+}
+
+public final class net/postchain/eif/EvmBlockHeaderCodecKt {
+	public static final fun decodeBlockHeaderDataFromEVM ([B)Lnet/postchain/eif/DecodedBlockHeaderDataForEVM;
+	public static final fun encodeBlockHeaderDataForEVM ([BLnet/postchain/base/gtv/BlockHeaderData;)[B
+}
+
+public final class net/postchain/eif/EvmBlockOp {
+	public static final field Companion Lnet/postchain/eif/EvmBlockOp$Companion;
+	public static final field OP_NAME Ljava/lang/String;
+	public fun <init> (JLjava/math/BigInteger;Lnet/postchain/common/types/WrappedByteArray;Ljava/util/List;)V
+	public final fun component1 ()J
+	public final fun component2 ()Ljava/math/BigInteger;
+	public final fun component3 ()Lnet/postchain/common/types/WrappedByteArray;
+	public final fun component4 ()Ljava/util/List;
+	public final fun copy (JLjava/math/BigInteger;Lnet/postchain/common/types/WrappedByteArray;Ljava/util/List;)Lnet/postchain/eif/EvmBlockOp;
+	public static synthetic fun copy$default (Lnet/postchain/eif/EvmBlockOp;JLjava/math/BigInteger;Lnet/postchain/common/types/WrappedByteArray;Ljava/util/List;ILjava/lang/Object;)Lnet/postchain/eif/EvmBlockOp;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEvents ()Ljava/util/List;
+	public final fun getEvmBlockHash ()Lnet/postchain/common/types/WrappedByteArray;
+	public final fun getEvmBlockHeight ()Ljava/math/BigInteger;
+	public final fun getNetworkId ()J
+	public fun hashCode ()I
+	public final fun toOpData ()Lnet/postchain/gtx/data/OpData;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class net/postchain/eif/EvmBlockOp$Companion : mu/KLogging {
+	public final fun fromOpData (Lnet/postchain/gtx/data/OpData;)Lnet/postchain/eif/EvmBlockOp;
+	public final fun fromOpNameAndArgs (Ljava/lang/String;[Lnet/postchain/gtv/Gtv;)Lnet/postchain/eif/EvmBlockOp;
+}
+
+public final class net/postchain/eif/EvmEventFetcher : net/postchain/eif/EventFetcher {
+	public static final field Companion Lnet/postchain/eif/EvmEventFetcher$Companion;
+	public static final field DEFAULT_CURSOR_PERSIST_INTERVAL J
+	public fun <init> (JLjava/util/List;ZZLjava/util/List;ZLjava/math/BigInteger;JJLnet/postchain/core/BlockchainEngine;Lnet/postchain/eif/web3j/Web3jRequestHandler;JZLnet/postchain/eif/EvmEventProcessor;Lnet/postchain/eif/EvmReadCursorStore;JLjava/math/BigInteger;JLjava/time/Clock;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (JLjava/util/List;ZZLjava/util/List;ZLjava/math/BigInteger;JJLnet/postchain/core/BlockchainEngine;Lnet/postchain/eif/web3j/Web3jRequestHandler;JZLnet/postchain/eif/EvmEventProcessor;Lnet/postchain/eif/EvmReadCursorStore;JLjava/math/BigInteger;JLjava/time/Clock;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun flushEvents (Ljava/math/BigInteger;)V
+	public final fun getLastCommittedEvmEventHeight (J[B)Ljava/math/BigInteger;
+	public final fun getLastPersistedCursorHeight ()Ljava/math/BigInteger;
+	public final fun getLastSeenEvmHeadHeight ()Ljava/math/BigInteger;
+	public final fun getNewContractFlushes ()Ljava/util/concurrent/atomic/AtomicLong;
+	public final fun getReadLagBlocks ()Ljava/math/BigInteger;
+	public final fun getSignerValidationConflicts ()Ljava/util/concurrent/atomic/AtomicLong;
+	public final fun getValidationConflictFlushes ()Ljava/util/concurrent/atomic/AtomicLong;
+	public fun recordValidationConflict (Ljava/math/BigInteger;)V
+	public fun shutdown ()V
+}
+
+public final class net/postchain/eif/EvmEventFetcher$Companion : mu/KLogging {
+}
+
+public final class net/postchain/eif/EvmEventProcessor : net/postchain/eif/EventProcessor {
+	public static final field Companion Lnet/postchain/eif/EvmEventProcessor$Companion;
+	public fun <init> (JLjava/math/BigInteger;J)V
+	public fun blockCommitted (Ljava/math/BigInteger;)V
+	public fun flushEvents (Ljava/math/BigInteger;)V
+	public fun getEventData ()Ljava/util/List;
+	public final fun getLastConfirmedEvmBlockHeight ()Ljava/math/BigInteger;
+	public final fun getLastReadLogBlockHeight ()Ljava/math/BigInteger;
+	public fun getNumberOfNewEvents ()J
+	public final fun getSafeResumeHeight ()Ljava/math/BigInteger;
+	public final fun holdResumeHeightBelow (Ljava/math/BigInteger;)V
+	public final fun isQueueFull ()Z
+	public fun isValidEventData (Ljava/util/List;)Lnet/postchain/eif/EventValidationResult;
+	public fun markAsProcessed (Ljava/util/List;)V
+	public final fun processLogEventsAndUpdateOffsets (Ljava/util/List;Ljava/math/BigInteger;)V
+	public final fun setLastReadLogBlockHeight (Ljava/math/BigInteger;)V
+}
+
+public final class net/postchain/eif/EvmEventProcessor$Companion : mu/KLogging {
+}
+
+public final class net/postchain/eif/EvmEventProcessor$EvmBlock {
+	public fun <init> (Ljava/math/BigInteger;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/math/BigInteger;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/math/BigInteger;Ljava/lang/String;)Lnet/postchain/eif/EvmEventProcessor$EvmBlock;
+	public static synthetic fun copy$default (Lnet/postchain/eif/EvmEventProcessor$EvmBlock;Ljava/math/BigInteger;Ljava/lang/String;ILjava/lang/Object;)Lnet/postchain/eif/EvmEventProcessor$EvmBlock;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHash ()Ljava/lang/String;
+	public final fun getNumber ()Ljava/math/BigInteger;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class net/postchain/eif/EvmReadCursor {
+	public fun <init> (Ljava/math/BigInteger;Ljava/util/Map;)V
+	public final fun component1 ()Ljava/math/BigInteger;
+	public final fun component2 ()Ljava/util/Map;
+	public final fun copy (Ljava/math/BigInteger;Ljava/util/Map;)Lnet/postchain/eif/EvmReadCursor;
+	public static synthetic fun copy$default (Lnet/postchain/eif/EvmReadCursor;Ljava/math/BigInteger;Ljava/util/Map;ILjava/lang/Object;)Lnet/postchain/eif/EvmReadCursor;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getContracts ()Ljava/util/Map;
+	public final fun getHeight ()Ljava/math/BigInteger;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class net/postchain/eif/EvmReadCursorStore {
+	public abstract fun load (J)Lnet/postchain/eif/EvmReadCursor;
+	public abstract fun save (JLnet/postchain/eif/EvmReadCursor;)V
+}
+
+public final class net/postchain/eif/HexUtilsKt {
+	public static final fun normalizeContractAddress (Ljava/lang/String;)Ljava/lang/String;
+	public static final fun parseEvmAddress (Ljava/lang/String;)Lnet/postchain/common/types/WrappedByteArray;
+	public static final fun upperCaseHex (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public final class net/postchain/eif/InMemoryEvmReadCursorStore : net/postchain/eif/EvmReadCursorStore {
+	public fun <init> ()V
+	public fun load (J)Lnet/postchain/eif/EvmReadCursor;
+	public fun save (JLnet/postchain/eif/EvmReadCursor;)V
+}
+
+public final class net/postchain/eif/NoOpEventFetcher : net/postchain/eif/EventFetcher {
+	public fun <init> (Lnet/postchain/eif/EventProcessor;)V
+	public fun flushEvents (Ljava/math/BigInteger;)V
+	public fun recordValidationConflict (Ljava/math/BigInteger;)V
+	public fun shutdown ()V
+}
+
+public final class net/postchain/eif/NoOpEventProcessor : net/postchain/eif/EventProcessor {
+	public static final field Companion Lnet/postchain/eif/NoOpEventProcessor$Companion;
+	public fun <init> ()V
+	public fun blockCommitted (Ljava/math/BigInteger;)V
+	public fun flushEvents (Ljava/math/BigInteger;)V
+	public fun getEventData ()Ljava/util/List;
+	public fun getNumberOfNewEvents ()J
+	public fun isValidEventData (Ljava/util/List;)Lnet/postchain/eif/EventValidationResult;
+	public fun markAsProcessed (Ljava/util/List;)V
+}
+
+public final class net/postchain/eif/NoOpEventProcessor$Companion : mu/KLogging {
+}
+
+public final class net/postchain/eif/cli/AppKt {
+	public static final fun main ([Ljava/lang/String;)V
+}
+
+public final class net/postchain/eif/cli/Eif : com/github/ajalt/clikt/core/CliktCommand {
+	public fun <init> ()V
+	public fun run ()V
+}
+
+public final class net/postchain/eif/cli/PubkeyToEthereumAddressCommand : com/github/ajalt/clikt/core/CliktCommand {
+	public fun <init> ()V
+	public fun help (Lcom/github/ajalt/clikt/core/Context;)Ljava/lang/String;
+	public fun run ()V
+}
+
+public final class net/postchain/eif/config/EifConfigTest : net/postchain/config/app/ConfigTest {
+	public fun <init> ()V
+	public fun <init> (Ljava/time/Clock;)V
+	public synthetic fun <init> (Ljava/time/Clock;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getClock ()Ljava/time/Clock;
+	public fun test (Lnet/postchain/config/app/AppConfig;)I
+}
+
+public final class net/postchain/eif/config/EifContainerConfigProvider : net/postchain/containers/bpm/ContainerConfigProvider {
+	public fun <init> ()V
+	public fun getConfig (Lnet/postchain/config/app/AppConfig;)Ljava/util/Map;
+}
+
+public final class net/postchain/eif/config/EifEventConsumerConfig {
+	public fun <init> (Lnet/postchain/eif/config/EifSnapshotConfig;)V
+	public final fun component1 ()Lnet/postchain/eif/config/EifSnapshotConfig;
+	public final fun copy (Lnet/postchain/eif/config/EifSnapshotConfig;)Lnet/postchain/eif/config/EifEventConsumerConfig;
+	public static synthetic fun copy$default (Lnet/postchain/eif/config/EifEventConsumerConfig;Lnet/postchain/eif/config/EifSnapshotConfig;ILjava/lang/Object;)Lnet/postchain/eif/config/EifEventConsumerConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSnapshot ()Lnet/postchain/eif/config/EifSnapshotConfig;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class net/postchain/eif/config/EifEventReceiverConfig {
+	public fun <init> (JJJLjava/util/Map;)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun component4 ()Ljava/util/Map;
+	public final fun copy (JJJLjava/util/Map;)Lnet/postchain/eif/config/EifEventReceiverConfig;
+	public static synthetic fun copy$default (Lnet/postchain/eif/config/EifEventReceiverConfig;JJJLjava/util/Map;ILjava/lang/Object;)Lnet/postchain/eif/config/EifEventReceiverConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getChains ()Ljava/util/Map;
+	public final fun getMaxEventDelay ()J
+	public final fun getMaxEventsPerBlock ()J
+	public final fun getNumberOfEventsToTriggerBlockBuilding ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class net/postchain/eif/config/EifEvmChainConfig {
+	public fun <init> (Lnet/postchain/gtv/Gtv;JLjava/util/List;Lnet/postchain/gtv/Gtv;JJJLjava/util/List;)V
+	public final fun component1 ()Lnet/postchain/gtv/Gtv;
+	public final fun component2 ()J
+	public final fun component4 ()Lnet/postchain/gtv/Gtv;
+	public final fun component5 ()J
+	public final fun component6 ()J
+	public final fun component7 ()J
+	public final fun component8 ()Ljava/util/List;
+	public final fun copy (Lnet/postchain/gtv/Gtv;JLjava/util/List;Lnet/postchain/gtv/Gtv;JJJLjava/util/List;)Lnet/postchain/eif/config/EifEvmChainConfig;
+	public static synthetic fun copy$default (Lnet/postchain/eif/config/EifEvmChainConfig;Lnet/postchain/gtv/Gtv;JLjava/util/List;Lnet/postchain/gtv/Gtv;JJJLjava/util/List;ILjava/lang/Object;)Lnet/postchain/eif/config/EifEvmChainConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getContracts ()Ljava/util/List;
+	public final fun getContractsToFetch ()Ljava/util/List;
+	public final fun getEvents ()Lnet/postchain/gtv/Gtv;
+	public final fun getEvmReadOffset ()J
+	public final fun getNetworkId ()J
+	public final fun getRawGtv ()Lnet/postchain/gtv/Gtv;
+	public final fun getReadOffset ()J
+	public final fun getSkipToHeight ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class net/postchain/eif/config/EifEvmContractConfig {
+	public fun <init> (Ljava/lang/String;J)V
+	public final fun component2 ()J
+	public final fun copy (Ljava/lang/String;J)Lnet/postchain/eif/config/EifEvmContractConfig;
+	public static synthetic fun copy$default (Lnet/postchain/eif/config/EifEvmContractConfig;Ljava/lang/String;JILjava/lang/Object;)Lnet/postchain/eif/config/EifEvmContractConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAddress ()Lnet/postchain/common/types/WrappedByteArray;
+	public final fun getSkipToHeight ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class net/postchain/eif/config/EifSnapshotConfig {
+	public fun <init> (JJJ)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun copy (JJJ)Lnet/postchain/eif/config/EifSnapshotConfig;
+	public static synthetic fun copy$default (Lnet/postchain/eif/config/EifSnapshotConfig;JJJILjava/lang/Object;)Lnet/postchain/eif/config/EifSnapshotConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLevelsPerPage ()J
+	public final fun getSnapshotsToKeep ()J
+	public final fun getVersion ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class net/postchain/eif/config/EvmConfig {
+	public static final field Companion Lnet/postchain/eif/config/EvmConfig$Companion;
+	public static final field DEFAULT_MIN_POLL_INTERVAL J
+	public static final field EIF_CONFIG_ENV_PREFIX Ljava/lang/String;
+	public fun <init> (JJJJJJJLjava/util/List;JJJJ)V
+	public synthetic fun <init> (JJJJJJJLjava/util/List;JJJJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()J
+	public final fun component10 ()J
+	public final fun component11 ()J
+	public final fun component12 ()J
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun component4 ()J
+	public final fun component5 ()J
+	public final fun component6 ()J
+	public final fun component7 ()J
+	public final fun component8 ()Ljava/util/List;
+	public final fun component9 ()J
+	public final fun copy (JJJJJJJLjava/util/List;JJJJ)Lnet/postchain/eif/config/EvmConfig;
+	public static synthetic fun copy$default (Lnet/postchain/eif/config/EvmConfig;JJJJJJJLjava/util/List;JJJJILjava/lang/Object;)Lnet/postchain/eif/config/EvmConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public static final fun fromAppConfig (Ljava/lang/String;Lnet/postchain/config/app/AppConfig;)Lnet/postchain/eif/config/EvmConfig;
+	public final fun getConnectTimeout ()J
+	public final fun getDelayWhenNoNewBlocks ()J
+	public final fun getIgnoreReadCursorBelow ()J
+	public final fun getMaxQueueSize ()J
+	public final fun getMaxReadAhead ()J
+	public final fun getMaxRetryDelay ()J
+	public final fun getMaxTryErrors ()J
+	public final fun getMinPollInterval ()J
+	public final fun getMinRetryDelay ()J
+	public static final fun getNetworkUrls (Ljava/lang/String;Lnet/postchain/config/app/AppConfig;)Ljava/util/List;
+	public final fun getReadTimeout ()J
+	public final fun getUrls ()Ljava/util/List;
+	public final fun getWriteTimeout ()J
+	public fun hashCode ()I
+	public final fun toEnvironmentKeyValueMap (Ljava/lang/String;)Ljava/util/Map;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class net/postchain/eif/config/EvmConfig$Companion {
+	public final fun defaultMinPollInterval (Ljava/lang/String;)J
+	public final fun fromAppConfig (Ljava/lang/String;Lnet/postchain/config/app/AppConfig;)Lnet/postchain/eif/config/EvmConfig;
+	public final fun getDEFAULT_MIN_POLL_INTERVALS ()Ljava/util/Map;
+	public final fun getNetworkUrls (Ljava/lang/String;Lnet/postchain/config/app/AppConfig;)Ljava/util/List;
+}
+
+public final class net/postchain/eif/gtv/GtvToEventMapper {
+	public static final field INSTANCE Lnet/postchain/eif/gtv/GtvToEventMapper;
+	public final fun map (Lnet/postchain/gtv/Gtv;)Lorg/web3j/abi/datatypes/Event;
+}
+
+public final class net/postchain/eif/gtv/GtvToTypeMapper {
+	public static final field INSTANCE Lnet/postchain/eif/gtv/GtvToTypeMapper;
+	public final fun map (Lnet/postchain/gtv/Gtv;Ljava/lang/String;)Lorg/web3j/abi/datatypes/Type;
+}
+
+public final class net/postchain/eif/gtv/SimpleGtvEncoder {
+	public static final field INSTANCE Lnet/postchain/eif/gtv/SimpleGtvEncoder;
+	public final fun encodeGtv (Lnet/postchain/gtv/GtvArray;)[B
+}
+
+public final class net/postchain/eif/gtv/TypeToGtvMapper {
+	public static final field INSTANCE Lnet/postchain/eif/gtv/TypeToGtvMapper;
+	public final fun map (Lorg/web3j/abi/datatypes/Type;)Lnet/postchain/gtv/Gtv;
+}
+
+public final class net/postchain/eif/merkle/EifSignature {
+	public fun <init> ([B[B)V
+	public final fun component1 ()[B
+	public final fun component2 ()[B
+	public final fun copy ([B[B)Lnet/postchain/eif/merkle/EifSignature;
+	public static synthetic fun copy$default (Lnet/postchain/eif/merkle/EifSignature;[B[BILjava/lang/Object;)Lnet/postchain/eif/merkle/EifSignature;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPubkey ()[B
+	public final fun getSig ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class net/postchain/eif/merkle/EvmMerkleProof {
+	public fun <init> ([B[BLjava/util/List;Lnet/postchain/eif/merkle/Proof;Lnet/postchain/eif/merkle/ExtraMerkleProof;)V
+	public final fun component1 ()[B
+	public final fun component2 ()[B
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Lnet/postchain/eif/merkle/Proof;
+	public final fun component5 ()Lnet/postchain/eif/merkle/ExtraMerkleProof;
+	public final fun copy ([B[BLjava/util/List;Lnet/postchain/eif/merkle/Proof;Lnet/postchain/eif/merkle/ExtraMerkleProof;)Lnet/postchain/eif/merkle/EvmMerkleProof;
+	public static synthetic fun copy$default (Lnet/postchain/eif/merkle/EvmMerkleProof;[B[BLjava/util/List;Lnet/postchain/eif/merkle/Proof;Lnet/postchain/eif/merkle/ExtraMerkleProof;ILjava/lang/Object;)Lnet/postchain/eif/merkle/EvmMerkleProof;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBlockHeader ()[B
+	public final fun getBlockWitness ()Ljava/util/List;
+	public final fun getData ()[B
+	public final fun getExtraMerkleProof ()Lnet/postchain/eif/merkle/ExtraMerkleProof;
+	public final fun getProof ()Lnet/postchain/eif/merkle/Proof;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class net/postchain/eif/merkle/EvmMerkleProofBuilder {
+	public fun <init> (Lnet/postchain/base/snapshot/PageStore;Lnet/postchain/crypto/CryptoSystem;Ljava/util/List;)V
+	public final fun build (Lnet/postchain/core/ExecutionContext;J[B[B[BJ[Lnet/postchain/crypto/Signature;)Lnet/postchain/eif/merkle/EvmMerkleProof;
+	public static synthetic fun build$default (Lnet/postchain/eif/merkle/EvmMerkleProofBuilder;Lnet/postchain/core/ExecutionContext;J[B[B[BJ[Lnet/postchain/crypto/Signature;ILjava/lang/Object;)Lnet/postchain/eif/merkle/EvmMerkleProof;
+}
+
+public final class net/postchain/eif/merkle/ExtraMerkleProof {
+	public fun <init> ([B[BJ[BLjava/util/List;)V
+	public final fun component1 ()[B
+	public final fun component2 ()[B
+	public final fun component3 ()J
+	public final fun component4 ()[B
+	public final fun component5 ()Ljava/util/List;
+	public final fun copy ([B[BJ[BLjava/util/List;)Lnet/postchain/eif/merkle/ExtraMerkleProof;
+	public static synthetic fun copy$default (Lnet/postchain/eif/merkle/ExtraMerkleProof;[B[BJ[BLjava/util/List;ILjava/lang/Object;)Lnet/postchain/eif/merkle/ExtraMerkleProof;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExtraMerkleProofs ()Ljava/util/List;
+	public final fun getExtraRoot ()[B
+	public final fun getHashedLeaf ()[B
+	public final fun getLeaf ()[B
+	public final fun getPosition ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class net/postchain/eif/merkle/MerkleProofUtil {
+	public static final field INSTANCE Lnet/postchain/eif/merkle/MerkleProofUtil;
+	public final fun getMerkleProof (Ljava/util/List;I[BLkotlin/jvm/functions/Function2;)[B
+	public final fun getPrefixedMerkleProof (Ljava/util/List;I[BLnet/postchain/crypto/CryptoSystem;)[B
+}
+
+public final class net/postchain/eif/merkle/Proof {
+	public fun <init> ([BJLjava/util/List;)V
+	public final fun component1 ()[B
+	public final fun component2 ()J
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy ([BJLjava/util/List;)Lnet/postchain/eif/merkle/Proof;
+	public static synthetic fun copy$default (Lnet/postchain/eif/merkle/Proof;[BJLjava/util/List;ILjava/lang/Object;)Lnet/postchain/eif/merkle/Proof;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLeaf ()[B
+	public final fun getMerkleProofs ()Ljava/util/List;
+	public final fun getPosition ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class net/postchain/eif/merkle/ProofTreeParser {
+	public static final field INSTANCE Lnet/postchain/eif/merkle/ProofTreeParser;
+	public final fun getProofListAndPosition (Lnet/postchain/gtv/merkle/proof/MerkleProofElement;)Lkotlin/Pair;
+}
+
+public final class net/postchain/eif/metrics/EifMetricsRegistry {
+	public fun <init> ()V
+	public final fun registerMetrics (JLnet/postchain/common/BlockchainRid;JLnet/postchain/eif/EventPipeline;)V
+	public final fun unregisterAllMetrics ()V
+	public final fun unregisterMetrics (Lnet/postchain/common/BlockchainRid;)V
+}
+
+public final class net/postchain/eif/metrics/EifMetricsRegistryKt {
+	public static final field NETWORK_ID_TAG Ljava/lang/String;
+}
+
+public final class net/postchain/eif/metrics/RpcUsageMetrics {
+	public fun <init> (JLnet/postchain/common/BlockchainRid;J)V
+	public final fun createUsageCounter (I)Lio/micrometer/core/instrument/Counter;
+	public final fun getBlockchainRid ()Lnet/postchain/common/BlockchainRid;
+	public final fun getChainIID ()J
+	public final fun getNetworkId ()J
+}
+
+public final class net/postchain/eif/transaction/EvmBlockHeaderValidator {
+	public static final field Companion Lnet/postchain/eif/transaction/EvmBlockHeaderValidator$Companion;
+	public fun <init> (Ljava/lang/String;)V
+	public final fun verifyEVMSignatures (Lnet/postchain/eif/DecodedBlockHeaderDataForEVM;Ljava/util/List;Ljava/util/List;)Z
+	public final fun verifyEVMSignaturesAndCompareAgainstCurrentEVMSignerList (Lnet/postchain/eif/DecodedBlockHeaderDataForEVM;Ljava/util/List;Ljava/util/List;Ljava/util/List;)Z
+	public final fun verifySignersAgainstCurrentEVMSignerList (Ljava/util/List;Ljava/util/List;)Z
+}
+
+public final class net/postchain/eif/transaction/EvmBlockHeaderValidator$Companion : mu/KLogging {
+}
+
+public final class net/postchain/eif/transaction/EvmPendingTx {
+	public static final field Companion Lnet/postchain/eif/transaction/EvmPendingTx$Companion;
+	public fun <init> (JJLjava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;[BLjava/lang/String;Ljava/math/BigInteger;Ljava/math/BigInteger;Ljava/math/BigInteger;)V
+	public synthetic fun <init> (JJLjava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;[BLjava/lang/String;Ljava/math/BigInteger;Ljava/math/BigInteger;Ljava/math/BigInteger;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBlockHash ()Ljava/lang/String;
+	public final fun getBlockNumber ()Ljava/math/BigInteger;
+	public final fun getCompletedTime ()Ljava/lang/Long;
+	public final fun getContractAddress ()Ljava/lang/String;
+	public final fun getEffectiveGasPrice ()Ljava/math/BigInteger;
+	public final fun getFunctionName ()Ljava/lang/String;
+	public final fun getGasUsed ()Ljava/math/BigInteger;
+	public final fun getNetworkId ()J
+	public final fun getParameterTypes ()Ljava/util/List;
+	public final fun getParameterValues ()Ljava/util/List;
+	public final fun getProcessedBy ()[B
+	public final fun getRowId ()J
+	public final fun getStatus ()Lnet/postchain/eif/transaction/PendingTxStatus;
+	public final fun getTxHash ()Ljava/lang/String;
+	public final fun setBlockHash (Ljava/lang/String;)V
+	public final fun setBlockNumber (Ljava/math/BigInteger;)V
+	public final fun setEffectiveGasPrice (Ljava/math/BigInteger;)V
+	public final fun setGasUsed (Ljava/math/BigInteger;)V
+	public final fun setStatus (Lnet/postchain/eif/transaction/PendingTxStatus;)V
+}
+
+public final class net/postchain/eif/transaction/EvmPendingTx$Companion {
+	public final fun fromEvmSubmitTxRellRequest (Lnet/postchain/eif/transaction/EvmSubmitTxRellRequest;Ljava/lang/String;)Lnet/postchain/eif/transaction/EvmPendingTx;
+}
+
+public final class net/postchain/eif/transaction/EvmSubmitTransactionResult {
+	public fun <init> (JLnet/postchain/eif/transaction/RellTransactionStatus;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (JLnet/postchain/eif/transaction/RellTransactionStatus;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()J
+	public final fun component2 ()Lnet/postchain/eif/transaction/RellTransactionStatus;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (JLnet/postchain/eif/transaction/RellTransactionStatus;Ljava/lang/String;Ljava/lang/String;)Lnet/postchain/eif/transaction/EvmSubmitTransactionResult;
+	public static synthetic fun copy$default (Lnet/postchain/eif/transaction/EvmSubmitTransactionResult;JLnet/postchain/eif/transaction/RellTransactionStatus;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lnet/postchain/eif/transaction/EvmSubmitTransactionResult;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFailureReason ()Ljava/lang/String;
+	public final fun getRequestId ()J
+	public final fun getStatus ()Lnet/postchain/eif/transaction/RellTransactionStatus;
+	public final fun getTxHash ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public class net/postchain/eif/transaction/EvmSubmitTxRellRequest {
+	public fun <init> (JLjava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;JLjava/math/BigInteger;Ljava/math/BigInteger;[BJLjava/lang/String;Lnet/postchain/eif/transaction/RellTransactionStatus;[B)V
+	public final fun getContractAddress ()Ljava/lang/String;
+	public final fun getCreated ()J
+	public final fun getFunctionName ()Ljava/lang/String;
+	public final fun getMaxFeePerGas ()Ljava/math/BigInteger;
+	public final fun getMaxPriorityFeePerGas ()Ljava/math/BigInteger;
+	public final fun getNetworkId ()J
+	public final fun getParameterTypes ()Ljava/util/List;
+	public final fun getParameterValues ()Ljava/util/List;
+	public final fun getProcessedBy ()[B
+	public final fun getRowId ()J
+	public final fun getSender ()[B
+	public final fun getStatus ()Lnet/postchain/eif/transaction/RellTransactionStatus;
+	public final fun getTxHash ()Ljava/lang/String;
+	public final fun setMaxFeePerGas (Ljava/math/BigInteger;)V
+	public final fun setMaxPriorityFeePerGas (Ljava/math/BigInteger;)V
+	public final fun setTxHash (Ljava/lang/String;)V
+}
+
+public final class net/postchain/eif/transaction/EvmSubmitTxRequest : net/postchain/eif/transaction/EvmSubmitTxRellRequest {
+	public static final field Companion Lnet/postchain/eif/transaction/EvmSubmitTxRequest$Companion;
+	public fun <init> (Lnet/postchain/eif/transaction/EvmSubmitTxRellRequest;Z)V
+	public synthetic fun <init> (Lnet/postchain/eif/transaction/EvmSubmitTxRellRequest;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBcPersisted ()Z
+	public final fun setBcPersisted (Z)V
+	public final fun toRell ()Lnet/postchain/eif/transaction/EvmSubmitTxRellRequest;
+}
+
+public final class net/postchain/eif/transaction/EvmSubmitTxRequest$Companion {
+	public final fun fromRell (Lnet/postchain/eif/transaction/EvmSubmitTxRellRequest;)Lnet/postchain/eif/transaction/EvmSubmitTxRequest;
+}
+
+public final class net/postchain/eif/transaction/EvmTxNoOp : net/postchain/gtx/GTXOperation {
+	public fun <init> (Lkotlin/Unit;Lnet/postchain/gtx/data/ExtOpData;)V
+	public fun apply (Lnet/postchain/core/TxEContext;)Z
+	public fun checkCorrectness ()V
+}
+
+public final class net/postchain/eif/transaction/PendingTxStatus : java/lang/Enum {
+	public static final field REVERTED Lnet/postchain/eif/transaction/PendingTxStatus;
+	public static final field SUCCESS Lnet/postchain/eif/transaction/PendingTxStatus;
+	public static final field VERIFYING Lnet/postchain/eif/transaction/PendingTxStatus;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun isCompleted ()Z
+	public static fun valueOf (Ljava/lang/String;)Lnet/postchain/eif/transaction/PendingTxStatus;
+	public static fun values ()[Lnet/postchain/eif/transaction/PendingTxStatus;
+}
+
+public final class net/postchain/eif/transaction/RellTransactionStatus : java/lang/Enum {
+	public static final field FAILURE Lnet/postchain/eif/transaction/RellTransactionStatus;
+	public static final field PENDING Lnet/postchain/eif/transaction/RellTransactionStatus;
+	public static final field QUEUED Lnet/postchain/eif/transaction/RellTransactionStatus;
+	public static final field SUCCESS Lnet/postchain/eif/transaction/RellTransactionStatus;
+	public static final field TAKEN Lnet/postchain/eif/transaction/RellTransactionStatus;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun isCompleted ()Z
+	public static fun valueOf (Ljava/lang/String;)Lnet/postchain/eif/transaction/RellTransactionStatus;
+	public static fun values ()[Lnet/postchain/eif/transaction/RellTransactionStatus;
+}
+
+public final class net/postchain/eif/transaction/SubmitTransactionModelKt {
+	public static final fun getEvmSubmitTxRequestRecordMapper ()Lorg/jooq/RecordMapper;
+}
+
+public class net/postchain/eif/transaction/TransactionSubmitter : net/postchain/core/Shutdownable {
+	public static final field Companion Lnet/postchain/eif/transaction/TransactionSubmitter$Companion;
+	public fun <init> (Lnet/postchain/eif/web3j/Web3jRequestHandler;Lnet/postchain/eif/web3j/Web3jRawTransactionHandler;Lnet/postchain/eif/transaction/gas/EIP1559FeeEstimatorFactory;Lnet/postchain/eif/transaction/TransactionSubmitterDatabaseOperations;Lnet/postchain/core/Storage;JJJLjava/util/Collection;Ljava/math/BigInteger;JJJLjava/math/BigDecimal;)V
+	public final fun addPendingTransaction (Lnet/postchain/eif/transaction/EvmPendingTx;)V
+	public fun cancelPendingTx (Lnet/postchain/eif/transaction/EvmPendingTx;)V
+	public final fun clearSubmitTxUpdates (Ljava/util/List;)V
+	public final fun enqueue (Lnet/postchain/eif/transaction/EvmSubmitTxRequest;)V
+	public final fun getCancelFeeMargin ()Ljava/math/BigDecimal;
+	public final fun getChainId ()J
+	public final fun getHealthCheckInterval ()J
+	public final fun getMinWalletBalance ()Ljava/math/BigInteger;
+	public final fun getNetworkId ()J
+	public final fun getNodeTxVerificationEvmBlocks ()J
+	public fun getPendingTx (J)Lnet/postchain/eif/transaction/EvmPendingTx;
+	public fun getPendingTxs ()Ljava/util/Map;
+	public final fun getStorage ()Lnet/postchain/core/Storage;
+	public fun getSubmitTxUpdates ()Ljava/util/List;
+	public final fun getTxPollInterval ()J
+	public final fun getTxVerificationTime ()J
+	public fun getVerifiedTransactions ()Ljava/util/List;
+	public final fun isHealthy ()Z
+	public fun removePendingTx (J)V
+	public final fun removeSubmitTx (Lnet/postchain/core/ExecutionContext;J)V
+	public final fun removeTransactionCompletely (Lnet/postchain/core/BlockEContext;J)V
+	public final fun setSubmitBCPersisted (Lnet/postchain/core/BlockEContext;J)V
+	public fun shutdown ()V
+}
+
+public final class net/postchain/eif/transaction/TransactionSubmitter$Companion : mu/KLogging {
+	public final fun encodeFunction (Ljava/lang/String;Ljava/util/List;Ljava/util/List;)Ljava/lang/String;
+}
+
+public abstract interface class net/postchain/eif/transaction/TransactionSubmitterDatabaseOperations {
+	public abstract fun getQueuedTransactions (Lnet/postchain/core/ExecutionContext;J)Ljava/util/List;
+	public abstract fun initialize (Lnet/postchain/core/ExecutionContext;)V
+	public abstract fun queueTransaction (Lnet/postchain/core/ExecutionContext;Lnet/postchain/eif/transaction/EvmSubmitTxRequest;J)V
+	public abstract fun recordTransactionGas (Lnet/postchain/core/ExecutionContext;JLjava/math/BigInteger;Ljava/math/BigInteger;)V
+	public abstract fun recordTransactionHash (Lnet/postchain/core/ExecutionContext;JLjava/lang/String;)V
+	public abstract fun removeTransaction (Lnet/postchain/core/ExecutionContext;J)Z
+	public abstract fun setSubmitTxBCPersisted (Lnet/postchain/core/ExecutionContext;J)V
+}
+
+public class net/postchain/eif/transaction/TransactionSubmitterDatabaseOperationsImpl : net/postchain/eif/transaction/TransactionSubmitterDatabaseOperations {
+	public static final field Companion Lnet/postchain/eif/transaction/TransactionSubmitterDatabaseOperationsImpl$Companion;
+	public static final field EVM_TX_SUBMIT_TABLE_NAME Ljava/lang/String;
+	public fun <init> ()V
+	public fun getQueuedTransactions (Lnet/postchain/core/ExecutionContext;J)Ljava/util/List;
+	public fun initialize (Lnet/postchain/core/ExecutionContext;)V
+	public fun queueTransaction (Lnet/postchain/core/ExecutionContext;Lnet/postchain/eif/transaction/EvmSubmitTxRequest;J)V
+	public fun recordTransactionGas (Lnet/postchain/core/ExecutionContext;JLjava/math/BigInteger;Ljava/math/BigInteger;)V
+	public fun recordTransactionHash (Lnet/postchain/core/ExecutionContext;JLjava/lang/String;)V
+	public fun removeTransaction (Lnet/postchain/core/ExecutionContext;J)Z
+	public fun setSubmitTxBCPersisted (Lnet/postchain/core/ExecutionContext;J)V
+}
+
+public final class net/postchain/eif/transaction/TransactionSubmitterDatabaseOperationsImpl$Companion {
+	public final fun getEVM_TX_SUBMIT_COLUMN_BC_PERSISTED ()Lorg/jooq/Field;
+	public final fun getEVM_TX_SUBMIT_COLUMN_CONTRACT ()Lorg/jooq/Field;
+	public final fun getEVM_TX_SUBMIT_COLUMN_CREATED ()Lorg/jooq/Field;
+	public final fun getEVM_TX_SUBMIT_COLUMN_FUNCTION ()Lorg/jooq/Field;
+	public final fun getEVM_TX_SUBMIT_COLUMN_GAS_LIMIT ()Lorg/jooq/Field;
+	public final fun getEVM_TX_SUBMIT_COLUMN_HASH ()Lorg/jooq/Field;
+	public final fun getEVM_TX_SUBMIT_COLUMN_MAX_FEE_PER_GAS ()Lorg/jooq/Field;
+	public final fun getEVM_TX_SUBMIT_COLUMN_MAX_GAS_PRICE ()Lorg/jooq/Field;
+	public final fun getEVM_TX_SUBMIT_COLUMN_MAX_PRIORITY_FEE_PER_GAS ()Lorg/jooq/Field;
+	public final fun getEVM_TX_SUBMIT_COLUMN_NETWORK_ID ()Lorg/jooq/Field;
+	public final fun getEVM_TX_SUBMIT_COLUMN_PARAMETER_TYPES ()Lorg/jooq/Field;
+	public final fun getEVM_TX_SUBMIT_COLUMN_PARAMETER_VALUES ()Lorg/jooq/Field;
+	public final fun getEVM_TX_SUBMIT_COLUMN_REQUEST_ID ()Lorg/jooq/Field;
+	public final fun getEVM_TX_SUBMIT_COLUMN_SENDER ()Lorg/jooq/Field;
+}
+
+public final class net/postchain/eif/transaction/TransactionSubmitterDatabaseOperationsImplKt {
+	public static final fun tableEvmTxSubmit (Lnet/postchain/base/data/DatabaseAccess;Lnet/postchain/core/ExecutionContext;)Ljava/lang/String;
+}
+
+public class net/postchain/eif/transaction/TransactionSubmitterException : java/lang/RuntimeException {
+	public static final field Companion Lnet/postchain/eif/transaction/TransactionSubmitterException$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Exception;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Exception;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getChainMessage ()Ljava/lang/String;
+}
+
+public final class net/postchain/eif/transaction/TransactionSubmitterException$Companion {
+	public final fun createChainAndLogException (Ljava/lang/String;Ljava/lang/Exception;)Lnet/postchain/eif/transaction/TransactionSubmitterException;
+}
+
+public final class net/postchain/eif/transaction/TransactionSubmitterGTXModule : net/postchain/gtx/SimpleGTXModule {
+	public fun <init> ()V
+	public fun getSpecialTxExtensions ()Ljava/util/List;
+	public fun initializeDB (Lnet/postchain/core/ExecutionContext;)V
+}
+
+public final class net/postchain/eif/transaction/TransactionSubmitterSpecialTxExtension : net/postchain/gtx/special/GTXBlockBuildingAffectingSpecialTxExtension {
+	public static final field Companion Lnet/postchain/eif/transaction/TransactionSubmitterSpecialTxExtension$Companion;
+	public static final field EVM_TX_NO_OP Ljava/lang/String;
+	public static final field FETCH_OLDEST_QUEUED_TRANSACTIONS_PER_CONTRACT Ljava/lang/String;
+	public static final field GET_PENDING_TRANSACTIONS Ljava/lang/String;
+	public static final field GET_TRANSACTION Ljava/lang/String;
+	public static final field GET_TRANSACTION_STATUS Ljava/lang/String;
+	public static final field SET_NODE_FAILURE_REASON Ljava/lang/String;
+	public static final field TRANSACTION_FAILURE_REASON_LENGTH_LIMIT I
+	public static final field UPDATE_EVM_TRANSACTION_RECEIPT Ljava/lang/String;
+	public static final field UPDATE_EVM_TRANSACTION_STATUS Ljava/lang/String;
+	public fun <init> ()V
+	public final fun addNewPendingTransactions (Lnet/postchain/core/BlockEContext;)V
+	public final fun addTransactionSubmitter (Lnet/postchain/eif/transaction/TransactionSubmitter;J)V
+	public fun blockCommitted (Lnet/postchain/core/block/BlockData;)V
+	public final fun buildTxReceiptOp (Lnet/postchain/eif/transaction/EvmPendingTx;)Lnet/postchain/gtx/data/OpData;
+	public final fun buildTxUpdateOp (JLnet/postchain/eif/transaction/RellTransactionStatus;Ljava/lang/String;)Lnet/postchain/gtx/data/OpData;
+	public static synthetic fun buildTxUpdateOp$default (Lnet/postchain/eif/transaction/TransactionSubmitterSpecialTxExtension;JLnet/postchain/eif/transaction/RellTransactionStatus;Ljava/lang/String;ILjava/lang/Object;)Lnet/postchain/gtx/data/OpData;
+	public fun createSpecialOperations (Lnet/postchain/base/SpecialTransactionPosition;Lnet/postchain/core/BlockEContext;)Ljava/util/List;
+	public fun getRelevantOps ()Ljava/util/Set;
+	public final fun getTransactionSubmitter (J)Lnet/postchain/eif/transaction/TransactionSubmitter;
+	public fun init (Lnet/postchain/gtx/GTXModule;JLnet/postchain/common/BlockchainRid;Lnet/postchain/crypto/CryptoSystem;)V
+	public fun needsSpecialTransaction (Lnet/postchain/base/SpecialTransactionPosition;)Z
+	public final fun setConfig (Lnet/postchain/crypto/SigMaker;[BLkotlin/jvm/functions/Function0;ZLnet/postchain/core/block/BlockQueries;)V
+	public fun shouldBuildBlock ()Z
+	public fun validateSpecialOperations (Lnet/postchain/base/SpecialTransactionPosition;Lnet/postchain/core/BlockEContext;Ljava/util/List;)Z
+	public final fun withTxPending (JLkotlin/jvm/functions/Function2;)Ljava/lang/Object;
+}
+
+public final class net/postchain/eif/transaction/TransactionSubmitterSpecialTxExtension$Companion : mu/KLogging {
+}
+
+public final class net/postchain/eif/transaction/TransactionSubmitterSynchronizationInfrastructureExtension : net/postchain/core/SynchronizationInfrastructureExtension {
+	public fun <init> (Lnet/postchain/PostchainContext;)V
+	public fun connectProcess (Lnet/postchain/core/BlockchainProcess;)V
+	public fun disconnectProcess (Lnet/postchain/core/BlockchainProcess;)V
+	public fun shutdown ()V
+}
+
+public final class net/postchain/eif/transaction/anchoring/EvmAnchoringSpecialTxExtension : net/postchain/gtx/special/GTXSpecialTxExtension {
+	public static final field ANCHOR_SYSTEM_ANCHORING_BLOCK_OP Ljava/lang/String;
+	public static final field Companion Lnet/postchain/eif/transaction/anchoring/EvmAnchoringSpecialTxExtension$Companion;
+	public static final field GET_CURRENT_EVM_SIGNER_LIST_QUERY Ljava/lang/String;
+	public static final field GET_PREVIOUSLY_ANCHORED_SYSTEM_ANCHORING_BLOCK_HEIGHT_QUERY Ljava/lang/String;
+	public static final field GET_SYSTEM_ANCHORING_BLOCKCHAIN_RID_QUERY Ljava/lang/String;
+	public static final field SHOULD_ANCHOR_SYSTEM_ANCHORING_BLOCK_QUERY Ljava/lang/String;
+	public field blockQueriesProvider Lnet/postchain/core/block/BlockQueriesProvider;
+	public fun <init> ()V
+	public fun createSpecialOperations (Lnet/postchain/base/SpecialTransactionPosition;Lnet/postchain/core/BlockEContext;)Ljava/util/List;
+	public final fun getBlockQueriesProvider ()Lnet/postchain/core/block/BlockQueriesProvider;
+	public fun getRelevantOps ()Ljava/util/Set;
+	public final fun getSystemAnchoringBrid ()Lnet/postchain/common/BlockchainRid;
+	public fun init (Lnet/postchain/gtx/GTXModule;JLnet/postchain/common/BlockchainRid;Lnet/postchain/crypto/CryptoSystem;)V
+	public fun needsSpecialTransaction (Lnet/postchain/base/SpecialTransactionPosition;)Z
+	public final fun setBlockQueriesProvider (Lnet/postchain/core/block/BlockQueriesProvider;)V
+	public final fun setSystemAnchoringBrid (Lnet/postchain/common/BlockchainRid;)V
+	public fun validateSpecialOperations (Lnet/postchain/base/SpecialTransactionPosition;Lnet/postchain/core/BlockEContext;Ljava/util/List;)Z
+}
+
+public final class net/postchain/eif/transaction/anchoring/EvmAnchoringSpecialTxExtension$Companion : mu/KLogging {
+}
+
+public final class net/postchain/eif/transaction/config/EvmTransactionSubmitterConfig {
+	public static final field Companion Lnet/postchain/eif/transaction/config/EvmTransactionSubmitterConfig$Companion;
+	public fun <init> (Ljava/util/List;JJJJJJLjava/lang/String;JJ)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component10 ()J
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun component4 ()J
+	public final fun component5 ()J
+	public final fun component6 ()J
+	public final fun component7 ()J
+	public final fun component8 ()Ljava/lang/String;
+	public final fun component9 ()J
+	public final fun copy (Ljava/util/List;JJJJJJLjava/lang/String;JJ)Lnet/postchain/eif/transaction/config/EvmTransactionSubmitterConfig;
+	public static synthetic fun copy$default (Lnet/postchain/eif/transaction/config/EvmTransactionSubmitterConfig;Ljava/util/List;JJJJJJLjava/lang/String;JJILjava/lang/Object;)Lnet/postchain/eif/transaction/config/EvmTransactionSubmitterConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public static final fun fromAppConfig (Ljava/lang/String;Lnet/postchain/config/app/AppConfig;)Lnet/postchain/eif/transaction/config/EvmTransactionSubmitterConfig;
+	public final fun getConnectTimeout ()J
+	public final fun getHealthCheckInterval ()J
+	public final fun getMaxRetryDelay ()J
+	public final fun getMaxTryErrors ()J
+	public final fun getMinRetryDelay ()J
+	public final fun getPrivateKey ()Ljava/lang/String;
+	public final fun getReadTimeout ()J
+	public final fun getTxPollInterval ()J
+	public final fun getUrls ()Ljava/util/List;
+	public final fun getWriteTimeout ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class net/postchain/eif/transaction/config/EvmTransactionSubmitterConfig$Companion {
+	public final fun fromAppConfig (Ljava/lang/String;Lnet/postchain/config/app/AppConfig;)Lnet/postchain/eif/transaction/config/EvmTransactionSubmitterConfig;
+}
+
+public final class net/postchain/eif/transaction/config/NetworkBlockchainConfig {
+	public fun <init> (JJJJLjava/math/BigDecimal;Ljava/math/BigDecimal;Ljava/math/BigDecimal;Ljava/math/BigDecimal;JJ)V
+	public final fun component1 ()J
+	public final fun component10 ()J
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun component4 ()J
+	public final fun component5 ()Ljava/math/BigDecimal;
+	public final fun component6 ()Ljava/math/BigDecimal;
+	public final fun component7 ()Ljava/math/BigDecimal;
+	public final fun component8 ()Ljava/math/BigDecimal;
+	public final fun component9 ()J
+	public final fun copy (JJJJLjava/math/BigDecimal;Ljava/math/BigDecimal;Ljava/math/BigDecimal;Ljava/math/BigDecimal;JJ)Lnet/postchain/eif/transaction/config/NetworkBlockchainConfig;
+	public static synthetic fun copy$default (Lnet/postchain/eif/transaction/config/NetworkBlockchainConfig;JJJJLjava/math/BigDecimal;Ljava/math/BigDecimal;Ljava/math/BigDecimal;Ljava/math/BigDecimal;JJILjava/lang/Object;)Lnet/postchain/eif/transaction/config/NetworkBlockchainConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBaseFeePerGasMargin ()Ljava/math/BigDecimal;
+	public final fun getCancelFeeMargin ()Ljava/math/BigDecimal;
+	public final fun getGasLimit ()J
+	public final fun getGasLimitMargin ()Ljava/math/BigDecimal;
+	public final fun getMaxGasPrice ()J
+	public final fun getMinWalletBalance ()J
+	public final fun getNetworkId ()J
+	public final fun getNodeTxVerificationEvmBlocks ()J
+	public final fun getPriorityFeePerGasMargin ()Ljava/math/BigDecimal;
+	public final fun getTxVerificationTime ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class net/postchain/eif/transaction/config/TransactionSubmitterBlockchainConfig {
+	public fun <init> (Ljava/util/Map;)V
+	public final fun component1 ()Ljava/util/Map;
+	public final fun copy (Ljava/util/Map;)Lnet/postchain/eif/transaction/config/TransactionSubmitterBlockchainConfig;
+	public static synthetic fun copy$default (Lnet/postchain/eif/transaction/config/TransactionSubmitterBlockchainConfig;Ljava/util/Map;ILjava/lang/Object;)Lnet/postchain/eif/transaction/config/TransactionSubmitterBlockchainConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getChains ()Ljava/util/Map;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class net/postchain/eif/transaction/gas/EIP1559FeeEstimator {
+	public abstract fun getBaseFeePerGas ()Ljava/math/BigInteger;
+	public abstract fun getBlockNumber ()Ljava/math/BigInteger;
+	public abstract fun getEstimatedGasLimit ()Ljava/math/BigInteger;
+	public abstract fun getEstimatedGasUsage ()Ljava/math/BigInteger;
+	public abstract fun getEstimatedTotalGasFee ()Ljava/math/BigInteger;
+	public abstract fun getMaxFeePerGas ()Ljava/math/BigInteger;
+	public abstract fun getMaxPriorityFeePerGas ()Ljava/math/BigInteger;
+	public abstract fun validateRequestFees (Lnet/postchain/eif/transaction/EvmSubmitTxRequest;)V
+}
+
+public class net/postchain/eif/transaction/gas/EIP1559FeeEstimatorFactory {
+	public fun <init> (Lnet/postchain/eif/web3j/Web3jRequestHandler;Ljava/math/BigInteger;Ljava/math/BigInteger;Ljava/math/BigDecimal;Ljava/math/BigDecimal;Ljava/math/BigDecimal;)V
+	public fun createEstimate (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/math/BigInteger;Ljava/math/BigInteger;)Lnet/postchain/eif/transaction/gas/EIP1559FeeEstimator;
+	public fun getBaseFeePerGasMargin ()Ljava/math/BigDecimal;
+	public fun getGasLimit ()Ljava/math/BigInteger;
+	public fun getGasLimitMargin ()Ljava/math/BigDecimal;
+	public fun getMaxGasPrice ()Ljava/math/BigInteger;
+	public fun getPriorityFeePerGasMargin ()Ljava/math/BigDecimal;
+}
+
+public final class net/postchain/eif/transaction/gas/EIP1559LastBlockFeeEstimator : net/postchain/eif/transaction/gas/EIP1559FeeEstimator {
+	public fun <init> (Lnet/postchain/eif/web3j/Web3jRequestHandler;Ljava/math/BigInteger;Ljava/math/BigInteger;Ljava/math/BigDecimal;Ljava/math/BigDecimal;Ljava/math/BigDecimal;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/math/BigInteger;Ljava/math/BigInteger;)V
+	public fun getBaseFeePerGas ()Ljava/math/BigInteger;
+	public fun getBlockNumber ()Ljava/math/BigInteger;
+	public fun getEstimatedGasLimit ()Ljava/math/BigInteger;
+	public fun getEstimatedGasUsage ()Ljava/math/BigInteger;
+	public fun getEstimatedTotalGasFee ()Ljava/math/BigInteger;
+	public fun getMaxFeePerGas ()Ljava/math/BigInteger;
+	public fun getMaxPriorityFeePerGas ()Ljava/math/BigInteger;
+	public fun toString ()Ljava/lang/String;
+	public fun validateRequestFees (Lnet/postchain/eif/transaction/EvmSubmitTxRequest;)V
+}
+
+public final class net/postchain/eif/transaction/signerupdate/BlockSignature {
+	public fun <init> ([B[B)V
+	public final fun component1 ()[B
+	public final fun component2 ()[B
+	public final fun copy ([B[B)Lnet/postchain/eif/transaction/signerupdate/BlockSignature;
+	public static synthetic fun copy$default (Lnet/postchain/eif/transaction/signerupdate/BlockSignature;[B[BILjava/lang/Object;)Lnet/postchain/eif/transaction/signerupdate/BlockSignature;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSignature ()[B
+	public final fun getSubjectID ()[B
+	public fun hashCode ()I
+	public final fun toEifSignature ([B)Lnet/postchain/eif/merkle/EifSignature;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class net/postchain/eif/transaction/signerupdate/EvmSignerUpdate {
+	public fun <init> (JJ[B[BJZ)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun component3 ()[B
+	public final fun component4 ()[B
+	public final fun component5 ()J
+	public final fun component6 ()Z
+	public final fun copy (JJ[B[BJZ)Lnet/postchain/eif/transaction/signerupdate/EvmSignerUpdate;
+	public static synthetic fun copy$default (Lnet/postchain/eif/transaction/signerupdate/EvmSignerUpdate;JJ[B[BJZILjava/lang/Object;)Lnet/postchain/eif/transaction/signerupdate/EvmSignerUpdate;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBlockchainRid ()[B
+	public final fun getConfirmedInDirectoryAtHeight ()J
+	public final fun getHistorical ()Z
+	public final fun getRowId ()J
+	public final fun getSerial ()J
+	public final fun getSigners ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class net/postchain/eif/transaction/signerupdate/EvmSignerUpdateBlockWitnessFetcher : net/postchain/core/Shutdownable {
+	public static final field Companion Lnet/postchain/eif/transaction/signerupdate/EvmSignerUpdateBlockWitnessFetcher$Companion;
+	public fun <init> (Lnet/postchain/core/block/BlockQueriesProvider;Lnet/postchain/common/BlockchainRid;Lnet/postchain/base/BlockWitnessProvider;[B)V
+	public final fun fetchMissingWitnessesForBlock (Lnet/postchain/eif/transaction/signerupdate/EvmSignerUpdate;Ljava/util/List;Ljava/util/List;)V
+	public final fun getWitnessJobResult (J)Ljava/util/List;
+	public final fun hasWitnessJob (J)Z
+	public final fun removeAllWitnessJobs ()V
+	public final fun removeWitnessJob (J)Ljava/lang/Boolean;
+	public fun shutdown ()V
+}
+
+public final class net/postchain/eif/transaction/signerupdate/EvmSignerUpdateBlockWitnessFetcher$Companion : mu/KLogging {
+}
+
+public final class net/postchain/eif/transaction/signerupdate/EvmSignerUpdateSpecialTxExtension : net/postchain/gtx/special/GTXSpecialTxExtension {
+	public static final field CURRENT_EVM_SIGNERS_QUERY Ljava/lang/String;
+	public static final field Companion Lnet/postchain/eif/transaction/signerupdate/EvmSignerUpdateSpecialTxExtension$Companion;
+	public static final field ENQUEUE_SIGNER_UPDATE_TRANSACTION_OP Ljava/lang/String;
+	public static final field GET_QUEUED_SIGNER_UPDATES_QUERY Ljava/lang/String;
+	public static final field IS_CHAIN_UPDATABLE_AT_HEIGHT_QUERY Ljava/lang/String;
+	public static final field LATEST_UPDATE_STATUS_QUERY Ljava/lang/String;
+	public field blockQueriesProvider Lnet/postchain/core/block/BlockQueriesProvider;
+	public field directoryChainBrid Lnet/postchain/common/BlockchainRid;
+	public field witnessFetcher Lnet/postchain/eif/transaction/signerupdate/EvmSignerUpdateBlockWitnessFetcher;
+	public fun <init> ()V
+	public fun createSpecialOperations (Lnet/postchain/base/SpecialTransactionPosition;Lnet/postchain/core/BlockEContext;)Ljava/util/List;
+	public final fun getBlockQueriesProvider ()Lnet/postchain/core/block/BlockQueriesProvider;
+	public final fun getDirectoryChainBrid ()Lnet/postchain/common/BlockchainRid;
+	public fun getRelevantOps ()Ljava/util/Set;
+	public final fun getWitnessFetcher ()Lnet/postchain/eif/transaction/signerupdate/EvmSignerUpdateBlockWitnessFetcher;
+	public fun init (Lnet/postchain/gtx/GTXModule;JLnet/postchain/common/BlockchainRid;Lnet/postchain/crypto/CryptoSystem;)V
+	public fun needsSpecialTransaction (Lnet/postchain/base/SpecialTransactionPosition;)Z
+	public final fun setBlockQueriesProvider (Lnet/postchain/core/block/BlockQueriesProvider;)V
+	public final fun setDirectoryChainBrid (Lnet/postchain/common/BlockchainRid;)V
+	public final fun setWitnessFetcher (Lnet/postchain/eif/transaction/signerupdate/EvmSignerUpdateBlockWitnessFetcher;)V
+	public fun validateSpecialOperations (Lnet/postchain/base/SpecialTransactionPosition;Lnet/postchain/core/BlockEContext;Ljava/util/List;)Z
+}
+
+public final class net/postchain/eif/transaction/signerupdate/EvmSignerUpdateSpecialTxExtension$Companion : mu/KLogging {
+}
+
+public final class net/postchain/eif/transaction/signerupdate/EvmTypeEncoder {
+	public static final field INSTANCE Lnet/postchain/eif/transaction/signerupdate/EvmTypeEncoder;
+	public final fun decodeExtraMerkleProof ([B)Lnet/postchain/eif/merkle/ExtraMerkleProof;
+	public final fun decodeProof ([B)Lnet/postchain/eif/merkle/Proof;
+	public final fun encodeExtraMerkleProof (Lnet/postchain/eif/merkle/ExtraMerkleProof;)[B
+	public final fun encodeProof (Lnet/postchain/eif/merkle/Proof;)[B
+	public final fun encodeSignerUpdateEvent (J[BLjava/util/List;)[B
+}
+
+public final class net/postchain/eif/transaction/signerupdate/ExtraMerkleProofStruct : org/web3j/abi/datatypes/DynamicStruct {
+	public fun <init> (Lorg/web3j/abi/datatypes/DynamicBytes;Lorg/web3j/abi/datatypes/generated/Bytes32;Lorg/web3j/abi/datatypes/Uint;Lorg/web3j/abi/datatypes/generated/Bytes32;Lorg/web3j/abi/datatypes/DynamicArray;)V
+	public final fun getExtraMerkleProofs ()Lorg/web3j/abi/datatypes/DynamicArray;
+	public final fun getExtraRoot ()Lorg/web3j/abi/datatypes/generated/Bytes32;
+	public final fun getHashedLeaf ()Lorg/web3j/abi/datatypes/generated/Bytes32;
+	public final fun getLeaf ()Lorg/web3j/abi/datatypes/DynamicBytes;
+	public final fun getPosition ()Lorg/web3j/abi/datatypes/Uint;
+}
+
+public final class net/postchain/eif/transaction/signerupdate/ProofStruct : org/web3j/abi/datatypes/DynamicStruct {
+	public fun <init> (Lorg/web3j/abi/datatypes/generated/Bytes32;Lorg/web3j/abi/datatypes/Uint;Lorg/web3j/abi/datatypes/DynamicArray;)V
+	public final fun getLeaf ()Lorg/web3j/abi/datatypes/generated/Bytes32;
+	public final fun getPosition ()Lorg/web3j/abi/datatypes/Uint;
+	public final fun getProofs ()Lorg/web3j/abi/datatypes/DynamicArray;
+}
+
+public final class net/postchain/eif/transaction/signerupdate/directorychain/EvmSignerUpdateBlockBuilderExtension : net/postchain/base/BaseBlockBuilderExtension, net/postchain/base/TxEventSink {
+	public static final field Companion Lnet/postchain/eif/transaction/signerupdate/directorychain/EvmSignerUpdateBlockBuilderExtension$Companion;
+	public static final field SIGNER_LIST_UPDATE_EVENT Ljava/lang/String;
+	public static final field SIGNER_LIST_UPDATE_EXTRA_HEADER Ljava/lang/String;
+	public static final field SIGNER_LIST_UPDATE_TABLE_PREFIX Ljava/lang/String;
+	public fun <init> (Lnet/postchain/base/snapshot/DigestSystem;I)V
+	public fun finalize ()Ljava/util/Map;
+	public fun init (Lnet/postchain/core/BlockEContext;Lnet/postchain/base/data/BaseBlockBuilder;)V
+	public fun processEmittedEvent (Lnet/postchain/core/TxEContext;Ljava/lang/String;Lnet/postchain/gtv/Gtv;)V
+}
+
+public final class net/postchain/eif/transaction/signerupdate/directorychain/EvmSignerUpdateBlockBuilderExtension$Companion {
+}
+
+public final class net/postchain/eif/transaction/signerupdate/directorychain/SignerUpdateGTXModule : net/postchain/gtx/SimpleGTXModule, net/postchain/gtx/MetadataProvider {
+	public static final field Companion Lnet/postchain/eif/transaction/signerupdate/directorychain/SignerUpdateGTXModule$Companion;
+	public static final field LEVELS_PER_PAGE I
+	public static final field SIGNER_LIST_UPDATE_PROOF_QUERY Ljava/lang/String;
+	public fun <init> ()V
+	public fun getMetadata ()Lnet/postchain/gtx/GTXModuleMetadata;
+	public fun initializeDB (Lnet/postchain/core/ExecutionContext;)V
+	public fun makeBlockBuilderExtensions ()Ljava/util/List;
+}
+
+public final class net/postchain/eif/transaction/signerupdate/directorychain/SignerUpdateGTXModule$Companion {
+}
+
+public final class net/postchain/eif/transaction/signerupdate/directorychain/SignerUpdateGTXModuleKt {
+	public static final fun signerListUpdateProofQuery (Lnet/postchain/core/ExecutionContext;Lnet/postchain/gtv/Gtv;)Lnet/postchain/gtv/Gtv;
+}
+
+public class net/postchain/eif/web3j/Web3jRawTransactionHandler {
+	public fun <init> (Ljava/util/Map;)V
+	public fun <init> (Ljava/util/Map;Ljava/lang/String;)V
+	public fun getFromAddress ()Ljava/lang/String;
+	public fun sendWeb3jTransaction (JLkotlin/jvm/functions/Function1;)Lorg/web3j/protocol/core/methods/response/EthSendTransaction;
+}
+
+public class net/postchain/eif/web3j/Web3jRequestHandler : java/io/Closeable {
+	public static final field Companion Lnet/postchain/eif/web3j/Web3jRequestHandler$Companion;
+	public static final field DELAY_POWER_BASE D
+	public fun <init> (JJJLjava/util/List;Ljava/util/List;Lnet/postchain/eif/metrics/RpcUsageMetrics;)V
+	public synthetic fun <init> (JJJLjava/util/List;Ljava/util/List;Lnet/postchain/eif/metrics/RpcUsageMetrics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun close ()V
+	public fun ethBlockNumber ()Lorg/web3j/protocol/core/methods/response/EthBlockNumber;
+	public fun ethEstimateGas (Lorg/web3j/protocol/core/methods/request/Transaction;)Lorg/web3j/protocol/core/methods/response/EthEstimateGas;
+	public fun ethGetBalance (Ljava/lang/String;Lorg/web3j/protocol/core/DefaultBlockParameter;)Lorg/web3j/protocol/core/methods/response/EthGetBalance;
+	public fun ethGetBlockByNumber (Lorg/web3j/protocol/core/DefaultBlockParameter;Z)Lorg/web3j/protocol/core/methods/response/EthBlock;
+	public fun ethGetTransactionByHash (Ljava/lang/String;)Lorg/web3j/protocol/core/methods/response/EthTransaction;
+	public fun ethGetTransactionReceipt (Ljava/lang/String;)Lorg/web3j/protocol/core/methods/response/EthGetTransactionReceipt;
+	public fun ethMaxPriorityFeePerGas ()Lorg/web3j/protocol/core/methods/response/EthMaxPriorityFeePerGas;
+	public fun sendWeb3jRequest (Lkotlin/jvm/functions/Function1;)Lorg/web3j/protocol/core/Response;
+	public final fun sendWeb3jRequestWithRetry (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class net/postchain/eif/web3j/Web3jRequestHandler$Companion : mu/KLogging {
+}
+
+public final class net/postchain/eif/web3j/Web3jServiceFactory {
+	public static final field INSTANCE Lnet/postchain/eif/web3j/Web3jServiceFactory;
+	public final fun buildServices (Ljava/util/List;JJJLnet/postchain/common/BlockchainRid;)Ljava/util/List;
+	public final fun buildServicesMap (Ljava/util/List;JJJLnet/postchain/common/BlockchainRid;)Ljava/util/Map;
+}
+
