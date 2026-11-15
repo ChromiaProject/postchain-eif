@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.Address
+import org.web3j.abi.datatypes.DynamicArray
 import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.tx.Contract
@@ -64,7 +65,13 @@ class EvmSignerUpdateIT : EifBaseIntegrationTest() {
         txSubmitterChain = startNewBlockchain(setOf(0), setOf(), rawBlockchainConfiguration = GtvEncoder.encodeGtv(txSubmitterConfig))
 
         // Deploy directory chain validator contract
-        val encodedDirectoryValidatorConstructor = FunctionEncoder.encodeConstructor(listOf(Bytes32(directoryChainBrid.data)))
+        val initialValidators = DynamicArray(
+                Address::class.java,
+                listOf(Address(getEthereumAddress(node.appConfig.pubKeyByteArray).toHex()))
+        )
+        val encodedDirectoryValidatorConstructor = FunctionEncoder.encodeConstructor(
+                listOf(Bytes32(directoryChainBrid.data), initialValidators)
+        )
         val directoryChainValidatorBinary = getBinaryFromArtifactResource("/net/postchain/eif/contracts/DirectoryChainValidator.bin")
         directoryValidatorContract = Contract.deployRemoteCall(DirectoryChainValidator::class.java, web3j, transactionManager, gasProvider, directoryChainValidatorBinary, encodedDirectoryValidatorConstructor).send()
 

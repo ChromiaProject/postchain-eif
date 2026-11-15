@@ -55,10 +55,7 @@ abstract contract BaseManagedValidator is IManagedValidator {
         if (validatorUpdate.serial <= previousUpdateSerial) revert("Update validators: proof is older or same as previous update");
 
         if (!MerkleProof.verify(proof.merkleProofs, proof.leaf, proof.position, validatorUpdateRoot)) revert("Update validators: invalid merkle proof");
-        // Skip signature validation for first directory chain update
-        if (blockchainRid != _directoryBlockchainRid() || validators.length > 0) {
-            if (!_validateUpdateSignatures(blockRid, signatures, signers)) revert("Update validators: block signature is invalid");
-        }
+        if (!_validateUpdateSignatures(blockRid, signatures, signers)) revert("Update validators: block signature is invalid");
 
         previousUpdateHeight = height;
         previousUpdateSerial = validatorUpdate.serial;

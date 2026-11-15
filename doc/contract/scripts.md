@@ -15,7 +15,7 @@ This document describes all available scripts in the `postchain-eif-contracts` p
 ## Validator Deployment Scripts
 
 - **deploy:validator**: Deploys a Validator contract or a ManagedValidator contract depending on the parameters
-- **deploy:directoryValidator**: Deploys the DirectoryChainValidator contract
+- **deploy:directoryValidator**: Deploys the DirectoryChainValidator contract with a required comma-separated initial validator set
 - **deploy:anchoring**: Deploys a ManagedValidator contract and an Anchoring contract for the chain specified by the blockchain RID
 - **inspect:validator**: Inspects the deployed Validator contract
 - **inspect:managedValidator**: Inspects the deployed ManagedValidator contract

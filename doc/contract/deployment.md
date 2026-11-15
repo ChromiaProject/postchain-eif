@@ -55,7 +55,7 @@ $ yarn deploy:validator --network sepolia --verify --directory-validator {DIRECT
 For directory chain validator (if you have deployed your own Chromia network):
 
 ```sh
-$ yarn deploy:directoryValidator --network sepolia --verify --blockchain-rid {DIRECTORY_CHAIN_RID}
+$ yarn deploy:directoryValidator --network sepolia --verify --blockchain-rid {DIRECTORY_CHAIN_RID} --validators "{INITIAL_VALIDATOR_1},{INITIAL_VALIDATOR_2}"
 ```
 
 Note: If you want to inspect the validator contract, you can use the following commands:
