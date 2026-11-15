@@ -201,13 +201,19 @@ contract TokenBridgeV4 is Initializable, PausableUpgradeable, Ownable2StepUpgrad
         return addr.code.length > 0;
     }
 
+    function isDelegatedEOA(address addr) internal view returns (bool) {
+        // EIP-7702 delegation designator: 0xef0100 || address (23 bytes). EIP-3541 forbids deploying 0xEF-prefixed code.
+        bytes memory code = addr.code;
+        return code.length == 23 && code[0] == 0xef && code[1] == 0x01 && code[2] == 0x00;
+    }
+
     modifier onlyContract() {
         require(isContract(msg.sender), "TokenBridge: only contract can call this function");
         _;
     }
 
     modifier onlyEOA() {
-        require(!isContract(msg.sender), "TokenBridge: only EOA can call this function");
+        require(!isContract(msg.sender) || isDelegatedEOA(msg.sender), "TokenBridge: only EOA can call this function");
         _;
     }
 

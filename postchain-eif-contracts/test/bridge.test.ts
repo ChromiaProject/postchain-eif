@@ -30,6 +30,34 @@ const { expect } = chai;
 const WITHDRAW_TIME_OFFSET = 10000;
 const EIF_HEADER_KEY_HASH = hashGtvStringLeaf("eif");
 
+const withCodeAccount = async (
+    code: string,
+    run: (address: string, signer: SignerWithAddress) => Promise<void>
+) => {
+    const address = ethers.Wallet.createRandom().address;
+    await network.provider.request({
+        method: "hardhat_setCode",
+        params: [address, code],
+    });
+    await network.provider.request({
+        method: "hardhat_setBalance",
+        params: [address, ethers.toQuantity(ethers.parseEther("10"))],
+    });
+    await network.provider.request({
+        method: "hardhat_impersonateAccount",
+        params: [address],
+    });
+
+    try {
+        await run(address, await ethers.getSigner(address));
+    } finally {
+        await network.provider.request({
+            method: "hardhat_stopImpersonatingAccount",
+            params: [address],
+        });
+    }
+};
+
 describe("Token Bridge Test", () => {
 
     let tokenContract: TestToken;
@@ -170,6 +198,62 @@ describe("Token Bridge Test", () => {
             expect(await tokenInstance.balanceOf(bridgeAddress)).to.eq(toDeposit);
             expect(await tokenInstance.balanceOf(user.address)).to.eq(toMint - toDeposit);
         })
+
+        it("EIP-7702 delegated EOA can deposit ERC20 token", async () => {
+            const toDeposit = ethers.parseEther("1");
+
+            await withCodeAccount(`0xef0100${bridgeAddress.slice(2)}`, async (address, signer) => {
+                await tokenContract.mint(address, toDeposit);
+                await tokenContract.connect(signer).approve(bridgeAddress, toDeposit);
+
+                await expect(bridgeContract.connect(signer).deposit(tokenAddress, toDeposit))
+                    .to.emit(bridgeContract, "DepositedERC20")
+                    .withArgs(address, tokenAddress, toDeposit, ethers.ZeroHash);
+            });
+        });
+
+        it("EIP-7702 delegated EOA can deposit through TokenBridgeV4", async () => {
+            const [deployer] = await ethers.getSigners();
+            const bridgeV4Factory = await ethers.getContractFactory("TokenBridgeV4", deployer);
+            const bridgeV4 = await bridgeV4Factory.deploy();
+            await bridgeV4.waitForDeployment();
+            await bridgeV4.initialize(await validatorContract.getAddress(), WITHDRAW_TIME_OFFSET);
+            const bridgeV4Address = await bridgeV4.getAddress();
+            await bridgeV4.allowToken(tokenAddress);
+            const toDeposit = ethers.parseEther("1");
+
+            await withCodeAccount(`0xef0100${bridgeV4Address.slice(2)}`, async (address, signer) => {
+                await tokenContract.mint(address, toDeposit);
+                await tokenContract.connect(signer).approve(bridgeV4Address, toDeposit);
+
+                await expect(bridgeV4.connect(signer).deposit(tokenAddress, toDeposit))
+                    .to.emit(bridgeV4, "DepositedERC20")
+                    .withArgs(address, tokenAddress, toDeposit, ethers.ZeroHash);
+            });
+        });
+
+        it("contract caller cannot deposit ERC20 token through the EOA path", async () => {
+            const toDeposit = ethers.parseEther("1");
+
+            await tokenContract.mint(bridgeDelegatorAddress, toDeposit);
+            await tokenBridgeDelegatorContract.approve(tokenAddress, bridgeAddress, toDeposit);
+
+            await expect(tokenBridgeDelegatorContract.deposit(tokenAddress, toDeposit))
+                .to.be.rejectedWith("TokenBridge: only EOA can call this function");
+        });
+
+        it("arbitrary 23-byte code cannot deposit ERC20 token through the EOA path", async () => {
+            const toDeposit = ethers.parseEther("1");
+
+            await withCodeAccount(`0x60${"00".repeat(22)}`, async (address, signer) => {
+                await tokenContract.mint(address, toDeposit);
+                await tokenContract.connect(signer).approve(bridgeAddress, toDeposit);
+
+                await expect(bridgeContract.connect(signer).deposit(tokenAddress, toDeposit))
+                    .to.be.rejectedWith("TokenBridge: only EOA can call this function");
+            });
+        });
+
     });
 
     describe("Withdraw tests", async () => {
@@ -935,4 +1019,3 @@ describe("Token Bridge Test", () => {
         });
     })
 });
-
