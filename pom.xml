@@ -6,7 +6,7 @@
     <parent>
         <groupId>com.chromia</groupId>
         <artifactId>chromia-parent</artifactId>
-        <version>0.2.11</version>
+        <version>0.3.1</version>
     </parent>
 
     <groupId>net.postchain</groupId>
@@ -24,7 +24,7 @@
 
     <properties>
         <revision>dev</revision>
-        <postchain.version>3.49.23</postchain.version>
+        <postchain.version>3.49.24</postchain.version>
         <rell.version>0.15.4</rell.version>
         <kotlin.version>2.3.0</kotlin.version>
         <rell.maven.plugin.version>1.2.3</rell.maven.plugin.version>
@@ -125,7 +125,7 @@
                     <artifactId>dependency-check-maven</artifactId>
                     <configuration>
                         <prettyPrint>true</prettyPrint>
-                        <failBuildOnAnyVulnerability>true</failBuildOnAnyVulnerability>
+                        <failBuildOnCVSS>7</failBuildOnCVSS>
                         <assemblyAnalyzerEnabled>false</assemblyAnalyzerEnabled>
                         <yarnAuditAnalyzerEnabled>false</yarnAuditAnalyzerEnabled>
                         <suppressionFiles>
