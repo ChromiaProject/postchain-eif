@@ -466,8 +466,8 @@ public final class net/postchain/eif/config/EifEvmChainConfig {
 	public final fun getContracts ()Ljava/util/List;
 	public final fun getContractsToFetch ()Ljava/util/List;
 	public final fun getEvents ()Lnet/postchain/gtv/Gtv;
-	public final fun getEvmReadOffset ()J
 	public final fun getEvmHeadBlockTag ()Ljava/lang/String;
+	public final fun getEvmReadOffset ()J
 	public final fun getNetworkId ()J
 	public final fun getRawGtv ()Lnet/postchain/gtv/Gtv;
 	public final fun getReadOffset ()J
@@ -1223,3 +1223,4 @@ public final class net/postchain/eif/web3j/Web3jServiceFactory {
 	public final fun buildServices (Ljava/util/List;JJJLnet/postchain/common/BlockchainRid;)Ljava/util/List;
 	public final fun buildServicesMap (Ljava/util/List;JJJLnet/postchain/common/BlockchainRid;)Ljava/util/Map;
 }
+
