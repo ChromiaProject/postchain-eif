@@ -34,10 +34,13 @@ import org.mockito.kotlin.verify
 import org.web3j.abi.EventEncoder
 import org.web3j.abi.datatypes.Event
 import org.web3j.protocol.Web3j
+import org.web3j.protocol.core.DefaultBlockParameter
+import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.DefaultBlockParameterNumber
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.Response
 import org.web3j.protocol.core.methods.request.EthFilter
+import org.web3j.protocol.core.methods.response.EthBlock
 import org.web3j.protocol.core.methods.response.EthBlockNumber
 import org.web3j.protocol.core.methods.response.EthLog
 import java.time.Clock
@@ -1009,6 +1012,95 @@ class EvmEventFetcherTest {
         }
     }
 
+    @Test
+    fun `uses eth_blockNumber for the default latest head`() {
+        val rig = createRig(
+                contracts = listOf(contract1Low),
+                headHeight = 500L,
+        )
+
+        await.atMost(Duration.TEN_SECONDS).untilAsserted {
+            assertThat(rig.filters.isNotEmpty()).isTrue()
+        }
+
+        assertThat(rig.ethBlockNumberRequests.get()).isGreaterThan(0)
+        assertThat(rig.headBlockParameters.size).isEqualTo(0)
+    }
+
+    @Test
+    fun `finalized head bounds event query after evm read offset`() {
+        val finalizedHeight = 500L
+        val evmReadOffset = 7L
+        val rig = createRig(
+                contracts = listOf(contract1Low),
+                headHeight = 10_000L,
+                maxReadAhead = 1_000L,
+                evmReadOffset = evmReadOffset,
+                evmHeadBlockTag = "finalized",
+                finalizedHeadHeight = finalizedHeight,
+        )
+
+        await.atMost(Duration.TEN_SECONDS).untilAsserted {
+            assertThat(rig.filters.isNotEmpty()).isTrue()
+        }
+
+        assertThat(rig.headBlockParameters.first()).isEqualTo(DefaultBlockParameterName.FINALIZED)
+        assertThat(rig.ethBlockNumberRequests.get()).isEqualTo(0)
+        assertThat(rig.filters.first().second).isEqualTo(finalizedHeight - evmReadOffset)
+        assertThat(rig.eventFetcher.lastSeenEvmHeadHeight).isEqualTo(finalizedHeight.toBigInteger())
+    }
+
+    @Test
+    fun `missing finalized block skips log fetching`() {
+        val rig = createRig(
+                contracts = listOf(contract1Low),
+                headHeight = 500L,
+                evmHeadBlockTag = "finalized",
+                finalizedBlockMissing = true,
+        )
+
+        await.atMost(Duration.TEN_SECONDS).untilAsserted {
+            assertThat(rig.pacingDelays.isNotEmpty()).isTrue()
+        }
+
+        assertThat(rig.filters.isEmpty()).isTrue()
+        assertThat(rig.ethBlockNumberRequests.get()).isEqualTo(0)
+    }
+
+    @Test
+    fun `errored finalized response skips log fetching`() {
+        val rig = createRig(
+                contracts = listOf(contract1Low),
+                headHeight = 500L,
+                evmHeadBlockTag = "finalized",
+                finalizedBlockError = true,
+        )
+
+        await.atMost(Duration.TEN_SECONDS).untilAsserted {
+            assertThat(rig.pacingDelays.isNotEmpty()).isTrue()
+        }
+
+        assertThat(rig.filters.isEmpty()).isTrue()
+        assertThat(rig.ethBlockNumberRequests.get()).isEqualTo(0)
+    }
+
+    @Test
+    fun `finalized request exception skips log fetching`() {
+        val rig = createRig(
+                contracts = listOf(contract1Low),
+                headHeight = 500L,
+                evmHeadBlockTag = "finalized",
+                finalizedRpcFailure = true,
+        )
+
+        await.atMost(Duration.TEN_SECONDS).untilAsserted {
+            assertThat(rig.pacingDelays.isNotEmpty()).isTrue()
+        }
+
+        assertThat(rig.filters.isEmpty()).isTrue()
+        assertThat(rig.ethBlockNumberRequests.get()).isEqualTo(0)
+    }
+
     private class MutableClock(startMillis: Long) : Clock() {
         private val now = AtomicLong(startMillis)
 
@@ -1039,6 +1131,8 @@ class EvmEventFetcherTest {
             val eventProcessor: EvmEventProcessor,
             val store: RecordingEvmReadCursorStore,
             val headHeight: AtomicLong,
+            val ethBlockNumberRequests: AtomicLong,
+            val headBlockParameters: CopyOnWriteArrayList<DefaultBlockParameter>,
             /** from/to of every eth_getLogs request, in order */
             val filters: CopyOnWriteArrayList<Pair<Long, Long>>,
             /** every pacing delay requested by the fetcher, in order */
@@ -1056,6 +1150,12 @@ class EvmEventFetcherTest {
             headHeight: Long,
             headAdvancesPerPoll: Boolean = false,
             maxReadAhead: Long = 100L,
+            evmReadOffset: Long = 0L,
+            evmHeadBlockTag: String = "latest",
+            finalizedHeadHeight: Long? = null,
+            finalizedBlockMissing: Boolean = false,
+            finalizedBlockError: Boolean = false,
+            finalizedRpcFailure: Boolean = false,
             delayWhenNoNewBlocks: Long = 100L,
             getLogsLatency: Long = 0L,
             ignoreReadCursorBelow: Long = 0L,
@@ -1087,13 +1187,28 @@ class EvmEventFetcherTest {
         val ethLog = mock<EthLog>(stubOnly = true) {
             on { logs } doAnswer { pendingLogs.getAndSet(emptyList()) }
         }
+        val finalizedBlock = mock<EthBlock.Block>(stubOnly = true) {
+            on { number } doReturn (finalizedHeadHeight ?: headHeight).toBigInteger()
+        }
+        val finalizedBlockResponse = mock<EthBlock>(stubOnly = true) {
+            on { hasError() } doReturn finalizedBlockError
+            on { block } doReturn if (finalizedBlockMissing) null else finalizedBlock
+        }
         val filters = CopyOnWriteArrayList<Pair<Long, Long>>()
+        val ethBlockNumberRequests = AtomicLong()
+        val headBlockParameters = CopyOnWriteArrayList<DefaultBlockParameter>()
         val ethBlockNumberRequest = Request<String, EthBlockNumber>("eth_blockNumber", emptyList(), mock(), EthBlockNumber::class.java)
+        val ethGetBlockByNumberRequest = Request<String, EthBlock>("eth_getBlockByNumber", emptyList(), mock(), EthBlock::class.java)
         val ethGetLogsRequest = Request<String, EthLog>("eth_getLogs", emptyList(), mock(), EthLog::class.java)
         val web3j: Web3j = mock(stubOnly = true) {
             on { ethBlockNumber() } doAnswer {
+                ethBlockNumberRequests.incrementAndGet()
                 if (headAdvancesPerPoll) head.incrementAndGet()
                 ethBlockNumberRequest
+            }
+            on { ethGetBlockByNumber(any(), any()) } doAnswer { invocation ->
+                headBlockParameters.add(invocation.arguments[0] as DefaultBlockParameter)
+                ethGetBlockByNumberRequest
             }
             on { ethGetLogs(any()) } doAnswer { invocation ->
                 val filter = invocation.arguments[0] as EthFilter
@@ -1109,6 +1224,10 @@ class EvmEventFetcherTest {
                 val request = requestFunc.invoke(web3j)
                 when (request.method) {
                     "eth_blockNumber" -> blockNumber
+                    "eth_getBlockByNumber" -> {
+                        if (finalizedRpcFailure) throw IllegalStateException("finalized RPC failure")
+                        finalizedBlockResponse
+                    }
                     "eth_getLogs" -> ethLog
                     else -> mock()
                 }
@@ -1133,7 +1252,7 @@ class EvmEventFetcherTest {
                 hasDynamicContacts = true,
                 staticEvents = emptyList(),
                 hasDynamicEvents = true,
-                evmReadOffset = 0.toBigInteger(),
+                evmReadOffset = evmReadOffset.toBigInteger(),
                 maxReadAhead = maxReadAhead,
                 networkSkipToHeight = networkSkipToHeight,
                 blockchainEngine = blockchainEngine,
@@ -1147,9 +1266,10 @@ class EvmEventFetcherTest {
                 cursorPersistInterval = 0L,
                 clock = clock,
                 pacingDelay = { pacingDelays.add(it); delay(10) },
+                evmHeadBlockTag = evmHeadBlockTag,
         ).also(fetchers::add)
 
-        return Rig(eventFetcher, eventProcessor, store, head, filters, pacingDelays, clock, pendingLogs)
+        return Rig(eventFetcher, eventProcessor, store, head, ethBlockNumberRequests, headBlockParameters, filters, pacingDelays, clock, pendingLogs)
     }
 
     @Suppress("UNCHECKED_CAST", "SameParameterValue")

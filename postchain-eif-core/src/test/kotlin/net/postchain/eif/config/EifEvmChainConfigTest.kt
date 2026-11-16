@@ -16,6 +16,7 @@ class EifEvmChainConfigTest {
                 "contracts" to gtv(gtv("ee"), gtv("0xff")),
         ), EifEvmChainConfig::class.java)
         assertThat(eifConfig.contracts?.map { it.toHex() }).isEqualTo(listOf("EE", "FF"))
+        assertThat(eifConfig.evmHeadBlockTag).isEqualTo("latest")
 
         val contractConfig = GtvObjectMapper.fromGtv(
                 gtv(

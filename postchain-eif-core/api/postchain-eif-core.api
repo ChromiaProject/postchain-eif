@@ -292,8 +292,8 @@ public final class net/postchain/eif/EvmBlockOp$Companion : mu/KLogging {
 public final class net/postchain/eif/EvmEventFetcher : net/postchain/eif/EventFetcher {
 	public static final field Companion Lnet/postchain/eif/EvmEventFetcher$Companion;
 	public static final field DEFAULT_CURSOR_PERSIST_INTERVAL J
-	public fun <init> (JLjava/util/List;ZZLjava/util/List;ZLjava/math/BigInteger;JJLnet/postchain/core/BlockchainEngine;Lnet/postchain/eif/web3j/Web3jRequestHandler;JZLnet/postchain/eif/EvmEventProcessor;Lnet/postchain/eif/EvmReadCursorStore;JLjava/math/BigInteger;JLjava/time/Clock;Lkotlin/jvm/functions/Function2;)V
-	public synthetic fun <init> (JLjava/util/List;ZZLjava/util/List;ZLjava/math/BigInteger;JJLnet/postchain/core/BlockchainEngine;Lnet/postchain/eif/web3j/Web3jRequestHandler;JZLnet/postchain/eif/EvmEventProcessor;Lnet/postchain/eif/EvmReadCursorStore;JLjava/math/BigInteger;JLjava/time/Clock;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (JLjava/util/List;ZZLjava/util/List;ZLjava/math/BigInteger;JJLnet/postchain/core/BlockchainEngine;Lnet/postchain/eif/web3j/Web3jRequestHandler;JZLnet/postchain/eif/EvmEventProcessor;Lnet/postchain/eif/EvmReadCursorStore;JLjava/math/BigInteger;JLjava/time/Clock;Lkotlin/jvm/functions/Function2;Ljava/lang/String;)V
+	public synthetic fun <init> (JLjava/util/List;ZZLjava/util/List;ZLjava/math/BigInteger;JJLnet/postchain/core/BlockchainEngine;Lnet/postchain/eif/web3j/Web3jRequestHandler;JZLnet/postchain/eif/EvmEventProcessor;Lnet/postchain/eif/EvmReadCursorStore;JLjava/math/BigInteger;JLjava/time/Clock;Lkotlin/jvm/functions/Function2;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun flushEvents (Ljava/math/BigInteger;)V
 	public final fun getLastCommittedEvmEventHeight (J[B)Ljava/math/BigInteger;
 	public final fun getLastPersistedCursorHeight ()Ljava/math/BigInteger;
@@ -451,21 +451,23 @@ public final class net/postchain/eif/config/EifEventReceiverConfig {
 }
 
 public final class net/postchain/eif/config/EifEvmChainConfig {
-	public fun <init> (Lnet/postchain/gtv/Gtv;JLjava/util/List;Lnet/postchain/gtv/Gtv;JJJLjava/util/List;)V
+	public fun <init> (Lnet/postchain/gtv/Gtv;JLjava/util/List;Lnet/postchain/gtv/Gtv;JJLjava/lang/String;JLjava/util/List;)V
 	public final fun component1 ()Lnet/postchain/gtv/Gtv;
 	public final fun component2 ()J
 	public final fun component4 ()Lnet/postchain/gtv/Gtv;
 	public final fun component5 ()J
 	public final fun component6 ()J
-	public final fun component7 ()J
-	public final fun component8 ()Ljava/util/List;
-	public final fun copy (Lnet/postchain/gtv/Gtv;JLjava/util/List;Lnet/postchain/gtv/Gtv;JJJLjava/util/List;)Lnet/postchain/eif/config/EifEvmChainConfig;
-	public static synthetic fun copy$default (Lnet/postchain/eif/config/EifEvmChainConfig;Lnet/postchain/gtv/Gtv;JLjava/util/List;Lnet/postchain/gtv/Gtv;JJJLjava/util/List;ILjava/lang/Object;)Lnet/postchain/eif/config/EifEvmChainConfig;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()J
+	public final fun component9 ()Ljava/util/List;
+	public final fun copy (Lnet/postchain/gtv/Gtv;JLjava/util/List;Lnet/postchain/gtv/Gtv;JJLjava/lang/String;JLjava/util/List;)Lnet/postchain/eif/config/EifEvmChainConfig;
+	public static synthetic fun copy$default (Lnet/postchain/eif/config/EifEvmChainConfig;Lnet/postchain/gtv/Gtv;JLjava/util/List;Lnet/postchain/gtv/Gtv;JJLjava/lang/String;JLjava/util/List;ILjava/lang/Object;)Lnet/postchain/eif/config/EifEvmChainConfig;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getContracts ()Ljava/util/List;
 	public final fun getContractsToFetch ()Ljava/util/List;
 	public final fun getEvents ()Lnet/postchain/gtv/Gtv;
 	public final fun getEvmReadOffset ()J
+	public final fun getEvmHeadBlockTag ()Ljava/lang/String;
 	public final fun getNetworkId ()J
 	public final fun getRawGtv ()Lnet/postchain/gtv/Gtv;
 	public final fun getReadOffset ()J
@@ -1221,4 +1223,3 @@ public final class net/postchain/eif/web3j/Web3jServiceFactory {
 	public final fun buildServices (Ljava/util/List;JJJLnet/postchain/common/BlockchainRid;)Ljava/util/List;
 	public final fun buildServicesMap (Ljava/util/List;JJJLnet/postchain/common/BlockchainRid;)Ljava/util/Map;
 }
-

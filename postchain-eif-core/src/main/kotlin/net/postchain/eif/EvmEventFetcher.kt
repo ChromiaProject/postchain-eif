@@ -33,6 +33,7 @@ import net.postchain.gtv.GtvNull
 import org.web3j.abi.EventEncoder
 import org.web3j.abi.datatypes.Event
 import org.web3j.protocol.core.DefaultBlockParameter
+import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.methods.request.EthFilter
 import org.web3j.protocol.core.methods.response.EthLog
 import org.web3j.protocol.core.methods.response.Log
@@ -73,6 +74,7 @@ class EvmEventFetcher(
         private val cursorPersistInterval: Long = DEFAULT_CURSOR_PERSIST_INTERVAL,
         private val clock: Clock = Clock.systemUTC(),
         private val pacingDelay: suspend (Long) -> Unit = { delay(it.milliseconds) },
+        private val evmHeadBlockTag: String = "latest",
 ) : EventFetcher {
     companion object : KLogging() {
         const val DEFAULT_CURSOR_PERSIST_INTERVAL = 10_000L
@@ -205,7 +207,35 @@ class EvmEventFetcher(
 
         val from = evmEventProcessor.lastReadLogBlockHeight + BigInteger.ONE
 
-        val evmHeadHeight = web3jRequestHandler.sendWeb3jRequestWithRetry { it.ethBlockNumber() }.blockNumber
+        val evmHeadHeight = when (evmHeadBlockTag) {
+            "latest" -> web3jRequestHandler.sendWeb3jRequestWithRetry { it.ethBlockNumber() }.blockNumber
+            "finalized" -> try {
+                val response = web3jRequestHandler.sendWeb3jRequestWithRetry {
+                    it.ethGetBlockByNumber(DefaultBlockParameterName.FINALIZED, false)
+                }
+                when {
+                    response.hasError() -> {
+                        logger.warn { "RPC returned an error for the finalized EVM head; skipping this fetch cycle" }
+                        null
+                    }
+                    response.block == null -> {
+                        logger.warn { "RPC returned no finalized EVM block; skipping this fetch cycle" }
+                        null
+                    }
+                    else -> response.block.number
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logger.warn { "Failed to fetch finalized EVM head: ${e.message}; skipping this fetch cycle" }
+                null
+            }
+            else -> throw IllegalStateException("Unsupported EVM head block tag: $evmHeadBlockTag")
+        }
+        if (evmHeadHeight == null) {
+            waitForNewBlocks(cycleStart)
+            return
+        }
         lastSeenEvmHeadHeight = evmHeadHeight
         val currentBlockHeight = evmHeadHeight - evmReadOffset
         reportPendingRewind(from, currentBlockHeight)

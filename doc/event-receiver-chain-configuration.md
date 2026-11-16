@@ -20,7 +20,8 @@ Each entry in `chains` has the following configuration properties:
 | `contracts_to_fetch` | List of smart contracts whose events Event Receiver will listen to                                                                                                                                       | array         | :white_check_mark: |         |
 | `events`             | List of smart contract events that Event Receiver will listen to                                                                                                                                         | gtv           | :white_check_mark: |         |
 | `skip_to_height`     | The block number to skip up to (inclusive). Event querying begins from `skip_to_height + 1`. This is the lower bound for any contract. See note and table below for details.                             | int           |                    | 0       |
-| `evm_read_offset`    | The number of block confirmations required on the EVM network side to be considered final on the Chromia network side. This offset is used to avoid issues caused by potential EVM chain reorganization. | int           |                    | 100     |
+| `evm_read_offset`    | Additional number of blocks to read behind the selected EVM head. Keep a positive offset as an extra margin against reorganizations if desired.                                                                 | int           |                    | 100     |
+| `evm_head_block_tag` | EVM block tag used as the event-reading head: `latest` preserves existing behavior; `finalized` is the recommended secure setting. BSC finality is about 1–2 s; Ethereum finality is about 2 epochs (~16 min). `evm_read_offset` is still applied, so set it to 0 to read the finalized head directly or keep a positive margin. | string        |                    | latest  |
 | `read_offset`        | The processing delay for blocks that have been read. Enables slower nodes to validate blocks.                                                                                                            | int           |                    | 2       |
 
 Each entry in `contracts_to_fetch` has the following configuration properties:
@@ -76,7 +77,7 @@ The reader exposes these metrics, tagged with chain IID, blockchain RID and netw
 |--------------------------------------------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `eif.last_read_evm_block_height`           | gauge   | Last EVM block height read, the reader's position; its events are proposed after `read_offset` more blocks                                                    |
 | `eif.last_seen_evm_head_height`            | gauge   | Last EVM chain head height reported by the RPC node                                                                                                           |
-| `eif.unread_evm_blocks`                    | gauge   | Readable blocks (head minus `evm_read_offset`) not read yet, 0 when caught up                                                                                 |
+| `eif.unread_evm_blocks`                    | gauge   | Readable blocks (selected head tag minus `evm_read_offset`) not read yet, 0 when caught up                                                                   |
 | `eif.last_persisted_evm_block_height`      | gauge   | Height of the last persisted read cursor, a restarted reader resumes after it                                                                                 |
 | `eif.evm_read_rewind_total`                | counter | Times the read position moved backwards, tagged with `reason` (`new_contract`, `validation_conflict`)                                                         |
 | `eif.evm_signer_validation_conflict_total` | counter | Block proposals this node, as a signer, rejected because their EVM blocks differ from the ones it read                                                        |
@@ -260,7 +261,7 @@ EVM Event Receiver node configuration has the following properties.
 
 #### Polling at the EVM chain head
 
-One fetch cycle of the reader costs two RPC requests: `eth_blockNumber` for the head and `eth_getLogs` for the events of the blocks read, up to `${chain}.maxReadAhead` blocks per request. While the reader is behind, cycles follow each other without a pause. Once a cycle has read up to the readable head, the EVM head minus `evm_read_offset`, the next poll is paced:
+One fetch cycle of the reader costs two RPC requests: `eth_blockNumber` for the `latest` head (or `eth_getBlockByNumber` for `finalized`) and `eth_getLogs` for the events of the blocks read, up to `${chain}.maxReadAhead` blocks per request. While the reader is behind, cycles follow each other without a pause. Once a cycle has read up to the readable head, the selected EVM head minus `evm_read_offset`, the next poll is paced:
 
 - A cycle that read new blocks is padded to `${chain}.minPollInterval`, since more blocks are expected.
 - A cycle that found nothing to read, no new blocks or no contracts or events configured, waits `evm.delayWhenNoNewBlocks`, but never less than what is left of `${chain}.minPollInterval`.
@@ -285,7 +286,7 @@ The default `${chain}.minPollInterval` therefore depends on the chain key. The k
 | `arbitrum`    | 0.25 s     | 3000                      | 12              |
 | any other key |            | 1000                      |                 |
 
-The property or the environment variable overrides the default. Raise it to spend fewer requests at the cost of latency, lower it for the opposite; the latency is small next to the confirmation delay of `evm_read_offset` blocks and the receiver chain's own block time. `evm.delayWhenNoNewBlocks` is a node-wide setting shared by every network, so leave it at its default and tune `${chain}.minPollInterval` per network. 0 disables the minimum; on a network whose blocks come faster than a fetch cycle the reader then polls back to back.
+The property or the environment variable overrides the default. Raise it to spend fewer requests at the cost of latency, lower it for the opposite; this polling latency is small next to the selected head's finality delay, any extra margin from `evm_read_offset`, and the receiver chain's own block time. `evm.delayWhenNoNewBlocks` is a node-wide setting shared by every network, so leave it at its default and tune `${chain}.minPollInterval` per network. 0 disables the minimum; on a network whose blocks come faster than a fetch cycle the reader then polls back to back.
 
 
 #### Configuration when running Master-Sub architecture

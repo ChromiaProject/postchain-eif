@@ -38,7 +38,13 @@ class EifSynchronizationInfrastructureExtension(
     private val eventFetchers = mutableMapOf<BlockchainRid, MutableMap<Long, EventFetcher>>()
     private val eifMetricsRegistry = EifMetricsRegistry()
 
-    companion object : KLogging()
+    companion object : KLogging() {
+        internal fun validateEvmHeadBlockTag(evmHeadBlockTag: String) {
+            if (evmHeadBlockTag != "latest" && evmHeadBlockTag != "finalized") {
+                throw UserMistake("evmHeadBlockTag must be either 'latest' or 'finalized'")
+            }
+        }
+    }
 
     override fun connectProcess(process: BlockchainProcess) {
         val engine = process.blockchainEngine
@@ -127,6 +133,7 @@ class EifSynchronizationInfrastructureExtension(
         if (evmChainConfig.skipToHeight < 0) throw UserMistake("skip-to-height for EVM network: $evmChainName is negative")
         if (evmChainConfig.evmReadOffset < 0) throw UserMistake("evmReadOffset cannot be negative")
         if (evmChainConfig.readOffset < 0) throw UserMistake("readOffset cannot be negative")
+        validateEvmHeadBlockTag(evmChainConfig.evmHeadBlockTag)
 
         if ("ignore".equals(evmConfig.urls.first(), ignoreCase = true)) {
             logger.warn("EIF is running in disconnected mode. No events will be fetched from or validated against Ethereum.")
@@ -185,6 +192,7 @@ class EifSynchronizationInfrastructureExtension(
                 readCursorStore,
                 evmConfig.minPollInterval,
                 ignoreReadCursorBelow = BigInteger.valueOf(evmConfig.ignoreReadCursorBelow),
+                evmHeadBlockTag = evmChainConfig.evmHeadBlockTag,
         )
 
         return EventPipeline(eventFetcher, eventProcessor)

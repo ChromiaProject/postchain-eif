@@ -21,6 +21,9 @@ data class EifEvmChainConfig(
         @param:Name("evm_read_offset")
         @param:DefaultValue(defaultLong = 100)
         val evmReadOffset: Long,
+        @param:Name("evm_head_block_tag")
+        @param:DefaultValue(defaultString = "latest")
+        val evmHeadBlockTag: String,
         @param:Name("read_offset")
         @param:DefaultValue(defaultLong = 2)
         val readOffset: Long,
