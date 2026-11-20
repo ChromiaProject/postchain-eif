@@ -36,9 +36,12 @@ contract ChromiaTokenBridge is TokenBridge {
         tokenMinter = _tokenMinter;
     }
 
-    function transferDeposit(IERC20 token, uint256 amount) internal override {
+    function transferDeposit(IERC20 token, uint256 amount) internal override returns (uint256 received) {
+        uint256 balanceBefore = token.balanceOf(address(tokenMinter));
         token.safeTransferFrom(msg.sender, address(tokenMinter), amount);
-        tokenMinter.burn(amount);
+        received = token.balanceOf(address(tokenMinter)) - balanceBefore;
+        require(received > 0, "TokenBridge: no tokens received");
+        tokenMinter.burn(received);
     }
 
     function transferWithdraw(IERC20 token, address beneficiary, uint value) internal override {

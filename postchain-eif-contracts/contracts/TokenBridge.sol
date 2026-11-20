@@ -172,9 +172,9 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
      * @dev Deposit tokens from an EOA. The recipient account on Chromia is derived from the sender's address.
      * Smart contracts should use depositToAccountID() to specify an explicit recipient.
      */
-    function deposit(IERC20 token, uint256 amount) public isAllowToken(token) whenNotPaused whenNotMassExit onlyEOA returns (bool) {
-        transferDeposit(token, amount);
-        emit DepositedERC20(msg.sender, token, amount, 0x0); // accountID will be determined from sender
+    function deposit(IERC20 token, uint256 amount) public isAllowToken(token) whenNotPaused whenNotMassExit onlyEOA nonReentrant returns (bool) {
+        uint256 received = transferDeposit(token, amount);
+        emit DepositedERC20(msg.sender, token, received, 0x0); // accountID will be determined from sender
         return true;
     }
 
@@ -205,11 +205,12 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         whenNotPaused
         whenNotMassExit
         onlyContract
+        nonReentrant
         returns (bool)
     {
         require(accountID != bytes32(0), "TokenBridge: invalid accountID, cannot be zero.");
-        transferDeposit(token, amount);
-        emit DepositedERC20(msg.sender, token, amount, accountID);
+        uint256 received = transferDeposit(token, amount);
+        emit DepositedERC20(msg.sender, token, received, accountID);
         return true;
     }
 
@@ -217,8 +218,11 @@ contract TokenBridge is Initializable, PausableUpgradeable, Ownable2StepUpgradea
         emit LinkAccountID(msg.sender, accountID, isContract(msg.sender));
     }
 
-    function transferDeposit(IERC20 token, uint256 amount) internal virtual {
+    function transferDeposit(IERC20 token, uint256 amount) internal virtual returns (uint256 received) {
+        uint256 balanceBefore = token.balanceOf(address(this));
         token.safeTransferFrom(msg.sender, address(this), amount);
+        received = token.balanceOf(address(this)) - balanceBefore;
+        require(received > 0, "TokenBridge: no tokens received");
     }
 
     /**

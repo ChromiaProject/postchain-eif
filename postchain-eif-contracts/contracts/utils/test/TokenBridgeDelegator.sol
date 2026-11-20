@@ -21,6 +21,10 @@ contract TokenBridgeDelegator {
         return _bridge.deposit(token, amount);
     }
 
+    function depositToAccountID(IERC20 token, uint256 amount, bytes32 accountID) public returns (bool) {
+        return _bridge.depositToAccountID(token, amount, accountID);
+    }
+
     function withdrawRequest(
         bytes memory _event,
         Data.Proof memory eventProof,
