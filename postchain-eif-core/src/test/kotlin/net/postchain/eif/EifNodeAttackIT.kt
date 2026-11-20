@@ -5,6 +5,7 @@ import net.postchain.base.SpecialTransactionPosition
 import net.postchain.base.TxEventSink
 import net.postchain.common.hexStringToByteArray
 import net.postchain.common.exception.UserMistake
+import net.postchain.common.toHex
 import net.postchain.common.wrap
 import net.postchain.concurrent.util.get
 import net.postchain.core.TxEContext
@@ -13,6 +14,7 @@ import net.postchain.eif.contracts.TokenBridgeWithSnapshotWithdraw
 import net.postchain.gtv.Gtv
 import net.postchain.gtv.GtvFactory.gtv
 import net.postchain.gtx.GTXModuleAware
+import org.apache.logging.log4j.Level
 import org.awaitility.Awaitility.await
 import org.awaitility.Duration
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -62,9 +64,54 @@ abstract class EifNodeAttackTestBase : EifNodeTestBase() {
                     .module.getSpecialTxExtensions()
                     .filterIsInstance<EifSpecialTxExtension>().first()
 
+    protected fun assertSignerConfiguration(signerNodes: List<PostchainTestNode>) {
+        val expectedSigners = signerNodes
+                .map { it.pubKey.hexStringToByteArray().toHex() }
+                .sorted()
+        val expectedSignerKeys = signerNodes.map { it.pubKey.uppercase() }.toSet()
+        nodes.forEach { testNode ->
+            val process = testNode.getBlockchainInstance(chainId)
+            assertEquals(
+                    testNode.pubKey.uppercase() in expectedSignerKeys,
+                    process.isSigner(),
+                    "unexpected validator role for node ${testNode.pubKey}",
+            )
+            assertEquals(
+                    expectedSigners,
+                    process.blockchainEngine.getConfiguration().signers.map { it.toHex() }.sorted(),
+                    "unexpected chain signer list on node ${testNode.pubKey}",
+            )
+        }
+    }
+
+    protected fun fabricatedDeposit(expected: EvmBlockOp, transactionHash: ByteArray): EvmBlockOp {
+        val eventFields = expected.events.single().asArray().toMutableList()
+        val nonIndexedValues = eventFields[6].asArray().toMutableList()
+        eventFields[0] = gtv(transactionHash)
+        nonIndexedValues[0] = gtv(BigInteger.valueOf(999))
+        eventFields[6] = gtv(nonIndexedValues)
+        return expected.copy(events = listOf(gtv(eventFields)))
+    }
+
+    protected fun getAssetBalanceAt(testNode: PostchainTestNode): BigInteger? {
+        val balance = testNode.getBlockchainInstance(chainId).blockchainEngine.getBlockQueries().query(
+                "ft4.get_asset_balance",
+                gtv("account_id" to gtv(aliceAccount.accountId), "asset_id" to gtv(assetId)),
+        ).get()
+        return if (balance.isNull()) null else balance["amount"]!!.asBigInteger()
+    }
+
     protected fun assertRejectedByActualValidator(proposal: EvmBlockOp, expectedMessage: String) {
-        val engine = node.getBlockchainInstance(chainId).blockchainEngine
-        val nextBlockHeight = node.blockQueries().getLastBlockHeight().get()!! + 1
+        assertRejectedByActualValidator(node, proposal, expectedMessage)
+    }
+
+    protected fun assertRejectedByActualValidator(
+            testNode: PostchainTestNode,
+            proposal: EvmBlockOp,
+            expectedMessage: String,
+    ) {
+        val engine = testNode.getBlockchainInstance(chainId).blockchainEngine
+        val nextBlockHeight = engine.getBlockQueries().getLastBlockHeight().get() + 1
         val executionContext = engine.blockBuilderStorage.openReadConnection(chainId)
         val blockContext = BaseBlockEContext(
                 executionContext,
@@ -73,12 +120,12 @@ abstract class EifNodeAttackTestBase : EifNodeTestBase() {
                 System.currentTimeMillis(),
                 emptyMap(),
                 object : TxEventSink {
-                    override fun processEmittedEvent(ctx: TxEContext, topic: String, data: Gtv) = Unit
+                    override fun processEmittedEvent(ctxt: TxEContext, type: String, data: Gtv) = Unit
                 },
         )
         val failure = try {
             assertThrows(UserMistake::class.java) {
-                eventExtension(node).validateSpecialOperations(
+                eventExtension(testNode).validateSpecialOperations(
                         SpecialTransactionPosition.Begin,
                         blockContext,
                         listOf(proposal.toOpData()),
@@ -283,4 +330,215 @@ class EifNodeFabricatedEventIT : EifNodeAttackTestBase() {
         val lastEvmBlock = blockQuery.query("get_last_evm_block", gtv("network_id" to gtv(networkId))).get()
         assertEquals(expected.evmBlockHeight.toLong(), lastEvmBlock["evm_block_height"]!!.asInteger())
     }
+}
+
+@Testcontainers(disabledWithoutDocker = true)
+class EifNodeByzantineMultiNodeIT : EifNodeAttackTestBase() {
+
+    @Test
+    fun `E4 four validators reject a Byzantine fabricated deposit and continue with the real deposit`() {
+        deployBridgeAndToken()
+        startPostchain(
+                nodeCount = 4,
+                maxEventDelay = 300_000,
+                numberOfEventsToTriggerBlockBuilding = 100,
+        )
+        assertEquals(4, nodes.size)
+        assertSignerConfiguration(nodes)
+        configureHbridge()
+
+        val (expected, transactionHash) = configuredDeposit()
+        val honestNodes = nodes.drop(1)
+        val honestProcessors = honestNodes.map(::eventProcessor)
+        await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            honestProcessors.forEach { processor ->
+                assertTrue(processor.getEventData().any { it == expected })
+            }
+        }
+
+        val fabricatedTransactionHash = ByteArray(32) { 0xff.toByte() }
+        val fabricatedBlock = fabricatedDeposit(expected, fabricatedTransactionHash)
+
+        val byzantineProcessor = eventProcessor(nodes[0])
+        byzantineProcessor.flushEvents(expected.evmBlockHeight - BigInteger.ONE)
+        byzantineProcessor.processLogEventsAndUpdateOffsets(
+                listOf(fabricatedBlock),
+                expected.evmBlockHeight,
+        )
+        assertEquals(listOf(fabricatedBlock), byzantineProcessor.getEventData())
+
+        val logAppender = TestLogAppender.addAppender(listOf(Level.ERROR, Level.WARN))
+        logAppender.clear()
+        val attemptedHeight = getLastHeight(honestNodes.first()) + 1
+        buildBlockNoWait(listOf(nodes[0]), chainId, attemptedHeight)
+        await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            assertTrue(
+                    listOf(Level.ERROR, Level.WARN).sumOf { level ->
+                        logAppender.countEvents(
+                                level,
+                                "Events in received block ${expected.evmBlockHeight} do not match expected events",
+                        )
+                    } >= honestNodes.size,
+                    "not every honest validator logged rejection of the Byzantine event proposal")
+        }
+
+        nodes.forEach { testNode ->
+            val queries = testNode.getBlockchainInstance(chainId).blockchainEngine.getBlockQueries()
+            val balance = getAssetBalanceAt(testNode)
+            assertTrue(
+                    balance == null || balance == BigInteger.ZERO,
+                    "fabricated deposit was credited before the real proposal on node ${testNode.pubKey}: $balance",
+            )
+            assertTrue(queries.query("get_last_evm_block", gtv("network_id" to gtv(networkId))).get().isNull())
+            assertEquals(attemptedHeight - 1, getLastHeight(testNode), "validator accepted the Byzantine block")
+            val fakeDeposit = queries.query(
+                    "eif.hbridge.get_erc20_deposit_by_evm_tx_hash",
+                    gtv(
+                            "evm_tx_hash" to gtv(fabricatedTransactionHash),
+                            "evm_log_index" to gtv(expected.events.single().asArray()[1].asBigInteger()),
+                    ),
+            ).get()
+            assertTrue(fakeDeposit.isNull(), "fabricated deposit was recorded on node ${testNode.pubKey}")
+        }
+
+        await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            honestProcessors.forEach { processor ->
+                assertTrue(processor.getEventData().any { it == expected }, "honest validator did not retain the real EVM deposit")
+            }
+        }
+        eventExtension(nodes[0]).pipelines.getValue(networkId).fetcher.flushEvents(
+                expected.evmBlockHeight - BigInteger.ONE,
+        )
+        await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            assertEquals(listOf(expected), byzantineProcessor.getEventData())
+        }
+        buildBlockNoWait(nodes, chainId, attemptedHeight)
+        await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            nodes.forEach { testNode ->
+                assertEquals(attemptedHeight, getLastHeight(testNode))
+            }
+        }
+        honestNodes.forEach { honestNode ->
+            assertEquals(BigInteger.valueOf(100), getAssetBalanceAt(honestNode))
+            val queries = honestNode.getBlockchainInstance(chainId).blockchainEngine.getBlockQueries()
+            val lastEvmBlock = queries.query("get_last_evm_block", gtv("network_id" to gtv(networkId))).get()
+            assertEquals(expected.evmBlockHeight.toLong(), lastEvmBlock["evm_block_height"]!!.asInteger())
+            val deposit = queries.query(
+                    "eif.hbridge.get_erc20_deposit_by_evm_tx_hash",
+                    gtv(
+                            "evm_tx_hash" to gtv(transactionHash.removePrefix("0x").hexStringToByteArray()),
+                            "evm_log_index" to gtv(expected.events.single().asArray()[1].asBigInteger()),
+                    ),
+            ).get()
+            assertFalse(deposit.isNull(), "real EVM deposit was not recorded")
+            assertEquals(BigInteger.valueOf(100), deposit["amount"]!!.asBigInteger())
+        }
+
+        val continuedHeight = attemptedHeight + 1
+        buildBlockNoWait(nodes, chainId, continuedHeight)
+        await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            nodes.forEach { testNode ->
+                assertEquals(continuedHeight, getLastHeight(testNode))
+            }
+        }
+
+        nodes.forEach { testNode ->
+            val balance = getAssetBalanceAt(testNode)
+            assertTrue(
+                    balance == null || balance == BigInteger.ZERO || balance == BigInteger.valueOf(100),
+                    "fabricated deposit was credited on node ${testNode.pubKey}: $balance",
+            )
+            val queries = testNode.getBlockchainInstance(chainId).blockchainEngine.getBlockQueries()
+            val fakeDeposit = queries.query(
+                    "eif.hbridge.get_erc20_deposit_by_evm_tx_hash",
+                    gtv(
+                            "evm_tx_hash" to gtv(fabricatedTransactionHash),
+                            "evm_log_index" to gtv(expected.events.single().asArray()[1].asBigInteger()),
+                    ),
+            ).get()
+            assertTrue(fakeDeposit.isNull(), "fabricated deposit was recorded on node ${testNode.pubKey}")
+        }
+    }
+
+}
+
+@Testcontainers(disabledWithoutDocker = true)
+class EifNodeReplicaValidationIT : EifNodeAttackTestBase() {
+
+    @Test
+    fun `replicas reject a fabricated event proposed by the sole signer`() {
+        deployBridgeAndToken()
+        startPostchain(
+                nodeCount = 4,
+                signerCount = 1,
+                maxEventDelay = 300_000,
+                numberOfEventsToTriggerBlockBuilding = 100,
+        )
+        assertSignerConfiguration(listOf(nodes[0]))
+        configureHbridge()
+
+        val (expected, _) = configuredDeposit()
+        val replicas = nodes.drop(1)
+        val replicaProcessors = replicas.map(::eventProcessor)
+        await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            replicaProcessors.forEach { processor ->
+                assertTrue(processor.getEventData().any { it == expected })
+            }
+        }
+
+        val fabricatedTransactionHash = ByteArray(32) { 0xff.toByte() }
+        val fabricatedBlock = fabricatedDeposit(expected, fabricatedTransactionHash)
+        val soleSignerProcessor = eventProcessor(nodes[0])
+        soleSignerProcessor.processLogEventsAndUpdateOffsets(
+                listOf(fabricatedBlock),
+                soleSignerProcessor.lastReadLogBlockHeight,
+        )
+
+        val logAppender = TestLogAppender.addAppender(listOf(Level.ERROR, Level.WARN))
+        logAppender.clear()
+        val attemptedHeight = getLastHeight(nodes[0]) + 1
+        buildBlockNoWait(listOf(nodes[0]), chainId, attemptedHeight)
+        await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            assertTrue(
+                    listOf(Level.ERROR, Level.WARN).sumOf { level ->
+                        logAppender.countEvents(level, "Exception committing block height $attemptedHeight from peer")
+                    } >= replicas.size,
+                    "not every replica logged rejection of the sole signer's fabricated event",
+            )
+        }
+        await().atMost(Duration.ONE_MINUTE).untilAsserted {
+            assertEquals(attemptedHeight, getLastHeight(nodes[0]))
+        }
+
+        val signerQueries = nodes[0].getBlockchainInstance(chainId).blockchainEngine.getBlockQueries()
+        val signerDeposit = signerQueries.query(
+                "eif.hbridge.get_erc20_deposit_by_evm_tx_hash",
+                gtv(
+                        "evm_tx_hash" to gtv(fabricatedTransactionHash),
+                        "evm_log_index" to gtv(expected.events.single().asArray()[1].asBigInteger()),
+                ),
+        ).get()
+        assertFalse(signerDeposit.isNull(), "sole signer did not commit the fabricated deposit")
+        assertEquals(BigInteger.valueOf(999), signerDeposit["amount"]!!.asBigInteger())
+
+        replicas.forEach { replica ->
+            val queries = replica.getBlockchainInstance(chainId).blockchainEngine.getBlockQueries()
+            assertEquals(attemptedHeight - 1, getLastHeight(replica), "replica accepted the sole signer's block")
+            val balance = getAssetBalanceAt(replica)
+            assertTrue(balance == null || balance == BigInteger.ZERO, "replica credited the fabricated deposit: $balance")
+            assertTrue(
+                    queries.query("get_last_evm_block", gtv("network_id" to gtv(networkId))).get().isNull(),
+                    "replica changed EVM receiver state",
+            )
+            val fakeDeposit = queries.query(
+                    "eif.hbridge.get_erc20_deposit_by_evm_tx_hash",
+                    gtv(
+                            "evm_tx_hash" to gtv(fabricatedTransactionHash),
+                            "evm_log_index" to gtv(expected.events.single().asArray()[1].asBigInteger()),
+                    ),
+            ).get()
+            assertTrue(fakeDeposit.isNull(), "replica recorded the fabricated deposit")
+        }
+    }
+
 }

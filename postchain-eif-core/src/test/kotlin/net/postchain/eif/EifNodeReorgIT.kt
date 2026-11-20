@@ -1,6 +1,7 @@
 package net.postchain.eif
 
 import mu.KotlinLogging
+import net.postchain.base.configuration.KEY_SIGNERS
 import net.postchain.common.hexStringToByteArray
 import net.postchain.concurrent.util.get
 import net.postchain.devtools.PostchainTestNode
@@ -156,13 +157,28 @@ abstract class EifNodeTestBase : HBridgeBaseIntegrationTest() {
 
     protected lateinit var bridgeDeployHeight: BigInteger
 
-    protected fun startPostchain() {
-        configOverrides.setProperty("messaging.port", 0)
-        startManagedSystem(1, 0, restApi = false)
+    protected fun startPostchain(
+            nodeCount: Int = 1,
+            signerCount: Int = nodeCount,
+            maxEventDelay: Long? = null,
+            numberOfEventsToTriggerBlockBuilding: Long? = null,
+    ) {
+        require(signerCount in 1..nodeCount)
+        if (nodeCount == 1) configOverrides.setProperty("messaging.port", 0)
+        startManagedSystem(signerCount, nodeCount - signerCount, restApi = false)
+        val signerNodeIndices = (0 until signerCount).toSet()
+        val replicaNodeIndices = (signerCount until nodeCount).toSet()
+        val blockchainConfiguration = loadConfigWithOffsets(maxEventDelay, numberOfEventsToTriggerBlockBuilding)
+                .asDict().toMutableMap()
+        blockchainConfiguration[KEY_SIGNERS] = gtv(
+                signerNodeIndices.map { gtv(nodes[it].pubKey.hexStringToByteArray()) },
+        )
         chainId = startNewBlockchain(
-                setOf(0),
-                setOf(),
-                rawBlockchainConfiguration = GtvEncoder.encodeGtv(loadConfigWithOffsets()),
+                signerNodeIndices,
+                replicaNodeIndices,
+                rawBlockchainConfiguration = GtvEncoder.encodeGtv(
+                        gtv(blockchainConfiguration),
+                ),
         )
         buildBlock(chainId)
         node = nodes[0]
@@ -194,9 +210,16 @@ abstract class EifNodeTestBase : HBridgeBaseIntegrationTest() {
         sealBlock()
     }
 
-    protected fun loadConfigWithOffsets(): Gtv {
+    protected fun loadConfigWithOffsets(
+            maxEventDelay: Long? = null,
+            numberOfEventsToTriggerBlockBuilding: Long? = null,
+    ): Gtv {
         val config = loadEifBlockchainConfig().asDict().toMutableMap()
         val eif = config["eif"]!!.asDict().toMutableMap()
+        maxEventDelay?.let { eif["max_event_delay"] = gtv(it) }
+        numberOfEventsToTriggerBlockBuilding?.let {
+            eif["number_of_events_to_trigger_block_building"] = gtv(it)
+        }
         val chains = eif["chains"]!!.asDict().toMutableMap()
         val ethereum = chains["ethereum"]!!.asDict().toMutableMap()
         ethereum["evm_read_offset"] = gtv(evmReadOffset)

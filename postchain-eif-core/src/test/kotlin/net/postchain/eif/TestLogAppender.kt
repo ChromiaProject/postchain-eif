@@ -91,6 +91,9 @@ class TestLogAppender(levels: List<Level>) : Appender {
     fun hasEvent(level: Level, message: String): Boolean =
             events.any { it.level == level && it.message.formattedMessage.contains(message) }
 
+    fun countEvents(level: Level, message: String): Int =
+            events.count { it.level == level && it.message.formattedMessage.contains(message) }
+
     fun clear() {
         events.clear()
     }
