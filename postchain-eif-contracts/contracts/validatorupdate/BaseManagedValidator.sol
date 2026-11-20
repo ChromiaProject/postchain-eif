@@ -55,10 +55,7 @@ abstract contract BaseManagedValidator is IManagedValidator {
         if (validatorUpdate.serial <= previousUpdateSerial) revert("Update validators: proof is older or same as previous update");
 
         if (!MerkleProof.verify(proof.merkleProofs, proof.leaf, proof.position, validatorUpdateRoot)) revert("Update validators: invalid merkle proof");
-        // Skip signature validation for first directory chain update
-        if (blockchainRid != _directoryBlockchainRid() || validators.length > 0) {
-            if (!_validateUpdateSignatures(blockRid, signatures, signers)) revert("Update validators: block signature is invalid");
-        }
+        if (!_validateUpdateSignatures(blockRid, signatures, signers)) revert("Update validators: block signature is invalid");
 
         previousUpdateHeight = height;
         previousUpdateSerial = validatorUpdate.serial;
@@ -73,6 +70,7 @@ abstract contract BaseManagedValidator is IManagedValidator {
 
     // update validator list
     function _updateValidators(address[] memory _validators) internal {
+        require(_validators.length > 0, "Validator: validator list cannot be empty");
         bytes32 validatorHash = keccak256(abi.encodePacked(_validators));
         if (currentUpdateHash != bytes32(0)) {
             historicalUpdates[currentUpdateHash] = block.timestamp;
@@ -85,6 +83,7 @@ abstract contract BaseManagedValidator is IManagedValidator {
         validators = _validators;
         for (uint i = 0; i < validators.length; i++) {
             require(validators[i] != address(0), "Validator: validator address cannot be zero");
+            require(!validatorMap[validators[i]], "Validator: duplicate validator");
             validatorMap[validators[i]] = true;
         }
     }

@@ -150,7 +150,7 @@ Not needed, transaction submitter chain is a system chain, thus we only support 
 
 ## Setup
 
-To handle signer updates the first step is to deploy `DirectoryChainValidator.sol` contract to all supported networks.
+To handle signer updates the first step is to deploy `DirectoryChainValidator.sol` contract to all supported networks. Initialize each deployment with the current directory-chain validator addresses using the constructor's `validators` argument; an empty validator set is not accepted, and subsequent updates must be signed by the current set.
 
 Configure tx submitter chain with contract:
 

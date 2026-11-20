@@ -34,39 +34,22 @@ describe("Managed Validator Test", () => {
 
         [validator1, validator2, validator3] = await ethers.getSigners();
         const directoryValidatorFactory = await ethers.getContractFactory("DirectoryChainValidator", validator1) as DirectoryChainValidator__factory;
-        directoryChainValidatorContract = await directoryValidatorFactory.deploy(directoryChainBrid);
+        directoryChainValidatorContract = await directoryValidatorFactory.deploy(directoryChainBrid, [validator1.address]);
 
         const managedValidatorFactory = await ethers.getContractFactory("ManagedValidator", validator1) as ManagedValidator__factory;
         managedValidatorContract = await managedValidatorFactory.deploy(directoryChainValidatorContract);
         await managedValidatorContract.setBlockchainRid(testChainBrid);
-
-        // Set validator1 as initial signer of directory chain
-        const encodedUpdateEvent = ethers.AbiCoder.defaultAbiCoder().encode(
-            ["uint", "bytes32", "address[]"],
-            [1, directoryChainBrid, [validator1.address]]
-        );
-        const proofData = encodeProofData(encodedUpdateEvent, SIGNER_UPDATE_HEADER_KEY_HASH)
-        const blockHeader = encodeBlockHeaderDataForEVM(directoryChainBrid, 0, 0, proofData.extraDataMerkleRoot);
-        const signatures = [await validator1.signMessage(ethers.getBytes(blockHeader.blockRid))];
-        await directoryChainValidatorContract.updateValidators(
-            encodedUpdateEvent,
-            blockHeader.encodedData,
-            signatures,
-            [validator1.address],
-            proofData.encodedExtraProofData,
-            proofData.encodedEventProof
-        );
     });
 
     describe("Updates", async () => {
-        it("Directory chain validator initialization and upgrade", async () => {
+        it("Directory chain validator constructor initialization and upgrade", async () => {
             expect(await directoryChainValidatorContract.isValidator(validator1.address)).eq(true);
             expect(await directoryChainValidatorContract.getValidatorCount()).eq(1);
 
             // Build update to add validator2
             const encodedUpdateEvent = ethers.AbiCoder.defaultAbiCoder().encode(
                 ["uint", "bytes32", "address[]"],
-                [2, directoryChainBrid, [validator1.address, validator2.address]]
+                [1, directoryChainBrid, [validator1.address, validator2.address]]
             );
             const proofData = encodeProofData(encodedUpdateEvent, SIGNER_UPDATE_HEADER_KEY_HASH)
             const blockHeader = encodeBlockHeaderDataForEVM(directoryChainBrid, 0, 0, proofData.extraDataMerkleRoot);
