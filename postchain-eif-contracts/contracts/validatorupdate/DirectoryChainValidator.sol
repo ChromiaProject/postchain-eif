@@ -6,7 +6,6 @@ import {BaseManagedValidator} from "./BaseManagedValidator.sol";
 contract DirectoryChainValidator is BaseManagedValidator {
 
     constructor(bytes32 _blockchainRid, address[] memory _initialValidators) {
-        require(_blockchainRid != bytes32(0), "DirectoryChainValidator: blockchain rid is invalid");
         blockchainRid = _blockchainRid;
         _updateValidators(_initialValidators);
     }

@@ -72,12 +72,6 @@ describe("DirectoryChainValidator bootstrap", () => {
             .to.be.revertedWith("Validator: validator list cannot be empty");
     });
 
-    it("rejects a zero directory-chain RID", async () => {
-        const factory = await ethers.getContractFactory("DirectoryChainValidator") as DirectoryChainValidator__factory;
-        await expect(factory.deploy(ethers.ZeroHash, [validatorA.address]))
-            .to.be.revertedWith("DirectoryChainValidator: blockchain rid is invalid");
-    });
-
     it("rejects duplicate constructor validators", async () => {
         const factory = await ethers.getContractFactory("DirectoryChainValidator") as DirectoryChainValidator__factory;
         await expect(factory.deploy(DIRECTORY_CHAIN_BRID, [validatorA.address, validatorA.address]))

@@ -8,15 +8,28 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
  * 
  * This task deploys a DirectoryChainValidator contract.
  * 
- * @param blockchainRid - The blockchain RID of the directory chain.
+ * @param blockchainRid - Required nonzero 32-byte blockchain RID of the directory chain.
  * @param validators - The initial validator addresses.
  * @param verify - Optional. If set, verifies the deployed contract at Etherscan.
  */
 task("deploy:directoryValidator", "Deploy directory chain validator contract")
-    .addParam("blockchainRid", "Blockchain RID of directory chain")
+    .addOptionalParam("blockchainRid", "Nonzero 32-byte blockchain RID of directory chain")
     .addParam("validators", "Comma-separated initial validator addresses")
     .addFlag("verify", "Verify contracts at Etherscan")
     .setAction(async ({ blockchainRid, validators, verify }, hre) => {
+        const rawBlockchainRid = typeof blockchainRid === "string" ? blockchainRid.trim() : "";
+        if (!rawBlockchainRid) {
+            throw new Error("A nonzero 32-byte directory-chain blockchain RID is required");
+        }
+        const ridHex = rawBlockchainRid.replace(/^0x/i, "");
+        if (!/^[0-9a-f]{64}$/i.test(ridHex)) {
+            throw new Error("Directory-chain blockchain RID must be exactly 32 bytes");
+        }
+        if (/^0{64}$/.test(ridHex)) {
+            throw new Error("Directory-chain blockchain RID must not be all zero");
+        }
+        const directoryChainRid = `0x${ridHex}`;
+
         const initialValidators = validators.split(",").map((validator: string) => validator.trim());
         if (initialValidators.length === 0 || initialValidators.some((validator: string) => validator.length === 0)) {
             throw new Error("Validator list cannot be empty");
@@ -29,7 +42,7 @@ task("deploy:directoryValidator", "Deploy directory chain validator contract")
         }
 
         const validatorFactory = await hre.ethers.getContractFactory("DirectoryChainValidator") as DirectoryChainValidator__factory;
-        const validator = await validatorFactory.deploy(blockchainRid, initialValidators) as DirectoryChainValidator;
+        const validator = await validatorFactory.deploy(directoryChainRid, initialValidators) as DirectoryChainValidator;
         await validator.waitForDeployment();
         const validatorAddress = await validator.getAddress();
         console.log("Validator deployed to: ", validatorAddress);
@@ -39,7 +52,7 @@ task("deploy:directoryValidator", "Deploy directory chain validator contract")
             await delay(30000);
             await hre.run("verify:verify", {
                 address: validatorAddress,
-                constructorArguments: [blockchainRid, initialValidators],
+                constructorArguments: [directoryChainRid, initialValidators],
                 libraries: {},
                 contract: "contracts/validatorupdate/DirectoryChainValidator.sol:DirectoryChainValidator",
             });

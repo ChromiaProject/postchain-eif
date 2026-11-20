@@ -58,6 +58,8 @@ For directory chain validator (if you have deployed your own Chromia network):
 $ yarn deploy:directoryValidator --network sepolia --verify --blockchain-rid {DIRECTORY_CHAIN_RID} --validators {VALIDATOR_0_ADDRESS},{VALIDATOR_1_ADDRESS},{VALIDATOR_2_ADDRESS}
 ```
 
+The directory-chain RID must be a nonzero 32-byte value (64 hexadecimal characters, with or without a `0x` prefix).
+
 Note: If you want to inspect the validator contract, you can use the following commands:
 
 ```sh
