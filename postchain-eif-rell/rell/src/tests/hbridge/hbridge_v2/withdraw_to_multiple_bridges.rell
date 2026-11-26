@@ -287,3 +287,36 @@ function _can_not_withdraw_negative_or_zero_amount_to_evm(ft_asset: assets.asset
         .sign(rell.test.keypairs.alice)
         .run_must_fail("Parameter amount: value must be non-zero positive, actual: -1");
 }
+
+function _pack_v2_with_empty_bridge() {
+    hbridge.pack_withdrawal_event_v2(1, network_id1, CHR.token_address, evm_address, x"", 100L);
+}
+
+function test_pack_withdrawal_event_v2_rejects_empty_bridge_address() {
+    assert_fails(
+        "Bridge address must not be empty for HBridge v2 withdrawals.",
+        _pack_v2_with_empty_bridge(*)
+    );
+}
+
+function test_cross_bridge_withdrawal_events_have_distinct_hashes_and_reject_mismatched_bridge() {
+    val ft_asset = register_ft4_asset(CHR);
+    val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.erc20.bridge_mode.foreign);
+    register_bridge_with_erc20_assets(network_id1, bridge_address1, [erc20]);
+    register_bridge_with_erc20_assets(network_id1, bridge_address2, [erc20]);
+
+    val (auth_descriptor, ft_account, linked_evm_address) = _register_ft_account_and_link_evm_address();
+    val amount = _mint(ft_account, ft_asset);
+
+    // Identical parameters on bridge_address1 vs bridge_address2 must yield distinct v2 event hashes
+    val (_, hash1) = hbridge.pack_withdrawal_event_v2(1, network_id1, CHR.token_address, linked_evm_address, bridge_address1, amount / 4);
+    val (_, hash2) = hbridge.pack_withdrawal_event_v2(1, network_id1, CHR.token_address, linked_evm_address, bridge_address2, amount / 4);
+    assert_not_equals(hash1, hash2);
+
+    // Withdrawing to an unregistered/mismatched bridge_address3 must fail
+    rell.test.tx()
+        .op(auth.external.ft_auth(ft_account.id, auth_descriptor.hash()))
+        .op(hbridge.bridge_ft_asset_to_evm(ft_asset.id, amount / 4, network_id1, linked_evm_address, bridge_address3))
+        .sign(rell.test.keypairs.alice)
+        .run_must_fail("are not registered on network ID 1");
+}

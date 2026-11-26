@@ -1,7 +1,9 @@
 @test module;
 
 import lib.hbridge_admin.*;
+import lib.hbridge;
 import ^.helper_operations.*;
+import tests.hbridge.helpers;
 
 val bridge_admin_account_privkey = rell.test.privkeys.charlie;
 val bridge_admin_account_signer = rell.test.pubkeys.charlie;
@@ -90,4 +92,38 @@ function ft_auth_operation_for(signer: byte_array) {
     );
 
     return ft4.auth.external.ft_auth(descriptor.account.id, descriptor.id);
+}
+
+function test_blacklisted_account_cannot_withdraw_via_bridge_ft4_token_to_evm_contract() {
+    rell.test.tx().op(register_bridge_admin_account()).run();
+    rell.test.tx().op(
+        register_test_account(rell.test.pubkeys.alice),
+        register_asset()
+    ).run();
+
+    val alice_account = ft4.accounts.account_by_id(rell.test.pubkeys.alice.hash());
+    val asset = get_asset();
+    val network_id = 1;
+    val token_address = x"1111111111111111111111111111111111111111";
+    val evm_beneficiary = x"2222222222222222222222222222222222222222";
+
+    rell.test.tx()
+        .op(mint_to(alice_account, 1000))
+        .op(helpers.register_erc20_asset_op(network_id, token_address, asset, hbridge.bridge_mode.foreign, true))
+        .op(
+            ft_auth_operation_for(bridge_admin_account_signer),
+            access_list_control.add_account_id_to_blacklist(alice_account.id)
+        )
+        .sign(bridge_admin_account_privkey)
+        .run();
+
+    assert_false(access_list_control.check_access_list(alice_account.id));
+
+    rell.test.tx()
+        .op(
+            ft_auth_operation_for(rell.test.pubkeys.alice),
+            hbridge.bridge_ft4_token_to_evm_contract(network_id, asset.id, 100, evm_beneficiary, token_address)
+        )
+        .sign(rell.test.privkeys.alice)
+        .run_must_fail("Account id %s not on access list.".format(alice_account.id));
 }

@@ -211,6 +211,10 @@ describe("Managed Validator Test", () => {
                 directoryValidatorFactory.deploy(directoryChainBrid, [ethers.ZeroAddress])
             ).to.rejectedWith("Validator: validator address cannot be zero");
 
+            await expect(
+                directoryValidatorFactory.deploy(directoryChainBrid, [validator1.address, ethers.ZeroAddress])
+            ).to.rejectedWith("Validator: validator address cannot be zero");
+
             // Fresh DirectoryChainValidator initialized with validator1 must reject unsigned / attacker-signed first update
             const freshDirValidator = await directoryValidatorFactory.deploy(directoryChainBrid, [validator1.address]);
             const attackerUpdate = ethers.AbiCoder.defaultAbiCoder().encode(
@@ -240,6 +244,23 @@ describe("Managed Validator Test", () => {
                 proofData.encodedExtraProofData,
                 proofData.encodedEventProof
             )).to.rejectedWith("Validator: signer is not validator");
+
+            // Even a valid validator signature must not allow injecting address(0) into the validator set
+            const zeroAddrUpdate = ethers.AbiCoder.defaultAbiCoder().encode(
+                ["uint", "bytes32", "address[]"],
+                [1, directoryChainBrid, [validator1.address, ethers.ZeroAddress]]
+            );
+            const zeroProof = encodeProofData(zeroAddrUpdate, SIGNER_UPDATE_HEADER_KEY_HASH);
+            const zeroHeader = encodeBlockHeaderDataForEVM(directoryChainBrid, 0, 0, zeroProof.extraDataMerkleRoot);
+            const validSig = [await validator1.signMessage(ethers.getBytes(zeroHeader.blockRid))];
+            await expect(freshDirValidator.updateValidators(
+                zeroAddrUpdate,
+                zeroHeader.encodedData,
+                validSig,
+                [validator1.address],
+                zeroProof.encodedExtraProofData,
+                zeroProof.encodedEventProof
+            )).to.rejectedWith("Validator: validator address cannot be zero");
         });
     });
 });

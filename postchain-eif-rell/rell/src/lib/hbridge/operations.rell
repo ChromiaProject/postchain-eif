@@ -32,7 +32,7 @@ operation bridge_ft4_token_to_evm(network_id: integer, asset_id: byte_array, amo
     require(erc20_asset, "ERC20 token not found for network ID %d and ft4 asset ID %s".format(network_id, asset_id));
 
     val from_account = ft4.auth.authenticate();
-    require(withdraw_check_access_list(from_account.id), "Account id %s not on access list.".format(from_account.id));
+    require(withdraw_check_access_list(from_account.id) ?: true, "Account id %s not on access list.".format(from_account.id));
     require(
         core.evm_eoa_account_link @? { from_account, beneficiary } ??
         or core.evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
@@ -79,7 +79,7 @@ operation bridge_ft_asset_to_evm(
     );
 
     val from_account = ft4.auth.authenticate();
-    require(withdraw_check_access_list(from_account.id), "Account id %s not on access list.".format(from_account.id));
+    require(withdraw_check_access_list(from_account.id) ?: true, "Account id %s not on access list.".format(from_account.id));
     require(
         core.evm_eoa_account_link @? { from_account, beneficiary } ??
         or core.evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
@@ -123,7 +123,7 @@ operation bridge_ft4_token_to_evm_contract(network_id: integer, asset_id: byte_a
     require(erc20_asset, "ERC20 token not found for network ID %d, ft4 asset ID %s, and ERC20 token address %s".format(network_id, asset_id, token_address));
 
     val from_account = ft4.auth.authenticate();
-    require(withdraw_check_access_list(from_account.id), "Account id %s not on access list.".format(from_account.id));
+    require(withdraw_check_access_list(from_account.id) ?: true, "Account id %s not on access list.".format(from_account.id));
 
     require(
         core.evm_eoa_account_link @? { from_account, beneficiary } ??

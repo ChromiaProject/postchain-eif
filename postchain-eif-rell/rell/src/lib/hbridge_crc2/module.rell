@@ -31,7 +31,7 @@ val need_consent_on_deposit = true;
 val zero_recipient_id = x"0000000000000000000000000000000000000000000000000000000000000000";
 
 @extendable
-function deposit_check_access_list(account_id: byte_array): boolean = true;
+function deposit_check_access_list(account_id: byte_array): boolean? = null;
 
 @extendable
-function withdraw_check_access_list(account_id: byte_array): boolean = true;
+function withdraw_check_access_list(account_id: byte_array): boolean? = null;

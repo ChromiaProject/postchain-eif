@@ -14,12 +14,12 @@ namespace ft4 {
 }
 
 @extend(hbridge.deposit_check_access_list)
-function deposit_check_access_list(account_id: byte_array): boolean {
+function deposit_check_access_list(account_id: byte_array): boolean? {
     return check_access_list(account_id);
 }
 
 @extend(hbridge.withdraw_check_access_list)
-function withdraw_check_access_list(account_id: byte_array): boolean {
+function withdraw_check_access_list(account_id: byte_array): boolean? {
     return check_access_list(account_id);
 }
 

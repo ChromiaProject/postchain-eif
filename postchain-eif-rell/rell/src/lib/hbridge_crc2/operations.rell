@@ -69,7 +69,7 @@ function bridge_tokens_to_evm(
         "Bridge address %s or contract address %s are not registered on network ID %d".format(bridge_address, contract_address, network_id)
     );
 
-    require(withdraw_check_access_list(from_account.id), "Account id %s not on access list.".format(from_account.id));
+    require(withdraw_check_access_list(from_account.id) ?: true, "Account id %s not on access list.".format(from_account.id));
     require(
         evm.core.evm_eoa_account_link @? { from_account, beneficiary } ??
         or evm.core.evm_sc_account_link @? { from_account, beneficiary, network_id } ??,
