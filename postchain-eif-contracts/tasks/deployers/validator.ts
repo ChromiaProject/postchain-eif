@@ -13,10 +13,12 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
  */
 task("deploy:directoryValidator", "Deploy directory chain validator contract")
     .addParam("blockchainRid", "Blockchain RID of directory chain")
+    .addParam("validators", "Comma-separated list of initial directory chain validator addresses")
     .addFlag("verify", "Verify contracts at Etherscan")
-    .setAction(async ({ blockchainRid, verify }, hre) => {
+    .setAction(async ({ blockchainRid, validators, verify }, hre) => {
+        const initialValidators = parseValidators(validators);
         const validatorFactory = await hre.ethers.getContractFactory("DirectoryChainValidator") as DirectoryChainValidator__factory;
-        const validator = await validatorFactory.deploy(blockchainRid) as DirectoryChainValidator;
+        const validator = await validatorFactory.deploy(blockchainRid, initialValidators) as DirectoryChainValidator;
         await validator.waitForDeployment();
         const validatorAddress = await validator.getAddress();
         console.log("Validator deployed to: ", validatorAddress);
@@ -26,7 +28,7 @@ task("deploy:directoryValidator", "Deploy directory chain validator contract")
             await delay(30000);
             await hre.run("verify:verify", {
                 address: validatorAddress,
-                constructorArguments: [blockchainRid],
+                constructorArguments: [blockchainRid, initialValidators],
                 libraries: {},
                 contract: "contracts/validatorupdate/DirectoryChainValidator.sol:DirectoryChainValidator",
             });

@@ -34,7 +34,7 @@ describe("Managed Validator Test", () => {
 
         [validator1, validator2, validator3] = await ethers.getSigners();
         const directoryValidatorFactory = await ethers.getContractFactory("DirectoryChainValidator", validator1) as DirectoryChainValidator__factory;
-        directoryChainValidatorContract = await directoryValidatorFactory.deploy(directoryChainBrid);
+        directoryChainValidatorContract = await directoryValidatorFactory.deploy(directoryChainBrid, [validator1.address]);
 
         const managedValidatorFactory = await ethers.getContractFactory("ManagedValidator", validator1) as ManagedValidator__factory;
         managedValidatorContract = await managedValidatorFactory.deploy(directoryChainValidatorContract);
@@ -198,6 +198,48 @@ describe("Managed Validator Test", () => {
             expect(await managedValidatorContract.isValidSignaturesWithHistoricalValidators(
                 signedContent, signaturesToCheck, [validator3.address], [validator3.address], latestBlockTime - 3 * daySeconds
             )).eq(true);
+        });
+
+        it("DirectoryChainValidator rejects empty or zero-address initial validators and requires valid signatures on first update", async () => {
+            const directoryValidatorFactory = await ethers.getContractFactory("DirectoryChainValidator", validator1) as DirectoryChainValidator__factory;
+
+            await expect(
+                directoryValidatorFactory.deploy(directoryChainBrid, [])
+            ).to.rejectedWith("Validator: initial validators cannot be empty");
+
+            await expect(
+                directoryValidatorFactory.deploy(directoryChainBrid, [ethers.ZeroAddress])
+            ).to.rejectedWith("Validator: validator address cannot be zero");
+
+            // Fresh DirectoryChainValidator initialized with validator1 must reject unsigned / attacker-signed first update
+            const freshDirValidator = await directoryValidatorFactory.deploy(directoryChainBrid, [validator1.address]);
+            const attackerUpdate = ethers.AbiCoder.defaultAbiCoder().encode(
+                ["uint", "bytes32", "address[]"],
+                [1, directoryChainBrid, [validator2.address]]
+            );
+            const proofData = encodeProofData(attackerUpdate, SIGNER_UPDATE_HEADER_KEY_HASH);
+            const blockHeader = encodeBlockHeaderDataForEVM(directoryChainBrid, 0, 0, proofData.extraDataMerkleRoot);
+
+            // Empty signatures must fail
+            await expect(freshDirValidator.updateValidators(
+                attackerUpdate,
+                blockHeader.encodedData,
+                [],
+                [],
+                proofData.encodedExtraProofData,
+                proofData.encodedEventProof
+            )).to.rejectedWith("Update validators: block signature is invalid");
+
+            // Attacker signature must fail
+            const attackerSig = [await validator2.signMessage(ethers.getBytes(blockHeader.blockRid))];
+            await expect(freshDirValidator.updateValidators(
+                attackerUpdate,
+                blockHeader.encodedData,
+                attackerSig,
+                [validator2.address],
+                proofData.encodedExtraProofData,
+                proofData.encodedEventProof
+            )).to.rejectedWith("Validator: signer is not validator");
         });
     });
 });

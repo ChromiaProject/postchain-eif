@@ -26,6 +26,12 @@ function test_can_not_call_operation__bridge_ft4_token_to_evm__if_hbridge_uses_v
     ).run_must_fail("Unsupported HBridge version 2 for the `bridge_ft4_token_to_evm` operation. Version 1 is required.");
 }
 
+function test_can_not_call_operation__bridge_ft4_token_to_evm_contract__if_hbridge_uses_v2() {
+    rell.test.tx().op(
+        hbridge.bridge_ft4_token_to_evm_contract(network_id1, x"", 1, evm_address, CHR.token_address)
+    ).run_must_fail("Unsupported HBridge version 2 for the `bridge_ft4_token_to_evm_contract` operation. Version 1 is required.");
+}
+
 function test_withdraw_foreign_asset_to_evm_with_already_linked_account() {
     val ft_asset = register_ft4_asset(CHR);
     val erc20 = register_erc20_asset(ft_asset, CHR, network_id1, bridge_mode = hbridge.bridge_mode.foreign);

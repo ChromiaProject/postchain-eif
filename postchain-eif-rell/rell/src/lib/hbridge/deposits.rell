@@ -11,6 +11,7 @@ entity erc20_deposit {
     index evm_tx_hash: byte_array;
     evm_log_index: big_integer = 0L;
     index evm_tx_hash, evm_log_index;
+    bridge_address: byte_array = x"";
 }
 
 struct erc20_deposit_info {

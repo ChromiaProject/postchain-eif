@@ -186,6 +186,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
             last_updated = op_context.last_block_time,
             evm_tx_hash = event.evm_tx_hash,
             evm_log_index = event.evm_log_index,
+            bridge_address = event.bridge_address,
         );
 
         val creation = ft4.transfer_strategy.pool_assets_with_rules(
@@ -212,6 +213,7 @@ function process_deposit_erc20_event(network_id: integer, event: deposited_erc20
                 last_updated = op_context.last_block_time,
                 evm_tx_hash = event.evm_tx_hash,
                 evm_log_index = event.evm_log_index,
+                bridge_address = event.bridge_address,
             );
             create erc20_completed_deposit_transaction(deposit);
 
@@ -245,7 +247,7 @@ function process_withdrawal_to_postchain_event(network_id: integer, event: withd
 
 // return deposit if we cannot credit it to the account
 function bounce_deposit_event(network_id: integer, event: deposited_erc20_event, reason: text) {
-    val withdrawal = emit_withdrawal_event(network_id, event.token_address, event.sender, event.amount);
+    val withdrawal = emit_withdrawal_event(network_id, event.token_address, event.sender, event.amount, event.bridge_address);
     create bounced_erc20_deposit(
         erc20_withdrawal = withdrawal,
         sender_address = event.sender,

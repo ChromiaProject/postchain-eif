@@ -61,6 +61,7 @@ function pack_withdrawal_event_v2(
     bridge_address: byte_array,
     amount: big_integer
 ): (gtv, byte_array) {
+    require(not bridge_address.empty(), "Bridge address must not be empty for HBridge v2 withdrawals.");
 
     val discriminator = network_contract_discriminator(network_id, bridge_address);
 
